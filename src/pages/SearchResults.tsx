@@ -56,7 +56,7 @@ const SearchResults = () => {
       onClick={() => navigate(`/spot/${spot.id}`)}
     >
       <div className="flex gap-3">
-        <div className="w-16 h-16 rounded-lg bg-muted flex-shrink-0">
+        <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0">
           <img 
             src="/placeholder.svg" 
             alt={spot.title}
@@ -64,17 +64,17 @@ const SearchResults = () => {
           />
         </div>
         
-        <div className="flex-1 space-y-1">
-          <div className="flex justify-between items-start">
-            <h3 className="font-semibold">{spot.title}</h3>
-            <div className="text-right">
-              <p className="font-bold text-primary">${spot.hourlyRate}/hr</p>
+        <div className="flex-1 space-y-2 min-w-0">
+          <div className="flex justify-between items-start gap-2">
+            <h3 className="font-semibold text-base leading-tight">{spot.title}</h3>
+            <div className="text-right flex-shrink-0">
+              <p className="font-bold text-primary text-lg">${spot.hourlyRate}/hr</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <MapPin className="h-3 w-3" />
-            <span>{spot.address}</span>
+          <div className="flex items-start gap-1 text-sm text-muted-foreground">
+            <MapPin className="h-3 w-3 flex-shrink-0 mt-0.5" />
+            <span className="leading-tight">{spot.address}</span>
           </div>
           
           {spot.distance && (
@@ -91,7 +91,7 @@ const SearchResults = () => {
             {spot.status && (
               <Badge 
                 variant={spot.status === 'Available Now' ? 'default' : 'secondary'}
-                className={spot.status === 'Available Now' ? 'bg-green-100 text-green-800' : ''}
+                className={spot.status === 'Available Now' ? 'bg-green-100 text-green-800 text-xs' : 'text-xs'}
               >
                 {spot.status}
               </Badge>
@@ -99,9 +99,9 @@ const SearchResults = () => {
           </div>
 
           {spot.amenities && (
-            <div className="flex gap-1 flex-wrap mt-2">
+            <div className="flex gap-1 flex-wrap">
               {spot.amenities.slice(0, 3).map((amenity, index) => (
-                <Badge key={index} variant="outline" className="text-xs">
+                <Badge key={index} variant="outline" className="text-xs px-1.5 py-0.5">
                   {amenity}
                 </Badge>
               ))}

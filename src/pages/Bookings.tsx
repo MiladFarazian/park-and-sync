@@ -49,42 +49,45 @@ const Bookings = () => {
   const BookingCard = ({ booking, isPast = false }: { booking: any, isPast?: boolean }) => (
     <Card className="p-4">
       <div className="flex gap-3">
-        <div className="w-16 h-16 rounded-lg bg-muted flex-shrink-0">
+        <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0">
           <img 
             src={booking.image} 
             alt={booking.title}
             className="w-full h-full object-cover rounded-lg"
           />
         </div>
-        <div className="flex-1 space-y-1">
-          <div className="flex justify-between items-start">
-            <h3 className="font-semibold">{booking.title}</h3>
-            <div className="text-right">
-              <p className="font-bold">${booking.price}</p>
-              <p className="text-sm text-muted-foreground">{booking.duration}</p>
+        <div className="flex-1 space-y-2 min-w-0">
+          <div className="flex justify-between items-start gap-2">
+            <h3 className="font-semibold text-base leading-tight truncate">{booking.title}</h3>
+            <div className="text-right flex-shrink-0">
+              <p className="font-bold text-lg">${booking.price}</p>
+              <p className="text-xs text-muted-foreground">{booking.duration}</p>
             </div>
           </div>
           
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <MapPin className="h-3 w-3" />
-            <span>{booking.address}</span>
+            <MapPin className="h-3 w-3 flex-shrink-0" />
+            <span className="truncate">{booking.address}</span>
           </div>
           
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <Clock className="h-3 w-3" />
-            <span>{booking.date} • {booking.time}</span>
+          <div className="text-sm text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Clock className="h-3 w-3 flex-shrink-0" />
+              <span>{booking.date}</span>
+            </div>
+            <div className="ml-4 text-xs">{booking.time}</div>
           </div>
           
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-1">
               <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-              <span className="font-medium">{booking.rating}</span>
+              <span className="font-medium text-sm">{booking.rating}</span>
             </div>
             
             {isPast ? (
-              <Button variant="outline" size="sm">Book Again</Button>
+              <Button variant="outline" size="sm" className="text-xs px-3">Book Again</Button>
             ) : (
-              <Button variant="hero" size="sm">View Details</Button>
+              <Button variant="default" size="sm" className="text-xs px-3">View Details</Button>
             )}
           </div>
         </div>

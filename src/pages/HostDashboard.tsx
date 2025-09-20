@@ -36,28 +36,28 @@ const HostDashboard = () => {
   const ListingCard = ({ listing }: { listing: any }) => (
     <Card className="p-4">
       <div className="flex gap-3">
-        <div className="w-16 h-16 rounded-lg bg-muted flex-shrink-0">
+        <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0 relative">
           <img 
             src={listing.image} 
             alt={listing.title}
             className="w-full h-full object-cover rounded-lg"
           />
-          <div className="absolute top-2 left-2">
-            <Badge variant="secondary" className="text-xs">${listing.hourlyRate}/hr</Badge>
+          <div className="absolute top-1 left-1">
+            <Badge variant="secondary" className="text-xs px-1.5 py-0.5">${listing.hourlyRate}/hr</Badge>
           </div>
         </div>
         
-        <div className="flex-1 space-y-1">
-          <div className="flex justify-between items-start">
-            <h3 className="font-semibold">{listing.title}</h3>
-            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+        <div className="flex-1 space-y-2 min-w-0">
+          <div className="flex justify-between items-start gap-2">
+            <h3 className="font-semibold text-base leading-tight">{listing.title}</h3>
+            <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-xs flex-shrink-0">
               {listing.status}
             </Badge>
           </div>
           
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <MapPin className="h-3 w-3" />
-            <span>{listing.address}</span>
+            <MapPin className="h-3 w-3 flex-shrink-0" />
+            <span className="truncate">{listing.address}</span>
           </div>
           
           <div className="flex items-center gap-1 text-sm">
@@ -66,14 +66,14 @@ const HostDashboard = () => {
             <span className="text-muted-foreground">({listing.reviews})</span>
           </div>
           
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between pt-1">
             <p className="font-bold text-lg">${listing.earnings.toFixed(2)}</p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="text-xs px-2 py-1">
                 <Edit className="h-3 w-3 mr-1" />
                 Edit
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="text-xs px-2 py-1">
                 <Eye className="h-3 w-3 mr-1" />
                 View
               </Button>
@@ -100,7 +100,7 @@ const HostDashboard = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 gap-4">
-        <Card className="p-4 bg-gradient-primary text-primary-foreground">
+        <Card className="p-4 bg-primary text-primary-foreground">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
@@ -116,7 +116,7 @@ const HostDashboard = () => {
           </div>
         </Card>
         
-        <Card className="p-4 bg-gradient-primary text-primary-foreground">
+        <Card className="p-4 bg-primary text-primary-foreground">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />

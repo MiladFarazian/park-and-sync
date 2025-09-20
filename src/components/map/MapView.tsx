@@ -93,7 +93,7 @@ const MapView = ({ spots }: MapViewProps) => {
         <div className="absolute bottom-4 left-4 right-4">
           <Card className="p-4 bg-background/95 backdrop-blur-sm">
             <div className="flex gap-3">
-              <div className="w-16 h-16 rounded-lg bg-muted flex-shrink-0">
+              <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0">
                 <img 
                   src="/placeholder.svg" 
                   alt={selectedSpot.title}
@@ -101,54 +101,56 @@ const MapView = ({ spots }: MapViewProps) => {
                 />
               </div>
               
-              <div className="flex-1 space-y-1">
-                <div className="flex justify-between items-start">
-                  <h3 className="font-semibold">{selectedSpot.title}</h3>
-                  <div className="text-right">
-                    <p className="font-bold text-primary">${selectedSpot.hourlyRate}/hr</p>
+              <div className="flex-1 space-y-2 min-w-0">
+                <div className="flex justify-between items-start gap-2">
+                  <h3 className="font-semibold text-base leading-tight">{selectedSpot.title}</h3>
+                  <div className="text-right flex-shrink-0">
+                    <p className="font-bold text-primary text-lg">${selectedSpot.hourlyRate}/hr</p>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <MapPin className="h-3 w-3" />
-                  <span className="truncate">{selectedSpot.address}</span>
+                <div className="flex items-start gap-1 text-sm text-muted-foreground">
+                  <MapPin className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                  <span className="leading-tight">{selectedSpot.address}</span>
                 </div>
                 
                 {selectedSpot.distance && (
                   <p className="text-sm text-muted-foreground">{selectedSpot.distance} • {selectedSpot.walkTime}</p>
                 )}
                 
-                <div className="flex items-center gap-1">
-                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                  <span className="font-medium text-sm">{selectedSpot.rating}</span>
-                  <span className="text-muted-foreground text-sm">({selectedSpot.reviews})</span>
-                </div>
-
-                {selectedSpot.amenities && (
-                  <div className="flex gap-1 flex-wrap">
-                    {selectedSpot.amenities.slice(0, 3).map((amenity, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {amenity}
-                      </Badge>
-                    ))}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                    <span className="font-medium text-sm">{selectedSpot.rating}</span>
+                    <span className="text-muted-foreground text-sm">({selectedSpot.reviews})</span>
                   </div>
-                )}
+
+                  {selectedSpot.amenities && (
+                    <div className="flex gap-1">
+                      {selectedSpot.amenities.slice(0, 2).map((amenity, index) => (
+                        <Badge key={index} variant="outline" className="text-xs px-1.5 py-0.5">
+                          {amenity}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             
-            <div className="flex gap-2 mt-4">
+            <div className="flex gap-3 mt-4">
               <Button 
                 variant="outline" 
-                className="flex-1"
+                className="flex-1 text-sm"
                 onClick={() => navigate(`/spot/${selectedSpot.id}`)}
               >
                 View Details
               </Button>
               <Button 
-                className="flex-1"
+                className="flex-1 text-sm"
                 onClick={() => navigate(`/book/${selectedSpot.id}`)}
               >
-                <Navigation className="h-4 w-4 mr-2" />
+                <Navigation className="h-4 w-4 mr-1" />
                 Book Now
               </Button>
             </div>

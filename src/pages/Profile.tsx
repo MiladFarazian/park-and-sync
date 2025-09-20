@@ -60,8 +60,8 @@ const Profile = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header with gradient background */}
-      <div className="bg-gradient-primary text-primary-foreground p-6 rounded-b-2xl">
+      {/* Header with solid blue background */}
+      <div className="bg-primary text-primary-foreground p-6 rounded-b-2xl">
         <div className="flex justify-between items-start mb-6">
           <h1 className="text-2xl font-bold">Profile</h1>
           <Button variant="secondary" size="sm">
@@ -81,18 +81,18 @@ const Profile = () => {
             </div>
           </div>
           
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <h2 className="text-xl font-bold">John Doe</h2>
-            <p className="text-primary-foreground/80">Member since March 2022</p>
+            <p className="text-primary-foreground/80 text-sm">Member since March 2022</p>
             <div className="flex items-center gap-1 mt-1">
               <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
               <span className="font-semibold">4.8</span>
-              <span className="text-primary-foreground/80">(28 reviews)</span>
+              <span className="text-primary-foreground/80 text-sm">(28 reviews)</span>
             </div>
           </div>
           
-          <Button variant="secondary" size="sm">
-            <Edit className="h-4 w-4 mr-2" />
+          <Button variant="secondary" size="sm" className="flex-shrink-0">
+            <Edit className="h-4 w-4 mr-1" />
             Edit
           </Button>
         </div>
