@@ -32,6 +32,7 @@ const MapView = ({ spots }: MapViewProps) => {
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [mapReady, setMapReady] = useState(false);
 
   // Fetch Mapbox token
   useEffect(() => {
@@ -68,11 +69,16 @@ const MapView = ({ spots }: MapViewProps) => {
 
     // Add navigation controls
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    // Mark map as ready when loaded
+    map.current.on('load', () => {
+      setMapReady(true);
+    });
   }, [mapboxToken, spots]);
 
   // Add markers for spots
   useEffect(() => {
-    if (!map.current || !spots.length) return;
+    if (!map.current || !spots.length || !mapReady) return;
 
     console.log('Adding markers for spots:', spots);
 
@@ -150,7 +156,7 @@ const MapView = ({ spots }: MapViewProps) => {
     }
 
     console.log('Added', markers.current.length, 'markers to map');
-  }, [spots]);
+  }, [spots, mapReady]);
 
   const handleSpotClick = (spot: Spot) => {
     setSelectedSpot(spot);
