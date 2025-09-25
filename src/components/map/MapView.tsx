@@ -70,7 +70,7 @@ const MapView = ({ spots, onVisibleSpotsChange }: MapViewProps) => {
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12', 
       center: center,
-      zoom: 13 // Closer zoom for neighborhood level
+      zoom: 14 // Start at neighborhood zoom level
     });
 
     // Add navigation controls
@@ -200,11 +200,11 @@ const MapView = ({ spots, onVisibleSpotsChange }: MapViewProps) => {
     const layerBounds = new mapboxgl.LngLatBounds();
     (features as any).forEach((f: any) => layerBounds.extend(f.geometry.coordinates as [number, number]));
     if (!layerBounds.isEmpty()) {
-      // Use higher minZoom for neighborhood focus, lower maxZoom to allow zooming out
+      // For neighborhood searches, maintain close zoom
       map.current.fitBounds(layerBounds, { 
         padding: { top: 80, bottom: 120, left: 80, right: 80 }, 
-        minZoom: 12,
-        maxZoom: 15, 
+        minZoom: 13, // Higher min zoom to stay at neighborhood level
+        maxZoom: 16, 
         duration: 600 
       });
     }
