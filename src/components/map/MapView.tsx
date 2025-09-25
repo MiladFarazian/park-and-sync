@@ -56,19 +56,14 @@ const MapView = ({ spots }: MapViewProps) => {
 
     mapboxgl.accessToken = mapboxToken;
 
-    // Calculate center point from spots
-    const center: [number, number] = spots.length > 0 
-      ? [
-          spots.reduce((sum, spot) => sum + Number(spot.lng), 0) / spots.length,
-          spots.reduce((sum, spot) => sum + Number(spot.lat), 0) / spots.length
-        ]
-      : [-118.2437, 34.0522]; // Default to LA
-
+    // Calculate center point for all of LA
+    const laCenter: [number, number] = [-118.2437, 34.0522]; // Central LA coordinates
+    
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
-      center: center,
-      zoom: 11
+      style: 'mapbox://styles/mapbox/streets-v12', 
+      center: laCenter,
+      zoom: 10
     });
 
     // Add navigation controls
@@ -93,28 +88,42 @@ const MapView = ({ spots }: MapViewProps) => {
       markerElement.className = 'relative cursor-pointer';
       markerElement.innerHTML = `
         <div style="
-          background-color: hsl(var(--primary));
-          color: hsl(var(--primary-foreground));
-          padding: 4px 12px;
-          border-radius: 9999px;
-          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-          font-weight: 600;
-          font-size: 14px;
-          white-space: nowrap;
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         ">
-          $${spot.hourlyRate}/hr
+          <div style="
+            width: 40px;
+            height: 40px;
+            background-color: hsl(var(--primary));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border: 3px solid white;
+            position: relative;
+          ">
+            <div style="
+              color: white;
+              font-weight: 700;
+              font-size: 11px;
+            ">$${spot.hourlyRate}</div>
+          </div>
+          <div style="
+            position: absolute;
+            top: 32px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 12px solid hsl(var(--primary));
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+          "></div>
         </div>
-        <div style="
-          position: absolute;
-          top: 100%;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 0;
-          height: 0;
-          border-left: 4px solid transparent;
-          border-right: 4px solid transparent;
-          border-top: 4px solid hsl(var(--primary));
-        "></div>
       `;
 
       // Create marker
