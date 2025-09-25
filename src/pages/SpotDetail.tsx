@@ -15,6 +15,23 @@ import sunsetStrip from '@/assets/sunset-strip.jpg';
 import rodeoDrive from '@/assets/rodeo-drive.jpg';
 import veniceBeach from '@/assets/venice-beach.jpg';
 import staplesCenter from '@/assets/staples-center.jpg';
+import vermontExpositionLot from '@/assets/vermont-exposition-lot.jpg';
+import westAdamsMansion from '@/assets/west-adams-mansion.jpg';
+import mainStreetVeniceBorder from '@/assets/main-street-venice-border.jpg';
+import picoBusinessHub from '@/assets/pico-business-hub.jpg';
+import smcCollegeArea from '@/assets/smc-college-area.jpg';
+import wilshireOfficeComplex from '@/assets/wilshire-office-complex.jpg';
+import melroseDesignDistrict from '@/assets/melrose-design-district.jpg';
+import santaMonicaBlvdHub from '@/assets/santa-monica-blvd-hub.jpg';
+import beverlyHillsCityHall from '@/assets/beverly-hills-city-hall.jpg';
+import abbotKinneyCreative from '@/assets/abbot-kinney-creative.jpg';
+import veniceCanalsHistoric from '@/assets/venice-canals-historic.jpg';
+import artsDistrictLoft from '@/assets/arts-district-loft.jpg';
+import grandCentralMarket from '@/assets/grand-central-market.jpg';
+import littleTokyoCultural from '@/assets/little-tokyo-cultural.jpg';
+import financialDistrictHighrise from '@/assets/financial-district-highrise.jpg';
+import hollywoodWalkFame from '@/assets/hollywood-walk-fame.jpg';
+import griffithObservatoryArea from '@/assets/griffith-observatory-area.jpg';
 
 const SpotDetail = () => {
   const navigate = useNavigate();
@@ -33,7 +50,24 @@ const SpotDetail = () => {
     '/src/assets/sunset-strip.jpg': sunsetStrip,
     '/src/assets/rodeo-drive.jpg': rodeoDrive,
     '/src/assets/venice-beach.jpg': veniceBeach,
-    '/src/assets/staples-center.jpg': staplesCenter
+    '/src/assets/staples-center.jpg': staplesCenter,
+    '/src/assets/vermont-exposition-lot.jpg': vermontExpositionLot,
+    '/src/assets/west-adams-mansion.jpg': westAdamsMansion,
+    '/src/assets/main-street-venice-border.jpg': mainStreetVeniceBorder,
+    '/src/assets/pico-business-hub.jpg': picoBusinessHub,
+    '/src/assets/smc-college-area.jpg': smcCollegeArea,
+    '/src/assets/wilshire-office-complex.jpg': wilshireOfficeComplex,
+    '/src/assets/melrose-design-district.jpg': melroseDesignDistrict,
+    '/src/assets/santa-monica-blvd-hub.jpg': santaMonicaBlvdHub,
+    '/src/assets/beverly-hills-city-hall.jpg': beverlyHillsCityHall,
+    '/src/assets/abbot-kinney-creative.jpg': abbotKinneyCreative,
+    '/src/assets/venice-canals-historic.jpg': veniceCanalsHistoric,
+    '/src/assets/arts-district-loft.jpg': artsDistrictLoft,
+    '/src/assets/grand-central-market.jpg': grandCentralMarket,
+    '/src/assets/little-tokyo-cultural.jpg': littleTokyoCultural,
+    '/src/assets/financial-district-highrise.jpg': financialDistrictHighrise,
+    '/src/assets/hollywood-walk-fame.jpg': hollywoodWalkFame,
+    '/src/assets/griffith-observatory-area.jpg': griffithObservatoryArea
   };
 
   useEffect(() => {
