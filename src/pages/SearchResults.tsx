@@ -1,54 +1,93 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Map, List, Filter, Star, MapPin } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Map, List, Filter, Star, MapPin, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import MapView from '@/components/map/MapView';
 
 const SearchResults = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
+  const [parkingSpots, setParkingSpots] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const parkingSpots = [
-    {
-      id: 1,
-      title: 'Premium Downtown Garage',
-      address: '123 Main St',
-      hourlyRate: 8,
-      rating: 4.9,
-      reviews: 124,
-      status: 'Available Now',
-      lat: 37.7749,
-      lng: -122.4194,
-      amenities: ['Covered', 'Security Camera', '24/7 Access']
-    },
-    {
-      id: 2,
-      title: 'Central Mall Parking',
-      address: '100 Mall Center Drive, San Francisco, CA 94103',
-      hourlyRate: 6,
-      rating: 4.6,
-      reviews: 89,
-      distance: '1.1 mi',
-      walkTime: '15 min walk',
-      lat: 37.7849,
-      lng: -122.4094,
-      amenities: ['Shopping Access', 'Food Court', 'Restrooms']
-    },
-    {
-      id: 3,
-      title: 'Safe Residential Driveway',
-      address: '456 Oak Ave',
-      hourlyRate: 5,
-      rating: 4.8,
-      reviews: 67,
-      status: 'Available in 30 min',
-      lat: 37.7649,
-      lng: -122.4294,
-      amenities: ['Residential', 'Well Lit', 'Easy Access']
+  // Get search parameters
+  const location = searchParams.get('location') || 'Downtown San Francisco';
+  const checkIn = searchParams.get('checkIn') || '';
+  const checkOut = searchParams.get('checkOut') || '';
+
+  useEffect(() => {
+    searchParkingSpots();
+  }, [location, checkIn, checkOut]);
+
+  const searchParkingSpots = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Default to San Francisco coordinates
+      const latitude = 37.7749;
+      const longitude = -122.4194;
+      
+      // Create start and end times for the search
+      const startTime = new Date(`${checkIn}T09:00:00.000Z`).toISOString();
+      const endTime = new Date(`${checkOut}T18:00:00.000Z`).toISOString();
+
+      console.log('Searching spots with params:', {
+        latitude,
+        longitude,
+        start_time: startTime,
+        end_time: endTime
+      });
+
+      const { data, error } = await supabase.functions.invoke('search-spots', {
+        body: {
+          latitude,
+          longitude,
+          radius: 5000, // 5km radius
+          start_time: startTime,
+          end_time: endTime
+        }
+      });
+
+      if (error) {
+        console.error('Search error:', error);
+        setError('Failed to search parking spots');
+        return;
+      }
+
+      console.log('Search results:', data);
+
+      // Transform the data to match our component structure
+      const transformedSpots = data.spots?.map((spot: any) => ({
+        id: spot.id,
+        title: spot.title,
+        address: spot.address,
+        hourlyRate: parseFloat(spot.hourly_rate),
+        rating: parseFloat(spot.profiles?.rating || 0),
+        reviews: spot.profiles?.review_count || 0,
+        lat: parseFloat(spot.latitude),
+        lng: parseFloat(spot.longitude),
+        distance: spot.distance ? `${(spot.distance / 1000).toFixed(1)} km` : undefined,
+        amenities: [
+          ...(spot.has_ev_charging ? ['EV Charging'] : []),
+          ...(spot.is_covered ? ['Covered'] : []),
+          ...(spot.is_secure ? ['Secure'] : []),
+        ]
+      })) || [];
+
+      setParkingSpots(transformedSpots);
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      setError('An unexpected error occurred');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const SpotCard = ({ spot, isSelected = false }: { spot: any, isSelected?: boolean }) => (
     <Card 
@@ -122,8 +161,10 @@ const SearchResults = () => {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="font-semibold">4 spots nearby</h1>
-              <p className="text-sm text-muted-foreground">Downtown San Francisco</p>
+              <h1 className="font-semibold">
+                {loading ? 'Searching...' : `${parkingSpots.length} spots nearby`}
+              </h1>
+              <p className="text-sm text-muted-foreground">{location}</p>
             </div>
           </div>
           
@@ -156,7 +197,28 @@ const SearchResults = () => {
       </div>
 
       {/* Content */}
-      {viewMode === 'map' ? (
+      {loading ? (
+        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+            <p className="text-muted-foreground">Searching for parking spots...</p>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+          <div className="text-center space-y-4">
+            <p className="text-red-500">{error}</p>
+            <Button onClick={() => searchParkingSpots()}>Try Again</Button>
+          </div>
+        </div>
+      ) : parkingSpots.length === 0 ? (
+        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+          <div className="text-center space-y-4">
+            <p className="text-muted-foreground">No parking spots found</p>
+            <Button onClick={() => navigate('/')}>Search Again</Button>
+          </div>
+        </div>
+      ) : viewMode === 'map' ? (
         <div className="relative h-[calc(100vh-140px)]">
           <MapView spots={parkingSpots} />
         </div>

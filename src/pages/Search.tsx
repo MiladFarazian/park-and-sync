@@ -12,6 +12,18 @@ const Search = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const [searchLocation, setSearchLocation] = useState('Downtown San Francisco');
+  const [checkInDate, setCheckInDate] = useState('');
+  const [checkOutDate, setCheckOutDate] = useState('');
+
+  // Set default dates
+  React.useEffect(() => {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    setCheckInDate(now.toISOString().split('T')[0]);
+    setCheckOutDate(tomorrow.toISOString().split('T')[0]);
+  }, []);
 
   const stats = [
     { value: '4', label: 'Spots Available' },
@@ -92,14 +104,24 @@ const Search = () => {
             <p className="text-sm font-medium text-muted-foreground mb-2">Check-in</p>
             <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
               <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">08/16/2025</span>
+              <input 
+                type="date"
+                value={checkInDate}
+                onChange={(e) => setCheckInDate(e.target.value)}
+                className="bg-transparent border-none text-sm flex-1 outline-none"
+              />
             </div>
           </div>
           <div>
             <p className="text-sm font-medium text-muted-foreground mb-2">Check-out</p>
             <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">08/16/2025</span>
+              <input 
+                type="date"
+                value={checkOutDate}
+                onChange={(e) => setCheckOutDate(e.target.value)}
+                className="bg-transparent border-none text-sm flex-1 outline-none"
+              />
             </div>
           </div>
         </div>
@@ -112,7 +134,13 @@ const Search = () => {
               navigate('/auth');
               return;
             }
-            navigate('/search-results');
+            // Pass search parameters via URL
+            const params = new URLSearchParams({
+              location: searchLocation,
+              checkIn: checkInDate,
+              checkOut: checkOutDate
+            });
+            navigate(`/search-results?${params.toString()}`);
           }}
         >
           <SearchIcon className="h-5 w-5 mr-2" />
