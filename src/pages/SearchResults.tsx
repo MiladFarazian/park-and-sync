@@ -29,9 +29,41 @@ const SearchResults = () => {
       setLoading(true);
       setError(null);
 
-      // Default to San Francisco coordinates
-      const latitude = 37.7749;
-      const longitude = -122.4194;
+      // Get coordinates based on location - default to University Park, LA
+      const getCoordinates = (locationName: string) => {
+        // University Park (USC area) coordinates
+        const defaultCoords = { lat: 34.0224, lng: -118.2851 };
+        
+        const locationMap: { [key: string]: { lat: number; lng: number } } = {
+          'university park': { lat: 34.0224, lng: -118.2851 },
+          'downtown los angeles': { lat: 34.0522, lng: -118.2437 },
+          'west hollywood': { lat: 34.0900, lng: -118.3617 },
+          'santa monica': { lat: 34.0195, lng: -118.4912 },
+          'beverly hills': { lat: 34.0736, lng: -118.4004 },
+          'venice': { lat: 34.0052, lng: -118.4810 },
+          'manhattan beach': { lat: 33.8847, lng: -118.4109 },
+          'hermosa beach': { lat: 33.8622, lng: -118.3998 },
+          'hollywood': { lat: 34.0928, lng: -118.3287 },
+          'westwood': { lat: 34.0669, lng: -118.4456 },
+          'culver city': { lat: 34.0211, lng: -118.3965 },
+          'marina del rey': { lat: 33.9802, lng: -118.4517 },
+          'koreatown': { lat: 34.0579, lng: -118.3009 },
+          'east los angeles': { lat: 34.0236, lng: -118.1720 },
+          'pasadena': { lat: 34.1478, lng: -118.1445 }
+        };
+        
+        const normalized = locationName.toLowerCase();
+        for (const [key, coords] of Object.entries(locationMap)) {
+          if (normalized.includes(key)) {
+            return coords;
+          }
+        }
+        return defaultCoords;
+      };
+
+      const coords = getCoordinates(location);
+      const latitude = coords.lat;
+      const longitude = coords.lng;
       
       // Create start and end times for the search
       const startTime = new Date(`${checkIn}T09:00:00.000Z`).toISOString();

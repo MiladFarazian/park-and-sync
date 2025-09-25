@@ -11,9 +11,71 @@ import { useAuth } from '@/contexts/AuthContext';
 const Search = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
-  const [searchLocation, setSearchLocation] = useState('Downtown San Francisco');
+  const [searchLocation, setSearchLocation] = useState('University Park, Los Angeles');
   const [checkInDate, setCheckInDate] = useState('');
   const [checkOutDate, setCheckOutDate] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
+
+  // LA neighborhoods and areas
+  const laNeighborhoods = [
+    'University Park, Los Angeles',
+    'Downtown Los Angeles',
+    'West Hollywood',
+    'Santa Monica',
+    'Beverly Hills',
+    'Venice',
+    'Manhattan Beach',
+    'Hermosa Beach',
+    'Redondo Beach',
+    'El Segundo',
+    'Culver City',
+    'Marina del Rey',
+    'Playa del Rey',
+    'Westwood',
+    'Brentwood',
+    'Pacific Palisades',
+    'Malibu',
+    'Hollywood',
+    'West Adams',
+    'Mid-City',
+    'Koreatown',
+    'Los Feliz',
+    'Silver Lake',
+    'Echo Park',
+    'East Los Angeles',
+    'Boyle Heights',
+    'South Park',
+    'Arts District',
+    'Little Tokyo',
+    'Chinatown',
+    'Griffith Park',
+    'Atwater Village',
+    'Glendale',
+    'Pasadena',
+    'Burbank',
+    'North Hollywood',
+    'Studio City',
+    'Sherman Oaks',
+    'Encino',
+    'Tarzana',
+    'Woodland Hills',
+    'Canoga Park',
+    'Reseda',
+    'Van Nuys',
+    'Northridge',
+    'Granada Hills',
+    'Chatsworth',
+    'San Fernando',
+    'Pacoima',
+    'Sun Valley',
+    'Sylmar',
+    'Mission Hills',
+    'Arleta',
+    'Panorama City',
+    'Valley Glen',
+    'Valley Village'
+  ];
 
   // Set default dates
   React.useEffect(() => {
@@ -24,6 +86,27 @@ const Search = () => {
     setCheckInDate(now.toISOString().split('T')[0]);
     setCheckOutDate(tomorrow.toISOString().split('T')[0]);
   }, []);
+
+  // Handle search input changes
+  const handleSearchChange = (value: string) => {
+    setSearchLocation(value);
+    
+    if (value.length > 0) {
+      const filtered = laNeighborhoods.filter(neighborhood =>
+        neighborhood.toLowerCase().includes(value.toLowerCase())
+      );
+      setFilteredSuggestions(filtered);
+      setShowSuggestions(true);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  // Handle suggestion selection
+  const handleSuggestionClick = (suggestion: string) => {
+    setSearchLocation(suggestion);
+    setShowSuggestions(false);
+  };
 
   const stats = [
     { value: '4', label: 'Spots Available' },
@@ -89,12 +172,44 @@ const Search = () => {
         <div className="space-y-3">
           <h2 className="text-lg font-semibold">Where</h2>
           <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5 z-10" />
             <Input 
               value={searchLocation}
-              onChange={(e) => setSearchLocation(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              onFocus={() => {
+                if (searchLocation.length > 0) {
+                  const filtered = laNeighborhoods.filter(neighborhood =>
+                    neighborhood.toLowerCase().includes(searchLocation.toLowerCase())
+                  );
+                  setFilteredSuggestions(filtered);
+                  setShowSuggestions(true);
+                }
+              }}
+              onBlur={() => {
+                // Delay hiding suggestions to allow for clicks
+                setTimeout(() => setShowSuggestions(false), 200);
+              }}
               className="pl-12 h-14 text-lg border-0 bg-muted/30"
+              placeholder="Search Los Angeles neighborhoods..."
             />
+            
+            {/* Suggestions Dropdown */}
+            {showSuggestions && filteredSuggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-background border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {filteredSuggestions.slice(0, 8).map((suggestion, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleSuggestionClick(suggestion)}
+                    className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-b-0 focus:outline-none focus:bg-muted/50"
+                  >
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">{suggestion}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
