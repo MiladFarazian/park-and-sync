@@ -91,18 +91,32 @@ const MapView = ({ spots }: MapViewProps) => {
     spots.forEach((spot) => {
       console.log('Creating marker for spot:', spot.title, 'at lat:', spot.lat, 'lng:', spot.lng);
       
-      // Validate coordinates
-      const lat = Number(spot.lat);
-      const lng = Number(spot.lng);
-      
-      if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-        console.error('Invalid coordinates for spot:', spot.title, { lat, lng });
-        return;
+      // Validate and normalize coordinates
+      const rawLat = Number(spot.lat);
+      const rawLng = Number(spot.lng);
+
+      const withinLat = (v: number) => v >= -90 && v <= 90;
+      const withinLng = (v: number) => v >= -180 && v <= 180;
+
+      let lat = rawLat;
+      let lng = rawLng;
+
+      if (!withinLat(lat) || !withinLng(lng)) {
+        // Try swapping if developer data came in [lng, lat]
+        if (withinLat(rawLng) && withinLng(rawLat)) {
+          console.warn('Swapped lat/lng for spot due to invalid order:', spot.title, { rawLat, rawLng });
+          lat = rawLng;
+          lng = rawLat;
+        } else {
+          console.error('Invalid coordinates for spot, skipping:', spot.title, { rawLat, rawLng });
+          return;
+        }
       }
 
-      // LA should have lat ~34, lng ~-118
-      if (lat < 33 || lat > 35 || lng > -117 || lng < -119) {
-        console.warn('Coordinates outside LA area for spot:', spot.title, { lat, lng });
+      // Extra sanity check for LA area (optional)
+      const inLABox = lat > 33 && lat < 35 && lng > -119.8 && lng < -116.5;
+      if (!inLABox) {
+        console.warn('Spot outside expected LA bounds:', spot.title, { lat, lng });
       }
       
       // Create custom marker element
