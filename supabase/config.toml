@@ -1,1 +1,7 @@
 project_id = "mqbupmusmciijsjmzbcu"
+
+[functions.search-spots]
+verify_jwt = false
+
+[functions.stripe-webhooks]
+verify_jwt = false

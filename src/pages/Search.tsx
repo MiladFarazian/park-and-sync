@@ -6,9 +6,11 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Search = () => {
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
   const [searchLocation, setSearchLocation] = useState('Downtown San Francisco');
 
   const stats = [
@@ -56,10 +58,18 @@ const Search = () => {
           </div>
           <div className="flex items-center gap-3">
             <Bell className="h-6 w-6 text-muted-foreground" />
-            <Avatar className="h-8 w-8">
-              <AvatarImage src="/placeholder.svg" />
-              <AvatarFallback>JD</AvatarFallback>
-            </Avatar>
+            {user ? (
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={profile?.avatar_url} />
+                <AvatarFallback>
+                  {profile?.first_name?.[0] || user.email?.[0]?.toUpperCase() || 'U'}
+                </AvatarFallback>
+              </Avatar>
+            ) : (
+              <Button variant="outline" onClick={() => navigate('/auth')}>
+                Sign In
+              </Button>
+            )}
           </div>
         </div>
 
@@ -97,7 +107,13 @@ const Search = () => {
         {/* Find Parking Button */}
         <Button 
           className="w-full h-14 text-lg mt-6" 
-          onClick={() => navigate('/search-results')}
+          onClick={() => {
+            if (!user) {
+              navigate('/auth');
+              return;
+            }
+            navigate('/search-results');
+          }}
         >
           <SearchIcon className="h-5 w-5 mr-2" />
           Find Parking
