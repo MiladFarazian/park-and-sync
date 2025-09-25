@@ -12,17 +12,12 @@ interface Spot {
   id: string;
   title: string;
   address: string;
-  hourly_rate: number;
-  latitude: number;
-  longitude: number;
-  profiles?: {
-    rating: number;
-    review_count: number;
-  };
-  spot_photos?: {
-    url: string;
-    is_primary: boolean;
-  }[];
+  hourlyRate: number;
+  lat: number;
+  lng: number;
+  rating?: number;
+  reviewCount?: number;
+  imageUrl?: string;
 }
 
 interface MapViewProps {
@@ -64,8 +59,8 @@ const MapView = ({ spots }: MapViewProps) => {
     // Calculate center point from spots
     const center: [number, number] = spots.length > 0 
       ? [
-          spots.reduce((sum, spot) => sum + Number(spot.longitude), 0) / spots.length,
-          spots.reduce((sum, spot) => sum + Number(spot.latitude), 0) / spots.length
+          spots.reduce((sum, spot) => sum + Number(spot.lng), 0) / spots.length,
+          spots.reduce((sum, spot) => sum + Number(spot.lat), 0) / spots.length
         ]
       : [-118.2437, 34.0522]; // Default to LA
 
@@ -94,14 +89,14 @@ const MapView = ({ spots }: MapViewProps) => {
       markerElement.className = 'relative cursor-pointer';
       markerElement.innerHTML = `
         <div class="bg-primary text-primary-foreground px-3 py-1 rounded-full shadow-lg font-semibold text-sm whitespace-nowrap">
-          $${spot.hourly_rate}/hr
+          $${spot.hourlyRate}/hr
         </div>
         <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-primary"></div>
       `;
 
       // Create marker
       const marker = new mapboxgl.Marker({ element: markerElement })
-        .setLngLat([Number(spot.longitude), Number(spot.latitude)])
+        .setLngLat([Number(spot.lng), Number(spot.lat)])
         .addTo(map.current!);
 
       // Add click handler
@@ -154,7 +149,7 @@ const MapView = ({ spots }: MapViewProps) => {
             <div className="flex gap-3">
               <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0">
                 <img 
-                  src={selectedSpot.spot_photos?.[0]?.url || "/placeholder.svg"}
+                  src={selectedSpot.imageUrl || "/placeholder.svg"}
                   alt={selectedSpot.title}
                   className="w-full h-full object-cover rounded-lg"
                 />
@@ -164,7 +159,7 @@ const MapView = ({ spots }: MapViewProps) => {
                 <div className="flex justify-between items-start gap-2">
                   <h3 className="font-semibold text-base leading-tight">{selectedSpot.title}</h3>
                   <div className="text-right flex-shrink-0">
-                    <p className="font-bold text-primary text-lg">${selectedSpot.hourly_rate}/hr</p>
+                    <p className="font-bold text-primary text-lg">${selectedSpot.hourlyRate}/hr</p>
                   </div>
                 </div>
                 
@@ -176,8 +171,8 @@ const MapView = ({ spots }: MapViewProps) => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
                     <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                    <span className="font-medium text-sm">{selectedSpot.profiles?.rating || 'New'}</span>
-                    <span className="text-muted-foreground text-sm">({selectedSpot.profiles?.review_count || 0})</span>
+                    <span className="font-medium text-sm">{selectedSpot.rating || 'New'}</span>
+                    <span className="text-muted-foreground text-sm">({selectedSpot.reviewCount || 0})</span>
                   </div>
                 </div>
               </div>
