@@ -13,7 +13,12 @@ const SearchResults = () => {
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [visibleSpotCount, setVisibleSpotCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  const handleVisibleSpotsChange = (count: number) => {
+    setVisibleSpotCount(count);
+  };
 
   // Get search parameters
   const location = searchParams.get('location') || 'Downtown San Francisco';
@@ -195,7 +200,7 @@ const SearchResults = () => {
             </Button>
             <div>
               <h1 className="font-semibold">
-                {loading ? 'Searching...' : `${parkingSpots.length} spots nearby`}
+                {loading ? 'Searching...' : `${visibleSpotCount || parkingSpots.length} spots ${viewMode === 'map' && visibleSpotCount !== parkingSpots.length ? 'visible' : 'nearby'}`}
               </h1>
               <p className="text-sm text-muted-foreground">{location}</p>
             </div>
@@ -253,7 +258,7 @@ const SearchResults = () => {
         </div>
       ) : viewMode === 'map' ? (
         <div className="relative h-[calc(100vh-140px)]">
-          <MapView spots={parkingSpots} />
+          <MapView spots={parkingSpots} onVisibleSpotsChange={handleVisibleSpotsChange} />
         </div>
       ) : (
         <div className="p-4 space-y-3">

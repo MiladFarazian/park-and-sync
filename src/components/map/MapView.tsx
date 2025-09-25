@@ -22,9 +22,10 @@ interface Spot {
 
 interface MapViewProps {
   spots: Spot[];
+  onVisibleSpotsChange?: (count: number) => void;
 }
 
-const MapView = ({ spots }: MapViewProps) => {
+const MapView = ({ spots, onVisibleSpotsChange }: MapViewProps) => {
   const navigate = useNavigate();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -57,14 +58,19 @@ const MapView = ({ spots }: MapViewProps) => {
 
     mapboxgl.accessToken = mapboxToken;
 
-    // Calculate center point for all of LA
-    const laCenter: [number, number] = [-118.2437, 34.0522]; // Central LA coordinates
+    // Calculate center from spots if available, else default LA
+    const center: [number, number] = spots.length > 0 
+      ? [
+          spots.reduce((sum, spot) => sum + Number(spot.lng), 0) / spots.length,
+          spots.reduce((sum, spot) => sum + Number(spot.lat), 0) / spots.length
+        ]
+      : [-118.2437, 34.0522]; // Default to central LA
     
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12', 
-      center: laCenter,
-      zoom: 10
+      center: center,
+      zoom: 13 // Closer zoom for neighborhood level
     });
 
     // Add navigation controls
@@ -74,7 +80,24 @@ const MapView = ({ spots }: MapViewProps) => {
     map.current.on('load', () => {
       setMapReady(true);
     });
-  }, [mapboxToken, spots]);
+
+    // Update visible spots count when map moves
+    const updateVisibleSpots = () => {
+      if (!map.current || !spots.length) return;
+      
+      const bounds = map.current.getBounds();
+      const visibleSpots = spots.filter(spot => {
+        const lat = Number(spot.lat);
+        const lng = Number(spot.lng);
+        return bounds.contains([lng, lat]);
+      });
+      
+      onVisibleSpotsChange?.(visibleSpots.length);
+    };
+
+    map.current.on('moveend', updateVisibleSpots);
+    map.current.on('zoomend', updateVisibleSpots);
+  }, [mapboxToken, spots, onVisibleSpotsChange]);
 
   // Add markers for spots
   useEffect(() => {
@@ -173,11 +196,17 @@ const MapView = ({ spots }: MapViewProps) => {
       map.current.on('click', labelId, onClick);
     }
 
-    // Fit bounds to all features
+    // Fit bounds to all features with neighborhood-level zoom
     const layerBounds = new mapboxgl.LngLatBounds();
     (features as any).forEach((f: any) => layerBounds.extend(f.geometry.coordinates as [number, number]));
     if (!layerBounds.isEmpty()) {
-      map.current.fitBounds(layerBounds, { padding: 80, maxZoom: 13, duration: 400 });
+      // Use higher minZoom for neighborhood focus, lower maxZoom to allow zooming out
+      map.current.fitBounds(layerBounds, { 
+        padding: { top: 80, bottom: 120, left: 80, right: 80 }, 
+        minZoom: 12,
+        maxZoom: 15, 
+        duration: 600 
+      });
     }
 
     console.log('Rendered spots via layers:', (features as any).length);
