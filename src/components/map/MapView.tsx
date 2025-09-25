@@ -89,7 +89,21 @@ const MapView = ({ spots }: MapViewProps) => {
     const bounds = new mapboxgl.LngLatBounds();
 
     spots.forEach((spot) => {
-      console.log('Creating marker for spot:', spot.title, 'at', spot.lat, spot.lng);
+      console.log('Creating marker for spot:', spot.title, 'at lat:', spot.lat, 'lng:', spot.lng);
+      
+      // Validate coordinates
+      const lat = Number(spot.lat);
+      const lng = Number(spot.lng);
+      
+      if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        console.error('Invalid coordinates for spot:', spot.title, { lat, lng });
+        return;
+      }
+
+      // LA should have lat ~34, lng ~-118
+      if (lat < 33 || lat > 35 || lng > -117 || lng < -119) {
+        console.warn('Coordinates outside LA area for spot:', spot.title, { lat, lng });
+      }
       
       // Create custom marker element
       const markerElement = document.createElement('div');
@@ -104,17 +118,17 @@ const MapView = ({ spots }: MapViewProps) => {
           <div style="
             width: 40px;
             height: 40px;
-            background-color: hsl(var(--primary, 222 47% 11%));
+            background-color: #1f2937;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            border: 3px solid hsl(var(--background, 0 0% 100%));
+            border: 3px solid white;
             position: relative;
           ">
             <div style="
-              color: hsl(var(--primary-foreground, 210 40% 98%));
+              color: white;
               font-weight: 700;
               font-size: 11px;
             ">$${spot.hourlyRate}</div>
@@ -128,19 +142,21 @@ const MapView = ({ spots }: MapViewProps) => {
             height: 0;
             border-left: 8px solid transparent;
             border-right: 8px solid transparent;
-            border-top: 12px solid hsl(var(--primary, 222 47% 11%));
+            border-top: 12px solid #1f2937;
             filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
           "></div>
         </div>
       `;
 
-      // Create marker with bottom anchor for pin
+      // Create marker with bottom anchor for pin - ensure correct order [lng, lat]
       const marker = new mapboxgl.Marker({ element: markerElement, anchor: 'bottom' })
-        .setLngLat([Number(spot.lng), Number(spot.lat)])
+        .setLngLat([lng, lat])
         .addTo(map.current!);
 
+      console.log('Marker added at:', [lng, lat]);
+
       // Extend bounds
-      bounds.extend([Number(spot.lng), Number(spot.lat)]);
+      bounds.extend([lng, lat]);
 
       // Add click handler
       markerElement.addEventListener('click', () => {
