@@ -61,8 +61,7 @@ const SearchResults = () => {
         return defaultCoords;
       };
 
-      // Get coordinates for all of LA - use central LA coordinates and large radius
-      const coords = { lat: 34.0522, lng: -118.2437 }; // Central LA
+      const coords = getCoordinates(location);
       const latitude = coords.lat;
       const longitude = coords.lng;
       
@@ -81,7 +80,7 @@ const SearchResults = () => {
         body: {
           latitude,
           longitude,
-          radius: 25000, // 25km radius to cover all of LA
+          radius: 40000, // 40km radius to cover all of LA
           start_time: startTime,
           end_time: endTime
         }

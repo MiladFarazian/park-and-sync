@@ -80,6 +80,8 @@ const MapView = ({ spots }: MapViewProps) => {
     markers.current.forEach(marker => marker.remove());
     markers.current = [];
 
+    const bounds = new mapboxgl.LngLatBounds();
+
     spots.forEach((spot) => {
       console.log('Creating marker for spot:', spot.title, 'at', spot.lat, spot.lng);
       
@@ -96,17 +98,17 @@ const MapView = ({ spots }: MapViewProps) => {
           <div style="
             width: 40px;
             height: 40px;
-            background-color: hsl(var(--primary));
+            background-color: hsl(var(--primary, 222 47% 11%));
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            border: 3px solid white;
+            border: 3px solid hsl(var(--background, 0 0% 100%));
             position: relative;
           ">
             <div style="
-              color: white;
+              color: hsl(var(--primary-foreground, 210 40% 98%));
               font-weight: 700;
               font-size: 11px;
             ">$${spot.hourlyRate}</div>
@@ -120,16 +122,19 @@ const MapView = ({ spots }: MapViewProps) => {
             height: 0;
             border-left: 8px solid transparent;
             border-right: 8px solid transparent;
-            border-top: 12px solid hsl(var(--primary));
+            border-top: 12px solid hsl(var(--primary, 222 47% 11%));
             filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
           "></div>
         </div>
       `;
 
-      // Create marker
-      const marker = new mapboxgl.Marker({ element: markerElement })
+      // Create marker with bottom anchor for pin
+      const marker = new mapboxgl.Marker({ element: markerElement, anchor: 'bottom' })
         .setLngLat([Number(spot.lng), Number(spot.lat)])
         .addTo(map.current!);
+
+      // Extend bounds
+      bounds.extend([Number(spot.lng), Number(spot.lat)]);
 
       // Add click handler
       markerElement.addEventListener('click', () => {
@@ -138,6 +143,11 @@ const MapView = ({ spots }: MapViewProps) => {
 
       markers.current.push(marker);
     });
+
+    // Fit map to markers
+    if (!bounds.isEmpty()) {
+      map.current.fitBounds(bounds, { padding: 80, maxZoom: 13, duration: 500 });
+    }
 
     console.log('Added', markers.current.length, 'markers to map');
   }, [spots]);
