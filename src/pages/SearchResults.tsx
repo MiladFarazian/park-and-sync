@@ -104,6 +104,7 @@ const SearchResults = () => {
         reviews: spot.profiles?.review_count || 0,
         lat: parseFloat(spot.latitude),
         lng: parseFloat(spot.longitude),
+        imageUrl: spot.spot_photos?.find((photo: any) => photo.is_primary)?.url || spot.spot_photos?.[0]?.url,
         distance: spot.distance ? `${(spot.distance / 1000).toFixed(1)} km` : undefined,
         amenities: [
           ...(spot.has_ev_charging ? ['EV Charging'] : []),

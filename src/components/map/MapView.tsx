@@ -16,7 +16,7 @@ interface Spot {
   lat: number;
   lng: number;
   rating?: number;
-  reviewCount?: number;
+  reviews?: number;
   imageUrl?: string;
 }
 
@@ -172,7 +172,7 @@ const MapView = ({ spots }: MapViewProps) => {
                   <div className="flex items-center gap-1">
                     <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
                     <span className="font-medium text-sm">{selectedSpot.rating || 'New'}</span>
-                    <span className="text-muted-foreground text-sm">({selectedSpot.reviewCount || 0})</span>
+                    <span className="text-muted-foreground text-sm">({selectedSpot.reviews || 0})</span>
                   </div>
                 </div>
               </div>
