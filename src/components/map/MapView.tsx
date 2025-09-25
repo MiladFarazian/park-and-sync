@@ -185,6 +185,42 @@ const MapView = ({ spots }: MapViewProps) => {
       map.current.fitBounds(bounds, { padding: 80, maxZoom: 13, duration: 500 });
     }
 
+    // Debug: draw a small circle layer at each spot to verify positions
+    const geojson = {
+      type: 'FeatureCollection',
+      features: spots
+        .map((spot) => {
+          const lat = Number(spot.lat);
+          const lng = Number(spot.lng);
+          if (isNaN(lat) || isNaN(lng)) return null;
+          return {
+            type: 'Feature',
+            properties: { id: spot.id },
+            geometry: { type: 'Point', coordinates: [lng, lat] },
+          };
+        })
+        .filter(Boolean) as any[],
+    } as any;
+
+    const srcId = 'spots-debug';
+    const layerId = 'spots-debug-layer';
+    if (map.current.getSource(srcId)) {
+      (map.current.getSource(srcId) as any).setData(geojson);
+    } else {
+      map.current.addSource(srcId, { type: 'geojson', data: geojson } as any);
+      map.current.addLayer({
+        id: layerId,
+        type: 'circle',
+        source: srcId,
+        paint: {
+          'circle-radius': 5,
+          'circle-color': '#ef4444',
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#ffffff',
+        },
+      } as any);
+    }
+
     console.log('Added', markers.current.length, 'markers to map');
   }, [spots, mapReady]);
 
