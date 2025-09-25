@@ -116,28 +116,51 @@ const MapView = ({ spots }: MapViewProps) => {
       (map.current.getSource(sourceId) as any).setData(data);
     } else {
       map.current.addSource(sourceId, { type: 'geojson', data } as any);
+      
+      // Pin body (circle)
       map.current.addLayer({
         id: circleId,
         type: 'circle',
         source: sourceId,
         paint: {
-          'circle-radius': 14,
-          'circle-color': '#1f2937',
-          'circle-stroke-width': 2,
+          'circle-radius': 18,
+          'circle-color': 'hsl(222, 47%, 47%)', // Signature blue
+          'circle-stroke-width': 3,
           'circle-stroke-color': '#ffffff',
+          'circle-translate': [0, -8], // Offset up for pin effect
         },
       } as any);
+
+      // Pin shadow/base
+      map.current.addLayer({
+        id: `${circleId}-shadow`,
+        type: 'circle', 
+        source: sourceId,
+        paint: {
+          'circle-radius': 6,
+          'circle-color': 'rgba(0, 0, 0, 0.3)',
+          'circle-blur': 1,
+          'circle-translate': [0, 8], // Offset down for shadow
+        },
+      } as any);
+
+      // Price labels
       map.current.addLayer({
         id: labelId,
         type: 'symbol',
         source: sourceId,
         layout: {
           'text-field': ['get', 'price'],
-          'text-size': 11,
-          'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+          'text-size': 12,
+          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
           'text-allow-overlap': true,
+          'text-offset': [0, -0.5], // Offset up to center in pin
         },
-        paint: { 'text-color': '#ffffff' },
+        paint: { 
+          'text-color': '#ffffff',
+          'text-halo-color': 'hsl(222, 47%, 35%)',
+          'text-halo-width': 1,
+        },
       } as any);
 
       const onClick = (e: any) => {
