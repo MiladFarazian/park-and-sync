@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 const Search = () => {
   const navigate = useNavigate();
@@ -109,33 +110,65 @@ const Search = () => {
   };
 
   const stats = [
-    { value: '4', label: 'Spots Available' },
-    { value: '$6', label: 'Average Price' },
-    { value: '2 min', label: 'Average Walk' }
+    { value: '25+', label: 'Spots Available' },
+    { value: '$10', label: 'Average Price' },
+    { value: '3 min', label: 'Average Walk' }
   ];
 
-  const recentlyViewed = [
-    {
-      id: 1,
-      title: 'Premium Downtown Garage',
-      address: '123 Main St',
-      hourlyRate: 8,
-      rating: 4.9,
-      reviews: 124,
-      status: 'Available Now',
-      image: '/placeholder.svg'
-    },
-    {
-      id: 2,
-      title: 'Safe Residential Driveway',
-      address: '456 Oak Ave',
-      hourlyRate: 5,
-      rating: 4.8,
-      reviews: 89,
-      status: 'Available in 30 min',
-      image: '/placeholder.svg'
+  const [recentlyViewed, setRecentlyViewed] = useState<any[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(false);
+
+  // Fetch recently viewed spots on component mount
+  React.useEffect(() => {
+    fetchRecentSpots();
+  }, []);
+
+  const fetchRecentSpots = async () => {
+    try {
+      setLoadingRecent(true);
+      // Get a few random spots to show as "recently viewed"
+      const { data: spots, error } = await supabase
+        .from('spots')
+        .select(`
+          id,
+          title,
+          address,
+          hourly_rate,
+          profiles!spots_host_id_fkey (
+            rating,
+            review_count
+          ),
+          spot_photos (
+            url,
+            is_primary
+          )
+        `)
+        .eq('status', 'active')
+        .limit(2);
+
+      if (error) {
+        console.error('Error fetching recent spots:', error);
+        return;
+      }
+
+      const transformedSpots = spots?.map((spot: any) => ({
+        id: spot.id,
+        title: spot.title,
+        address: spot.address,
+        hourlyRate: parseFloat(spot.hourly_rate),
+        rating: parseFloat(spot.profiles?.rating || 4.5),
+        reviews: spot.profiles?.review_count || 0,
+        status: 'Available Now',
+        image: spot.spot_photos?.find((p: any) => p.is_primary)?.url || '/placeholder.svg'
+      })) || [];
+
+      setRecentlyViewed(transformedSpots);
+    } catch (err) {
+      console.error('Error fetching recent spots:', err);
+    } finally {
+      setLoadingRecent(false);
     }
-  ];
+  };
 
   return (
     <div className="space-y-6">
@@ -281,52 +314,65 @@ const Search = () => {
         </div>
         
         <div className="space-y-3">
-          {recentlyViewed.map((spot) => (
-            <Card 
-              key={spot.id} 
-              className="p-4 cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => navigate(`/spot/${spot.id}`)}
-            >
-              <div className="flex gap-3">
-                <div className="w-16 h-16 rounded-lg bg-muted flex-shrink-0">
-                  <img 
-                    src={spot.image} 
-                    alt={spot.title}
-                    className="w-full h-full object-cover rounded-lg"
-                  />
-                </div>
-                
-                <div className="flex-1 space-y-1">
-                  <div className="flex justify-between items-start">
-                    <h3 className="font-semibold">{spot.title}</h3>
-                    <div className="text-right">
-                      <p className="font-bold text-primary">${spot.hourlyRate}/hr</p>
-                    </div>
+          {loadingRecent ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center space-y-2">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                <p className="text-sm text-muted-foreground">Loading spots...</p>
+              </div>
+            </div>
+          ) : recentlyViewed.length > 0 ? (
+            recentlyViewed.map((spot) => (
+              <Card 
+                key={spot.id} 
+                className="p-4 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => navigate(`/spot/${spot.id}`)}
+              >
+                <div className="flex gap-3">
+                  <div className="w-16 h-16 rounded-lg bg-muted flex-shrink-0">
+                    <img 
+                      src={spot.image} 
+                      alt={spot.title}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
                   </div>
                   
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <MapPin className="h-3 w-3" />
-                    <span>{spot.address}</span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1">
-                      <span className="text-yellow-500">★</span>
-                      <span className="font-medium text-sm">{spot.rating}</span>
-                      <span className="text-muted-foreground text-sm">({spot.reviews})</span>
+                  <div className="flex-1 space-y-1">
+                    <div className="flex justify-between items-start">
+                      <h3 className="font-semibold">{spot.title}</h3>
+                      <div className="text-right">
+                        <p className="font-bold text-primary">${spot.hourlyRate}/hr</p>
+                      </div>
                     </div>
                     
-                    <Badge 
-                      variant={spot.status === 'Available Now' ? 'default' : 'secondary'}
-                      className={spot.status === 'Available Now' ? 'bg-green-100 text-green-800' : ''}
-                    >
-                      {spot.status}
-                    </Badge>
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <MapPin className="h-3 w-3" />
+                      <span>{spot.address}</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        <span className="text-yellow-500">★</span>
+                        <span className="font-medium text-sm">{spot.rating}</span>
+                        <span className="text-muted-foreground text-sm">({spot.reviews})</span>
+                      </div>
+                      
+                      <Badge 
+                        variant={spot.status === 'Available Now' ? 'default' : 'secondary'}
+                        className={spot.status === 'Available Now' ? 'bg-green-100 text-green-800' : ''}
+                      >
+                        {spot.status}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            ))
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No recent spots to show</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

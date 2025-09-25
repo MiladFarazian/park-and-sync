@@ -1,84 +1,129 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Heart, Share, Star, MapPin, Calendar, Navigation, MessageCircle, Phone, Camera, Wifi, Clock, Shield, Zap } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Heart, Share, Star, MapPin, Calendar, Navigation, MessageCircle, Phone, Camera, Clock, Shield, Zap, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNavigate, useParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+
+// Import the generated images
+import uscGarage from '@/assets/usc-garage.jpg';
+import expositionDriveway from '@/assets/exposition-driveway.jpg';
+import santaMonicaPier from '@/assets/santa-monica-pier.jpg';
+import thirdStreetGarage from '@/assets/third-street-garage.jpg';
+import sunsetStrip from '@/assets/sunset-strip.jpg';
+import rodeoDrive from '@/assets/rodeo-drive.jpg';
+import veniceBeach from '@/assets/venice-beach.jpg';
+import staplesCenter from '@/assets/staples-center.jpg';
 
 const SpotDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [spot, setSpot] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - in a real app, this would come from an API
-  const spot = {
-    id: 1,
-    title: 'Premium Downtown Garage',
-    address: '123 Main St',
-    hourlyRate: 8,
-    rating: 4.9,
-    reviewCount: 124,
-    status: 'Available Now',
-    images: ['/placeholder.svg', '/placeholder.svg', '/placeholder.svg', '/placeholder.svg'],
-    amenities: [
-      { icon: Shield, title: 'Covered Parking', subtitle: 'Protected from weather' },
-      { icon: Camera, title: '24/7 Security', subtitle: 'Monitored by cameras' },
-      { icon: Zap, title: 'EV Charging', subtitle: 'Level 2 charger available' },
-      { icon: Wifi, title: 'WiFi Access', subtitle: 'Free wireless internet' },
-      { icon: Clock, title: 'Instant Access', subtitle: 'Keyless entry system' }
-    ],
-    description: 'Secure covered parking in the heart of downtown. Perfect for business meetings, shopping, or exploring the city. Easy access with 24/7 security monitoring.',
-    rules: [
-      'Maximum vehicle height: 7 feet',
-      'No overnight parking after 2 AM',
-      'Keep spot clean and tidy',
-      'Report any damages immediately'
-    ],
-    host: {
-      name: 'Sarah M.',
-      avatar: '/placeholder.svg',
-      responseTime: 'Usually responds within 1 hour'
-    },
-    reviewsList: [
-      {
-        id: 1,
-        user: 'John D.',
-        avatar: '/placeholder.svg',
-        rating: 5,
-        date: '2 weeks ago',
-        comment: 'Perfect location right in downtown. Easy access and very secure. Sarah was super responsive and helpful!'
-      },
-      {
-        id: 2,
-        user: 'Maria S.',
-        avatar: '/placeholder.svg',
-        rating: 5,
-        date: '1 month ago',
-        comment: 'Great covered parking spot. I felt very safe leaving my car here. Would definitely book again!'
-      },
-      {
-        id: 3,
-        user: 'Alex K.',
-        avatar: '/placeholder.svg',
-        rating: 4,
-        date: '2 months ago',
-        comment: 'Convenient location and fair price. The EV charging was a nice bonus. Easy check-in process.'
-      }
-    ]
+  // Map of image paths
+  const imageMap: { [key: string]: string } = {
+    '/src/assets/usc-garage.jpg': uscGarage,
+    '/src/assets/exposition-driveway.jpg': expositionDriveway,
+    '/src/assets/santa-monica-pier.jpg': santaMonicaPier,
+    '/src/assets/third-street-garage.jpg': thirdStreetGarage,
+    '/src/assets/sunset-strip.jpg': sunsetStrip,
+    '/src/assets/rodeo-drive.jpg': rodeoDrive,
+    '/src/assets/venice-beach.jpg': veniceBeach,
+    '/src/assets/staples-center.jpg': staplesCenter
   };
 
-  const AmenityIcon = ({ icon: Icon, title, subtitle }: any) => (
-    <div className="flex items-start gap-3 p-3">
-      <div className="p-2 bg-muted rounded-lg">
-        <Icon className="h-5 w-5 text-primary" />
+  useEffect(() => {
+    if (id) {
+      fetchSpotDetails();
+    }
+  }, [id]);
+
+  const fetchSpotDetails = async () => {
+    try {
+      setLoading(true);
+      const { data: spotData, error: spotError } = await supabase
+        .from('spots')
+        .select(`
+          *,
+          profiles!spots_host_id_fkey (
+            first_name,
+            last_name,
+            rating,
+            review_count,
+            avatar_url
+          ),
+          spot_photos (
+            url,
+            is_primary,
+            sort_order
+          )
+        `)
+        .eq('id', id)
+        .single();
+
+      if (spotError || !spotData) {
+        setError('Parking spot not found');
+        return;
+      }
+
+      const photos = Array.isArray(spotData.spot_photos) ? spotData.spot_photos : [];
+      const transformedImages = photos.length > 0 
+        ? photos.sort((a, b) => a.sort_order - b.sort_order).map(photo => imageMap[photo.url] || photo.url)
+        : ['/placeholder.svg'];
+
+      setSpot({
+        ...spotData,
+        hourlyRate: Number(spotData.hourly_rate),
+        dailyRate: spotData.daily_rate ? Number(spotData.daily_rate) : null,
+        rating: Number(spotData.profiles?.rating || 0),
+        reviewCount: Number(spotData.profiles?.review_count || 0),
+        images: transformedImages,
+        amenities: [
+          ...(spotData.is_covered ? [{ icon: Shield, title: 'Covered Parking', subtitle: 'Protected from weather' }] : []),
+          ...(spotData.is_secure ? [{ icon: Camera, title: 'Security', subtitle: 'Monitored parking area' }] : []),
+          ...(spotData.has_ev_charging ? [{ icon: Zap, title: 'EV Charging', subtitle: 'Electric vehicle charging available' }] : []),
+          { icon: Clock, title: 'Easy Access', subtitle: 'Convenient location' }
+        ],
+        rules: spotData.host_rules ? spotData.host_rules.split('.').filter((r: string) => r.trim()) : ['Follow parking guidelines'],
+        host: {
+          name: spotData.profiles ? `${spotData.profiles.first_name || 'Host'} ${(spotData.profiles.last_name || '').charAt(0)}.` : 'Host',
+          avatar: spotData.profiles?.avatar_url || '/placeholder.svg',
+          responseTime: 'Usually responds within a few hours'
+        },
+        reviewsList: []
+      });
+    } catch (err) {
+      setError('An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+          <p className="text-muted-foreground">Loading parking spot...</p>
+        </div>
       </div>
-      <div>
-        <p className="font-medium">{title}</p>
-        <p className="text-sm text-muted-foreground">{subtitle}</p>
+    );
+  }
+
+  if (error || !spot) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-red-500">{error || 'Spot not found'}</p>
+          <Button onClick={() => navigate('/')}>Back to Search</Button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -90,7 +135,6 @@ const SpotDetail = () => {
           className="w-full h-full object-cover"
         />
         
-        {/* Header Controls */}
         <div className="absolute top-4 left-4 right-4 flex justify-between">
           <Button variant="secondary" size="sm" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-4 w-4" />
@@ -105,28 +149,13 @@ const SpotDetail = () => {
           </div>
         </div>
 
-        {/* Image Counter */}
-        <div className="absolute bottom-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1">
-          <Camera className="h-3 w-3" />
+        <div className="absolute bottom-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+          <Camera className="h-3 w-3 inline mr-1" />
           {spot.images.length} photos
-        </div>
-
-        {/* Image Dots */}
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2">
-          {spot.images.map((_, index) => (
-            <button
-              key={index}
-              className={`w-2 h-2 rounded-full ${
-                index === currentImageIndex ? 'bg-white' : 'bg-white/50'
-              }`}
-              onClick={() => setCurrentImageIndex(index)}
-            />
-          ))}
         </div>
       </div>
 
       <div className="p-4 space-y-6">
-        {/* Basic Info */}
         <div>
           <div className="flex justify-between items-start mb-2">
             <h1 className="text-2xl font-bold">{spot.title}</h1>
@@ -136,140 +165,77 @@ const SpotDetail = () => {
             </div>
           </div>
           
-          <div className="flex items-center gap-1 text-muted-foreground mb-2">
+          <div className="flex items-center gap-1 text-muted-foreground mb-4">
             <MapPin className="h-4 w-4" />
             <span>{spot.address}</span>
           </div>
-          
-            <div className="flex items-center gap-4 mb-4">
-            <div className="flex items-center gap-1">
-              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-              <span className="font-semibold">{spot.rating}</span>
-              <span className="text-muted-foreground">({spot.reviewCount} reviews)</span>
-            </div>
-            
-            <Badge className="bg-green-100 text-green-800">
-              {spot.status}
-            </Badge>
-          </div>
 
-          {/* Action Buttons */}
           <div className="flex gap-3 mb-6">
-            <Button className="flex-1" onClick={() => navigate(`/book/${spot.id}`)}>
+            <Button className="flex-1">
               <Calendar className="h-4 w-4 mr-2" />
               Book Now
             </Button>
             <Button variant="outline" className="flex-1">
               <Navigation className="h-4 w-4 mr-2" />
-              Get Directions
+              Directions
             </Button>
           </div>
         </div>
 
-        {/* What this place offers */}
         <div>
           <h2 className="text-xl font-semibold mb-4">What this place offers</h2>
           <div className="space-y-1">
-            {spot.amenities.map((amenity, index) => (
-              <AmenityIcon key={index} {...amenity} />
+            {spot.amenities.map((amenity: any, index: number) => (
+              <div key={index} className="flex items-start gap-3 p-3">
+                <div className="p-2 bg-muted rounded-lg">
+                  <amenity.icon className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">{amenity.title}</p>
+                  <p className="text-sm text-muted-foreground">{amenity.subtitle}</p>
+                </div>
+              </div>
             ))}
           </div>
         </div>
 
-        {/* About this space */}
         <div>
           <h2 className="text-xl font-semibold mb-3">About this space</h2>
           <p className="text-muted-foreground leading-relaxed">{spot.description}</p>
+          {spot.access_notes && (
+            <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+              <p className="font-medium mb-2">Access Instructions:</p>
+              <p className="text-sm text-muted-foreground">{spot.access_notes}</p>
+            </div>
+          )}
         </div>
 
-        {/* Host Info */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <Avatar>
                 <AvatarImage src={spot.host.avatar} />
-                <AvatarFallback>{spot.host.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                <AvatarFallback>H</AvatarFallback>
               </Avatar>
               <div>
                 <p className="font-semibold">{spot.host.name}</p>
                 <p className="text-sm text-muted-foreground">Host</p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm">
-                <Phone className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm">
-                <MessageCircle className="h-4 w-4" />
-              </Button>
-            </div>
           </div>
-          <p className="text-sm text-muted-foreground">{spot.host.responseTime}</p>
-        </div>
-
-        {/* Reviews */}
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Reviews ({spot.reviewCount})</h2>
-            <Button variant="ghost" className="text-primary">View all</Button>
-          </div>
-          
-          <div className="space-y-4">
-            {spot.reviewsList.map((review) => (
-              <div key={review.id} className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={review.avatar} />
-                    <AvatarFallback>{review.user.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium">{review.user}</p>
-                    <div className="flex items-center gap-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <Star 
-                            key={i} 
-                            className={`h-3 w-3 ${i < review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} 
-                          />
-                        ))}
-                      </div>
-                      <span className="text-sm text-muted-foreground">{review.date}</span>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-muted-foreground">{review.comment}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Things to know */}
-        <div>
-          <h2 className="text-xl font-semibold mb-3">Things to know</h2>
-          <ul className="space-y-2">
-            {spot.rules.map((rule, index) => (
-              <li key={index} className="flex items-start gap-2 text-muted-foreground">
-                <span className="w-1 h-1 bg-muted-foreground rounded-full mt-2 flex-shrink-0"></span>
-                <span>{rule}</span>
-              </li>
-            ))}
-          </ul>
         </div>
       </div>
 
-      {/* Fixed Bottom Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4">
         <div className="max-w-md mx-auto flex items-center justify-between">
           <div>
             <p className="text-lg font-bold">${spot.hourlyRate} / hour</p>
             <div className="flex items-center gap-1">
               <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-              <span className="text-sm font-medium">{spot.rating} ({spot.reviewCount})</span>
+              <span className="text-sm font-medium">{spot.rating || 'New'}</span>
             </div>
           </div>
-          <Button size="lg" onClick={() => navigate(`/book/${spot.id}`)}>
-            Book Now
-          </Button>
+          <Button size="lg">Book Now</Button>
         </div>
       </div>
     </div>
