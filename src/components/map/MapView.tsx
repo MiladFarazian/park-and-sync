@@ -80,7 +80,85 @@ const MapView = ({ spots }: MapViewProps) => {
   useEffect(() => {
     if (!map.current || !spots.length || !mapReady) return;
 
-    console.log('Adding markers for spots:', spots);
+    // Render spots using Mapbox layers (stable on zoom)
+    const sourceId = 'spots-source';
+    const circleId = 'spots-circles';
+    const labelId = 'spots-labels';
+
+    const features = spots
+      .map((spot) => {
+        const rawLat = Number(spot.lat);
+        const rawLng = Number(spot.lng);
+        const latOk = !isNaN(rawLat) && rawLat >= -90 && rawLat <= 90;
+        const lngOk = !isNaN(rawLng) && rawLng >= -180 && rawLng <= 180;
+        let lat = rawLat;
+        let lng = rawLng;
+        if (!latOk || !lngOk) {
+          if (!isNaN(rawLng) && rawLng >= -90 && rawLng <= 90 && !isNaN(rawLat) && rawLat >= -180 && rawLat <= 180) {
+            lat = rawLng;
+            lng = rawLat;
+          } else {
+            console.warn('Skipping invalid coords for spot', spot.title, rawLat, rawLng);
+            return null;
+          }
+        }
+        return {
+          type: 'Feature',
+          properties: { id: spot.id, title: spot.title, price: `$${spot.hourlyRate}` },
+          geometry: { type: 'Point', coordinates: [lng, lat] as [number, number] },
+        } as any;
+      })
+      .filter(Boolean);
+
+    const data = { type: 'FeatureCollection', features } as any;
+
+    if (map.current.getSource(sourceId)) {
+      (map.current.getSource(sourceId) as any).setData(data);
+    } else {
+      map.current.addSource(sourceId, { type: 'geojson', data } as any);
+      map.current.addLayer({
+        id: circleId,
+        type: 'circle',
+        source: sourceId,
+        paint: {
+          'circle-radius': 14,
+          'circle-color': '#1f2937',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#ffffff',
+        },
+      } as any);
+      map.current.addLayer({
+        id: labelId,
+        type: 'symbol',
+        source: sourceId,
+        layout: {
+          'text-field': ['get', 'price'],
+          'text-size': 11,
+          'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+          'text-allow-overlap': true,
+        },
+        paint: { 'text-color': '#ffffff' },
+      } as any);
+
+      const onClick = (e: any) => {
+        const f = e.features?.[0];
+        if (!f) return;
+        const spot = spots.find((s) => s.id === f.properties.id);
+        if (spot) setSelectedSpot(spot);
+      };
+      map.current.on('click', circleId, onClick);
+      map.current.on('click', labelId, onClick);
+    }
+
+    // Fit bounds to all features
+    const layerBounds = new mapboxgl.LngLatBounds();
+    (features as any).forEach((f: any) => layerBounds.extend(f.geometry.coordinates as [number, number]));
+    if (!layerBounds.isEmpty()) {
+      map.current.fitBounds(layerBounds, { padding: 80, maxZoom: 13, duration: 400 });
+    }
+
+    console.log('Rendered spots via layers:', (features as any).length);
+    return;
 
     // Clear existing markers
     markers.current.forEach(marker => marker.remove());
