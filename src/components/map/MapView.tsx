@@ -68,7 +68,7 @@ const MapView = ({ spots }: MapViewProps) => {
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12',
       center: center,
-      zoom: 12
+      zoom: 11
     });
 
     // Add navigation controls
@@ -79,19 +79,42 @@ const MapView = ({ spots }: MapViewProps) => {
   useEffect(() => {
     if (!map.current || !spots.length) return;
 
+    console.log('Adding markers for spots:', spots);
+
     // Clear existing markers
     markers.current.forEach(marker => marker.remove());
     markers.current = [];
 
     spots.forEach((spot) => {
+      console.log('Creating marker for spot:', spot.title, 'at', spot.lat, spot.lng);
+      
       // Create custom marker element
       const markerElement = document.createElement('div');
       markerElement.className = 'relative cursor-pointer';
       markerElement.innerHTML = `
-        <div class="bg-primary text-primary-foreground px-3 py-1 rounded-full shadow-lg font-semibold text-sm whitespace-nowrap">
+        <div style="
+          background-color: hsl(var(--primary));
+          color: hsl(var(--primary-foreground));
+          padding: 4px 12px;
+          border-radius: 9999px;
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+          font-weight: 600;
+          font-size: 14px;
+          white-space: nowrap;
+        ">
           $${spot.hourlyRate}/hr
         </div>
-        <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-primary"></div>
+        <div style="
+          position: absolute;
+          top: 100%;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 0;
+          height: 0;
+          border-left: 4px solid transparent;
+          border-right: 4px solid transparent;
+          border-top: 4px solid hsl(var(--primary));
+        "></div>
       `;
 
       // Create marker
@@ -106,6 +129,8 @@ const MapView = ({ spots }: MapViewProps) => {
 
       markers.current.push(marker);
     });
+
+    console.log('Added', markers.current.length, 'markers to map');
   }, [spots]);
 
   const handleSpotClick = (spot: Spot) => {
