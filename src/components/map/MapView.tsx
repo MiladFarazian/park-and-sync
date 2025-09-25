@@ -1,22 +1,28 @@
 import React, { useEffect, useRef, useState } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Star, MapPin, Navigation } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Spot {
-  id: number;
+  id: string;
   title: string;
   address: string;
-  hourlyRate: number;
-  rating: number;
-  reviews: number;
-  lat: number;
-  lng: number;
-  amenities?: string[];
-  distance?: string;
-  walkTime?: string;
+  hourly_rate: number;
+  latitude: number;
+  longitude: number;
+  profiles?: {
+    rating: number;
+    review_count: number;
+  };
+  spot_photos?: {
+    url: string;
+    is_primary: boolean;
+  }[];
 }
 
 interface MapViewProps {
@@ -26,76 +32,129 @@ interface MapViewProps {
 const MapView = ({ spots }: MapViewProps) => {
   const navigate = useNavigate();
   const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const markers = useRef<mapboxgl.Marker[]>([]);
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
+  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Mock map implementation - in a real app, you'd use Mapbox GL JS here
+  // Fetch Mapbox token
   useEffect(() => {
-    if (!mapContainer.current) return;
-    
-    // This would be your actual Mapbox initialization
-    // For now, we'll just show a styled map placeholder
+    const fetchMapboxToken = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('get-mapbox-token');
+        if (error) throw error;
+        setMapboxToken(data.token);
+      } catch (error) {
+        console.error('Error fetching Mapbox token:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMapboxToken();
   }, []);
+
+  // Initialize map
+  useEffect(() => {
+    if (!mapContainer.current || !mapboxToken || map.current) return;
+
+    mapboxgl.accessToken = mapboxToken;
+
+    // Calculate center point from spots
+    const center: [number, number] = spots.length > 0 
+      ? [
+          spots.reduce((sum, spot) => sum + Number(spot.longitude), 0) / spots.length,
+          spots.reduce((sum, spot) => sum + Number(spot.latitude), 0) / spots.length
+        ]
+      : [-118.2437, 34.0522]; // Default to LA
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: center,
+      zoom: 12
+    });
+
+    // Add navigation controls
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+  }, [mapboxToken, spots]);
+
+  // Add markers for spots
+  useEffect(() => {
+    if (!map.current || !spots.length) return;
+
+    // Clear existing markers
+    markers.current.forEach(marker => marker.remove());
+    markers.current = [];
+
+    spots.forEach((spot) => {
+      // Create custom marker element
+      const markerElement = document.createElement('div');
+      markerElement.className = 'relative cursor-pointer';
+      markerElement.innerHTML = `
+        <div class="bg-primary text-primary-foreground px-3 py-1 rounded-full shadow-lg font-semibold text-sm whitespace-nowrap">
+          $${spot.hourly_rate}/hr
+        </div>
+        <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-primary"></div>
+      `;
+
+      // Create marker
+      const marker = new mapboxgl.Marker({ element: markerElement })
+        .setLngLat([Number(spot.longitude), Number(spot.latitude)])
+        .addTo(map.current!);
+
+      // Add click handler
+      markerElement.addEventListener('click', () => {
+        setSelectedSpot(spot);
+      });
+
+      markers.current.push(marker);
+    });
+  }, [spots]);
 
   const handleSpotClick = (spot: Spot) => {
     setSelectedSpot(spot);
   };
+
+  if (isLoading) {
+    return (
+      <div className="relative w-full h-full flex items-center justify-center bg-muted">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+          <p className="text-sm text-muted-foreground">Loading map...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!mapboxToken) {
+    return (
+      <div className="relative w-full h-full flex items-center justify-center bg-muted">
+        <div className="text-center p-4">
+          <p className="text-sm text-muted-foreground mb-2">Map not available</p>
+          <p className="text-xs text-muted-foreground">Please configure Mapbox token</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-full">
       {/* Map Container */}
       <div 
         ref={mapContainer} 
-        className="absolute inset-0 bg-gradient-to-br from-blue-100 to-green-100"
-        style={{
-          backgroundImage: `
-            linear-gradient(45deg, #f0f9ff 25%, transparent 25%),
-            linear-gradient(-45deg, #f0f9ff 25%, transparent 25%),
-            linear-gradient(45deg, transparent 75%, #f0f9ff 75%),
-            linear-gradient(-45deg, transparent 75%, #f0f9ff 75%)
-          `,
-          backgroundSize: '20px 20px',
-          backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
-        }}
+        className="absolute inset-0"
       />
-      
-      {/* Parking Spot Markers */}
-      {spots.map((spot) => {
-        const x = 20 + (spot.id * 180); // Mock positioning
-        const y = 100 + (spot.id * 120);
-        
-        return (
-          <div
-            key={spot.id}
-            className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer"
-            style={{ left: `${x}px`, top: `${y}px` }}
-            onClick={() => handleSpotClick(spot)}
-          >
-            {/* Price Marker */}
-            <div className="relative">
-              <div className="bg-primary text-primary-foreground px-3 py-1 rounded-full shadow-lg font-semibold text-sm whitespace-nowrap">
-                ${spot.hourlyRate}/hr
-              </div>
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-primary"></div>
-            </div>
-            
-            {/* Car Icon */}
-            <div className="absolute top-8 left-1/2 transform -translate-x-1/2">
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center shadow-lg">
-                <div className="w-4 h-3 bg-primary-foreground rounded-sm"></div>
-              </div>
-            </div>
-          </div>
-        );
-      })}
 
       {/* Selected Spot Details Card */}
       {selectedSpot && (
-        <div className="absolute bottom-4 left-4 right-4">
+        <div className="absolute bottom-4 left-4 right-4 z-10">
           <Card className="p-4 bg-background/95 backdrop-blur-sm">
             <div className="flex gap-3">
               <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0">
                 <img 
-                  src="/placeholder.svg" 
+                  src={selectedSpot.spot_photos?.[0]?.url || "/placeholder.svg"}
                   alt={selectedSpot.title}
                   className="w-full h-full object-cover rounded-lg"
                 />
@@ -105,7 +164,7 @@ const MapView = ({ spots }: MapViewProps) => {
                 <div className="flex justify-between items-start gap-2">
                   <h3 className="font-semibold text-base leading-tight">{selectedSpot.title}</h3>
                   <div className="text-right flex-shrink-0">
-                    <p className="font-bold text-primary text-lg">${selectedSpot.hourlyRate}/hr</p>
+                    <p className="font-bold text-primary text-lg">${selectedSpot.hourly_rate}/hr</p>
                   </div>
                 </div>
                 
@@ -114,26 +173,12 @@ const MapView = ({ spots }: MapViewProps) => {
                   <span className="leading-tight">{selectedSpot.address}</span>
                 </div>
                 
-                {selectedSpot.distance && (
-                  <p className="text-sm text-muted-foreground">{selectedSpot.distance} • {selectedSpot.walkTime}</p>
-                )}
-                
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
                     <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                    <span className="font-medium text-sm">{selectedSpot.rating}</span>
-                    <span className="text-muted-foreground text-sm">({selectedSpot.reviews})</span>
+                    <span className="font-medium text-sm">{selectedSpot.profiles?.rating || 'New'}</span>
+                    <span className="text-muted-foreground text-sm">({selectedSpot.profiles?.review_count || 0})</span>
                   </div>
-
-                  {selectedSpot.amenities && (
-                    <div className="flex gap-1">
-                      {selectedSpot.amenities.slice(0, 2).map((amenity, index) => (
-                        <Badge key={index} variant="outline" className="text-xs px-1.5 py-0.5">
-                          {amenity}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -157,16 +202,6 @@ const MapView = ({ spots }: MapViewProps) => {
           </Card>
         </div>
       )}
-
-      {/* Map Controls */}
-      <div className="absolute bottom-6 right-6 flex flex-col gap-2">
-        <Button variant="outline" size="sm" className="w-10 h-10 p-0">
-          <Navigation className="h-4 w-4" />
-        </Button>
-        <Button variant="outline" size="sm" className="w-10 h-10 p-0">
-          <MapPin className="h-4 w-4" />
-        </Button>
-      </div>
     </div>
   );
 };
