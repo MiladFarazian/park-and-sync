@@ -133,12 +133,17 @@ const SearchResults = () => {
       onClick={() => navigate(`/spot/${spot.id}`)}
     >
       <div className="flex gap-3">
-        <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0">
-          <img 
-            src="/placeholder.svg" 
-            alt={spot.title}
-            className="w-full h-full object-cover rounded-lg"
-          />
+        <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
+          {spot.imageUrl ? (
+            <img 
+              src={spot.imageUrl} 
+              alt={spot.title}
+              loading="lazy"
+              className="w-full h-full object-cover rounded-lg"
+            />
+          ) : (
+            <div className="w-full h-full bg-muted" />
+          )}
         </div>
         
         <div className="flex-1 space-y-2 min-w-0">

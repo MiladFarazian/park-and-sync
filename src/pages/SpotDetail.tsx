@@ -166,6 +166,7 @@ const SpotDetail = () => {
         <img 
           src={spot.images[currentImageIndex]} 
           alt={spot.title}
+          loading="lazy"
           className="w-full h-full object-cover"
         />
         
