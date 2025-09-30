@@ -182,7 +182,7 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
           'text-size': 11,
           'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
           'text-allow-overlap': true,
-          'text-offset': [0, -2.1]
+          'text-offset': [0, -2.8]
         },
         paint: {
           'text-color': 'hsl(222, 47%, 47%)',
