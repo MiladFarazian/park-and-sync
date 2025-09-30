@@ -111,69 +111,117 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
   useEffect(() => {
     if (!map.current || !spots.length || !mapReady) return;
 
-    // Clear existing markers
+    // Clear existing HTML markers
     markers.current.forEach(marker => marker.remove());
     markers.current = [];
 
-    spots.forEach((spot) => {
-      const rawLat = Number(spot.lat);
-      const rawLng = Number(spot.lng);
+    // Remove old layers if they exist
+    const sourceId = 'spots-source';
+    const circleId = 'spots-circles';
+    const shadowId = 'spots-circles-shadow';
+    const labelId = 'spots-labels';
 
-      const withinLat = (v: number) => v >= -90 && v <= 90;
-      const withinLng = (v: number) => v >= -180 && v <= 180;
+    if (map.current.getLayer(labelId)) map.current.removeLayer(labelId);
+    if (map.current.getLayer(circleId)) map.current.removeLayer(circleId);
+    if (map.current.getLayer(shadowId)) map.current.removeLayer(shadowId);
+    if (map.current.getSource(sourceId)) map.current.removeSource(sourceId);
 
-      let lat = rawLat;
-      let lng = rawLng;
-
-      if (!withinLat(lat) || !withinLng(lng)) {
-        if (withinLat(rawLng) && withinLng(rawLat)) {
-          lat = rawLng;
-          lng = rawLat;
-        } else {
-          console.warn('Invalid coordinates for spot, skipping:', spot.title, { rawLat, rawLng });
-          return;
+    // Render spots using Mapbox layers with pin shape
+    const features = spots
+      .map((spot) => {
+        const rawLat = Number(spot.lat);
+        const rawLng = Number(spot.lng);
+        const latOk = !isNaN(rawLat) && rawLat >= -90 && rawLat <= 90;
+        const lngOk = !isNaN(rawLng) && rawLng >= -180 && rawLng <= 180;
+        let lat = rawLat;
+        let lng = rawLng;
+        if (!latOk || !lngOk) {
+          if (!isNaN(rawLng) && rawLng >= -90 && rawLng <= 90 && !isNaN(rawLat) && rawLat >= -180 && rawLat <= 180) {
+            lat = rawLng;
+            lng = rawLat;
+          } else {
+            console.warn('Skipping invalid coords for spot', spot.title, rawLat, rawLng);
+            return null;
+          }
         }
-      }
-
-      // Create custom pin marker with teardrop shape
-      const markerElement = document.createElement('div');
-      markerElement.className = 'relative cursor-pointer';
-      markerElement.style.width = '50px';
-      markerElement.style.height = '60px';
-      markerElement.innerHTML = `
-        <svg width="50" height="60" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));">
-          <!-- Teardrop pin shape -->
-          <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
-                fill="hsl(222, 47%, 47%)" 
-                stroke="white" 
-                stroke-width="2.5"/>
-          <!-- Price circle inside pin -->
-          <circle cx="25" cy="20" r="13" fill="white" opacity="0.95"/>
-          <!-- Price text -->
-          <text x="25" y="25" 
-                text-anchor="middle" 
-                fill="hsl(222, 47%, 47%)" 
-                font-size="11" 
-                font-weight="700" 
-                font-family="system-ui, -apple-system, sans-serif">$${spot.hourlyRate}</text>
-        </svg>
-      `;
-
-      // Create marker with bottom-center anchor for pin tip
-      const marker = new mapboxgl.Marker({ 
-        element: markerElement, 
-        anchor: 'bottom' 
+        return {
+          type: 'Feature',
+          properties: { id: spot.id, title: spot.title, price: `$${spot.hourlyRate}` },
+          geometry: { type: 'Point', coordinates: [lng, lat] as [number, number] },
+        } as any;
       })
-        .setLngLat([lng, lat])
-        .addTo(map.current!);
+      .filter(Boolean);
 
-      // Add click handler
-      markerElement.addEventListener('click', () => {
-        setSelectedSpot(spot);
-      });
+    const data = { type: 'FeatureCollection', features } as any;
 
-      markers.current.push(marker);
-    });
+    map.current.addSource(sourceId, { type: 'geojson', data } as any);
+
+    // Teardrop pin body (larger circle at top)
+    map.current.addLayer({
+      id: circleId,
+      type: 'circle',
+      source: sourceId,
+      paint: {
+        'circle-radius': 18,
+        'circle-color': 'hsl(222, 47%, 47%)', // Signature blue
+        'circle-stroke-width': 3,
+        'circle-stroke-color': '#ffffff',
+        'circle-translate': [0, -12], // Offset up for teardrop effect
+      },
+    } as any);
+
+    // Pin tip (small circle at bottom for teardrop point)
+    map.current.addLayer({
+      id: `${circleId}-tip`,
+      type: 'circle',
+      source: sourceId,
+      paint: {
+        'circle-radius': 4,
+        'circle-color': 'hsl(222, 47%, 47%)',
+        'circle-translate': [0, 2], // Offset down for pin tip
+      },
+    } as any);
+
+    // Pin shadow/base
+    map.current.addLayer({
+      id: shadowId,
+      type: 'circle',
+      source: sourceId,
+      paint: {
+        'circle-radius': 6,
+        'circle-color': 'rgba(0, 0, 0, 0.3)',
+        'circle-blur': 1,
+        'circle-translate': [0, 4],
+      },
+    } as any);
+
+    // Price labels
+    map.current.addLayer({
+      id: labelId,
+      type: 'symbol',
+      source: sourceId,
+      layout: {
+        'text-field': ['get', 'price'],
+        'text-size': 12,
+        'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+        'text-allow-overlap': true,
+        'text-offset': [0, -0.75], // Offset up to center in pin
+      },
+      paint: {
+        'text-color': '#ffffff',
+        'text-halo-color': 'hsl(222, 47%, 35%)',
+        'text-halo-width': 1,
+      },
+    } as any);
+
+    const onClick = (e: any) => {
+      const f = e.features?.[0];
+      if (!f) return;
+      const spot = spots.find((s) => s.id === f.properties.id);
+      if (spot) setSelectedSpot(spot);
+    };
+    map.current.on('click', circleId, onClick);
+    map.current.on('click', labelId, onClick);
 
     // Trigger visible spots count update after rendering
     if (map.current) {
@@ -188,7 +236,7 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
       }, 100);
     }
 
-    console.log('Added', markers.current.length, 'pin markers to map');
+    console.log('Rendered', features.length, 'spot pins via layers');
   }, [spots, mapReady]);
 
   const handleSpotClick = (spot: Spot) => {
