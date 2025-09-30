@@ -171,7 +171,7 @@ const SpotDetail = () => {
         />
         
         <div className="absolute top-4 left-4 right-4 flex justify-between">
-          <Button variant="secondary" size="sm" onClick={() => navigate(-1)}>
+          <Button variant="secondary" size="sm" onClick={() => navigate('/search-results')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex gap-2">
