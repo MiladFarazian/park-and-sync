@@ -166,7 +166,7 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
         source: sourceId,
         layout: {
           'icon-image': pinImageId,
-          'icon-size': 1.0,
+          'icon-size': 1.2,
           'icon-allow-overlap': true,
           'icon-anchor': 'bottom'
         }
