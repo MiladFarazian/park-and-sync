@@ -185,7 +185,7 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
           'text-offset': [0, -2.8]
         },
         paint: {
-          'text-color': 'hsl(222, 47%, 47%)',
+          'text-color': 'hsl(250, 100%, 65%)',
           'text-halo-color': '#ffffff',
           'text-halo-width': 0.5
         }
@@ -225,7 +225,7 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
           </defs>
           <g filter="url(#shadow)">
             <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
-                  fill="hsl(222, 47%, 47%)" stroke="white" stroke-width="2.5"/>
+                  fill="hsl(250, 100%, 65%)" stroke="white" stroke-width="2.5"/>
             <circle cx="25" cy="20" r="13" fill="white" opacity="0.95"/>
           </g>
         </svg>`;
