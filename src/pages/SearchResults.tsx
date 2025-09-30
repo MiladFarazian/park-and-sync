@@ -202,7 +202,6 @@ const SearchResults = () => {
               <h1 className="font-semibold">
                 {loading ? 'Searching...' : `${visibleSpotCount || parkingSpots.length} spots ${viewMode === 'map' && visibleSpotCount !== parkingSpots.length ? 'visible' : 'nearby'}`}
               </h1>
-              <p className="text-sm text-muted-foreground">{location}</p>
             </div>
           </div>
           
