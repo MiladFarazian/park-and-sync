@@ -111,101 +111,70 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
   useEffect(() => {
     if (!map.current || !spots.length || !mapReady) return;
 
-    // Render spots using Mapbox layers (stable on zoom)
-    const sourceId = 'spots-source';
-    const circleId = 'spots-circles';
-    const labelId = 'spots-labels';
+    // Clear existing markers
+    markers.current.forEach(marker => marker.remove());
+    markers.current = [];
 
-    const features = spots
-      .map((spot) => {
-        const rawLat = Number(spot.lat);
-        const rawLng = Number(spot.lng);
-        const latOk = !isNaN(rawLat) && rawLat >= -90 && rawLat <= 90;
-        const lngOk = !isNaN(rawLng) && rawLng >= -180 && rawLng <= 180;
-        let lat = rawLat;
-        let lng = rawLng;
-        if (!latOk || !lngOk) {
-          if (!isNaN(rawLng) && rawLng >= -90 && rawLng <= 90 && !isNaN(rawLat) && rawLat >= -180 && rawLat <= 180) {
-            lat = rawLng;
-            lng = rawLat;
-          } else {
-            console.warn('Skipping invalid coords for spot', spot.title, rawLat, rawLng);
-            return null;
-          }
+    spots.forEach((spot) => {
+      const rawLat = Number(spot.lat);
+      const rawLng = Number(spot.lng);
+
+      const withinLat = (v: number) => v >= -90 && v <= 90;
+      const withinLng = (v: number) => v >= -180 && v <= 180;
+
+      let lat = rawLat;
+      let lng = rawLng;
+
+      if (!withinLat(lat) || !withinLng(lng)) {
+        if (withinLat(rawLng) && withinLng(rawLat)) {
+          lat = rawLng;
+          lng = rawLat;
+        } else {
+          console.warn('Invalid coordinates for spot, skipping:', spot.title, { rawLat, rawLng });
+          return;
         }
-        return {
-          type: 'Feature',
-          properties: { id: spot.id, title: spot.title, price: `$${spot.hourlyRate}` },
-          geometry: { type: 'Point', coordinates: [lng, lat] as [number, number] },
-        } as any;
+      }
+
+      // Create custom pin marker with teardrop shape
+      const markerElement = document.createElement('div');
+      markerElement.className = 'relative cursor-pointer';
+      markerElement.style.width = '50px';
+      markerElement.style.height = '60px';
+      markerElement.innerHTML = `
+        <svg width="50" height="60" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));">
+          <!-- Teardrop pin shape -->
+          <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
+                fill="hsl(222, 47%, 47%)" 
+                stroke="white" 
+                stroke-width="2.5"/>
+          <!-- Price circle inside pin -->
+          <circle cx="25" cy="20" r="13" fill="white" opacity="0.95"/>
+          <!-- Price text -->
+          <text x="25" y="25" 
+                text-anchor="middle" 
+                fill="hsl(222, 47%, 47%)" 
+                font-size="11" 
+                font-weight="700" 
+                font-family="system-ui, -apple-system, sans-serif">$${spot.hourlyRate}</text>
+        </svg>
+      `;
+
+      // Create marker with bottom-center anchor for pin tip
+      const marker = new mapboxgl.Marker({ 
+        element: markerElement, 
+        anchor: 'bottom' 
       })
-      .filter(Boolean);
+        .setLngLat([lng, lat])
+        .addTo(map.current!);
 
-    const data = { type: 'FeatureCollection', features } as any;
+      // Add click handler
+      markerElement.addEventListener('click', () => {
+        setSelectedSpot(spot);
+      });
 
-    if (map.current.getSource(sourceId)) {
-      (map.current.getSource(sourceId) as any).setData(data);
-    } else {
-      map.current.addSource(sourceId, { type: 'geojson', data } as any);
-      
-      // Pin body (circle)
-      map.current.addLayer({
-        id: circleId,
-        type: 'circle',
-        source: sourceId,
-        paint: {
-          'circle-radius': 18,
-          'circle-color': 'hsl(222, 47%, 47%)', // Signature blue
-          'circle-stroke-width': 3,
-          'circle-stroke-color': '#ffffff',
-          'circle-translate': [0, -8], // Offset up for pin effect
-        },
-      } as any);
+      markers.current.push(marker);
+    });
 
-      // Pin shadow/base
-      map.current.addLayer({
-        id: `${circleId}-shadow`,
-        type: 'circle', 
-        source: sourceId,
-        paint: {
-          'circle-radius': 6,
-          'circle-color': 'rgba(0, 0, 0, 0.3)',
-          'circle-blur': 1,
-          'circle-translate': [0, 8], // Offset down for shadow
-        },
-      } as any);
-
-      // Price labels
-      map.current.addLayer({
-        id: labelId,
-        type: 'symbol',
-        source: sourceId,
-        layout: {
-          'text-field': ['get', 'price'],
-          'text-size': 12,
-          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-          'text-allow-overlap': true,
-          'text-offset': [0, -0.5], // Offset up to center in pin
-        },
-        paint: { 
-          'text-color': '#ffffff',
-          'text-halo-color': 'hsl(222, 47%, 35%)',
-          'text-halo-width': 1,
-        },
-      } as any);
-
-      const onClick = (e: any) => {
-        const f = e.features?.[0];
-        if (!f) return;
-        const spot = spots.find((s) => s.id === f.properties.id);
-        if (spot) setSelectedSpot(spot);
-      };
-      map.current.on('click', circleId, onClick);
-      map.current.on('click', labelId, onClick);
-    }
-
-    // Don't auto-fit bounds - keep zoomed to search center at neighborhood level
-    
     // Trigger visible spots count update after rendering
     if (map.current) {
       setTimeout(() => {
@@ -219,149 +188,7 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
       }, 100);
     }
 
-    console.log('Rendered spots via layers:', (features as any).length);
-    return;
-
-    // Clear existing markers
-    markers.current.forEach(marker => marker.remove());
-    markers.current = [];
-
-    const bounds = new mapboxgl.LngLatBounds();
-
-    spots.forEach((spot) => {
-      console.log('Creating marker for spot:', spot.title, 'at lat:', spot.lat, 'lng:', spot.lng);
-      
-      // Validate and normalize coordinates
-      const rawLat = Number(spot.lat);
-      const rawLng = Number(spot.lng);
-
-      const withinLat = (v: number) => v >= -90 && v <= 90;
-      const withinLng = (v: number) => v >= -180 && v <= 180;
-
-      let lat = rawLat;
-      let lng = rawLng;
-
-      if (!withinLat(lat) || !withinLng(lng)) {
-        // Try swapping if developer data came in [lng, lat]
-        if (withinLat(rawLng) && withinLng(rawLat)) {
-          console.warn('Swapped lat/lng for spot due to invalid order:', spot.title, { rawLat, rawLng });
-          lat = rawLng;
-          lng = rawLat;
-        } else {
-          console.error('Invalid coordinates for spot, skipping:', spot.title, { rawLat, rawLng });
-          return;
-        }
-      }
-
-      // Extra sanity check for LA area (optional)
-      const inLABox = lat > 33 && lat < 35 && lng > -119.8 && lng < -116.5;
-      if (!inLABox) {
-        console.warn('Spot outside expected LA bounds:', spot.title, { lat, lng });
-      }
-      
-      // Create custom marker element
-      const markerElement = document.createElement('div');
-      markerElement.className = 'relative cursor-pointer';
-      markerElement.innerHTML = `
-        <div style="
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        ">
-          <div style="
-            width: 40px;
-            height: 40px;
-            background-color: #1f2937;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            border: 3px solid white;
-            position: relative;
-          ">
-            <div style="
-              color: white;
-              font-weight: 700;
-              font-size: 11px;
-            ">$${spot.hourlyRate}</div>
-          </div>
-          <div style="
-            position: absolute;
-            top: 32px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 0;
-            height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            border-top: 12px solid #1f2937;
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-          "></div>
-        </div>
-      `;
-
-      // Create marker with bottom anchor for pin - ensure correct order [lng, lat]
-      const marker = new mapboxgl.Marker({ element: markerElement, anchor: 'bottom' })
-        .setLngLat([lng, lat])
-        .addTo(map.current!);
-
-      console.log('Marker added at:', [lng, lat]);
-
-      // Extend bounds
-      bounds.extend([lng, lat]);
-
-      // Add click handler
-      markerElement.addEventListener('click', () => {
-        setSelectedSpot(spot);
-      });
-
-      markers.current.push(marker);
-    });
-
-    // Fit map to markers
-    if (!bounds.isEmpty()) {
-      map.current.fitBounds(bounds, { padding: 80, maxZoom: 13, duration: 500 });
-    }
-
-    // Debug: draw a small circle layer at each spot to verify positions
-    const geojson = {
-      type: 'FeatureCollection',
-      features: spots
-        .map((spot) => {
-          const lat = Number(spot.lat);
-          const lng = Number(spot.lng);
-          if (isNaN(lat) || isNaN(lng)) return null;
-          return {
-            type: 'Feature',
-            properties: { id: spot.id },
-            geometry: { type: 'Point', coordinates: [lng, lat] },
-          };
-        })
-        .filter(Boolean) as any[],
-    } as any;
-
-    const srcId = 'spots-debug';
-    const layerId = 'spots-debug-layer';
-    if (map.current.getSource(srcId)) {
-      (map.current.getSource(srcId) as any).setData(geojson);
-    } else {
-      map.current.addSource(srcId, { type: 'geojson', data: geojson } as any);
-      map.current.addLayer({
-        id: layerId,
-        type: 'circle',
-        source: srcId,
-        paint: {
-          'circle-radius': 5,
-          'circle-color': '#ef4444',
-          'circle-stroke-width': 1,
-          'circle-stroke-color': '#ffffff',
-        },
-      } as any);
-    }
-
-    console.log('Added', markers.current.length, 'markers to map');
+    console.log('Added', markers.current.length, 'pin markers to map');
   }, [spots, mapReady]);
 
   const handleSpotClick = (spot: Spot) => {
