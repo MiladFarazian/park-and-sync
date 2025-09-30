@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import BookingModal from '@/components/booking/BookingModal';
 
 // Import the generated images
 import uscGarage from '@/assets/usc-garage.jpg';
@@ -40,6 +41,7 @@ const SpotDetail = () => {
   const [spot, setSpot] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [bookingModalOpen, setBookingModalOpen] = useState(false);
 
   // Map of image paths
   const imageMap: { [key: string]: string } = {
@@ -206,7 +208,7 @@ const SpotDetail = () => {
           </div>
 
           <div className="flex gap-3 mb-6">
-            <Button className="flex-1">
+            <Button className="flex-1" onClick={() => setBookingModalOpen(true)}>
               <Calendar className="h-4 w-4 mr-2" />
               Book Now
             </Button>
@@ -270,9 +272,23 @@ const SpotDetail = () => {
               <span className="text-sm font-medium">{spot.rating || 'New'}</span>
             </div>
           </div>
-          <Button size="lg">Book Now</Button>
+          <Button size="lg" onClick={() => setBookingModalOpen(true)}>Book Now</Button>
         </div>
       </div>
+
+      {spot && (
+        <BookingModal
+          open={bookingModalOpen}
+          onOpenChange={setBookingModalOpen}
+          spot={{
+            id: spot.id,
+            title: spot.title,
+            hourlyRate: spot.hourlyRate,
+            dailyRate: spot.dailyRate,
+            address: spot.address,
+          }}
+        />
+      )}
     </div>
   );
 };
