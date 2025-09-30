@@ -199,9 +199,9 @@ const SpotDetail = () => {
             </div>
           </div>
           
-          <div className="flex items-center gap-1 text-muted-foreground mb-4">
-            <MapPin className="h-4 w-4" />
-            <span>{spot.address}</span>
+          <div className="flex items-start gap-2 text-muted-foreground mb-4">
+            <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <span className="leading-relaxed">{spot.address}</span>
           </div>
 
           <div className="flex gap-3 mb-6">
