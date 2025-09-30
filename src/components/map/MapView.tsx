@@ -100,6 +100,11 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
 
     map.current.on('moveend', updateVisibleSpots);
     map.current.on('zoomend', updateVisibleSpots);
+    
+    // Initial update after map loads
+    map.current.on('idle', () => {
+      updateVisibleSpots();
+    });
   }, [mapboxToken, spots, onVisibleSpotsChange]);
 
   // Add markers for spots
@@ -200,6 +205,19 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
     }
 
     // Don't auto-fit bounds - keep zoomed to search center at neighborhood level
+    
+    // Trigger visible spots count update after rendering
+    if (map.current) {
+      setTimeout(() => {
+        const bounds = map.current!.getBounds();
+        const visibleSpots = spots.filter(spot => {
+          const lat = Number(spot.lat);
+          const lng = Number(spot.lng);
+          return bounds.contains([lng, lat]);
+        });
+        onVisibleSpotsChange?.(visibleSpots.length);
+      }, 100);
+    }
 
     console.log('Rendered spots via layers:', (features as any).length);
     return;
