@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
-import { Calendar, Clock, CreditCard, X } from 'lucide-react';
+import { Calendar, Clock, CreditCard, X, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
+import { format, addHours, differenceInHours } from 'date-fns';
 
 interface BookingModalProps {
   open: boolean;
@@ -24,25 +23,18 @@ interface BookingModalProps {
 
 const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
   const { toast } = useToast();
-  const [startDate, setStartDate] = useState<Date>();
-  const [endDate, setEndDate] = useState<Date>();
-  const [startTime, setStartTime] = useState<string>('09:00');
-  const [endTime, setEndTime] = useState<string>('17:00');
+  const today = new Date().toISOString().split('T')[0];
+  const [startDateTime, setStartDateTime] = useState<string>('');
+  const [endDateTime, setEndDateTime] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
-  // Generate time options (24-hour format)
-  const timeOptions = Array.from({ length: 24 }, (_, i) => {
-    const hour = i.toString().padStart(2, '0');
-    return `${hour}:00`;
-  });
-
   const calculateTotal = () => {
-    if (!startDate || !endDate) return null;
+    if (!startDateTime || !endDateTime) return null;
 
-    const start = new Date(`${format(startDate, 'yyyy-MM-dd')}T${startTime}`);
-    const end = new Date(`${format(endDate, 'yyyy-MM-dd')}T${endTime}`);
+    const start = new Date(startDateTime);
+    const end = new Date(endDateTime);
     
-    const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    const hours = differenceInHours(end, start);
     
     if (hours <= 0) return null;
 
@@ -51,7 +43,7 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
     const total = subtotal + platformFee;
 
     return {
-      hours: hours.toFixed(1),
+      hours: hours.toString(),
       subtotal: subtotal.toFixed(2),
       platformFee: platformFee.toFixed(2),
       total: total.toFixed(2),
@@ -59,10 +51,10 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
   };
 
   const handleBooking = async () => {
-    if (!startDate || !endDate) {
+    if (!startDateTime || !endDateTime) {
       toast({
-        title: "Missing dates",
-        description: "Please select start and end dates",
+        title: "Missing information",
+        description: "Please select start and end times",
         variant: "destructive",
       });
       return;
@@ -92,8 +84,8 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
         return;
       }
 
-      const startAt = new Date(`${format(startDate, 'yyyy-MM-dd')}T${startTime}`);
-      const endAt = new Date(`${format(endDate, 'yyyy-MM-dd')}T${endTime}`);
+      const startAt = new Date(startDateTime);
+      const endAt = new Date(endDateTime);
 
       // Create booking hold first
       const { data: holdData, error: holdError } = await supabase.functions.invoke('create-booking-hold', {
@@ -140,113 +132,95 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold">Book {spot.title}</DialogTitle>
-          <p className="text-sm text-muted-foreground">{spot.address}</p>
+          <DialogTitle className="text-xl font-bold">Book Parking</DialogTitle>
+          <p className="text-sm text-muted-foreground">{spot.title}</p>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          {/* Date Selection */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Start Date</Label>
-              <CalendarComponent
-                mode="single"
-                selected={startDate}
-                onSelect={setStartDate}
-                disabled={(date) => date < new Date()}
-                className="rounded-md border"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>End Date</Label>
-              <CalendarComponent
-                mode="single"
-                selected={endDate}
-                onSelect={setEndDate}
-                disabled={(date) => date < new Date() || (startDate && date < startDate)}
-                className="rounded-md border"
-              />
-            </div>
+        <div className="space-y-4 py-4">
+          {/* Start Date & Time */}
+          <div className="space-y-2">
+            <Label htmlFor="start" className="text-base font-semibold flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Start
+            </Label>
+            <Input
+              id="start"
+              type="datetime-local"
+              value={startDateTime}
+              onChange={(e) => setStartDateTime(e.target.value)}
+              min={new Date().toISOString().slice(0, 16)}
+              className="text-base"
+            />
           </div>
 
-          {/* Time Selection */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Start Time</Label>
-              <Select value={startTime} onValueChange={setStartTime}>
-                <SelectTrigger>
-                  <Clock className="h-4 w-4 mr-2" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {timeOptions.map((time) => (
-                    <SelectItem key={time} value={time}>
-                      {time}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>End Time</Label>
-              <Select value={endTime} onValueChange={setEndTime}>
-                <SelectTrigger>
-                  <Clock className="h-4 w-4 mr-2" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {timeOptions.map((time) => (
-                    <SelectItem key={time} value={time}>
-                      {time}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          {/* End Date & Time */}
+          <div className="space-y-2">
+            <Label htmlFor="end" className="text-base font-semibold flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              End
+            </Label>
+            <Input
+              id="end"
+              type="datetime-local"
+              value={endDateTime}
+              onChange={(e) => setEndDateTime(e.target.value)}
+              min={startDateTime || new Date().toISOString().slice(0, 16)}
+              className="text-base"
+            />
           </div>
 
           {/* Pricing Breakdown */}
           {pricing && (
-            <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
-              <h3 className="font-semibold">Pricing Details</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    ${spot.hourlyRate}/hr × {pricing.hours} hours
-                  </span>
-                  <span className="font-medium">${pricing.subtotal}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Platform fee (15%)</span>
-                  <span className="font-medium">${pricing.platformFee}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-base">
-                  <span className="font-semibold">Total</span>
-                  <span className="font-bold text-primary">${pricing.total}</span>
+            <>
+              <Separator />
+              <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+                <h3 className="font-semibold">Pricing Summary</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      ${spot.hourlyRate}/hr × {pricing.hours} hours
+                    </span>
+                    <span className="font-medium">${pricing.subtotal}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Service fee</span>
+                    <span className="font-medium">${pricing.platformFee}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between text-lg">
+                    <span className="font-bold">Total</span>
+                    <span className="font-bold text-primary">${pricing.total}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            </>
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex flex-col gap-3 pt-2">
             <Button
-              variant="outline"
-              className="flex-1"
+              className="w-full"
+              size="lg"
+              onClick={handleBooking}
+              disabled={!startDateTime || !endDateTime || !pricing || loading}
+            >
+              {loading ? (
+                'Processing...'
+              ) : (
+                <>
+                  Confirm & Pay ${pricing?.total || '0.00'}
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </>
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full"
               onClick={() => onOpenChange(false)}
             >
               Cancel
-            </Button>
-            <Button
-              className="flex-1"
-              onClick={handleBooking}
-              disabled={!startDate || !endDate || !pricing || loading}
-            >
-              <CreditCard className="h-4 w-4 mr-2" />
-              {loading ? 'Processing...' : 'Confirm Booking'}
             </Button>
           </div>
         </div>
