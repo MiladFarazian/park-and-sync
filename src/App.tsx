@@ -7,6 +7,7 @@ import AppLayout from "./components/layout/AppLayout";
 import Search from "./pages/Search";
 import SearchResults from "./pages/SearchResults";
 import SpotDetail from "./pages/SpotDetail";
+import Booking from "./pages/Booking";
 import Bookings from "./pages/Bookings";
 import HostDashboard from "./pages/HostDashboard";
 import Profile from "./pages/Profile";
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/search-results" element={<SearchResults />} />
             <Route path="/spot/:id" element={<SpotDetail />} />
+            <Route path="/book/:spotId" element={<Booking />} />
             <Route path="/*" element={
               <AppLayout>
                 <Routes>
