@@ -85,7 +85,7 @@ const SearchResults = () => {
         body: {
           latitude,
           longitude,
-          radius: 40000, // 40km radius to cover all of LA
+          radius: 10000, // 10km radius for local area
           start_time: startTime,
           end_time: endTime
         }
@@ -266,18 +266,18 @@ const SearchResults = () => {
         </div>
       ) : (
         <div className="p-4 space-y-6">
-          {/* Spots within the searched area (within 5km) */}
+          {/* Spots within the searched area (within 2km) */}
           {(() => {
             const nearbySpots = parkingSpots.filter(spot => {
               if (!spot.distance) return true;
               const distanceKm = parseFloat(spot.distance.split(' ')[0]);
-              return distanceKm <= 5;
+              return distanceKm <= 2;
             });
             
             const otherSpots = parkingSpots.filter(spot => {
               if (!spot.distance) return false;
               const distanceKm = parseFloat(spot.distance.split(' ')[0]);
-              return distanceKm > 5;
+              return distanceKm > 2;
             });
 
             return (
