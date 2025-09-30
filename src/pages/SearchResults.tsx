@@ -265,10 +265,51 @@ const SearchResults = () => {
           />
         </div>
       ) : (
-        <div className="p-4 space-y-3">
-          {parkingSpots.map((spot) => (
-            <SpotCard key={spot.id} spot={spot} />
-          ))}
+        <div className="p-4 space-y-6">
+          {/* Spots within the searched area (within 5km) */}
+          {(() => {
+            const nearbySpots = parkingSpots.filter(spot => {
+              if (!spot.distance) return true;
+              const distanceKm = parseFloat(spot.distance.split(' ')[0]);
+              return distanceKm <= 5;
+            });
+            
+            const otherSpots = parkingSpots.filter(spot => {
+              if (!spot.distance) return false;
+              const distanceKm = parseFloat(spot.distance.split(' ')[0]);
+              return distanceKm > 5;
+            });
+
+            return (
+              <>
+                {nearbySpots.length > 0 && (
+                  <div className="space-y-3">
+                    <div>
+                      <h2 className="font-semibold text-lg">In {location}</h2>
+                      <p className="text-sm text-muted-foreground">{nearbySpots.length} spot{nearbySpots.length !== 1 ? 's' : ''} within the area</p>
+                    </div>
+                    {nearbySpots.map((spot) => (
+                      <SpotCard key={spot.id} spot={spot} />
+                    ))}
+                  </div>
+                )}
+
+                {otherSpots.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="pt-4 border-t">
+                      <h2 className="font-semibold text-lg">Other Listings Around LA</h2>
+                      <p className="text-sm text-muted-foreground">
+                        {otherSpots.length} spot{otherSpots.length !== 1 ? 's' : ''} outside your specified area
+                      </p>
+                    </div>
+                    {otherSpots.map((spot) => (
+                      <SpotCard key={spot.id} spot={spot} />
+                    ))}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
     </div>
