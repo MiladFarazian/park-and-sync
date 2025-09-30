@@ -154,79 +154,55 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
 
     const data = { type: 'FeatureCollection', features } as any;
 
-    map.current.addSource(sourceId, { type: 'geojson', data } as any);
+    (map.current as any).addSource(sourceId, { type: 'geojson', data } as any);
 
-    // Teardrop pin body (larger circle at top)
-    map.current.addLayer({
-      id: circleId,
-      type: 'circle',
-      source: sourceId,
-      paint: {
-        'circle-radius': 18,
-        'circle-color': 'hsl(222, 47%, 47%)', // Signature blue
-        'circle-stroke-width': 3,
-        'circle-stroke-color': '#ffffff',
-        'circle-translate': [0, -12], // Offset up for teardrop effect
-      },
-    } as any);
+    const pinImageId = 'pin-blue';
 
-    // Pin tip (small circle at bottom for teardrop point)
-    map.current.addLayer({
-      id: `${circleId}-tip`,
-      type: 'circle',
-      source: sourceId,
-      paint: {
-        'circle-radius': 4,
-        'circle-color': 'hsl(222, 47%, 47%)',
-        'circle-translate': [0, 2], // Offset down for pin tip
-      },
-    } as any);
+    const addLayers = () => {
+      // Symbol layer for the pin image (anchor at tip)
+      (map.current as any).addLayer({
+        id: circleId,
+        type: 'symbol',
+        source: sourceId,
+        layout: {
+          'icon-image': pinImageId,
+          'icon-size': 0.8,
+          'icon-allow-overlap': true,
+          'icon-anchor': 'bottom'
+        }
+      } as any);
 
-    // Pin shadow/base
-    map.current.addLayer({
-      id: shadowId,
-      type: 'circle',
-      source: sourceId,
-      paint: {
-        'circle-radius': 6,
-        'circle-color': 'rgba(0, 0, 0, 0.3)',
-        'circle-blur': 1,
-        'circle-translate': [0, 4],
-      },
-    } as any);
+      // Price text centered inside the pin head
+      (map.current as any).addLayer({
+        id: labelId,
+        type: 'symbol',
+        source: sourceId,
+        layout: {
+          'text-field': ['get', 'price'],
+          'text-size': 11,
+          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+          'text-allow-overlap': true,
+          'text-offset': [0, -2.1]
+        },
+        paint: {
+          'text-color': 'hsl(222, 47%, 47%)',
+          'text-halo-color': '#ffffff',
+          'text-halo-width': 0.5
+        }
+      } as any);
 
-    // Price labels
-    map.current.addLayer({
-      id: labelId,
-      type: 'symbol',
-      source: sourceId,
-      layout: {
-        'text-field': ['get', 'price'],
-        'text-size': 12,
-        'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-        'text-allow-overlap': true,
-        'text-offset': [0, -0.75], // Offset up to center in pin
-      },
-      paint: {
-        'text-color': '#ffffff',
-        'text-halo-color': 'hsl(222, 47%, 35%)',
-        'text-halo-width': 1,
-      },
-    } as any);
+      const onClick = (e: any) => {
+        const f = e.features?.[0];
+        if (!f) return;
+        const spot = spots.find((s) => s.id === f.properties.id);
+        if (spot) setSelectedSpot(spot);
+      };
+      (map.current as any).on('click', circleId, onClick);
+      (map.current as any).on('click', labelId, onClick);
 
-    const onClick = (e: any) => {
-      const f = e.features?.[0];
-      if (!f) return;
-      const spot = spots.find((s) => s.id === f.properties.id);
-      if (spot) setSelectedSpot(spot);
-    };
-    map.current.on('click', circleId, onClick);
-    map.current.on('click', labelId, onClick);
-
-    // Trigger visible spots count update after rendering
-    if (map.current) {
+      // Trigger visible spots count update after rendering
       setTimeout(() => {
-        const bounds = map.current!.getBounds();
+        const bounds = (map.current as any).getBounds();
         const visibleSpots = spots.filter(spot => {
           const lat = Number(spot.lat);
           const lng = Number(spot.lng);
@@ -234,9 +210,39 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
         });
         onVisibleSpotsChange?.(visibleSpots.length);
       }, 100);
-    }
 
-    console.log('Rendered', features.length, 'spot pins via layers');
+      console.log('Rendered', features.length, 'spot pins via layers');
+    };
+
+    // Ensure the pin image is available, then add layers
+    if (!(map.current as any).hasImage?.(pinImageId)) {
+      const svg = `
+        <svg width="50" height="60" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.35)" />
+            </filter>
+          </defs>
+          <g filter="url(#shadow)">
+            <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
+                  fill="hsl(222, 47%, 47%)" stroke="white" stroke-width="2.5"/>
+            <circle cx="25" cy="20" r="13" fill="white" opacity="0.95"/>
+          </g>
+        </svg>`;
+      const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      const img = new Image(50, 60);
+      img.onload = () => {
+        try {
+          (map.current as any).addImage(pinImageId, img, { pixelRatio: 2 });
+        } catch (e) {
+          console.warn('addImage error (may already exist):', e);
+        }
+        addLayers();
+      };
+      img.src = url;
+    } else {
+      addLayers();
+    }
   }, [spots, mapReady]);
 
   const handleSpotClick = (spot: Spot) => {
