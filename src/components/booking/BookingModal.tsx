@@ -29,18 +29,34 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
   const [loading, setLoading] = useState(false);
 
   const calculateTotal = () => {
-    if (!startDateTime || !endDateTime) return null;
+    if (!startDateTime || !endDateTime) {
+      console.log('Missing dates:', { startDateTime, endDateTime });
+      return null;
+    }
 
     const start = new Date(startDateTime);
     const end = new Date(endDateTime);
     
-    const hours = differenceInHours(end, start);
+    console.log('Date objects:', { start, end });
     
-    if (hours <= 0) return null;
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      console.log('Invalid date objects');
+      return null;
+    }
+    
+    const hours = differenceInHours(end, start);
+    console.log('Hours calculated:', hours);
+    
+    if (hours <= 0) {
+      console.log('Hours less than or equal to 0');
+      return null;
+    }
 
     const subtotal = hours * spot.hourlyRate;
     const platformFee = subtotal * 0.15; // 15% platform fee
     const total = subtotal + platformFee;
+
+    console.log('Pricing:', { hours, subtotal, platformFee, total });
 
     return {
       hours: hours.toString(),
@@ -129,6 +145,8 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
   };
 
   const pricing = calculateTotal();
+  
+  console.log('Current state:', { startDateTime, endDateTime, pricing });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
