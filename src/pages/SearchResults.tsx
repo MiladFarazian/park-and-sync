@@ -251,7 +251,7 @@ const SearchResults = () => {
           </div>
         </div>
       ) : viewMode === 'map' ? (
-        <div className="relative h-[calc(100vh-140px)]">
+        <div className="relative h-[calc(100vh-73px)]">
           <MapView 
             spots={parkingSpots} 
             searchCenter={getCoordinates(location)}
