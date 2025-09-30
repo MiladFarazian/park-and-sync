@@ -3,7 +3,7 @@ import { ArrowLeft, Heart, Share, Star, MapPin, Calendar, Navigation, MessageCir
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
 // Import the generated images
@@ -36,10 +36,17 @@ import griffithObservatoryArea from '@/assets/griffith-observatory-area.jpg';
 const SpotDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [spot, setSpot] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Preserve search context for navigation back
+  const location = searchParams.get('location') || 'University Park';
+  const checkIn = searchParams.get('checkIn') || new Date().toISOString().split('T')[0];
+  const checkOut = searchParams.get('checkOut') || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const searchResultsUrl = `/search-results?location=${encodeURIComponent(location)}&checkIn=${checkIn}&checkOut=${checkOut}`;
 
   // Map of image paths
   const imageMap: { [key: string]: string } = {
@@ -171,7 +178,7 @@ const SpotDetail = () => {
         />
         
         <div className="absolute top-4 left-4 right-4 flex justify-between">
-          <Button variant="secondary" size="sm" onClick={() => navigate('/search-results')}>
+          <Button variant="secondary" size="sm" onClick={() => navigate(searchResultsUrl)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex gap-2">

@@ -20,10 +20,12 @@ const SearchResults = () => {
     setVisibleSpotCount(count);
   };
 
-  // Get search parameters
-  const location = searchParams.get('location') || 'Downtown San Francisco';
-  const checkIn = searchParams.get('checkIn') || '';
-  const checkOut = searchParams.get('checkOut') || '';
+  // Get search parameters with defaults
+  const location = searchParams.get('location') || 'University Park';
+  const today = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const checkIn = searchParams.get('checkIn') || today;
+  const checkOut = searchParams.get('checkOut') || tomorrow;
 
   useEffect(() => {
     searchParkingSpots();
@@ -130,7 +132,7 @@ const SearchResults = () => {
   const SpotCard = ({ spot, isSelected = false }: { spot: any, isSelected?: boolean }) => (
     <Card 
       className={`p-4 cursor-pointer transition-all ${isSelected ? 'ring-2 ring-primary' : 'hover:shadow-md'}`}
-      onClick={() => navigate(`/spot/${spot.id}`)}
+      onClick={() => navigate(`/spot/${spot.id}?from=search&location=${encodeURIComponent(location)}&checkIn=${checkIn}&checkOut=${checkOut}`)}
     >
       <div className="flex gap-3">
         <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
