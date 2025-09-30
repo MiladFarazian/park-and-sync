@@ -200,7 +200,10 @@ const SpotDetail = () => {
             </div>
           </div>
           
-          <p className="text-muted-foreground mb-4">{spot.address}</p>
+          <div className="flex items-start gap-2 text-muted-foreground mb-4">
+            <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <p>{spot.address}</p>
+          </div>
 
           <div className="flex gap-3 mb-6">
             <Button className="flex-1">
