@@ -22,10 +22,11 @@ interface Spot {
 
 interface MapViewProps {
   spots: Spot[];
+  searchCenter?: { lat: number; lng: number };
   onVisibleSpotsChange?: (count: number) => void;
 }
 
-const MapView = ({ spots, onVisibleSpotsChange }: MapViewProps) => {
+const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) => {
   const navigate = useNavigate();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -58,8 +59,10 @@ const MapView = ({ spots, onVisibleSpotsChange }: MapViewProps) => {
 
     mapboxgl.accessToken = mapboxToken;
 
-    // Calculate center from spots if available, else default LA
-    const center: [number, number] = spots.length > 0 
+    // Use search center if provided, otherwise calculate from spots
+    const center: [number, number] = searchCenter 
+      ? [searchCenter.lng, searchCenter.lat]
+      : spots.length > 0 
       ? [
           spots.reduce((sum, spot) => sum + Number(spot.lng), 0) / spots.length,
           spots.reduce((sum, spot) => sum + Number(spot.lat), 0) / spots.length
@@ -196,18 +199,7 @@ const MapView = ({ spots, onVisibleSpotsChange }: MapViewProps) => {
       map.current.on('click', labelId, onClick);
     }
 
-    // Fit bounds to all features with neighborhood-level zoom
-    const layerBounds = new mapboxgl.LngLatBounds();
-    (features as any).forEach((f: any) => layerBounds.extend(f.geometry.coordinates as [number, number]));
-    if (!layerBounds.isEmpty()) {
-      // For neighborhood searches, maintain close zoom
-      map.current.fitBounds(layerBounds, { 
-        padding: { top: 80, bottom: 120, left: 80, right: 80 }, 
-        minZoom: 13, // Higher min zoom to stay at neighborhood level
-        maxZoom: 16, 
-        duration: 600 
-      });
-    }
+    // Don't auto-fit bounds - keep zoomed to search center at neighborhood level
 
     console.log('Rendered spots via layers:', (features as any).length);
     return;

@@ -29,13 +29,8 @@ const SearchResults = () => {
     searchParkingSpots();
   }, [location, checkIn, checkOut]);
 
-  const searchParkingSpots = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Get coordinates based on location - default to University Park, LA
-      const getCoordinates = (locationName: string) => {
+  // Get coordinates based on location - default to University Park, LA
+  const getCoordinates = (locationName: string) => {
         // University Park (USC area) coordinates
         const defaultCoords = { lat: 34.0224, lng: -118.2851 };
         
@@ -64,7 +59,12 @@ const SearchResults = () => {
           }
         }
         return defaultCoords;
-      };
+  };
+
+  const searchParkingSpots = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
       const coords = getCoordinates(location);
       const latitude = coords.lat;
@@ -258,7 +258,11 @@ const SearchResults = () => {
         </div>
       ) : viewMode === 'map' ? (
         <div className="relative h-[calc(100vh-140px)]">
-          <MapView spots={parkingSpots} onVisibleSpotsChange={handleVisibleSpotsChange} />
+          <MapView 
+            spots={parkingSpots} 
+            searchCenter={getCoordinates(location)}
+            onVisibleSpotsChange={handleVisibleSpotsChange} 
+          />
         </div>
       ) : (
         <div className="p-4 space-y-3">
