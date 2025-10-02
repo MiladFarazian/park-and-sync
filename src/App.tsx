@@ -4,12 +4,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AppLayout from "./components/layout/AppLayout";
-import Search from "./pages/Search";
+import Home from "./pages/Home";
+import Explore from "./pages/Explore";
+import AddSpot from "./pages/AddSpot";
+import Activity from "./pages/Activity";
 import SearchResults from "./pages/SearchResults";
 import SpotDetail from "./pages/SpotDetail";
 import Booking from "./pages/Booking";
-import Bookings from "./pages/Bookings";
-import HostDashboard from "./pages/HostDashboard";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -32,9 +33,10 @@ const App = () => (
             <Route path="/*" element={
               <AppLayout>
                 <Routes>
-                  <Route path="/" element={<Search />} />
-                  <Route path="/bookings" element={<Bookings />} />
-                  <Route path="/host" element={<HostDashboard />} />
+                  <Route path="/" element={<Home />} />
+                  <Route path="/explore" element={<Explore />} />
+                  <Route path="/add-spot" element={<AddSpot />} />
+                  <Route path="/activity" element={<Activity />} />
                   <Route path="/profile" element={<Profile />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
