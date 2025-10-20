@@ -49,8 +49,14 @@ const Explore = () => {
   }, [userLocation]);
 
   const searchLocation = async (query: string) => {
-    if (!query.trim() || !mapboxToken) {
+    if (!query.trim()) {
       setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    if (!mapboxToken) {
+      console.log('Mapbox token not ready yet');
       return;
     }
 
@@ -59,10 +65,17 @@ const Explore = () => {
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&limit=5&types=place,locality,neighborhood,address,poi`
       );
       const data = await response.json();
-      setSuggestions(data.features || []);
+      if (data.features && data.features.length > 0) {
+        setSuggestions(data.features);
+        setShowSuggestions(true);
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
     } catch (error) {
       console.error('Error searching location:', error);
       setSuggestions([]);
+      setShowSuggestions(false);
     }
   };
 
@@ -174,11 +187,14 @@ const Explore = () => {
           )}
           
           {showSuggestions && suggestions.length > 0 && (
-            <Card className="absolute top-full mt-2 w-full bg-background shadow-lg max-h-80 overflow-y-auto">
+            <Card className="absolute top-full mt-2 w-full bg-background shadow-lg max-h-80 overflow-y-auto z-20">
               {suggestions.map((suggestion, index) => (
                 <button
                   key={index}
-                  onClick={() => handleSelectLocation(suggestion)}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelectLocation(suggestion);
+                  }}
                   className="w-full text-left p-3 hover:bg-accent transition-colors border-b border-border last:border-0"
                 >
                   <div className="font-medium text-sm">{suggestion.text}</div>
