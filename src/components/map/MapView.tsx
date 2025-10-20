@@ -286,7 +286,7 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
 
       {/* Selected Spot Details Card */}
       {selectedSpot && (
-        <div className="absolute bottom-4 left-4 right-4 z-10">
+        <div className="absolute bottom-20 md:bottom-4 left-4 right-4 z-10">
           <Card className="p-4 bg-background/95 backdrop-blur-sm">
             <div className="flex gap-3">
               <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0">
