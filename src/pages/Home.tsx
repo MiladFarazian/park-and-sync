@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -11,8 +11,23 @@ const Home = () => {
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState({ lat: 34.0224, lng: -118.2851 }); // Default to University Park
+  const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [mapboxToken, setMapboxToken] = useState('');
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
+    // Fetch Mapbox public token
+    (async () => {
+      try {
+        const { data } = await supabase.functions.invoke('get-mapbox-token');
+        if (data?.token) setMapboxToken(data.token);
+      } catch (e) {
+        console.error('Error fetching Mapbox token:', e);
+      }
+    })();
+
     // Get user's location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -22,7 +37,7 @@ const Home = () => {
             lng: position.coords.longitude
           });
         },
-        (error) => {
+        () => {
           console.log('Location access denied, using default location');
         }
       );
@@ -77,6 +92,66 @@ const Home = () => {
       console.error('Unexpected error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const searchLocation = async (query: string) => {
+    if (!query.trim()) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    if (!mapboxToken) {
+      console.log('Mapbox token not ready yet');
+      return;
+    }
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&limit=5&types=place,locality,neighborhood,address,poi`
+      );
+      const data = await response.json();
+      if (data.features && data.features.length > 0) {
+        setSuggestions(data.features);
+        setShowSuggestions(true);
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    } catch (error) {
+      console.error('Error searching location:', error);
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      searchLocation(value);
+    }, 300);
+  };
+
+  const handleSelectSuggestion = (feature: any) => {
+    const placeName = feature.place_name || feature.text;
+    setSearchQuery(placeName);
+    setShowSuggestions(false);
+    const params = new URLSearchParams({ location: placeName });
+    navigate(`/search-results?${params.toString()}`);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      if (suggestions.length > 0) {
+        handleSelectSuggestion(suggestions[0]);
+      } else if (searchQuery.trim()) {
+        const params = new URLSearchParams({ location: searchQuery });
+        navigate(`/search-results?${params.toString()}`);
+      }
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
     }
   };
 
@@ -149,9 +224,33 @@ const Home = () => {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
+            value={searchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+            onKeyDown={handleKeyDown}
             placeholder="Search by location, address, or landmark..." 
             className="pl-10"
           />
+
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="absolute top-full left-0 right-0 z-50 mt-2 bg-background border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              {suggestions.map((s, idx) => (
+                <button
+                  key={idx}
+                  onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(s); }}
+                  className="w-full text-left px-4 py-3 hover:bg-accent transition-colors border-b border-border last:border-0"
+                >
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">{s.text}</span>
+                      <span className="text-xs text-muted-foreground">{s.place_name}</span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {loading ? (
