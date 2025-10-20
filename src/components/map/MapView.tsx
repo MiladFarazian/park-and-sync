@@ -71,7 +71,7 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
     
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/dark-v11', 
+      style: 'mapbox://styles/mapbox/navigation-guidance-night-v4', 
       center: center,
       zoom: 14 // Start at neighborhood zoom level
     });
