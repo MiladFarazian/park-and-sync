@@ -1,22 +1,85 @@
-import React, { useEffect } from 'react';
-import { Settings, Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { toast } from 'sonner';
+
+const profileSchema = z.object({
+  first_name: z.string().trim().min(1, 'First name is required').max(50, 'First name must be less than 50 characters'),
+  last_name: z.string().trim().min(1, 'Last name is required').max(50, 'Last name must be less than 50 characters'),
+  phone: z.string().trim().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number format').optional().or(z.literal('')),
+  avatar_url: z.string().url('Invalid URL').optional().or(z.literal('')),
+});
+
+type ProfileFormData = z.infer<typeof profileSchema>;
 
 const Profile = () => {
-  const { user, profile, loading, signOut } = useAuth();
+  const { user, profile, loading, signOut, updateProfile } = useAuth();
   const navigate = useNavigate();
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const { register, handleSubmit, formState: { errors }, reset } = useForm<ProfileFormData>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: {
+      first_name: profile?.first_name || '',
+      last_name: profile?.last_name || '',
+      phone: profile?.phone || '',
+      avatar_url: profile?.avatar_url || '',
+    }
+  });
 
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
     }
   }, [user, loading, navigate]);
+
+  useEffect(() => {
+    if (profile) {
+      reset({
+        first_name: profile.first_name || '',
+        last_name: profile.last_name || '',
+        phone: profile.phone || '',
+        avatar_url: profile.avatar_url || '',
+      });
+    }
+  }, [profile, reset]);
+
+  const isProfileIncomplete = !profile?.first_name || !profile?.last_name;
+
+  const onSubmit = async (data: ProfileFormData) => {
+    setIsUpdating(true);
+    try {
+      const { error } = await updateProfile(data);
+      if (error) {
+        toast.error('Failed to update profile: ' + error.message);
+      } else {
+        toast.success('Profile updated successfully!');
+        setIsEditDialogOpen(false);
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleEditClick = () => {
+    setIsEditDialogOpen(true);
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -58,11 +121,6 @@ const Profile = () => {
     }
     return 'Recently';
   };
-  const profileStats = [
-    { label: 'Total Trips', value: '47' },
-    { label: 'Rating', value: '4.8' },
-    { label: 'Reviews', value: '28' }
-  ];
 
   const settingsItems = [
     { 
@@ -112,6 +170,24 @@ const Profile = () => {
 
   return (
     <div className="space-y-6">
+      {/* Incomplete Profile Alert */}
+      {isProfileIncomplete && (
+        <div className="px-4 pt-4">
+          <Alert className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
+            <AlertCircle className="h-4 w-4 text-yellow-600" />
+            <AlertDescription className="text-yellow-800 dark:text-yellow-200">
+              Complete your profile to get the most out of Parkway.{' '}
+              <button 
+                onClick={handleEditClick}
+                className="font-semibold underline hover:no-underline"
+              >
+                Add details now
+              </button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
       {/* Header with solid blue background */}
       <div className="bg-primary text-primary-foreground p-6 rounded-b-2xl">
         <div className="flex justify-between items-start mb-6">
@@ -143,7 +219,7 @@ const Profile = () => {
             </div>
           </div>
           
-          <Button variant="secondary" size="sm" className="flex-shrink-0">
+          <Button variant="secondary" size="sm" className="flex-shrink-0" onClick={handleEditClick}>
             <Edit className="h-4 w-4 mr-1" />
             Edit
           </Button>
@@ -205,6 +281,83 @@ const Profile = () => {
           })}
         </div>
       </div>
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Profile</DialogTitle>
+            <DialogDescription>
+              Update your profile information. Click save when you're done.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="first_name">First Name *</Label>
+                <Input
+                  id="first_name"
+                  {...register('first_name')}
+                  placeholder="John"
+                />
+                {errors.first_name && (
+                  <p className="text-sm text-destructive">{errors.first_name.message}</p>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="last_name">Last Name *</Label>
+                <Input
+                  id="last_name"
+                  {...register('last_name')}
+                  placeholder="Doe"
+                />
+                {errors.last_name && (
+                  <p className="text-sm text-destructive">{errors.last_name.message}</p>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  {...register('phone')}
+                  placeholder="+1234567890"
+                />
+                {errors.phone && (
+                  <p className="text-sm text-destructive">{errors.phone.message}</p>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="avatar_url">Avatar URL</Label>
+                <Input
+                  id="avatar_url"
+                  {...register('avatar_url')}
+                  placeholder="https://example.com/avatar.jpg"
+                />
+                {errors.avatar_url && (
+                  <p className="text-sm text-destructive">{errors.avatar_url.message}</p>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setIsEditDialogOpen(false)}
+                disabled={isUpdating}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isUpdating}>
+                {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

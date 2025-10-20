@@ -9,6 +9,7 @@ interface Profile {
   email: string;
   first_name?: string;
   last_name?: string;
+  phone?: string;
   role: 'renter' | 'host' | 'both';
   avatar_url?: string;
   rating: number;
