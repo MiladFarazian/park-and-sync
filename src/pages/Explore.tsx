@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import MapView from '@/components/map/MapView';
 
@@ -88,7 +89,16 @@ const Explore = () => {
   }
 
   return (
-    <div className="h-[calc(100vh-64px)]">
+    <div className="h-[calc(100vh-64px)] relative">
+      <div className="absolute top-4 left-4 right-4 z-10">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search by location, address, or landmark..." 
+            className="pl-10 bg-background shadow-lg"
+          />
+        </div>
+      </div>
       <MapView 
         spots={parkingSpots} 
         searchCenter={userLocation}

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Star, MapPin, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Star, MapPin, Loader2, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -143,6 +144,14 @@ const Home = () => {
         <div>
           <h1 className="text-2xl font-bold">Nearby Parking</h1>
           <p className="text-sm text-muted-foreground">Find parking spots close to you</p>
+        </div>
+
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search by location, address, or landmark..." 
+            className="pl-10"
+          />
         </div>
 
         {loading ? (
