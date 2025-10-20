@@ -129,6 +129,8 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
     if (map.current.getLayer(labelId)) map.current.removeLayer(labelId);
     if (map.current.getLayer(circleId)) map.current.removeLayer(circleId);
     if (map.current.getLayer(shadowId)) map.current.removeLayer(shadowId);
+    if (map.current.getLayer('cluster-count')) map.current.removeLayer('cluster-count');
+    if (map.current.getLayer('clusters')) map.current.removeLayer('clusters');
     if (map.current.getSource(sourceId)) map.current.removeSource(sourceId);
 
     // Render spots using Mapbox layers with pin shape
@@ -159,16 +161,70 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
 
     const data = { type: 'FeatureCollection', features } as any;
 
-    (map.current as any).addSource(sourceId, { type: 'geojson', data } as any);
+    // Add source with clustering enabled
+    (map.current as any).addSource(sourceId, { 
+      type: 'geojson', 
+      data,
+      cluster: true,
+      clusterMaxZoom: 16, // Max zoom to cluster points on
+      clusterRadius: 50 // Radius of each cluster when clustering points
+    } as any);
 
     const pinImageId = 'pin-blue';
 
     const addLayers = () => {
-      // Symbol layer for the pin image (anchor at tip)
+      // Add cluster circle layer
+      (map.current as any).addLayer({
+        id: 'clusters',
+        type: 'circle',
+        source: sourceId,
+        filter: ['has', 'point_count'],
+        paint: {
+          'circle-color': [
+            'step',
+            ['get', 'point_count'],
+            'hsl(250, 100%, 65%)', // Blue for small clusters
+            10,
+            'hsl(270, 100%, 60%)', // Purple for medium clusters
+            25,
+            'hsl(290, 100%, 55%)'  // Darker purple for large clusters
+          ],
+          'circle-radius': [
+            'step',
+            ['get', 'point_count'],
+            20,  // Small clusters
+            10,
+            30,  // Medium clusters
+            25,
+            40   // Large clusters
+          ],
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#ffffff'
+        }
+      } as any);
+
+      // Add cluster count label
+      (map.current as any).addLayer({
+        id: 'cluster-count',
+        type: 'symbol',
+        source: sourceId,
+        filter: ['has', 'point_count'],
+        layout: {
+          'text-field': '{point_count_abbreviated}',
+          'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+          'text-size': 14
+        },
+        paint: {
+          'text-color': '#ffffff'
+        }
+      } as any);
+
+      // Add unclustered point layer (individual pins)
       (map.current as any).addLayer({
         id: circleId,
         type: 'symbol',
         source: sourceId,
+        filter: ['!', ['has', 'point_count']],
         layout: {
           'icon-image': pinImageId,
           'icon-size': 1.5,
@@ -177,11 +233,12 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
         }
       } as any);
 
-      // Price text centered inside the pin head
+      // Price text centered inside the pin head (unclustered only)
       (map.current as any).addLayer({
         id: labelId,
         type: 'symbol',
         source: sourceId,
+        filter: ['!', ['has', 'point_count']],
         layout: {
           'text-field': ['get', 'price'],
           'text-size': 11,
@@ -196,6 +253,25 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
         }
       } as any);
 
+      // Handle cluster clicks - zoom in
+      (map.current as any).on('click', 'clusters', (e: any) => {
+        const features = (map.current as any).queryRenderedFeatures(e.point, {
+          layers: ['clusters']
+        });
+        const clusterId = features[0].properties.cluster_id;
+        (map.current as any).getSource(sourceId).getClusterExpansionZoom(
+          clusterId,
+          (err: any, zoom: number) => {
+            if (err) return;
+            (map.current as any).easeTo({
+              center: features[0].geometry.coordinates,
+              zoom: zoom
+            });
+          }
+        );
+      });
+
+      // Handle unclustered point clicks - show spot details
       const onClick = (e: any) => {
         const f = e.features?.[0];
         if (!f) return;
@@ -204,6 +280,20 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
       };
       (map.current as any).on('click', circleId, onClick);
       (map.current as any).on('click', labelId, onClick);
+
+      // Change cursor on hover
+      (map.current as any).on('mouseenter', 'clusters', () => {
+        (map.current as any).getCanvas().style.cursor = 'pointer';
+      });
+      (map.current as any).on('mouseleave', 'clusters', () => {
+        (map.current as any).getCanvas().style.cursor = '';
+      });
+      (map.current as any).on('mouseenter', circleId, () => {
+        (map.current as any).getCanvas().style.cursor = 'pointer';
+      });
+      (map.current as any).on('mouseleave', circleId, () => {
+        (map.current as any).getCanvas().style.cursor = '';
+      });
 
       // Trigger visible spots count update after rendering
       setTimeout(() => {
