@@ -1,7 +1,10 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import BottomNavigation from './BottomNavigation';
 import { AppSidebar } from './AppSidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { Bell, MessageSquare } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import parkwayLogo from '@/assets/parkway-logo.png';
 
 interface AppLayoutProps {
@@ -9,6 +12,9 @@ interface AppLayoutProps {
 }
 
 const AppLayout = ({ children }: AppLayoutProps) => {
+  const location = useLocation();
+  const isProfilePage = location.pathname === '/profile';
+
   return (
     <>
       {/* Desktop Layout with Sidebar */}
@@ -17,10 +23,22 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           <div className="flex min-h-screen w-full">
             <AppSidebar />
             <main className="flex-1">
-              <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4">
-                <SidebarTrigger />
-                <img src={parkwayLogo} alt="Parkway" className="h-8" />
-              </header>
+              {!isProfilePage && (
+                <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
+                  <div className="flex items-center gap-4">
+                    <SidebarTrigger />
+                    <img src={parkwayLogo} alt="Parkway" className="h-8" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon">
+                      <Bell className="h-5 w-5" />
+                    </Button>
+                    <Button variant="ghost" size="icon">
+                      <MessageSquare className="h-5 w-5" />
+                    </Button>
+                  </div>
+                </header>
+              )}
               <div className="container mx-auto p-6">
                 {children}
               </div>
@@ -31,9 +49,19 @@ const AppLayout = ({ children }: AppLayoutProps) => {
 
       {/* Mobile Layout with Bottom Navigation */}
       <div className="md:hidden">
-        <header className="sticky top-0 z-10 flex h-14 items-center justify-center border-b bg-background px-4">
-          <img src={parkwayLogo} alt="Parkway" className="h-8" />
-        </header>
+        {!isProfilePage && (
+          <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
+            <img src={parkwayLogo} alt="Parkway" className="h-8" />
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon">
+                <Bell className="h-5 w-5" />
+              </Button>
+              <Button variant="ghost" size="icon">
+                <MessageSquare className="h-5 w-5" />
+              </Button>
+            </div>
+          </header>
+        )}
         <div className="min-h-screen bg-background pb-16">
           <div className="max-w-md mx-auto">
             {children}
