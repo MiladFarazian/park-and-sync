@@ -138,18 +138,15 @@ const Home = () => {
     const placeName = feature.place_name || feature.text;
     setSearchQuery(placeName);
     setShowSuggestions(false);
-    const params = new URLSearchParams({ location: placeName });
-    navigate(`/search-results?${params.toString()}`);
+    
+    // Extract coordinates from Mapbox feature
+    const [lng, lat] = feature.center;
+    setUserLocation({ lat, lng });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      if (suggestions.length > 0) {
-        handleSelectSuggestion(suggestions[0]);
-      } else if (searchQuery.trim()) {
-        const params = new URLSearchParams({ location: searchQuery });
-        navigate(`/search-results?${params.toString()}`);
-      }
+    if (e.key === 'Enter' && suggestions.length > 0) {
+      handleSelectSuggestion(suggestions[0]);
     } else if (e.key === 'Escape') {
       setShowSuggestions(false);
     }
