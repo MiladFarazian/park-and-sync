@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle } from 'lucide-react';
+import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -15,12 +15,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 const profileSchema = z.object({
   first_name: z.string().trim().min(1, 'First name is required').max(50, 'First name must be less than 50 characters'),
   last_name: z.string().trim().min(1, 'Last name is required').max(50, 'Last name must be less than 50 characters'),
   phone: z.string().trim().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number format').optional().or(z.literal('')),
-  avatar_url: z.string().url('Invalid URL').optional().or(z.literal('')),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -30,6 +30,8 @@ const Profile = () => {
   const navigate = useNavigate();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string>('');
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -37,7 +39,6 @@ const Profile = () => {
       first_name: profile?.first_name || '',
       last_name: profile?.last_name || '',
       phone: profile?.phone || '',
-      avatar_url: profile?.avatar_url || '',
     }
   });
 
@@ -53,22 +54,95 @@ const Profile = () => {
         first_name: profile.first_name || '',
         last_name: profile.last_name || '',
         phone: profile.phone || '',
-        avatar_url: profile.avatar_url || '',
       });
+      setAvatarPreview(profile.avatar_url || '');
     }
   }, [profile, reset]);
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('File size must be less than 5MB');
+        return;
+      }
+      
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast.error('Only image files are allowed');
+        return;
+      }
+      
+      setAvatarFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadAvatar = async (): Promise<string | null> => {
+    if (!avatarFile || !user) return null;
+
+    try {
+      // Delete old avatar if exists
+      if (profile?.avatar_url) {
+        const oldPath = profile.avatar_url.split('/').slice(-2).join('/');
+        await supabase.storage.from('avatars').remove([oldPath]);
+      }
+
+      // Upload new avatar
+      const fileExt = avatarFile.name.split('.').pop();
+      const filePath = `${user.id}/avatar.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, avatarFile, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (error: any) {
+      toast.error('Failed to upload avatar: ' + error.message);
+      return null;
+    }
+  };
 
   const isProfileIncomplete = !profile?.first_name || !profile?.last_name;
 
   const onSubmit = async (data: ProfileFormData) => {
     setIsUpdating(true);
     try {
-      const { error } = await updateProfile(data);
+      let avatar_url = profile?.avatar_url;
+      
+      // Upload avatar if a new file was selected
+      if (avatarFile) {
+        const uploadedUrl = await uploadAvatar();
+        if (uploadedUrl) {
+          avatar_url = uploadedUrl;
+        }
+      }
+
+      const { error } = await updateProfile({
+        ...data,
+        avatar_url,
+      });
+      
       if (error) {
         toast.error('Failed to update profile: ' + error.message);
       } else {
         toast.success('Profile updated successfully!');
         setIsEditDialogOpen(false);
+        setAvatarFile(null);
       }
     } catch (error) {
       toast.error('An unexpected error occurred');
@@ -78,6 +152,8 @@ const Profile = () => {
   };
 
   const handleEditClick = () => {
+    setAvatarPreview(profile?.avatar_url || '');
+    setAvatarFile(null);
     setIsEditDialogOpen(true);
   };
 
@@ -293,6 +369,29 @@ const Profile = () => {
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)}>
             <div className="grid gap-4 py-4">
+              {/* Avatar Upload */}
+              <div className="space-y-2">
+                <Label>Profile Picture</Label>
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-20 w-20">
+                    <AvatarImage src={avatarPreview || profile?.avatar_url} />
+                    <AvatarFallback className="text-xl">{getInitials()}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <Input
+                      id="avatar"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarChange}
+                      className="cursor-pointer"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      PNG, JPG, WEBP up to 5MB
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="first_name">First Name *</Label>
                 <Input
@@ -326,18 +425,6 @@ const Profile = () => {
                 />
                 {errors.phone && (
                   <p className="text-sm text-destructive">{errors.phone.message}</p>
-                )}
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="avatar_url">Avatar URL</Label>
-                <Input
-                  id="avatar_url"
-                  {...register('avatar_url')}
-                  placeholder="https://example.com/avatar.jpg"
-                />
-                {errors.avatar_url && (
-                  <p className="text-sm text-destructive">{errors.avatar_url.message}</p>
                 )}
               </div>
             </div>
