@@ -82,6 +82,11 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
     // Mark map as ready when loaded
     map.current.on('load', () => {
       setMapReady(true);
+      
+      // Customize water color to deep blue
+      if (map.current?.getLayer('water')) {
+        map.current.setPaintProperty('water', 'fill-color', '#004e89');
+      }
     });
 
     // Update visible spots count when map moves
