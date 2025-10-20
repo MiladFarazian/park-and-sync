@@ -16,6 +16,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { ImageCropDialog } from '@/components/profile/ImageCropDialog';
 
 const profileSchema = z.object({
   first_name: z.string().trim().min(1, 'First name is required').max(50, 'First name must be less than 50 characters'),
@@ -30,8 +31,10 @@ const Profile = () => {
   const navigate = useNavigate();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarFile, setAvatarFile] = useState<Blob | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
+  const [isCropDialogOpen, setIsCropDialogOpen] = useState(false);
+  const [tempImageSrc, setTempImageSrc] = useState<string>('');
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -74,15 +77,32 @@ const Profile = () => {
         return;
       }
       
-      setAvatarFile(file);
-      
-      // Create preview
+      // Open crop dialog
       const reader = new FileReader();
       reader.onloadend = () => {
-        setAvatarPreview(reader.result as string);
+        setTempImageSrc(reader.result as string);
+        setIsCropDialogOpen(true);
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleCropComplete = (croppedBlob: Blob) => {
+    setAvatarFile(croppedBlob);
+    
+    // Create preview from cropped blob
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result as string);
+    };
+    reader.readAsDataURL(croppedBlob);
+    
+    setIsCropDialogOpen(false);
+  };
+
+  const handleCropCancel = () => {
+    setIsCropDialogOpen(false);
+    setTempImageSrc('');
   };
 
   const uploadAvatar = async (): Promise<string | null> => {
@@ -96,12 +116,14 @@ const Profile = () => {
       }
 
       // Upload new avatar
-      const fileExt = avatarFile.name.split('.').pop();
-      const filePath = `${user.id}/avatar.${fileExt}`;
+      const filePath = `${user.id}/avatar.jpg`;
       
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, avatarFile, { upsert: true });
+        .upload(filePath, avatarFile, { 
+          upsert: true,
+          contentType: 'image/jpeg'
+        });
 
       if (uploadError) throw uploadError;
 
@@ -445,6 +467,14 @@ const Profile = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Image Crop Dialog */}
+      <ImageCropDialog
+        open={isCropDialogOpen}
+        imageSrc={tempImageSrc}
+        onCropComplete={handleCropComplete}
+        onCancel={handleCropCancel}
+      />
     </div>
   );
 };
