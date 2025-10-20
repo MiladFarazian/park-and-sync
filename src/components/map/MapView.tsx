@@ -83,9 +83,45 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
     map.current.on('load', () => {
       setMapReady(true);
       
-      // Customize water color to deep blue
-      if (map.current?.getLayer('water')) {
-        map.current.setPaintProperty('water', 'fill-color', '#004e89');
+      // Add bathymetry (ocean depth) visualization
+      try {
+        // Add bathymetry source for ocean floor depth data
+        if (!map.current?.getSource('bathymetry')) {
+          map.current?.addSource('bathymetry', {
+            type: 'vector',
+            url: 'mapbox://mapbox.mapbox-bathymetry-v2'
+          });
+        }
+        
+        // Add depth-based gradient layer
+        if (!map.current?.getLayer('ocean-depth')) {
+          map.current?.addLayer({
+            id: 'ocean-depth',
+            type: 'fill',
+            source: 'bathymetry',
+            'source-layer': 'depth',
+            paint: {
+              'fill-color': [
+                'interpolate',
+                ['linear'],
+                ['get', 'depth'],
+                0, '#1e88e5',      // Shallow: Light blue
+                -200, '#1565c0',   // 200m: Medium blue
+                -1000, '#0d47a1',  // 1000m: Deep blue
+                -2000, '#004e89',  // 2000m: Darker blue
+                -4000, '#003366',  // 4000m: Navy
+                -6000, '#001a33'   // 6000m+: Very dark navy
+              ],
+              'fill-opacity': 0.6
+            }
+          }, 'waterway'); // Add before waterway layer
+        }
+      } catch (error) {
+        console.log('Bathymetry layer not available:', error);
+        // Fallback to basic water color if bathymetry fails
+        if (map.current?.getLayer('water')) {
+          map.current.setPaintProperty('water', 'fill-color', '#004e89');
+        }
       }
     });
 
