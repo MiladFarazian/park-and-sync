@@ -10,7 +10,7 @@ const BottomNavigation = () => {
   const tabs = [
     { id: 'home', label: 'Home', icon: Home, path: '/' },
     { id: 'explore', label: 'Explore', icon: Compass, path: '/explore' },
-    { id: 'add', label: '', icon: Plus, path: '/add-spot', isSpecial: true },
+    { id: 'add', label: 'Host', icon: Plus, path: '/add-spot', isSpecial: true },
     { id: 'activity', label: 'Activity', icon: Activity, path: '/activity' },
     { id: 'profile', label: 'Profile', icon: User, path: '/profile' },
   ];
@@ -27,9 +27,12 @@ const BottomNavigation = () => {
               <button
                 key={tab.id}
                 onClick={() => navigate(tab.path)}
-                className="flex items-center justify-center w-12 h-12 -mt-2 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
+                className="flex flex-col items-center gap-1 p-2"
               >
-                <Icon className="h-6 w-6" />
+                <div className="flex items-center justify-center w-12 h-12 -mt-2 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors">
+                  <Icon className="h-6 w-6" />
+                </div>
+                <span className="text-xs font-medium text-muted-foreground">{tab.label}</span>
               </button>
             );
           }

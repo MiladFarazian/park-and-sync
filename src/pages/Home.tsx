@@ -2,9 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Star, MapPin, Loader2, Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Star, MapPin, Loader2, Search, Calendar, Compass, PlusCircle, History, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -16,6 +18,8 @@ const Home = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [mapboxToken, setMapboxToken] = useState('');
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const [startTime, setStartTime] = useState(new Date());
+  const [endTime, setEndTime] = useState(new Date(Date.now() + 4 * 60 * 60 * 1000)); // 4 hours later
 
   useEffect(() => {
     // Fetch Mapbox public token
@@ -210,59 +214,131 @@ const Home = () => {
     </Card>
   );
 
+  const quickActions = [
+    { id: 'nearby', label: 'Find Nearby', icon: Compass, path: '/explore', color: 'bg-blue-500/10 text-blue-600' },
+    { id: 'list', label: 'List Your Spot', icon: PlusCircle, path: '/add-spot', color: 'bg-green-500/10 text-green-600' },
+    { id: 'bookings', label: 'My Bookings', icon: History, path: '/activity', color: 'bg-purple-500/10 text-purple-600' },
+    { id: 'instant', label: 'Instant Book', icon: Zap, path: '/explore', color: 'bg-orange-500/10 text-orange-600' },
+  ];
+
   return (
     <div className="min-h-screen bg-background pb-20">
-      <div className="p-4 space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold">Nearby Parking</h1>
-          <p className="text-sm text-muted-foreground">Find parking spots close to you</p>
-        </div>
+      <div className="p-4 space-y-6">
+        {/* Search Card */}
+        <Card className="p-6 space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input 
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+              onKeyDown={handleKeyDown}
+              placeholder="Where do you need parking?" 
+              className="pl-10 h-12 text-base"
+            />
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            value={searchQuery}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
-            onKeyDown={handleKeyDown}
-            placeholder="Search by location, address, or landmark..." 
-            className="pl-10"
-          />
-
-          {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute top-full left-0 right-0 z-50 mt-2 bg-background border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-              {suggestions.map((s, idx) => (
-                <button
-                  key={idx}
-                  onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(s); }}
-                  className="w-full text-left px-4 py-3 hover:bg-accent transition-colors border-b border-border last:border-0"
-                >
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">{s.text}</span>
-                      <span className="text-xs text-muted-foreground">{s.place_name}</span>
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 z-50 mt-2 bg-background border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {suggestions.map((s, idx) => (
+                  <button
+                    key={idx}
+                    onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(s); }}
+                    className="w-full text-left px-4 py-3 hover:bg-accent transition-colors border-b border-border last:border-0"
+                  >
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">{s.text}</span>
+                        <span className="text-xs text-muted-foreground">{s.place_name}</span>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <p className="font-semibold mb-3">When do you need parking?</p>
+            
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">Start Time</span>
+                </div>
+                <Input 
+                  type="datetime-local"
+                  value={format(startTime, "yyyy-MM-dd'T'HH:mm")}
+                  onChange={(e) => setStartTime(new Date(e.target.value))}
+                  className="h-12"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">End Time</span>
+                </div>
+                <Input 
+                  type="datetime-local"
+                  value={format(endTime, "yyyy-MM-dd'T'HH:mm")}
+                  onChange={(e) => setEndTime(new Date(e.target.value))}
+                  className="h-12"
+                />
+              </div>
             </div>
-          )}
+          </div>
+
+          <Button 
+            onClick={fetchNearbySpots}
+            className="w-full h-12 text-base"
+            size="lg"
+          >
+            <Search className="mr-2 h-5 w-5" />
+            Find Parking
+          </Button>
+        </Card>
+
+        {/* Quick Actions */}
+        <div>
+          <h2 className="text-lg font-semibold mb-3">Quick Actions</h2>
+          <div className="grid grid-cols-2 gap-3">
+            {quickActions.map((action) => {
+              const Icon = action.icon;
+              return (
+                <Card 
+                  key={action.id}
+                  className="p-4 cursor-pointer hover:shadow-md transition-all"
+                  onClick={() => navigate(action.path)}
+                >
+                  <div className="flex flex-col items-center text-center space-y-2">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${action.color}`}>
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <span className="text-sm font-medium">{action.label}</span>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
         </div>
 
+        {/* Results */}
         {loading ? (
-          <div className="flex items-center justify-center py-20">
+          <div className="flex items-center justify-center py-12">
             <div className="text-center space-y-4">
               <Loader2 className="h-8 w-8 animate-spin mx-auto" />
               <p className="text-muted-foreground">Finding nearby spots...</p>
             </div>
           </div>
         ) : parkingSpots.length === 0 ? (
-          <div className="flex items-center justify-center py-20">
+          <div className="flex items-center justify-center py-12">
             <p className="text-muted-foreground">No parking spots found nearby</p>
           </div>
         ) : (
           <div className="space-y-3">
+            <h2 className="text-lg font-semibold">Available Spots</h2>
             {parkingSpots.map((spot) => (
               <SpotCard key={spot.id} spot={spot} />
             ))}
