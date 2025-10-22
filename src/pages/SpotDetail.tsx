@@ -42,11 +42,30 @@ const SpotDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Preserve search context for navigation back
-  const location = searchParams.get('location') || 'University Park';
-  const checkIn = searchParams.get('checkIn') || new Date().toISOString().split('T')[0];
-  const checkOut = searchParams.get('checkOut') || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-  const searchResultsUrl = `/search-results?location=${encodeURIComponent(location)}&checkIn=${checkIn}&checkOut=${checkOut}`;
+  // Determine where to navigate back based on 'from' parameter
+  const from = searchParams.get('from');
+  const getBackUrl = () => {
+    if (from === 'home') {
+      return '/';
+    } else if (from === 'explore') {
+      const lat = searchParams.get('lat');
+      const lng = searchParams.get('lng');
+      const start = searchParams.get('start');
+      const end = searchParams.get('end');
+      const q = searchParams.get('q');
+      
+      const params = new URLSearchParams();
+      if (lat) params.set('lat', lat);
+      if (lng) params.set('lng', lng);
+      if (start) params.set('start', start);
+      if (end) params.set('end', end);
+      if (q) params.set('q', q);
+      
+      return `/explore${params.toString() ? `?${params.toString()}` : ''}`;
+    }
+    return '/'; // Default to home
+  };
+  const backUrl = getBackUrl();
 
   // Map of image paths
   const imageMap: { [key: string]: string } = {
@@ -178,7 +197,7 @@ const SpotDetail = () => {
         />
         
         <div className="absolute top-4 left-4 right-4 flex justify-between">
-          <Button variant="secondary" size="sm" onClick={() => navigate(searchResultsUrl)}>
+          <Button variant="secondary" size="sm" onClick={() => navigate(backUrl)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex gap-2">

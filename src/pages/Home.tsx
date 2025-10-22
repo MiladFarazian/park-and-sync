@@ -160,7 +160,7 @@ const Home = () => {
   const SpotCard = ({ spot }: { spot: any }) => (
     <Card 
       className="p-4 cursor-pointer transition-all hover:shadow-md"
-      onClick={() => navigate(`/spot/${spot.id}`)}
+      onClick={() => navigate(`/spot/${spot.id}?from=home`)}
     >
       <div className="flex gap-3">
         <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0 overflow-hidden">

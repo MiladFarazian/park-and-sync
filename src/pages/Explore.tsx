@@ -258,7 +258,14 @@ const Explore = () => {
       <MapView 
         spots={parkingSpots} 
         searchCenter={userLocation}
-        onVisibleSpotsChange={() => {}} 
+        onVisibleSpotsChange={() => {}}
+        exploreParams={{
+          lat: userLocation?.lat.toString(),
+          lng: userLocation?.lng.toString(),
+          start: startTime?.toISOString(),
+          end: endTime?.toISOString(),
+          q: searchQuery
+        }}
       />
     </div>
   );

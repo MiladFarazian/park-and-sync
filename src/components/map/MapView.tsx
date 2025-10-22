@@ -24,10 +24,27 @@ interface MapViewProps {
   spots: Spot[];
   searchCenter?: { lat: number; lng: number };
   onVisibleSpotsChange?: (count: number) => void;
+  exploreParams?: {
+    lat?: string;
+    lng?: string;
+    start?: string;
+    end?: string;
+    q?: string;
+  };
 }
 
-const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) => {
+const MapView = ({ spots, searchCenter, onVisibleSpotsChange, exploreParams }: MapViewProps) => {
   const navigate = useNavigate();
+  
+  const buildSpotUrl = (spotId: string) => {
+    const params = new URLSearchParams({ from: 'explore' });
+    if (exploreParams?.lat) params.set('lat', exploreParams.lat);
+    if (exploreParams?.lng) params.set('lng', exploreParams.lng);
+    if (exploreParams?.start) params.set('start', exploreParams.start);
+    if (exploreParams?.end) params.set('end', exploreParams.end);
+    if (exploreParams?.q) params.set('q', exploreParams.q);
+    return `/spot/${spotId}?${params.toString()}`;
+  };
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<mapboxgl.Marker[]>([]);
@@ -414,7 +431,7 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange }: MapViewProps) =>
               <Button 
                 variant="outline" 
                 className="flex-1 text-sm"
-                onClick={() => navigate(`/spot/${selectedSpot.id}`)}
+                onClick={() => navigate(buildSpotUrl(selectedSpot.id))}
               >
                 View Details
               </Button>
