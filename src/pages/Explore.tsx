@@ -32,27 +32,39 @@ const Explore = () => {
     const query = searchParams.get('q');
     
     if (lat && lng) {
-      setUserLocation({ lat: parseFloat(lat), lng: parseFloat(lng) });
+      const location = { lat: parseFloat(lat), lng: parseFloat(lng) };
+      setUserLocation(location);
       if (query) setSearchQuery(query);
+      // Fetch spots for the initial location
+      const startDate = start ? new Date(start) : new Date();
+      const endDate = end ? new Date(end) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+      if (start) setStartTime(startDate);
+      if (end) setEndTime(endDate);
+      fetchNearbySpots(location, 15000, true);
     } else {
       // Get user's current location
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            setUserLocation({
+            const location = {
               lat: position.coords.latitude,
               lng: position.coords.longitude
-            });
+            };
+            setUserLocation(location);
+            fetchNearbySpots(location, 15000, true);
           },
           (error) => {
             console.log('Location access denied, using default location');
+            fetchNearbySpots(userLocation, 15000, true);
           }
         );
+      } else {
+        fetchNearbySpots(userLocation, 15000, true);
       }
+      
+      if (start) setStartTime(new Date(start));
+      if (end) setEndTime(new Date(end));
     }
-    
-    if (start) setStartTime(new Date(start));
-    if (end) setEndTime(new Date(end));
   }, [searchParams]);
 
   const fetchMapboxToken = async () => {
@@ -65,12 +77,6 @@ const Explore = () => {
       console.error('Error fetching Mapbox token:', error);
     }
   };
-
-  useEffect(() => {
-    if (userLocation) {
-      fetchNearbySpots();
-    }
-  }, [userLocation, startTime, endTime]);
 
   const searchLocation = async (query: string) => {
     if (!query.trim()) {
@@ -119,10 +125,13 @@ const Explore = () => {
 
   const handleSelectLocation = (location: any) => {
     const [lng, lat] = location.center;
-    setUserLocation({ lat, lng });
+    const newLocation = { lat, lng };
+    setUserLocation(newLocation);
     setSearchQuery(location.place_name);
     setShowSuggestions(false);
     setSuggestions([]);
+    // Fetch spots for the new search location
+    fetchNearbySpots(newLocation, 15000, false);
   };
 
   const clearSearch = () => {
