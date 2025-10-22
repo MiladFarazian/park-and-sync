@@ -3,10 +3,10 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Star, MapPin, Loader2, Search, Calendar, Compass, PlusCircle, History, Zap, Plus, Activity } from 'lucide-react';
+import { DateTimePicker } from '@/components/ui/date-time-picker';
+import { Star, MapPin, Loader2, Search, Compass, Plus, Activity, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 const Home = () => {
@@ -303,34 +303,22 @@ const Home = () => {
           </div>
 
           <div>
-            <p className="font-semibold mb-3">When do you need parking?</p>
+            <p className="font-semibold mb-4">When do you need parking?</p>
             
             <div className="space-y-3">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium">Start Time</span>
-                </div>
-                <Input 
-                  type="datetime-local"
-                  value={format(startTime, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(e) => setStartTime(new Date(e.target.value))}
-                  className="h-12"
-                />
-              </div>
+              <DateTimePicker
+                date={startTime}
+                setDate={setStartTime}
+                label="Start Time"
+                minDate={new Date()}
+              />
 
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium">End Time</span>
-                </div>
-                <Input 
-                  type="datetime-local"
-                  value={format(endTime, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(e) => setEndTime(new Date(e.target.value))}
-                  className="h-12"
-                />
-              </div>
+              <DateTimePicker
+                date={endTime}
+                setDate={setEndTime}
+                label="End Time"
+                minDate={startTime}
+              />
             </div>
           </div>
 
