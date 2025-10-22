@@ -225,31 +225,31 @@ const Profile = () => {
       icon: User, 
       label: 'Personal Information', 
       subtitle: 'Update your profile details',
-      action: 'navigate'
+      onClick: () => navigate('/personal-information')
     },
     { 
       icon: Car, 
       label: 'My Vehicles', 
       subtitle: 'Manage your cars',
-      action: 'navigate'
+      onClick: () => navigate('/my-vehicles')
     },
     { 
       icon: CreditCard, 
       label: 'Payment Methods', 
       subtitle: 'Cards and billing',
-      action: 'navigate'
+      onClick: () => navigate('/payment-methods')
     },
     { 
       icon: Bell, 
       label: 'Notifications', 
       subtitle: 'Manage your preferences',
-      action: 'navigate'
+      onClick: () => navigate('/notifications')
     },
     { 
       icon: Shield, 
       label: 'Privacy & Security', 
       subtitle: 'Account security settings',
-      action: 'navigate'
+      onClick: () => navigate('/privacy-security')
     }
   ];
 
@@ -380,7 +380,11 @@ const Profile = () => {
           {settingsItems.map((item, index) => {
             const Icon = item.icon;
             return (
-              <Card key={index} className="p-4">
+              <Card 
+                key={index} 
+                className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                onClick={item.onClick}
+              >
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-muted rounded-lg">
                     <Icon className="h-5 w-5" />

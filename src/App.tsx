@@ -16,6 +16,12 @@ import Booking from "./pages/Booking";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import PersonalInformation from "./pages/PersonalInformation";
+import MyVehicles from "./pages/MyVehicles";
+import AddVehicle from "./pages/AddVehicle";
+import PaymentMethods from "./pages/PaymentMethods";
+import Notifications from "./pages/Notifications";
+import PrivacySecurity from "./pages/PrivacySecurity";
 import { AuthProvider } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
@@ -32,6 +38,12 @@ const App = () => (
             <Route path="/search-results" element={<SearchResults />} />
             <Route path="/spot/:id" element={<SpotDetail />} />
             <Route path="/book/:spotId" element={<Booking />} />
+            <Route path="/personal-information" element={<PersonalInformation />} />
+            <Route path="/my-vehicles" element={<MyVehicles />} />
+            <Route path="/add-vehicle" element={<AddVehicle />} />
+            <Route path="/payment-methods" element={<PaymentMethods />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/privacy-security" element={<PrivacySecurity />} />
             <Route path="/*" element={
               <AppLayout>
                 <Routes>
