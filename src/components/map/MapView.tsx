@@ -146,28 +146,28 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, explore
     map.current.on('idle', () => {
       updateVisibleSpots();
     });
-  }, [mapboxToken, spots, onVisibleSpotsChange]);
+  }, [mapboxToken]);
 
   // Add markers for spots
   useEffect(() => {
-    if (!map.current || !spots.length || !mapReady) return;
+    if (!map.current || !mapReady) return;
+    
+    const sourceId = 'spots-source';
+    const circleId = 'spots-circles';
+    const labelId = 'spots-labels';
+    
+    // If spots array is empty, just update the source to be empty
+    if (!spots.length) {
+      const source = map.current.getSource(sourceId);
+      if (source && 'setData' in source) {
+        (source as any).setData({ type: 'FeatureCollection', features: [] });
+      }
+      return;
+    }
 
     // Clear existing HTML markers
     markers.current.forEach(marker => marker.remove());
     markers.current = [];
-
-    // Remove old layers if they exist
-    const sourceId = 'spots-source';
-    const circleId = 'spots-circles';
-    const shadowId = 'spots-circles-shadow';
-    const labelId = 'spots-labels';
-
-    if (map.current.getLayer(labelId)) map.current.removeLayer(labelId);
-    if (map.current.getLayer(circleId)) map.current.removeLayer(circleId);
-    if (map.current.getLayer(shadowId)) map.current.removeLayer(shadowId);
-    if (map.current.getLayer('cluster-count')) map.current.removeLayer('cluster-count');
-    if (map.current.getLayer('clusters')) map.current.removeLayer('clusters');
-    if (map.current.getSource(sourceId)) map.current.removeSource(sourceId);
 
     // Render spots using Mapbox layers with pin shape
     const features = spots
@@ -197,7 +197,15 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, explore
 
     const data = { type: 'FeatureCollection', features } as any;
 
-    // Add source with clustering enabled
+    // Update existing source or create new one
+    const existingSource = (map.current as any).getSource(sourceId);
+    if (existingSource) {
+      // Just update the data instead of removing and re-adding everything
+      existingSource.setData(data);
+      return; // Exit early, layers already exist
+    }
+
+    // First time: Add source with clustering enabled
     (map.current as any).addSource(sourceId, { 
       type: 'geojson', 
       data,

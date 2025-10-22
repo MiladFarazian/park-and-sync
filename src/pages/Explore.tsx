@@ -131,9 +131,11 @@ const Explore = () => {
     setShowSuggestions(false);
   };
 
-  const fetchNearbySpots = async (center = userLocation, radius = 15000) => {
+  const fetchNearbySpots = async (center = userLocation, radius = 15000, isInitialLoad = true) => {
     try {
-      setLoading(true);
+      if (isInitialLoad) {
+        setLoading(true);
+      }
       
       // Use provided times or default to now + 24 hours
       const start = startTime || new Date();
@@ -176,7 +178,9 @@ const Explore = () => {
     } catch (err) {
       console.error('Unexpected error:', err);
     } finally {
-      setLoading(false);
+      if (isInitialLoad) {
+        setLoading(false);
+      }
     }
   };
 
@@ -187,8 +191,8 @@ const Explore = () => {
     }
 
     fetchTimeoutRef.current = setTimeout(() => {
-      fetchNearbySpots(center, radiusMeters);
-    }, 500); // Wait 500ms after user stops moving the map
+      fetchNearbySpots(center, radiusMeters, false); // Don't show loading on map movement
+    }, 800); // Longer debounce to reduce requests
   };
 
   if (loading) {
