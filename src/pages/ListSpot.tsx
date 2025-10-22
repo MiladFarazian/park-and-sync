@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 const formSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
@@ -71,15 +72,47 @@ const ListSpot = () => {
     }
   };
 
-  const onSubmit = (data: FormData) => {
-    const finalData = {
-      ...data,
-      amenities: selectedAmenities,
-      photos,
-    };
-    console.log('Submitting:', finalData);
-    toast.success('Parking spot listed successfully!');
-    navigate('/add-spot');
+  const onSubmit = async (data: FormData) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error('Please log in to list a spot');
+        return;
+      }
+
+      // Create the spot
+      const { data: spotData, error: spotError } = await supabase
+        .from('spots')
+        .insert({
+          host_id: user.id,
+          title: data.title,
+          address: data.address,
+          hourly_rate: parseFloat(data.hourlyRate),
+          description: data.description,
+          latitude: 34.0522, // Default LA coordinates - would use geocoding in production
+          longitude: -118.2437,
+          location: `POINT(-118.2437 34.0522)`, // Default LA - would use geocoding
+          status: 'pending_approval',
+          is_covered: selectedAmenities.includes('covered'),
+          is_secure: selectedAmenities.includes('security'),
+          has_ev_charging: selectedAmenities.includes('ev'),
+          size_constraints: ['compact', 'midsize'] // Default values
+        })
+        .select()
+        .single();
+
+      if (spotError) throw spotError;
+
+      // TODO: Handle photo uploads to storage
+      // For now, just show success
+      
+      toast.success('Parking spot submitted for review!');
+      navigate('/add-spot');
+    } catch (error) {
+      console.error('Error submitting spot:', error);
+      toast.error('Failed to submit listing');
+    }
   };
 
   const canProceed = () => {

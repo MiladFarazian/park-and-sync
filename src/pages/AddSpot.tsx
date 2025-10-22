@@ -1,47 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, DollarSign, Star, Plus } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 const AddSpot = () => {
   const [activeTab, setActiveTab] = useState('listings');
+  const [listedSpots, setListedSpots] = useState<any[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  // Mock data - replace with actual data from backend
-  const listedSpots = [
-    {
-      id: 1,
-      title: 'Covered Garage Space',
-      address: '456 Oak Ave, Los Angeles, CA',
-      rate: '$5/hr',
-      rating: 4.8,
-      reviews: 24,
-      earnings: 450,
-      status: 'Active'
-    },
-    {
-      id: 2,
-      title: 'Driveway Parking',
-      address: '789 Elm St, Santa Monica, CA',
-      rate: '$3/hr',
-      rating: 4.6,
-      reviews: 18,
-      earnings: 280,
-      status: 'Active'
-    },
-  ];
+  useEffect(() => {
+    if (user) {
+      fetchSpots();
+    }
+  }, [user]);
 
-  const pendingRequests = [
-    {
-      id: 1,
-      title: 'Downtown Office Parking',
-      address: '321 Main St, Los Angeles, CA',
-      status: 'Under Review'
-    },
-  ];
+  const fetchSpots = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch active listings
+      const { data: activeSpots, error: activeError } = await supabase
+        .from('spots')
+        .select('*')
+        .eq('host_id', user?.id)
+        .eq('status', 'active');
+
+      if (activeError) throw activeError;
+
+      // Fetch pending requests
+      const { data: pendingSpots, error: pendingError } = await supabase
+        .from('spots')
+        .select('*')
+        .eq('host_id', user?.id)
+        .eq('status', 'pending_approval');
+
+      if (pendingError) throw pendingError;
+
+      setListedSpots(activeSpots || []);
+      setPendingRequests(pendingSpots || []);
+    } catch (error) {
+      console.error('Error fetching spots:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const ListingCard = ({ listing }: { listing: any }) => (
     <Card>
@@ -54,32 +64,17 @@ const AddSpot = () => {
               {listing.address}
             </p>
           </div>
-          <Badge variant={listing.status === 'Active' ? 'default' : 'secondary'}>
-            {listing.status}
-          </Badge>
+          <Badge variant="default">Active</Badge>
         </div>
         
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-            <span>{listing.rate}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-            <span>{listing.rating} ({listing.reviews} reviews)</span>
-          </div>
-        </div>
-
-        <div className="mt-3 pt-3 border-t">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Total Earnings</span>
-            <span className="font-semibold text-lg">${listing.earnings}</span>
-          </div>
+        <div className="flex items-center gap-2 text-sm">
+          <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <span>${listing.hourly_rate}/hr</span>
         </div>
       </CardContent>
       <div className="p-4 pt-0 flex gap-2">
         <Button variant="outline" className="flex-1">Edit</Button>
-        <Button variant="default" className="flex-1">View</Button>
+        <Button variant="default" className="flex-1" onClick={() => navigate(`/spot/${listing.id}`)}>View</Button>
       </div>
     </Card>
   );
@@ -95,11 +90,19 @@ const AddSpot = () => {
               {request.address}
             </p>
           </div>
-          <Badge variant="secondary">{request.status}</Badge>
+          <Badge variant="secondary">Under Review</Badge>
         </div>
       </CardContent>
     </Card>
   );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
+        <p>Loading your listings...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background pb-20">
