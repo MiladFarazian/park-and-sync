@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Loader2, Search, X } from 'lucide-react';
+import { Loader2, Search, X, MapPin, Calendar, Clock } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import MapView from '@/components/map/MapView';
+import { useSearchParams } from 'react-router-dom';
+import { format } from 'date-fns';
 
 const Explore = () => {
+  const [searchParams] = useSearchParams();
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState({ lat: 34.0224, lng: -118.2851 }); // Default to University Park
@@ -14,24 +17,42 @@ const Explore = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [mapboxToken, setMapboxToken] = useState('');
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const [startTime, setStartTime] = useState<Date | null>(null);
+  const [endTime, setEndTime] = useState<Date | null>(null);
 
   useEffect(() => {
     fetchMapboxToken();
-    // Get user's location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        (error) => {
-          console.log('Location access denied, using default location');
-        }
-      );
+    
+    // Check for URL parameters
+    const lat = searchParams.get('lat');
+    const lng = searchParams.get('lng');
+    const start = searchParams.get('start');
+    const end = searchParams.get('end');
+    const query = searchParams.get('q');
+    
+    if (lat && lng) {
+      setUserLocation({ lat: parseFloat(lat), lng: parseFloat(lng) });
+      if (query) setSearchQuery(query);
+    } else {
+      // Get user's current location
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setUserLocation({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            });
+          },
+          (error) => {
+            console.log('Location access denied, using default location');
+          }
+        );
+      }
     }
-  }, []);
+    
+    if (start) setStartTime(new Date(start));
+    if (end) setEndTime(new Date(end));
+  }, [searchParams]);
 
   const fetchMapboxToken = async () => {
     try {
@@ -45,8 +66,10 @@ const Explore = () => {
   };
 
   useEffect(() => {
-    fetchNearbySpots();
-  }, [userLocation]);
+    if (userLocation) {
+      fetchNearbySpots();
+    }
+  }, [userLocation, startTime, endTime]);
 
   const searchLocation = async (query: string) => {
     if (!query.trim()) {
@@ -110,16 +133,18 @@ const Explore = () => {
   const fetchNearbySpots = async () => {
     try {
       setLoading(true);
-      const today = new Date().toISOString();
-      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      
+      // Use provided times or default to now + 24 hours
+      const start = startTime || new Date();
+      const end = endTime || new Date(Date.now() + 24 * 60 * 60 * 1000);
 
       const { data, error } = await supabase.functions.invoke('search-spots', {
         body: {
           latitude: userLocation.lat,
           longitude: userLocation.lng,
           radius: 10000, // 10km radius for map view
-          start_time: today,
-          end_time: tomorrow
+          start_time: start.toISOString(),
+          end_time: end.toISOString(),
         }
       });
 
@@ -167,45 +192,68 @@ const Explore = () => {
 
   return (
     <div className="h-[calc(100vh-64px)] relative">
-      <div className="absolute top-4 left-4 right-4 z-10">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <Input 
-            value={searchQuery}
-            onChange={handleSearchChange}
-            onFocus={() => setShowSuggestions(true)}
-            placeholder="Search by location, address, or landmark..." 
-            className="pl-10 pr-10 bg-background shadow-lg"
-          />
-          {searchQuery && (
-            <button
-              onClick={clearSearch}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-          
-          {showSuggestions && suggestions.length > 0 && (
-            <Card className="absolute top-full mt-2 w-full bg-background shadow-lg max-h-80 overflow-y-auto z-20">
-              {suggestions.map((suggestion, index) => (
-                <button
-                  key={index}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    handleSelectLocation(suggestion);
-                  }}
-                  className="w-full text-left p-3 hover:bg-accent transition-colors border-b border-border last:border-0"
-                >
-                  <div className="font-medium text-sm">{suggestion.text}</div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {suggestion.place_name}
-                  </div>
-                </button>
-              ))}
-            </Card>
-          )}
+      <div className="absolute top-4 left-4 right-4 z-10 space-y-2">
+        <div className="relative max-w-md mx-auto">
+          <div className="relative">
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input 
+              value={searchQuery}
+              onChange={handleSearchChange}
+              onFocus={() => setShowSuggestions(true)}
+              placeholder="Search by location, address, or landmark..." 
+              className="pl-10 pr-10 bg-background/95 backdrop-blur-sm shadow-lg"
+            />
+            {searchQuery && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+            
+            {showSuggestions && suggestions.length > 0 && (
+              <Card className="absolute top-full mt-2 w-full bg-background shadow-lg max-h-80 overflow-y-auto z-20">
+                {suggestions.map((suggestion, index) => (
+                  <button
+                    key={index}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectLocation(suggestion);
+                    }}
+                    className="w-full text-left p-3 hover:bg-accent transition-colors border-b border-border last:border-0"
+                  >
+                    <div className="font-medium text-sm">{suggestion.text}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {suggestion.place_name}
+                    </div>
+                  </button>
+                ))}
+              </Card>
+            )}
+          </div>
         </div>
+        
+        {(startTime || endTime) && (
+          <div className="max-w-md mx-auto">
+            <Card className="p-3 bg-background/95 backdrop-blur-sm shadow-lg">
+              <div className="flex items-center justify-center gap-4 text-sm">
+                {startTime && (
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span>{format(startTime, 'MMM dd, yyyy')}</span>
+                  </div>
+                )}
+                {startTime && endTime && (
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span>{format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')}</span>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+        )}
       </div>
       <MapView 
         spots={parkingSpots} 

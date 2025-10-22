@@ -3,10 +3,11 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Star, MapPin, Loader2, Search, Calendar, Compass, PlusCircle, History, Zap } from 'lucide-react';
+import { Star, MapPin, Loader2, Search, Calendar, Compass, PlusCircle, History, Zap, Plus, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -214,11 +215,54 @@ const Home = () => {
     </Card>
   );
 
+  const handleSearch = () => {
+    if (!searchQuery.trim()) {
+      toast.error('Please enter a location');
+      return;
+    }
+    
+    if (!startTime || !endTime) {
+      toast.error('Please select start and end times');
+      return;
+    }
+
+    // Navigate to explore page with location and time params
+    if (userLocation) {
+      navigate(`/explore?lat=${userLocation.lat}&lng=${userLocation.lng}&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchQuery)}`);
+    }
+  };
+
   const quickActions = [
-    { id: 'nearby', label: 'Find Nearby', icon: Compass, path: '/explore', color: 'bg-blue-500/10 text-blue-600' },
-    { id: 'list', label: 'List Your Spot', icon: PlusCircle, path: '/add-spot', color: 'bg-green-500/10 text-green-600' },
-    { id: 'bookings', label: 'My Bookings', icon: History, path: '/activity', color: 'bg-purple-500/10 text-purple-600' },
-    { id: 'instant', label: 'Instant Book', icon: Zap, path: '/explore', color: 'bg-orange-500/10 text-orange-600' },
+    { 
+      icon: Compass, 
+      label: 'Find Nearby', 
+      description: 'Browse spots',
+      onClick: () => navigate('/explore')
+    },
+    { 
+      icon: Plus, 
+      label: 'List Your Spot', 
+      description: 'Start earning',
+      onClick: () => navigate('/add-spot')
+    },
+    { 
+      icon: Activity, 
+      label: 'My Bookings', 
+      description: 'View history',
+      onClick: () => navigate('/activity')
+    },
+    { 
+      icon: Zap, 
+      label: 'Instant Book', 
+      description: 'Quick parking',
+      onClick: () => {
+        if (userLocation) {
+          navigate(`/explore?lat=${userLocation.lat}&lng=${userLocation.lng}`);
+        } else {
+          navigate('/explore');
+        }
+      }
+    },
   ];
 
   return (
@@ -291,7 +335,7 @@ const Home = () => {
           </div>
 
           <Button 
-            onClick={fetchNearbySpots}
+            onClick={handleSearch}
             className="w-full h-12 text-base"
             size="lg"
           >
@@ -304,19 +348,22 @@ const Home = () => {
         <div>
           <h2 className="text-lg font-semibold mb-3">Quick Actions</h2>
           <div className="grid grid-cols-2 gap-3">
-            {quickActions.map((action) => {
+            {quickActions.map((action, index) => {
               const Icon = action.icon;
               return (
                 <Card 
-                  key={action.id}
+                  key={index}
                   className="p-4 cursor-pointer hover:shadow-md transition-all"
-                  onClick={() => navigate(action.path)}
+                  onClick={action.onClick}
                 >
                   <div className="flex flex-col items-center text-center space-y-2">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${action.color}`}>
+                    <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center">
                       <Icon className="h-6 w-6" />
                     </div>
-                    <span className="text-sm font-medium">{action.label}</span>
+                    <div>
+                      <span className="text-sm font-medium block">{action.label}</span>
+                      <span className="text-xs text-muted-foreground">{action.description}</span>
+                    </div>
                   </div>
                 </Card>
               );
@@ -324,7 +371,7 @@ const Home = () => {
           </div>
         </div>
 
-        {/* Results */}
+        {/* Nearby Spots */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center space-y-4">
@@ -338,7 +385,7 @@ const Home = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold">Available Spots</h2>
+            <h2 className="text-lg font-semibold">Nearby Spots</h2>
             {parkingSpots.map((spot) => (
               <SpotCard key={spot.id} spot={spot} />
             ))}
