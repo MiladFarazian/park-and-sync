@@ -24,6 +24,7 @@ interface MapViewProps {
   spots: Spot[];
   searchCenter?: { lat: number; lng: number };
   onVisibleSpotsChange?: (count: number) => void;
+  onMapMove?: (center: { lat: number; lng: number }, radiusMeters: number) => void;
   exploreParams?: {
     lat?: string;
     lng?: string;
@@ -33,7 +34,7 @@ interface MapViewProps {
   };
 }
 
-const MapView = ({ spots, searchCenter, onVisibleSpotsChange, exploreParams }: MapViewProps) => {
+const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, exploreParams }: MapViewProps) => {
   const navigate = useNavigate();
   
   const buildSpotUrl = (spotId: string) => {
@@ -106,18 +107,36 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange, exploreParams }: M
       }
     });
 
-    // Update visible spots count when map moves
+    // Update visible spots count and notify parent when map moves
     const updateVisibleSpots = () => {
-      if (!map.current || !spots.length) return;
+      if (!map.current) return;
       
       const bounds = map.current.getBounds();
-      const visibleSpots = spots.filter(spot => {
-        const lat = Number(spot.lat);
-        const lng = Number(spot.lng);
-        return bounds.contains([lng, lat]);
-      });
+      const center = map.current.getCenter();
       
-      onVisibleSpotsChange?.(visibleSpots.length);
+      // Calculate radius based on viewport bounds (distance from center to corner)
+      const ne = bounds.getNorthEast();
+      const sw = bounds.getSouthWest();
+      const centerLat = center.lat;
+      const centerLng = center.lng;
+      
+      // Calculate approximate radius in meters (distance from center to corner)
+      const latDiff = ne.lat - centerLat;
+      const lngDiff = ne.lng - centerLng;
+      const radiusMeters = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff) * 111320; // Convert to meters
+      
+      // Notify parent of map movement with center and radius
+      onMapMove?.({ lat: centerLat, lng: centerLng }, Math.max(5000, radiusMeters)); // Min 5km
+      
+      // Update visible spots count
+      if (spots.length) {
+        const visibleSpots = spots.filter(spot => {
+          const lat = Number(spot.lat);
+          const lng = Number(spot.lng);
+          return bounds.contains([lng, lat]);
+        });
+        onVisibleSpotsChange?.(visibleSpots.length);
+      }
     };
 
     map.current.on('moveend', updateVisibleSpots);

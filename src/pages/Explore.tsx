@@ -19,6 +19,7 @@ const Explore = () => {
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [endTime, setEndTime] = useState<Date | null>(null);
+  const fetchTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     fetchMapboxToken();
@@ -130,7 +131,7 @@ const Explore = () => {
     setShowSuggestions(false);
   };
 
-  const fetchNearbySpots = async () => {
+  const fetchNearbySpots = async (center = userLocation, radius = 15000) => {
     try {
       setLoading(true);
       
@@ -140,9 +141,9 @@ const Explore = () => {
 
       const { data, error } = await supabase.functions.invoke('search-spots', {
         body: {
-          latitude: userLocation.lat,
-          longitude: userLocation.lng,
-          radius: 10000, // 10km radius for map view
+          latitude: center.lat,
+          longitude: center.lng,
+          radius: Math.ceil(radius), // Dynamic radius based on viewport
           start_time: start.toISOString(),
           end_time: end.toISOString(),
         }
@@ -177,6 +178,17 @@ const Explore = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleMapMove = (center: { lat: number; lng: number }, radiusMeters: number) => {
+    // Debounce map movement to avoid too many requests
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    fetchTimeoutRef.current = setTimeout(() => {
+      fetchNearbySpots(center, radiusMeters);
+    }, 500); // Wait 500ms after user stops moving the map
   };
 
   if (loading) {
@@ -259,6 +271,7 @@ const Explore = () => {
         spots={parkingSpots} 
         searchCenter={userLocation}
         onVisibleSpotsChange={() => {}}
+        onMapMove={handleMapMove}
         exploreParams={{
           lat: userLocation?.lat.toString(),
           lng: userLocation?.lng.toString(),
