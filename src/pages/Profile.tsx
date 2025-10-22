@@ -253,18 +253,21 @@ const Profile = () => {
     }
   ];
 
-  const quickSettings = [
-    {
-      label: 'Booking Updates',
-      subtitle: 'Get notified about bookings',
-      enabled: true
-    },
-    {
-      label: 'Host Messages',
-      subtitle: 'Messages from hosts',
-      enabled: true
+  const handleNotificationToggle = async (field: 'notification_booking_updates' | 'notification_host_messages', value: boolean) => {
+    try {
+      const { error } = await updateProfile({
+        [field]: value
+      });
+      
+      if (error) {
+        toast.error('Failed to update notification settings');
+      } else {
+        toast.success('Notification settings updated');
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred');
     }
-  ];
+  };
 
   return (
     <div className="space-y-6">
@@ -345,17 +348,31 @@ const Profile = () => {
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Quick Settings</h3>
           
-          {quickSettings.map((setting, index) => (
-            <Card key={index} className="p-4">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="font-medium">{setting.label}</p>
-                  <p className="text-sm text-muted-foreground">{setting.subtitle}</p>
-                </div>
-                <Switch checked={setting.enabled} />
+          <Card className="p-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="font-medium">Booking Updates</p>
+                <p className="text-sm text-muted-foreground">Get notified about bookings</p>
               </div>
-            </Card>
-          ))}
+              <Switch 
+                checked={profile?.notification_booking_updates ?? true}
+                onCheckedChange={(checked) => handleNotificationToggle('notification_booking_updates', checked)}
+              />
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="font-medium">Host Messages</p>
+                <p className="text-sm text-muted-foreground">Messages from hosts</p>
+              </div>
+              <Switch 
+                checked={profile?.notification_host_messages ?? true}
+                onCheckedChange={(checked) => handleNotificationToggle('notification_host_messages', checked)}
+              />
+            </div>
+          </Card>
         </div>
 
         {/* Settings Menu */}

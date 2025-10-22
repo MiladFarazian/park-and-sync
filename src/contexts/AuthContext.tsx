@@ -17,6 +17,8 @@ interface Profile {
   phone_verified: boolean;
   email_verified: boolean;
   stripe_account_enabled?: boolean;
+  notification_booking_updates?: boolean;
+  notification_host_messages?: boolean;
 }
 
 interface AuthContextType {

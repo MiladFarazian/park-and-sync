@@ -294,6 +294,8 @@ export type Database = {
           id: string
           kyc_status: Database["public"]["Enums"]["verification_status"] | null
           last_name: string | null
+          notification_booking_updates: boolean | null
+          notification_host_messages: boolean | null
           phone: string | null
           phone_verified: boolean | null
           rating: number | null
@@ -315,6 +317,8 @@ export type Database = {
           id?: string
           kyc_status?: Database["public"]["Enums"]["verification_status"] | null
           last_name?: string | null
+          notification_booking_updates?: boolean | null
+          notification_host_messages?: boolean | null
           phone?: string | null
           phone_verified?: boolean | null
           rating?: number | null
@@ -336,6 +340,8 @@ export type Database = {
           id?: string
           kyc_status?: Database["public"]["Enums"]["verification_status"] | null
           last_name?: string | null
+          notification_booking_updates?: boolean | null
+          notification_host_messages?: boolean | null
           phone?: string | null
           phone_verified?: boolean | null
           rating?: number | null
