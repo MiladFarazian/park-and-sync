@@ -10,6 +10,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface DateTimePickerProps {
   date: Date;
@@ -45,7 +46,6 @@ export function DateTimePicker({
     newDate.setHours(hour);
     newDate.setMinutes(minute);
     setDate(newDate);
-    setIsOpen(false);
   };
 
   return (
@@ -60,21 +60,22 @@ export function DateTimePicker({
               !date && "text-muted-foreground"
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
+            <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
             {date ? (
-              <span className="flex items-center gap-2">
-                {format(date, "PPP")}
-                <span className="text-muted-foreground">·</span>
-                <Clock className="h-3 w-3" />
-                {format(date, "h:mm a")}
+              <span className="flex items-center gap-1 md:gap-2 text-sm md:text-base truncate">
+                <span className="truncate">{format(date, "MMM d, yyyy")}</span>
+                <span className="text-muted-foreground flex-shrink-0">·</span>
+                <Clock className="h-3 w-3 flex-shrink-0" />
+                <span className="flex-shrink-0">{format(date, "h:mm a")}</span>
               </span>
             ) : (
               <span>{placeholder}</span>
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <div className="flex">
+        <PopoverContent className="w-auto p-0 max-w-[calc(100vw-2rem)]" align="start">
+          {/* Desktop: side-by-side layout */}
+          <div className="hidden md:flex">
             <Calendar
               mode="single"
               selected={date}
@@ -121,6 +122,68 @@ export function DateTimePicker({
               </div>
             </div>
           </div>
+
+          {/* Mobile: tabbed layout */}
+          <Tabs defaultValue="date" className="md:hidden w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="date">Date</TabsTrigger>
+              <TabsTrigger value="time">Time</TabsTrigger>
+            </TabsList>
+            <TabsContent value="date" className="m-0">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={handleDateSelect}
+                disabled={(date) => date < minDate}
+                initialFocus
+                className="pointer-events-auto"
+              />
+            </TabsContent>
+            <TabsContent value="time" className="m-0">
+              <div className="p-4">
+                <p className="text-sm font-medium text-center mb-3">Select Time</p>
+                <div className="flex gap-2 justify-center">
+                  <ScrollArea className="h-[240px] w-20">
+                    <div className="space-y-1">
+                      {hours.map((hour) => (
+                        <Button
+                          key={`hour-${hour}`}
+                          variant={date.getHours() === hour ? "default" : "ghost"}
+                          className="w-full justify-center text-sm h-10"
+                          onClick={() => handleTimeChange(hour, date.getMinutes())}
+                        >
+                          {hour.toString().padStart(2, "0")}
+                        </Button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                  <div className="flex items-center">
+                    <span className="text-2xl font-bold">:</span>
+                  </div>
+                  <ScrollArea className="h-[240px] w-20">
+                    <div className="space-y-1">
+                      {minutes.map((minute) => (
+                        <Button
+                          key={`minute-${minute}`}
+                          variant={date.getMinutes() === minute ? "default" : "ghost"}
+                          className="w-full justify-center text-sm h-10"
+                          onClick={() => handleTimeChange(date.getHours(), minute)}
+                        >
+                          {minute.toString().padStart(2, "0")}
+                        </Button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+                <Button
+                  onClick={() => setIsOpen(false)}
+                  className="w-full mt-4"
+                >
+                  Done
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
         </PopoverContent>
       </Popover>
     </div>
