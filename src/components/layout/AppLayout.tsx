@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import BottomNavigation from './BottomNavigation';
 import { AppSidebar } from './AppSidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
@@ -13,6 +13,7 @@ interface AppLayoutProps {
 
 const AppLayout = ({ children }: AppLayoutProps) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const isProfilePage = location.pathname === '/profile';
 
   return (
@@ -33,7 +34,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
                     <Button variant="ghost" size="icon">
                       <Bell className="h-5 w-5" />
                     </Button>
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" onClick={() => navigate('/messages')}>
                       <MessageSquare className="h-5 w-5" />
                     </Button>
                   </div>
@@ -56,7 +57,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
               <Button variant="ghost" size="icon">
                 <Bell className="h-5 w-5" />
               </Button>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" onClick={() => navigate('/messages')}>
                 <MessageSquare className="h-5 w-5" />
               </Button>
             </div>
