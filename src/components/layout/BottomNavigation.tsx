@@ -11,13 +11,13 @@ const BottomNavigation = () => {
 
   const tabs = [
     { id: 'home', label: 'Home', icon: Home, path: '/' },
+    mode === 'host' 
+      ? { id: 'listings', label: 'Listings', icon: List, path: '/add-spot' }
+      : null,
     mode === 'book' 
       ? { id: 'bookings', label: 'Bookings', icon: Calendar, path: '/activity' }
       : { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { id: 'messages', label: 'Messages', icon: MessageCircle, path: '/messages' },
-    mode === 'host' 
-      ? { id: 'listings', label: 'Listings', icon: List, path: '/add-spot' }
-      : null,
     { id: 'profile', label: 'Profile', icon: User, path: '/profile' },
   ].filter(Boolean) as Array<{ id: string; label: string; icon: any; path: string }>;
 
