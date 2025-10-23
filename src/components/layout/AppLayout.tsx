@@ -6,26 +6,23 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Bell, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import parkwayLogo from '@/assets/parkway-logo.png';
-
 interface AppLayoutProps {
   children: React.ReactNode;
 }
-
-const AppLayout = ({ children }: AppLayoutProps) => {
+const AppLayout = ({
+  children
+}: AppLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const isProfilePage = location.pathname === '/profile';
-
-  return (
-    <>
+  return <>
       {/* Desktop Layout with Sidebar */}
       <div className="hidden md:block">
         <SidebarProvider>
           <div className="flex min-h-screen w-full">
             <AppSidebar />
             <main className="flex-1">
-              {!isProfilePage && (
-                <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
+              {!isProfilePage && <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
                   <div className="flex items-center gap-4">
                     <SidebarTrigger />
                     <img src={parkwayLogo} alt="Parkway" className="h-8" />
@@ -38,8 +35,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
                       <MessageSquare className="h-5 w-5" />
                     </Button>
                   </div>
-                </header>
-              )}
+                </header>}
               <div className="container mx-auto p-6">
                 {children}
               </div>
@@ -50,19 +46,15 @@ const AppLayout = ({ children }: AppLayoutProps) => {
 
       {/* Mobile Layout with Bottom Navigation */}
       <div className="md:hidden">
-        {!isProfilePage && (
-          <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
+        {!isProfilePage && <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
             <img src={parkwayLogo} alt="Parkway" className="h-8" />
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon">
                 <Bell className="h-5 w-5" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => navigate('/messages')}>
-                <MessageSquare className="h-5 w-5" />
-              </Button>
+              
             </div>
-          </header>
-        )}
+          </header>}
         <div className="min-h-screen bg-background pb-16">
           <div className="max-w-md mx-auto">
             {children}
@@ -70,8 +62,6 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           <BottomNavigation />
         </div>
       </div>
-    </>
-  );
+    </>;
 };
-
 export default AppLayout;
