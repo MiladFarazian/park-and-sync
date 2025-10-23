@@ -22,6 +22,9 @@ const Search = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
 
+  // Validate that end time is after start time
+  const isValidTimeRange = checkOutDate.getTime() >= checkInDate.getTime();
+
   // LA neighborhoods and areas
   const laNeighborhoods = [
     'University Park, Los Angeles',
@@ -267,6 +270,13 @@ const Search = () => {
                         newDate.setHours(checkInDate.getHours());
                         newDate.setMinutes(checkInDate.getMinutes());
                         setCheckInDate(newDate);
+                        
+                        // Ensure end time is still after start time
+                        if (newDate.getTime() >= checkOutDate.getTime()) {
+                          const newEndDate = new Date(newDate);
+                          newEndDate.setHours(newEndDate.getHours() + 1);
+                          setCheckOutDate(newEndDate);
+                        }
                       }
                     }}
                     disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
@@ -283,6 +293,13 @@ const Search = () => {
                   updatedDate.setHours(newDate.getHours());
                   updatedDate.setMinutes(newDate.getMinutes());
                   setCheckInDate(updatedDate);
+                  
+                  // Ensure end time is still after start time
+                  if (updatedDate.getTime() >= checkOutDate.getTime()) {
+                    const newEndDate = new Date(updatedDate);
+                    newEndDate.setHours(newEndDate.getHours() + 1);
+                    setCheckOutDate(newEndDate);
+                  }
                 }}
               >
                 <button className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
@@ -316,7 +333,11 @@ const Search = () => {
                         const newDate = new Date(date);
                         newDate.setHours(checkOutDate.getHours());
                         newDate.setMinutes(checkOutDate.getMinutes());
-                        setCheckOutDate(newDate);
+                        
+                        // Only update if it's after start time
+                        if (newDate.getTime() >= checkInDate.getTime()) {
+                          setCheckOutDate(newDate);
+                        }
                       }
                     }}
                     disabled={(date) => date < checkInDate}
@@ -332,7 +353,11 @@ const Search = () => {
                   const updatedDate = new Date(checkOutDate);
                   updatedDate.setHours(newDate.getHours());
                   updatedDate.setMinutes(newDate.getMinutes());
-                  setCheckOutDate(updatedDate);
+                  
+                  // Only update if it's after start time
+                  if (updatedDate.getTime() >= checkInDate.getTime()) {
+                    setCheckOutDate(updatedDate);
+                  }
                 }}
               >
                 <button className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
@@ -346,7 +371,8 @@ const Search = () => {
 
         {/* Find Parking Button */}
         <Button 
-          className="w-full h-14 text-lg mt-6" 
+          className="w-full h-14 text-lg mt-6"
+          disabled={!isValidTimeRange}
           onClick={() => {
             if (!user) {
               navigate('/auth');
