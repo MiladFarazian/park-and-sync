@@ -10,7 +10,7 @@ const BottomNavigation = () => {
   const { mode } = useMode();
 
   const tabs = [
-    { id: 'home', label: 'Home', icon: Home, path: '/' },
+    { id: 'home', label: 'Home', icon: Home, path: mode === 'host' ? '/dashboard' : '/' },
     mode === 'host' 
       ? { id: 'listings', label: 'Listings', icon: List, path: '/add-spot' }
       : null,
@@ -19,7 +19,7 @@ const BottomNavigation = () => {
       : { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { id: 'messages', label: 'Messages', icon: MessageCircle, path: '/messages' },
     { id: 'profile', label: 'Profile', icon: User, path: '/profile' },
-  ].filter(Boolean) as Array<{ id: string; label: string; icon: any; path: string }>;
+  ].filter(Boolean) as Array<{ id: string; label: 'Home' | 'Listings' | 'Bookings' | 'Dashboard' | 'Messages' | 'Profile'; icon: any; path: string }>;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">

@@ -38,18 +38,32 @@ const Home = () => {
     // Get user's location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
+        async (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          setUserLocation({ lat, lng });
+          
+          // Reverse geocode to get place name and autofill search
+          if (mapboxToken) {
+            try {
+              const response = await fetch(
+                `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxToken}&limit=1`
+              );
+              const data = await response.json();
+              if (data.features && data.features.length > 0) {
+                setSearchQuery(data.features[0].place_name);
+              }
+            } catch (error) {
+              console.error('Error reverse geocoding:', error);
+            }
+          }
         },
         () => {
           console.log('Location access denied, using default location');
         }
       );
     }
-  }, []);
+  }, [mapboxToken]);
 
   useEffect(() => {
     fetchNearbySpots();
