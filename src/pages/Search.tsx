@@ -250,15 +250,26 @@ const Search = () => {
                 <PopoverTrigger asChild>
                   <button className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{format(checkInDate, 'MMM dd, yyyy')}</span>
+                    <span className="text-sm">
+                      {format(checkInDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+                        ? 'Today'
+                        : format(checkInDate, 'MMM dd, yyyy')}
+                    </span>
                   </button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <CalendarComponent
                     mode="single"
                     selected={checkInDate}
-                    onSelect={(date) => date && setCheckInDate(date)}
-                    disabled={(date) => date < new Date()}
+                    onSelect={(date) => {
+                      if (date) {
+                        const newDate = new Date(date);
+                        newDate.setHours(checkInDate.getHours());
+                        newDate.setMinutes(checkInDate.getMinutes());
+                        setCheckInDate(newDate);
+                      }
+                    }}
+                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                     initialFocus
                     className="pointer-events-auto"
                   />
@@ -281,14 +292,25 @@ const Search = () => {
                 <PopoverTrigger asChild>
                   <button className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{format(checkOutDate, 'MMM dd, yyyy')}</span>
+                    <span className="text-sm">
+                      {format(checkOutDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+                        ? 'Today'
+                        : format(checkOutDate, 'MMM dd, yyyy')}
+                    </span>
                   </button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <CalendarComponent
                     mode="single"
                     selected={checkOutDate}
-                    onSelect={(date) => date && setCheckOutDate(date)}
+                    onSelect={(date) => {
+                      if (date) {
+                        const newDate = new Date(date);
+                        newDate.setHours(checkOutDate.getHours());
+                        newDate.setMinutes(checkOutDate.getMinutes());
+                        setCheckOutDate(newDate);
+                      }
+                    }}
                     disabled={(date) => date < checkInDate}
                     initialFocus
                     className="pointer-events-auto"
