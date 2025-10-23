@@ -276,7 +276,15 @@ const Search = () => {
                 </PopoverContent>
               </Popover>
               
-              <TimePicker date={checkInDate} setDate={setCheckInDate}>
+              <TimePicker 
+                date={checkInDate} 
+                setDate={(newDate) => {
+                  const updatedDate = new Date(checkInDate);
+                  updatedDate.setHours(newDate.getHours());
+                  updatedDate.setMinutes(newDate.getMinutes());
+                  setCheckInDate(updatedDate);
+                }}
+              >
                 <button className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
                   <Clock className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">{format(checkInDate, 'h:mm a')}</span>
@@ -318,7 +326,15 @@ const Search = () => {
                 </PopoverContent>
               </Popover>
               
-              <TimePicker date={checkOutDate} setDate={setCheckOutDate}>
+              <TimePicker 
+                date={checkOutDate} 
+                setDate={(newDate) => {
+                  const updatedDate = new Date(checkOutDate);
+                  updatedDate.setHours(newDate.getHours());
+                  updatedDate.setMinutes(newDate.getMinutes());
+                  setCheckOutDate(updatedDate);
+                }}
+              >
                 <button className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
                   <Clock className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">{format(checkOutDate, 'h:mm a')}</span>
