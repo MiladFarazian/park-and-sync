@@ -4,13 +4,15 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
-import { Star, MapPin, Loader2, Search, Compass, Plus, Activity, Zap } from 'lucide-react';
+import { Star, MapPin, Loader2, Search, Plus, Activity, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useMode } from '@/contexts/ModeContext';
 
 const Home = () => {
   const navigate = useNavigate();
+  const { setMode } = useMode();
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState({ lat: 34.0224, lng: -118.2851 }); // Default to University Park
@@ -20,7 +22,7 @@ const Home = () => {
   const [mapboxToken, setMapboxToken] = useState('');
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const [startTime, setStartTime] = useState(new Date());
-  const [endTime, setEndTime] = useState(new Date(Date.now() + 4 * 60 * 60 * 1000)); // 4 hours later
+  const [endTime, setEndTime] = useState(new Date(Date.now() + 2 * 60 * 60 * 1000)); // 2 hours later
 
   useEffect(() => {
     // Fetch Mapbox public token
@@ -234,34 +236,30 @@ const Home = () => {
 
   const quickActions = [
     { 
-      icon: Compass, 
-      label: 'Find Nearby', 
-      description: 'Browse spots',
-      onClick: () => navigate('/explore')
-    },
-    { 
-      icon: Plus, 
-      label: 'List Your Spot', 
-      description: 'Start earning',
-      onClick: () => navigate('/add-spot')
-    },
-    { 
-      icon: Activity, 
-      label: 'My Bookings', 
-      description: 'View history',
-      onClick: () => navigate('/activity')
-    },
-    { 
       icon: Zap, 
-      label: 'Instant Book', 
-      description: 'Quick parking',
+      label: 'Instant Book',
       onClick: () => {
+        const now = new Date();
+        const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
         if (userLocation) {
-          navigate(`/explore?lat=${userLocation.lat}&lng=${userLocation.lng}`);
+          navigate(`/explore?lat=${userLocation.lat}&lng=${userLocation.lng}&start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
         } else {
           navigate('/explore');
         }
       }
+    },
+    { 
+      icon: Plus, 
+      label: 'List Your Spot',
+      onClick: () => {
+        setMode('host');
+        navigate('/add-spot');
+      }
+    },
+    { 
+      icon: Activity, 
+      label: 'My Bookings',
+      onClick: () => navigate('/activity')
     },
   ];
 
@@ -335,7 +333,7 @@ const Home = () => {
         {/* Quick Actions */}
         <div>
           <h2 className="text-lg font-semibold mb-3">Quick Actions</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             {quickActions.map((action, index) => {
               const Icon = action.icon;
               return (
@@ -348,10 +346,7 @@ const Home = () => {
                     <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
                       <Icon className="h-4 w-4" />
                     </div>
-                    <div>
-                      <span className="text-sm font-medium block">{action.label}</span>
-                      <span className="text-xs text-muted-foreground">{action.description}</span>
-                    </div>
+                    <span className="text-xs font-medium">{action.label}</span>
                   </div>
                 </Card>
               );
