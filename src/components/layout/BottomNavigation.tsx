@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Compass, Calendar, MessageCircle, User, Building } from 'lucide-react';
+import { Home, Calendar, MessageCircle, User, LayoutDashboard, List } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useMode } from '@/contexts/ModeContext';
@@ -13,10 +13,13 @@ const BottomNavigation = () => {
     { id: 'home', label: 'Home', icon: Home, path: '/' },
     mode === 'book' 
       ? { id: 'bookings', label: 'Bookings', icon: Calendar, path: '/activity' }
-      : { id: 'host', label: 'Host', icon: Building, path: '/list-spot' },
+      : { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { id: 'messages', label: 'Messages', icon: MessageCircle, path: '/messages' },
+    mode === 'host' 
+      ? { id: 'listings', label: 'Listings', icon: List, path: '/add-spot' }
+      : null,
     { id: 'profile', label: 'Profile', icon: User, path: '/profile' },
-  ];
+  ].filter(Boolean) as Array<{ id: string; label: string; icon: any; path: string }>;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">

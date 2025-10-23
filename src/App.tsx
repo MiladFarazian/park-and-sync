@@ -9,6 +9,7 @@ import Explore from "./pages/Explore";
 import AddSpot from "./pages/AddSpot";
 import ListSpot from "./pages/ListSpot";
 import Activity from "./pages/Activity";
+import Dashboard from "./pages/Dashboard";
 import Messages from "./pages/Messages";
 import SearchResults from "./pages/SearchResults";
 import SpotDetail from "./pages/SpotDetail";
@@ -54,6 +55,7 @@ const App = () => (
                   <Route path="/add-spot" element={<AddSpot />} />
                   <Route path="/list-spot" element={<ListSpot />} />
                   <Route path="/activity" element={<Activity />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/messages" element={<Messages />} />
                   <Route path="/profile" element={<Profile />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
