@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronDown, Car, Home } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import {
   Popover,
   PopoverContent,
@@ -11,12 +12,19 @@ import { cn } from '@/lib/utils';
 
 const ModeSwitcher = () => {
   const { mode, setMode, isLoading } = useMode();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
   const handleModeSwitch = (newMode: 'driver' | 'host') => {
     if (newMode !== mode) {
       setMode(newMode);
       setOpen(false);
+      // Navigate to the appropriate home page for the mode
+      if (newMode === 'host') {
+        navigate('/dashboard');
+      } else {
+        navigate('/');
+      }
     }
   };
 
