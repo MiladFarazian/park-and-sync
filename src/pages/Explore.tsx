@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Loader2, Search, X, MapPin, Calendar, Clock, Edit2 } from 'lucide-react';
+import { Loader2, Search, X, MapPin, Calendar, Clock, Edit2, ArrowRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -288,27 +288,29 @@ const Explore = () => {
             <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
               <PopoverTrigger asChild>
                 <Card className="p-3 bg-background/95 backdrop-blur-sm shadow-lg cursor-pointer hover:bg-accent/5 transition-colors">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4 text-sm flex-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-xs flex-1 min-w-0">
                       {startTime && (
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span>{format(startTime, 'MMM dd')}</span>
-                          <Clock className="h-4 w-4 text-muted-foreground ml-2" />
-                          <span>{format(startTime, 'h:mm a')}</span>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="whitespace-nowrap">{format(startTime, 'MMM dd')}</span>
+                          <Clock className="h-3.5 w-3.5 text-muted-foreground ml-0.5" />
+                          <span className="whitespace-nowrap">{format(startTime, 'h:mma')}</span>
                         </div>
                       )}
                       {endTime && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">to</span>
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span>{format(endTime, 'MMM dd')}</span>
-                          <Clock className="h-4 w-4 text-muted-foreground ml-2" />
-                          <span>{format(endTime, 'h:mm a')}</span>
-                        </div>
+                        <>
+                          <ArrowRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="whitespace-nowrap">{format(endTime, 'MMM dd')}</span>
+                            <Clock className="h-3.5 w-3.5 text-muted-foreground ml-0.5" />
+                            <span className="whitespace-nowrap">{format(endTime, 'h:mma')}</span>
+                          </div>
+                        </>
                       )}
                     </div>
-                    <Edit2 className="h-4 w-4 text-muted-foreground" />
+                    <Edit2 className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                   </div>
                 </Card>
               </PopoverTrigger>
