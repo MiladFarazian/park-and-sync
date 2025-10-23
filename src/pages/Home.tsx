@@ -341,12 +341,12 @@ const Home = () => {
               return (
                 <Card 
                   key={index}
-                  className="p-4 cursor-pointer hover:shadow-md transition-all"
+                  className="p-2 cursor-pointer hover:shadow-md transition-all"
                   onClick={action.onClick}
                 >
-                  <div className="flex flex-col items-center text-center space-y-2">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                      <Icon className="h-6 w-6" />
+                  <div className="flex flex-col items-center text-center space-y-1">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                      <Icon className="h-4 w-4" />
                     </div>
                     <div>
                       <span className="text-sm font-medium block">{action.label}</span>
