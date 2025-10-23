@@ -305,10 +305,10 @@ const Profile = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="bg-background">
                 <DropdownMenuItem 
-                  onClick={() => setMode(mode === 'book' ? 'host' : 'book')}
+                  onClick={() => setMode(mode === 'driver' ? 'host' : 'driver')}
                   className="cursor-pointer"
                 >
-                  Switch to {mode === 'book' ? 'Host' : 'Book'} Mode
+                  Switch to {mode === 'driver' ? 'Host' : 'Driver'} Mode
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -365,7 +365,7 @@ const Profile = () => {
         </div>
 
         {/* Become a Host Widget */}
-        {mode === 'book' && (
+        {mode === 'driver' && (
           <Card className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
             <div className="flex items-start gap-4">
               <div className="p-3 bg-primary/10 rounded-lg">

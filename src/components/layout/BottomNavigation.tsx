@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Calendar, MessageCircle, User, LayoutDashboard, List } from 'lucide-react';
+import { Home, Calendar, MessageCircle, User, List } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useMode } from '@/contexts/ModeContext';
@@ -9,17 +9,20 @@ const BottomNavigation = () => {
   const navigate = useNavigate();
   const { mode } = useMode();
 
-  const tabs = [
-    { id: 'home', label: 'Home', icon: Home, path: mode === 'host' ? '/dashboard' : '/' },
-    mode === 'host' 
-      ? { id: 'listings', label: 'Listings', icon: List, path: '/add-spot' }
-      : null,
-    mode === 'book' 
-      ? { id: 'bookings', label: 'Bookings', icon: Calendar, path: '/activity' }
-      : null,
-    { id: 'messages', label: 'Messages', icon: MessageCircle, path: '/messages' },
-    { id: 'profile', label: 'Profile', icon: User, path: '/profile' },
-  ].filter(Boolean) as Array<{ id: string; label: 'Home' | 'Listings' | 'Bookings' | 'Messages' | 'Profile'; icon: any; path: string }>;
+  const tabs = mode === 'host' 
+    ? [
+        { id: 'home', label: 'Home', icon: Home, path: '/dashboard' },
+        { id: 'listings', label: 'Listings', icon: List, path: '/add-spot' },
+        { id: 'reservations', label: 'Reservations', icon: Calendar, path: '/activity' },
+        { id: 'messages', label: 'Messages', icon: MessageCircle, path: '/messages' },
+        { id: 'account', label: 'Account', icon: User, path: '/profile' },
+      ]
+    : [
+        { id: 'home', label: 'Home', icon: Home, path: '/' },
+        { id: 'reservations', label: 'Reservations', icon: Calendar, path: '/activity' },
+        { id: 'messages', label: 'Messages', icon: MessageCircle, path: '/messages' },
+        { id: 'account', label: 'Account', icon: User, path: '/profile' },
+      ];
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
