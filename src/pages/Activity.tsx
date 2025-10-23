@@ -1,94 +1,117 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MapPin, Clock, Calendar, DollarSign } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const Activity = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('upcoming');
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data - replace with actual data from Supabase
-  const upcomingBookings = [
-    {
-      id: '1',
-      title: 'Downtown Garage',
-      address: '123 Main St, Los Angeles',
-      date: 'Dec 25, 2024',
-      time: '9:00 AM - 5:00 PM',
-      price: 40,
-      status: 'upcoming'
-    },
-    {
-      id: '2',
-      title: 'Santa Monica Beach Parking',
-      address: '789 Ocean Ave, Santa Monica',
-      date: 'Dec 28, 2024',
-      time: '10:00 AM - 4:00 PM',
-      price: 35,
-      status: 'upcoming'
-    }
-  ];
+  useEffect(() => {
+    fetchBookings();
+  }, []);
 
-  const pastBookings = [
-    {
-      id: '3',
-      title: 'Hollywood Walk of Fame',
-      address: '456 Hollywood Blvd, Los Angeles',
-      date: 'Dec 15, 2024',
-      time: '11:00 AM - 3:00 PM',
-      price: 25,
-      status: 'completed'
-    },
-    {
-      id: '4',
-      title: 'Beverly Hills Shopping',
-      address: '321 Rodeo Drive, Beverly Hills',
-      date: 'Dec 10, 2024',
-      time: '12:00 PM - 6:00 PM',
-      price: 50,
-      status: 'completed'
+  const fetchBookings = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          spots (
+            title,
+            address
+          )
+        `)
+        .eq('renter_id', user.id)
+        .order('start_at', { ascending: false });
+
+      if (error) throw error;
+
+      setBookings(data || []);
+    } catch (error) {
+      console.error('Error fetching bookings:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load bookings",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  };
+
+  const formatTime = (start: string, end: string) => {
+    const startTime = new Date(start).toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit' 
+    });
+    const endTime = new Date(end).toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit' 
+    });
+    return `${startTime} - ${endTime}`;
+  };
+
+  const now = new Date();
+  const upcomingBookings = bookings.filter(b => new Date(b.end_at) >= now);
+  const pastBookings = bookings.filter(b => new Date(b.end_at) < now);
 
   const BookingCard = ({ booking, isPast = false }: { booking: any; isPast?: boolean }) => (
     <Card>
       <CardContent className="p-4">
         <div className="flex justify-between items-start mb-3">
           <div>
-            <h3 className="font-semibold">{booking.title}</h3>
+            <h3 className="font-semibold">{booking.spots?.title || 'Parking Spot'}</h3>
             <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
               <MapPin className="h-3 w-3" />
-              {booking.address}
+              {booking.spots?.address || 'Address not available'}
             </p>
           </div>
           <Badge variant={isPast ? 'secondary' : 'default'}>
-            {isPast ? 'Completed' : 'Upcoming'}
+            {booking.status === 'paid' ? (isPast ? 'Completed' : 'Confirmed') : booking.status}
           </Badge>
         </div>
         
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span>{booking.date}</span>
+            <span>{formatDate(booking.start_at)}</span>
           </div>
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-muted-foreground" />
-            <span>{booking.time}</span>
+            <span>{formatTime(booking.start_at, booking.end_at)}</span>
           </div>
         </div>
 
         <div className="mt-3 pt-3 border-t flex justify-between items-center">
           <div className="flex items-center gap-2">
             <DollarSign className="h-5 w-5 text-muted-foreground" />
-            <span className="font-semibold text-lg">${booking.price}</span>
+            <span className="font-semibold text-lg">${Number(booking.total_amount).toFixed(2)}</span>
           </div>
         </div>
       </CardContent>
       <div className="p-4 pt-0 flex gap-2">
-        <Button variant="outline" className="flex-1">View Details</Button>
+        <Button variant="outline" className="flex-1" onClick={() => navigate(`/booking/${booking.id}`)}>View Details</Button>
         {!isPast && <Button variant="default" className="flex-1">Get Directions</Button>}
       </div>
     </Card>
@@ -109,7 +132,17 @@ const Activity = () => {
           </TabsList>
           
           <TabsContent value="upcoming" className="space-y-3 mt-4">
-            {upcomingBookings.length === 0 ? (
+            {loading ? (
+              <div className="space-y-3">
+                {[1, 2].map((i) => (
+                  <Card key={i}>
+                    <CardContent className="p-4">
+                      <Skeleton className="h-20 w-full" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : upcomingBookings.length === 0 ? (
               <Card>
                 <CardContent className="p-8 text-center">
                   <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -130,7 +163,17 @@ const Activity = () => {
           </TabsContent>
           
           <TabsContent value="past" className="space-y-3 mt-4">
-            {pastBookings.length === 0 ? (
+            {loading ? (
+              <div className="space-y-3">
+                {[1, 2].map((i) => (
+                  <Card key={i}>
+                    <CardContent className="p-4">
+                      <Skeleton className="h-20 w-full" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : pastBookings.length === 0 ? (
               <Card>
                 <CardContent className="p-8 text-center">
                   <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
