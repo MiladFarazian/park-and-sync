@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload } from 'lucide-react';
+import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, ChevronDown, Building2, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -17,6 +17,8 @@ import * as z from 'zod';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { ImageCropDialog } from '@/components/profile/ImageCropDialog';
+import { useMode } from '@/contexts/ModeContext';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const profileSchema = z.object({
   first_name: z.string().trim().min(1, 'First name is required').max(50, 'First name must be less than 50 characters'),
@@ -29,6 +31,7 @@ type ProfileFormData = z.infer<typeof profileSchema>;
 const Profile = () => {
   const { user, profile, loading, signOut, updateProfile } = useAuth();
   const navigate = useNavigate();
+  const { mode, setMode } = useMode();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [avatarFile, setAvatarFile] = useState<Blob | null>(null);
@@ -292,7 +295,24 @@ const Profile = () => {
       {/* Header with solid blue background */}
       <div className="bg-primary text-primary-foreground p-6 rounded-b-2xl">
         <div className="flex justify-between items-start mb-6">
-          <h1 className="text-2xl font-bold">Profile</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold">Profile</h1>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-primary-foreground hover:bg-primary-foreground/10">
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="bg-background">
+                <DropdownMenuItem 
+                  onClick={() => setMode(mode === 'book' ? 'host' : 'book')}
+                  className="cursor-pointer"
+                >
+                  Switch to {mode === 'book' ? 'Host' : 'Book'} Mode
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <Button variant="secondary" size="sm" onClick={handleSignOut}>
             <LogOut className="h-4 w-4" />
           </Button>
@@ -343,6 +363,30 @@ const Profile = () => {
             <p className="text-sm text-muted-foreground">Reviews</p>
           </Card>
         </div>
+
+        {/* Become a Host Widget */}
+        {mode === 'book' && (
+          <Card className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <Building2 className="h-6 w-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg mb-1">Become a Host</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Share your parking spot and earn extra income
+                </p>
+                <Button 
+                  onClick={() => navigate('/list-spot')} 
+                  className="w-full"
+                >
+                  List Your Spot
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Quick Settings */}
         <div className="space-y-4">

@@ -1,17 +1,21 @@
 import React from 'react';
-import { Home, Compass, Plus, Activity, User } from 'lucide-react';
+import { Home, Compass, Calendar, MessageCircle, User, Building } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useMode } from '@/contexts/ModeContext';
 
 const BottomNavigation = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { mode } = useMode();
 
   const tabs = [
     { id: 'home', label: 'Home', icon: Home, path: '/' },
     { id: 'explore', label: 'Explore', icon: Compass, path: '/explore' },
-    { id: 'add', label: 'Host', icon: Plus, path: '/add-spot' },
-    { id: 'activity', label: 'Activity', icon: Activity, path: '/activity' },
+    mode === 'book' 
+      ? { id: 'bookings', label: 'Bookings', icon: Calendar, path: '/activity' }
+      : { id: 'host', label: 'Host', icon: Building, path: '/list-spot' },
+    { id: 'messages', label: 'Messages', icon: MessageCircle, path: '/messages' },
     { id: 'profile', label: 'Profile', icon: User, path: '/profile' },
   ];
 

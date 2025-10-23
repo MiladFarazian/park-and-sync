@@ -23,16 +23,18 @@ import PaymentMethods from "./pages/PaymentMethods";
 import Notifications from "./pages/Notifications";
 import PrivacySecurity from "./pages/PrivacySecurity";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ModeProvider } from "./contexts/ModeContext";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+      <ModeProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/search-results" element={<SearchResults />} />
@@ -62,6 +64,7 @@ const App = () => (
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
+      </ModeProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
