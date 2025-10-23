@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -39,6 +39,23 @@ const ListSpot = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [photos, setPhotos] = useState<File[]>([]);
+  const [mapboxToken, setMapboxToken] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const fetchMapboxToken = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('get-mapbox-token');
+        if (error) throw error;
+        if (data?.token) {
+          setMapboxToken(data.token);
+        }
+      } catch (error) {
+        console.error('Error fetching Mapbox token:', error);
+      }
+    };
+    fetchMapboxToken();
+  }, []);
 
   const {
     register,
@@ -72,8 +89,39 @@ const ListSpot = () => {
     }
   };
 
-  const onSubmit = async (data: FormData) => {
+  const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
+    if (!mapboxToken) {
+      console.error('Mapbox token not available');
+      return null;
+    }
+
     try {
+      const encodedAddress = encodeURIComponent(address);
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${mapboxToken}&limit=1`
+      );
+      
+      if (!response.ok) throw new Error('Geocoding failed');
+      
+      const data = await response.json();
+      
+      if (data.features && data.features.length > 0) {
+        const [lng, lat] = data.features[0].center;
+        return { lat, lng };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error geocoding address:', error);
+      return null;
+    }
+  };
+
+  const onSubmit = async (data: FormData) => {
+    if (isSubmitting) return;
+    
+    try {
+      setIsSubmitting(true);
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -81,7 +129,15 @@ const ListSpot = () => {
         return;
       }
 
-      // Create the spot
+      // Geocode the address to get coordinates
+      const coordinates = await geocodeAddress(data.address);
+      
+      if (!coordinates) {
+        toast.error('Could not find location for this address. Please check the address and try again.');
+        return;
+      }
+
+      // Create the spot with proper coordinates
       const { data: spotData, error: spotError } = await supabase
         .from('spots')
         .insert({
@@ -90,9 +146,9 @@ const ListSpot = () => {
           address: data.address,
           hourly_rate: parseFloat(data.hourlyRate),
           description: data.description,
-          latitude: 34.0522, // Default LA coordinates - would use geocoding in production
-          longitude: -118.2437,
-          location: `POINT(-118.2437 34.0522)`, // Default LA - would use geocoding
+          latitude: coordinates.lat,
+          longitude: coordinates.lng,
+          location: `POINT(${coordinates.lng} ${coordinates.lat})`,
           status: 'pending_approval',
           is_covered: selectedAmenities.includes('covered'),
           is_secure: selectedAmenities.includes('security'),
@@ -112,6 +168,8 @@ const ListSpot = () => {
     } catch (error) {
       console.error('Error submitting spot:', error);
       toast.error('Failed to submit listing');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -481,8 +539,8 @@ const ListSpot = () => {
                   >
                     Back
                   </Button>
-                  <Button type="submit" className="flex-1">
-                    Submit Listing
+                  <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                    {isSubmitting ? 'Submitting...' : 'Submit Listing'}
                   </Button>
                 </div>
               </CardContent>
