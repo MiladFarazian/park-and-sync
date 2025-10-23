@@ -287,15 +287,15 @@ const Explore = () => {
         
         {(startTime || endTime) && (
           <div className="max-w-md mx-auto">
-            <Card className="p-3 bg-background/95 backdrop-blur-sm shadow-lg">
-              <div className="flex items-center gap-2 text-xs flex-wrap justify-center">
+            <Card className="p-2.5 bg-background/95 backdrop-blur-sm shadow-lg">
+              <div className="flex items-center gap-1.5 text-xs justify-center">
                 {startTime && (
                   <>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <button className="flex items-center gap-1.5 hover:bg-accent/50 rounded px-2 py-1 transition-colors">
-                          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="whitespace-nowrap">{formatDateDisplay(startTime)}</span>
+                        <button className="flex items-center gap-1 hover:bg-accent/50 rounded px-1.5 py-1 transition-colors flex-shrink-0">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          <span className="whitespace-nowrap text-[11px]">{formatDateDisplay(startTime)}</span>
                         </button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
@@ -325,25 +325,25 @@ const Explore = () => {
                         handleDateTimeUpdate();
                       }}
                     >
-                      <button className="flex items-center gap-1.5 hover:bg-accent/50 rounded px-2 py-1 transition-colors">
-                        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="whitespace-nowrap">{format(startTime, 'h:mma')}</span>
+                      <button className="flex items-center gap-1 hover:bg-accent/50 rounded px-1.5 py-1 transition-colors flex-shrink-0">
+                        <Clock className="h-3 w-3 text-muted-foreground" />
+                        <span className="whitespace-nowrap text-[11px]">{format(startTime, 'h:mma')}</span>
                       </button>
                     </TimePicker>
                   </>
                 )}
                 
                 {startTime && endTime && (
-                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                  <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                 )}
                 
                 {endTime && (
                   <>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <button className="flex items-center gap-1.5 hover:bg-accent/50 rounded px-2 py-1 transition-colors">
-                          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="whitespace-nowrap">{formatDateDisplay(endTime)}</span>
+                        <button className="flex items-center gap-1 hover:bg-accent/50 rounded px-1.5 py-1 transition-colors flex-shrink-0">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          <span className="whitespace-nowrap text-[11px]">{formatDateDisplay(endTime)}</span>
                         </button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
@@ -373,9 +373,9 @@ const Explore = () => {
                         handleDateTimeUpdate();
                       }}
                     >
-                      <button className="flex items-center gap-1.5 hover:bg-accent/50 rounded px-2 py-1 transition-colors">
-                        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="whitespace-nowrap">{format(endTime, 'h:mma')}</span>
+                      <button className="flex items-center gap-1 hover:bg-accent/50 rounded px-1.5 py-1 transition-colors flex-shrink-0">
+                        <Clock className="h-3 w-3 text-muted-foreground" />
+                        <span className="whitespace-nowrap text-[11px]">{format(endTime, 'h:mma')}</span>
                       </button>
                     </TimePicker>
                   </>

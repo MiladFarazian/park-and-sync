@@ -8,13 +8,17 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { TimePicker } from '@/components/ui/time-picker';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
 
 const Search = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const [searchLocation, setSearchLocation] = useState('University Park, Los Angeles');
-  const [checkInDate, setCheckInDate] = useState('');
-  const [checkOutDate, setCheckOutDate] = useState('');
+  const [checkInDate, setCheckInDate] = useState<Date>(new Date());
+  const [checkOutDate, setCheckOutDate] = useState<Date>(new Date(Date.now() + 24 * 60 * 60 * 1000));
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
 
@@ -78,15 +82,6 @@ const Search = () => {
     'Valley Village'
   ];
 
-  // Set default dates
-  React.useEffect(() => {
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    
-    setCheckInDate(now.toISOString().split('T')[0]);
-    setCheckOutDate(tomorrow.toISOString().split('T')[0]);
-  }, []);
 
   // Handle search input changes
   const handleSearchChange = (value: string) => {
@@ -247,29 +242,66 @@ const Search = () => {
         </div>
 
         {/* Check-in/Check-out */}
-        <div className="grid grid-cols-2 gap-4 mt-6">
+        <div className="space-y-4 mt-6">
           <div>
-            <p className="text-sm font-medium text-muted-foreground mb-2">Check-in</p>
-            <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <input 
-                type="date"
-                value={checkInDate}
-                onChange={(e) => setCheckInDate(e.target.value)}
-                className="bg-transparent border-none text-sm flex-1 outline-none"
-              />
+            <p className="text-sm font-medium text-muted-foreground mb-2">Start</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{format(checkInDate, 'MMM dd, yyyy')}</span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={checkInDate}
+                    onSelect={(date) => date && setCheckInDate(date)}
+                    disabled={(date) => date < new Date()}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+              
+              <TimePicker date={checkInDate} setDate={setCheckInDate}>
+                <button className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">{format(checkInDate, 'h:mm a')}</span>
+                </button>
+              </TimePicker>
             </div>
           </div>
+          
           <div>
-            <p className="text-sm font-medium text-muted-foreground mb-2">Check-out</p>
-            <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <input 
-                type="date"
-                value={checkOutDate}
-                onChange={(e) => setCheckOutDate(e.target.value)}
-                className="bg-transparent border-none text-sm flex-1 outline-none"
-              />
+            <p className="text-sm font-medium text-muted-foreground mb-2">End</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{format(checkOutDate, 'MMM dd, yyyy')}</span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={checkOutDate}
+                    onSelect={(date) => date && setCheckOutDate(date)}
+                    disabled={(date) => date < checkInDate}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+              
+              <TimePicker date={checkOutDate} setDate={setCheckOutDate}>
+                <button className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">{format(checkOutDate, 'h:mm a')}</span>
+                </button>
+              </TimePicker>
             </div>
           </div>
         </div>
@@ -285,8 +317,8 @@ const Search = () => {
             // Pass search parameters via URL
             const params = new URLSearchParams({
               location: searchLocation,
-              checkIn: checkInDate,
-              checkOut: checkOutDate
+              checkIn: checkInDate.toISOString(),
+              checkOut: checkOutDate.toISOString()
             });
             navigate(`/search-results?${params.toString()}`);
           }}
