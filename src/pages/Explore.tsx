@@ -1,14 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Loader2, Search, X, MapPin, Calendar, Clock } from 'lucide-react';
+import { Loader2, Search, X, MapPin, Calendar, Clock, Edit2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import MapView from '@/components/map/MapView';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import { DateTimePicker } from '@/components/ui/date-time-picker';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 const Explore = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState({ lat: 34.0224, lng: -118.2851 }); // Default to University Park
@@ -20,6 +28,7 @@ const Explore = () => {
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [endTime, setEndTime] = useState<Date | null>(null);
   const fetchTimeoutRef = useRef<NodeJS.Timeout>();
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   useEffect(() => {
     fetchMapboxToken();
@@ -204,6 +213,21 @@ const Explore = () => {
     }, 800); // Longer debounce to reduce requests
   };
 
+  const handleDateTimeUpdate = () => {
+    // Update URL params
+    const params = new URLSearchParams();
+    params.set('lat', userLocation.lat.toString());
+    params.set('lng', userLocation.lng.toString());
+    if (startTime) params.set('start', startTime.toISOString());
+    if (endTime) params.set('end', endTime.toISOString());
+    if (searchQuery) params.set('q', searchQuery);
+    navigate(`/explore?${params.toString()}`, { replace: true });
+    
+    // Refetch spots with new times
+    fetchNearbySpots(userLocation, 15000, false);
+    setDatePickerOpen(false);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-64px)]">
@@ -261,22 +285,57 @@ const Explore = () => {
         
         {(startTime || endTime) && (
           <div className="max-w-md mx-auto">
-            <Card className="p-3 bg-background/95 backdrop-blur-sm shadow-lg">
-              <div className="flex items-center justify-center gap-4 text-sm">
-                {startTime && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span>{format(startTime, 'MMM dd, yyyy')}</span>
+            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+              <PopoverTrigger asChild>
+                <Card className="p-3 bg-background/95 backdrop-blur-sm shadow-lg cursor-pointer hover:bg-accent/5 transition-colors">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 text-sm flex-1">
+                      {startTime && (
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span>{format(startTime, 'MMM dd')}</span>
+                          <Clock className="h-4 w-4 text-muted-foreground ml-2" />
+                          <span>{format(startTime, 'h:mm a')}</span>
+                        </div>
+                      )}
+                      {endTime && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">to</span>
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span>{format(endTime, 'MMM dd')}</span>
+                          <Clock className="h-4 w-4 text-muted-foreground ml-2" />
+                          <span>{format(endTime, 'h:mm a')}</span>
+                        </div>
+                      )}
+                    </div>
+                    <Edit2 className="h-4 w-4 text-muted-foreground" />
                   </div>
-                )}
-                {startTime && endTime && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span>{format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')}</span>
+                </Card>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-4" align="center">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <DateTimePicker
+                      date={startTime || undefined}
+                      setDate={(date) => setStartTime(date || null)}
+                      label="Start Date & Time"
+                      minDate={new Date()}
+                    />
                   </div>
-                )}
-              </div>
-            </Card>
+                  <div className="space-y-2">
+                    <DateTimePicker
+                      date={endTime || undefined}
+                      setDate={(date) => setEndTime(date || null)}
+                      label="End Date & Time"
+                      minDate={startTime || new Date()}
+                    />
+                  </div>
+                  <Button onClick={handleDateTimeUpdate} className="w-full">
+                    Update Search
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         )}
       </div>
