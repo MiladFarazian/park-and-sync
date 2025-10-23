@@ -392,11 +392,11 @@ const Profile = () => {
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Quick Settings</h3>
           
-          <Card className="p-2">
-            <div className="flex justify-between items-center gap-2">
+          <Card className="p-4">
+            <div className="flex justify-between items-center">
               <div>
-                <p className="font-medium text-sm">Booking Updates</p>
-                <p className="text-xs text-muted-foreground">Get notified about bookings</p>
+                <p className="font-medium">Booking Updates</p>
+                <p className="text-sm text-muted-foreground">Get notified about bookings</p>
               </div>
               <Switch 
                 checked={profile?.notification_booking_updates ?? true}
@@ -405,11 +405,11 @@ const Profile = () => {
             </div>
           </Card>
 
-          <Card className="p-2">
-            <div className="flex justify-between items-center gap-2">
+          <Card className="p-4">
+            <div className="flex justify-between items-center">
               <div>
-                <p className="font-medium text-sm">Host Messages</p>
-                <p className="text-xs text-muted-foreground">Messages from hosts</p>
+                <p className="font-medium">Host Messages</p>
+                <p className="text-sm text-muted-foreground">Messages from hosts</p>
               </div>
               <Switch 
                 checked={profile?.notification_host_messages ?? true}
