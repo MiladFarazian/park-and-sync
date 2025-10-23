@@ -16,10 +16,10 @@ const BottomNavigation = () => {
       : null,
     mode === 'book' 
       ? { id: 'bookings', label: 'Bookings', icon: Calendar, path: '/activity' }
-      : { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+      : null,
     { id: 'messages', label: 'Messages', icon: MessageCircle, path: '/messages' },
     { id: 'profile', label: 'Profile', icon: User, path: '/profile' },
-  ].filter(Boolean) as Array<{ id: string; label: 'Home' | 'Listings' | 'Bookings' | 'Dashboard' | 'Messages' | 'Profile'; icon: any; path: string }>;
+  ].filter(Boolean) as Array<{ id: string; label: 'Home' | 'Listings' | 'Bookings' | 'Messages' | 'Profile'; icon: any; path: string }>;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
