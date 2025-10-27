@@ -322,22 +322,24 @@ const Home = () => {
           <div>
             <p className="font-semibold mb-4">When do you need parking?</p>
             
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Start Time Section */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Start Time</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="flex border border-input rounded-lg overflow-hidden h-12">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         className={cn(
-                          "justify-start text-left font-normal h-12",
+                          "flex-1 justify-start text-left font-normal h-full rounded-none border-0 hover:bg-accent",
                           !startTime && "text-muted-foreground"
                         )}
                       >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {startTime ? format(startTime, "MMM d, yyyy") : "Pick date"}
+                        <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                        <span className="truncate">
+                          {startTime ? format(startTime, "MMM d, yyyy") : "Pick date"}
+                        </span>
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -359,13 +361,15 @@ const Home = () => {
                     </PopoverContent>
                   </Popover>
 
+                  <span className="flex items-center px-2 text-muted-foreground">·</span>
+
                   <TimePicker date={startTime} setDate={setStartTime}>
                     <Button
-                      variant="outline"
-                      className="justify-start text-left font-normal h-12"
+                      variant="ghost"
+                      className="justify-start text-left font-normal h-full rounded-none border-0 hover:bg-accent flex-shrink-0"
                     >
-                      <Clock className="mr-2 h-4 w-4" />
-                      {format(startTime, "h:mm a")}
+                      <Clock className="mr-2 h-4 w-4 flex-shrink-0" />
+                      <span className="flex-shrink-0">{format(startTime, "h:mm a")}</span>
                     </Button>
                   </TimePicker>
                 </div>
@@ -374,18 +378,20 @@ const Home = () => {
               {/* End Time Section */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">End Time</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="flex border border-input rounded-lg overflow-hidden h-12">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         className={cn(
-                          "justify-start text-left font-normal h-12",
+                          "flex-1 justify-start text-left font-normal h-full rounded-none border-0 hover:bg-accent",
                           !endTime && "text-muted-foreground"
                         )}
                       >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {endTime ? format(endTime, "MMM d, yyyy") : "Pick date"}
+                        <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                        <span className="truncate">
+                          {endTime ? format(endTime, "MMM d, yyyy") : "Pick date"}
+                        </span>
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -407,13 +413,15 @@ const Home = () => {
                     </PopoverContent>
                   </Popover>
 
+                  <span className="flex items-center px-2 text-muted-foreground">·</span>
+
                   <TimePicker date={endTime} setDate={setEndTime}>
                     <Button
-                      variant="outline"
-                      className="justify-start text-left font-normal h-12"
+                      variant="ghost"
+                      className="justify-start text-left font-normal h-full rounded-none border-0 hover:bg-accent flex-shrink-0"
                     >
-                      <Clock className="mr-2 h-4 w-4" />
-                      {format(endTime, "h:mm a")}
+                      <Clock className="mr-2 h-4 w-4 flex-shrink-0" />
+                      <span className="flex-shrink-0">{format(endTime, "h:mm a")}</span>
                     </Button>
                   </TimePicker>
                 </div>
