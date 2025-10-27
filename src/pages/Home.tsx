@@ -3,7 +3,12 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DateTimePicker } from '@/components/ui/date-time-picker';
+import { Calendar } from '@/components/ui/calendar';
+import { TimePicker } from '@/components/ui/time-picker';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
+import { CalendarIcon, Clock } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Star, MapPin, Loader2, Search, Plus, Activity, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -317,20 +322,102 @@ const Home = () => {
           <div>
             <p className="font-semibold mb-4">When do you need parking?</p>
             
-            <div className="space-y-3">
-              <DateTimePicker
-                date={startTime}
-                setDate={setStartTime}
-                label="Start Time"
-                minDate={new Date()}
-              />
+            <div className="space-y-4">
+              {/* Start Time Section */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Start Time</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "justify-start text-left font-normal h-12",
+                          !startTime && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {startTime ? format(startTime, "MMM d, yyyy") : "Pick date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startTime}
+                        onSelect={(date) => {
+                          if (date) {
+                            const newDate = new Date(date);
+                            newDate.setHours(startTime.getHours());
+                            newDate.setMinutes(startTime.getMinutes());
+                            setStartTime(newDate);
+                          }
+                        }}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
 
-              <DateTimePicker
-                date={endTime}
-                setDate={setEndTime}
-                label="End Time"
-                minDate={startTime}
-              />
+                  <TimePicker date={startTime} setDate={setStartTime}>
+                    <Button
+                      variant="outline"
+                      className="justify-start text-left font-normal h-12"
+                    >
+                      <Clock className="mr-2 h-4 w-4" />
+                      {format(startTime, "h:mm a")}
+                    </Button>
+                  </TimePicker>
+                </div>
+              </div>
+
+              {/* End Time Section */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">End Time</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "justify-start text-left font-normal h-12",
+                          !endTime && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {endTime ? format(endTime, "MMM d, yyyy") : "Pick date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={endTime}
+                        onSelect={(date) => {
+                          if (date) {
+                            const newDate = new Date(date);
+                            newDate.setHours(endTime.getHours());
+                            newDate.setMinutes(endTime.getMinutes());
+                            setEndTime(newDate);
+                          }
+                        }}
+                        disabled={(date) => date < startTime}
+                        initialFocus
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  <TimePicker date={endTime} setDate={setEndTime}>
+                    <Button
+                      variant="outline"
+                      className="justify-start text-left font-normal h-12"
+                    >
+                      <Clock className="mr-2 h-4 w-4" />
+                      {format(endTime, "h:mm a")}
+                    </Button>
+                  </TimePicker>
+                </div>
+              </div>
             </div>
           </div>
 
