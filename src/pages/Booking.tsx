@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check } from 'lucide-react';
+import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
+import { Calendar } from '@/components/ui/calendar';
+import { TimePicker } from '@/components/ui/time-picker';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { differenceInHours, addHours, format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 const Booking = () => {
   const { spotId } = useParams<{ spotId: string }>();
@@ -26,8 +28,8 @@ const Booking = () => {
   // Auto-fill start time (1 hour from now) and end time (5 hours from now, so 4 hours duration)
   const defaultStart = addHours(new Date(), 1);
   const defaultEnd = addHours(defaultStart, 4);
-  const [startDateTime, setStartDateTime] = useState<string>(format(defaultStart, "yyyy-MM-dd'T'HH:mm"));
-  const [endDateTime, setEndDateTime] = useState<string>(format(defaultEnd, "yyyy-MM-dd'T'HH:mm"));
+  const [startDateTime, setStartDateTime] = useState<Date>(defaultStart);
+  const [endDateTime, setEndDateTime] = useState<Date>(defaultEnd);
   
   const [editTimeOpen, setEditTimeOpen] = useState(false);
   const [editVehicleOpen, setEditVehicleOpen] = useState(false);
@@ -93,18 +95,13 @@ const Booking = () => {
       console.log('Missing dates:', { startDateTime, endDateTime, spot });
       return null;
     }
-
-    const start = new Date(startDateTime);
-    const end = new Date(endDateTime);
     
-    console.log('Date objects:', { start, end });
-    
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
       console.log('Invalid date objects');
       return null;
     }
     
-    const hours = differenceInHours(end, start);
+    const hours = differenceInHours(endDateTime, startDateTime);
     console.log('Hours calculated:', hours);
     
     if (hours <= 0) {
@@ -161,8 +158,8 @@ const Booking = () => {
         return;
       }
 
-      const startAt = new Date(startDateTime);
-      const endAt = new Date(endDateTime);
+      const startAt = startDateTime;
+      const endAt = endDateTime;
 
       // Create booking hold first
       const { data: holdData, error: holdError } = await supabase.functions.invoke('create-booking-hold', {
@@ -299,26 +296,110 @@ const Booking = () => {
                   <DialogTitle>Edit Parking Time</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 pt-4">
+                  {/* Start Time Section */}
                   <div className="space-y-2">
-                    <Label htmlFor="edit-start">Start Time</Label>
-                    <Input
-                      id="edit-start"
-                      type="datetime-local"
-                      value={startDateTime}
-                      onChange={(e) => setStartDateTime(e.target.value)}
-                      min={new Date().toISOString().slice(0, 16)}
-                    />
+                    <label className="text-sm font-medium">Start Time</label>
+                    <div className="flex border border-input rounded-lg overflow-hidden h-12">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className={cn(
+                              "flex-1 justify-start text-left font-normal h-full rounded-none border-0 hover:bg-accent",
+                              !startDateTime && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">
+                              {startDateTime ? format(startDateTime, "MMM d, yyyy") : "Pick date"}
+                            </span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={startDateTime}
+                            onSelect={(date) => {
+                              if (date) {
+                                const newDate = new Date(date);
+                                newDate.setHours(startDateTime.getHours());
+                                newDate.setMinutes(startDateTime.getMinutes());
+                                setStartDateTime(newDate);
+                              }
+                            }}
+                            disabled={(date) => date < new Date()}
+                            initialFocus
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+
+                      <span className="flex items-center px-2 text-muted-foreground">·</span>
+
+                      <TimePicker date={startDateTime} setDate={setStartDateTime}>
+                        <Button
+                          variant="ghost"
+                          className="justify-start text-left font-normal h-full rounded-none border-0 hover:bg-accent flex-shrink-0"
+                        >
+                          <Clock className="mr-2 h-4 w-4 flex-shrink-0" />
+                          <span className="flex-shrink-0">{format(startDateTime, "h:mm a")}</span>
+                        </Button>
+                      </TimePicker>
+                    </div>
                   </div>
+
+                  {/* End Time Section */}
                   <div className="space-y-2">
-                    <Label htmlFor="edit-end">End Time</Label>
-                    <Input
-                      id="edit-end"
-                      type="datetime-local"
-                      value={endDateTime}
-                      onChange={(e) => setEndDateTime(e.target.value)}
-                      min={startDateTime}
-                    />
+                    <label className="text-sm font-medium">End Time</label>
+                    <div className="flex border border-input rounded-lg overflow-hidden h-12">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className={cn(
+                              "flex-1 justify-start text-left font-normal h-full rounded-none border-0 hover:bg-accent",
+                              !endDateTime && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">
+                              {endDateTime ? format(endDateTime, "MMM d, yyyy") : "Pick date"}
+                            </span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={endDateTime}
+                            onSelect={(date) => {
+                              if (date) {
+                                const newDate = new Date(date);
+                                newDate.setHours(endDateTime.getHours());
+                                newDate.setMinutes(endDateTime.getMinutes());
+                                setEndDateTime(newDate);
+                              }
+                            }}
+                            disabled={(date) => date < startDateTime}
+                            initialFocus
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+
+                      <span className="flex items-center px-2 text-muted-foreground">·</span>
+
+                      <TimePicker date={endDateTime} setDate={setEndDateTime}>
+                        <Button
+                          variant="ghost"
+                          className="justify-start text-left font-normal h-full rounded-none border-0 hover:bg-accent flex-shrink-0"
+                        >
+                          <Clock className="mr-2 h-4 w-4 flex-shrink-0" />
+                          <span className="flex-shrink-0">{format(endDateTime, "h:mm a")}</span>
+                        </Button>
+                      </TimePicker>
+                    </div>
                   </div>
+
                   <Button className="w-full" onClick={() => setEditTimeOpen(false)}>
                     Save Changes
                   </Button>
@@ -328,12 +409,12 @@ const Booking = () => {
           </div>
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span>{format(new Date(startDateTime), 'EEEE, MMM d')}</span>
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+              <span>{format(startDateTime, 'EEEE, MMM d')}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span>{format(new Date(startDateTime), 'h:mm a')} - {format(new Date(endDateTime), 'h:mm a')}</span>
+              <span>{format(startDateTime, 'h:mm a')} - {format(endDateTime, 'h:mm a')}</span>
               <span className="ml-auto bg-primary/10 text-primary px-2 py-0.5 rounded text-xs font-medium">
                 {pricing?.hours}h
               </span>
