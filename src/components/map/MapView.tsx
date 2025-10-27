@@ -34,6 +34,24 @@ interface MapViewProps {
   };
 }
 
+// Calculate distance between two coordinates using Haversine formula (returns miles)
+const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 3959; // Earth's radius in miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+// Calculate walk time in minutes (assuming 3 mph walking speed)
+const calculateWalkTime = (distanceMiles: number): number => {
+  return Math.round((distanceMiles / 3) * 60);
+};
+
 const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, exploreParams }: MapViewProps) => {
   const navigate = useNavigate();
   
@@ -443,6 +461,14 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, explore
                   <MapPin className="h-3 w-3 flex-shrink-0 mt-0.5" />
                   <span className="leading-tight">{selectedSpot.address}</span>
                 </div>
+                
+                {searchCenter && (
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>{calculateDistance(searchCenter.lat, searchCenter.lng, selectedSpot.lat, selectedSpot.lng).toFixed(1)} mi</span>
+                    <span>•</span>
+                    <span>{calculateWalkTime(calculateDistance(searchCenter.lat, searchCenter.lng, selectedSpot.lat, selectedSpot.lng))} min walk</span>
+                  </div>
+                )}
                 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
