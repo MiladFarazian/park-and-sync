@@ -80,25 +80,63 @@ serve(async (req) => {
 
     console.log(`Cancellation for booking ${bookingId}: Refund amount: $${refundAmount}, Reason: ${refundReason}`);
 
-    // Process refund if applicable
+    // Process refund or cancel intent if applicable
     let refundId = null;
-    if (refundAmount > 0 && booking.stripe_payment_intent_id) {
+    if (booking.stripe_payment_intent_id) {
       const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
         apiVersion: '2025-08-27.basil',
       });
 
+      // Always retrieve the PaymentIntent to understand current state
       try {
-        const refund = await stripe.refunds.create({
-          payment_intent: booking.stripe_payment_intent_id,
-          amount: Math.round(refundAmount * 100), // Convert to cents
-          reason: 'requested_by_customer',
-        });
+        const pi = await stripe.paymentIntents.retrieve(booking.stripe_payment_intent_id);
 
-        refundId = refund.id;
-        console.log(`Refund created: ${refundId} for amount: $${refundAmount}`);
+        if (refundAmount > 0) {
+          // Refund only if the payment actually succeeded
+          if (pi.status === 'succeeded') {
+            try {
+              const refund = await stripe.refunds.create({
+                payment_intent: booking.stripe_payment_intent_id,
+                amount: Math.round(refundAmount * 100), // Convert to cents
+                reason: 'requested_by_customer',
+              });
+              refundId = refund.id;
+              console.log(`Refund created: ${refundId} for amount: $${refundAmount}`);
+            } catch (stripeError) {
+              console.error('Stripe refund error:', stripeError);
+              throw new Error(`Failed to process refund: ${stripeError.message}`);
+            }
+          } else {
+            // Not refundable because payment wasn't captured/succeeded. Cancel the intent to release any hold.
+            if (pi.status !== 'canceled') {
+              try {
+                await stripe.paymentIntents.cancel(pi.id);
+                console.log(`PaymentIntent ${pi.id} canceled instead of refund (status was ${pi.status})`);
+              } catch (cancelErr) {
+                console.warn('Failed to cancel PaymentIntent:', cancelErr);
+              }
+            }
+            refundReason = `Payment not captured (status=${pi.status}); canceled intent; no refund needed`;
+            refundAmount = 0;
+          }
+        } else {
+          // No refund due by policy; if PI hasn't succeeded, cancel to release authorization/hold
+          if (pi.status !== 'succeeded' && pi.status !== 'canceled') {
+            try {
+              await stripe.paymentIntents.cancel(pi.id);
+              console.log(`PaymentIntent ${pi.id} canceled (no refund due, status was ${pi.status})`);
+              if (!refundReason) refundReason = `No refund due; PaymentIntent canceled (status=${pi.status})`;
+            } catch (cancelErr) {
+              console.warn('Failed to cancel PaymentIntent:', cancelErr);
+            }
+          }
+        }
       } catch (stripeError) {
-        console.error('Stripe refund error:', stripeError);
-        throw new Error(`Failed to process refund: ${stripeError.message}`);
+        console.warn('Stripe operation error (retrieve/cancel path):', stripeError);
+        // Do not throw here to still allow booking cancellation to proceed
+        if (!refundReason) {
+          refundReason = `Stripe operation issue: ${stripeError.message ?? 'unknown'}`;
+        }
       }
     }
 
@@ -109,6 +147,7 @@ serve(async (req) => {
         status: 'canceled',
         refund_amount: refundAmount,
         stripe_refund_id: refundId,
+        cancellation_reason: refundReason,
       })
       .eq('id', bookingId);
 
