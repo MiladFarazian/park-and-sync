@@ -150,7 +150,11 @@ const Activity = () => {
                   <p className="text-sm text-muted-foreground mb-4">
                     Start exploring parking spots near you
                   </p>
-                  <Button onClick={() => navigate('/explore')}>
+                  <Button onClick={() => {
+                    const now = new Date();
+                    const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+                    navigate(`/explore?start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
+                  }}>
                     Find Parking
                   </Button>
                 </CardContent>
