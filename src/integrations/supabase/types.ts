@@ -782,6 +782,32 @@ export type Database = {
         Returns: boolean
       }
       cleanup_expired_holds: { Args: never; Returns: number }
+      create_booking_hold: {
+        Args: {
+          p_end_at: string
+          p_expires_at: string
+          p_idempotency_key: string
+          p_spot_id: string
+          p_start_at: string
+          p_user_id: string
+        }
+        Returns: {
+          created_at: string
+          end_at: string
+          expires_at: string
+          id: string
+          idempotency_key: string | null
+          spot_id: string
+          start_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "booking_holds"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       disablelongtransactions: { Args: never; Returns: string }
       dropgeometrycolumn:
         | {

@@ -66,21 +66,18 @@ serve(async (req) => {
       });
     }
 
-    // Create a 10-minute hold
+    // Create a 10-minute hold via security definer function to bypass RLS safely
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-    
+
     const { data: hold, error: holdError } = await supabase
-      .from('booking_holds')
-      .insert({
-        spot_id,
-        user_id: userData.user.id,
-        start_at,
-        end_at,
-        expires_at: expiresAt,
-        idempotency_key: idempotency_key || crypto.randomUUID()
-      })
-      .select()
-      .single();
+      .rpc('create_booking_hold', {
+        p_spot_id: spot_id,
+        p_user_id: userData.user.id,
+        p_start_at: start_at,
+        p_end_at: end_at,
+        p_expires_at: expiresAt,
+        p_idempotency_key: idempotency_key || crypto.randomUUID(),
+      });
 
     if (holdError) {
       console.error('Hold creation error:', holdError);
