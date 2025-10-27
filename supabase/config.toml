@@ -14,3 +14,6 @@ verify_jwt = true
 
 [functions.cancel-booking]
 verify_jwt = true
+
+[functions.get-stripe-publishable-key]
+verify_jwt = false

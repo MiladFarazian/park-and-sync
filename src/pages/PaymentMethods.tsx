@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+let stripePromise: Promise<any> | null = null;
 
 interface PaymentMethod {
   id: string;
@@ -124,6 +124,19 @@ const PaymentMethods = () => {
     }
   };
 
+  const getStripePromise = async () => {
+    if (!stripePromise) {
+      try {
+        const { data } = await supabase.functions.invoke('get-stripe-publishable-key');
+        stripePromise = loadStripe(data.publishableKey);
+      } catch (error) {
+        console.error('Failed to get publishable key:', error);
+        throw error;
+      }
+    }
+    return stripePromise;
+  };
+
   useEffect(() => {
     fetchPaymentMethods();
   }, []);
@@ -206,7 +219,7 @@ const PaymentMethods = () => {
             <DialogHeader>
               <DialogTitle>Add Payment Method</DialogTitle>
             </DialogHeader>
-            <Elements stripe={stripePromise}>
+            <Elements stripe={getStripePromise()}>
               <AddCardForm 
                 onSuccess={handleAddSuccess} 
                 onCancel={() => setShowAddCard(false)}
