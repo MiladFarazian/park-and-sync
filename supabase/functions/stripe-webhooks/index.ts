@@ -63,7 +63,20 @@ serve(async (req) => {
 async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   console.log('Payment succeeded:', paymentIntent.id);
   
-  const { error } = await supabase
+  // Get the booking details
+  const { data: booking, error: bookingError } = await supabase
+    .from('bookings')
+    .select('host_earnings, spot_id, spots!inner(host_id)')
+    .eq('stripe_payment_intent_id', paymentIntent.id)
+    .single();
+
+  if (bookingError || !booking) {
+    console.error('Failed to fetch booking:', bookingError);
+    return;
+  }
+
+  // Update booking status
+  const { error: updateError } = await supabase
     .from('bookings')
     .update({ 
       status: 'paid',
@@ -71,9 +84,36 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     })
     .eq('stripe_payment_intent_id', paymentIntent.id);
 
-  if (error) {
-    console.error('Failed to update booking status:', error);
+  if (updateError) {
+    console.error('Failed to update booking status:', updateError);
+    return;
   }
+
+  // Credit host's balance
+  const hostId = (booking.spots as any).host_id;
+  const hostEarnings = booking.host_earnings || 0;
+
+  const { error: balanceError } = await supabase.rpc('increment_balance', {
+    user_id: hostId,
+    amount: hostEarnings
+  });
+
+  if (balanceError) {
+    console.error('Failed to update host balance:', balanceError);
+    // Try direct update as fallback
+    const { error: fallbackError } = await supabase
+      .from('profiles')
+      .update({ 
+        balance: supabase.sql`balance + ${hostEarnings}`
+      })
+      .eq('user_id', hostId);
+    
+    if (fallbackError) {
+      console.error('Failed to update host balance (fallback):', fallbackError);
+    }
+  }
+
+  console.log(`Credited ${hostEarnings} to host ${hostId}`);
 }
 
 async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {

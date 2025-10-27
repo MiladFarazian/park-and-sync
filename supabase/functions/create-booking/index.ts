@@ -57,22 +57,12 @@ serve(async (req) => {
     // Get spot details for pricing
     const { data: spot, error: spotError } = await supabase
       .from('spots')
-      .select(`
-        *,
-        profiles!spots_host_id_fkey (
-          stripe_account_id,
-          stripe_account_enabled
-        )
-      `)
+      .select('*, host_id')
       .eq('id', spot_id)
       .single();
 
     if (spotError || !spot) {
       throw new Error('Spot not found');
-    }
-
-    if (!spot.profiles?.stripe_account_enabled) {
-      throw new Error('Host has not completed payment setup');
     }
 
     // Calculate pricing
@@ -81,7 +71,8 @@ serve(async (req) => {
     const totalHours = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60));
     const subtotal = totalHours * parseFloat(spot.hourly_rate);
     const platformFee = Math.round(subtotal * 0.15 * 100) / 100; // 15% platform fee
-    const totalAmount = subtotal + platformFee;
+    const hostEarnings = subtotal - platformFee; // Host gets subtotal minus platform fee
+    const totalAmount = subtotal;
 
     // Initialize Stripe
     const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');
@@ -115,20 +106,18 @@ serve(async (req) => {
         .eq('user_id', userData.user.id);
     }
 
-    // Create payment intent with application fee (platform fee goes to main account)
+    // Create payment intent (charge to platform account, track host balance)
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(totalAmount * 100), // Convert to cents
       currency: 'usd',
       customer: customerId,
-      application_fee_amount: Math.round(platformFee * 100),
-      transfer_data: {
-        destination: spot.profiles.stripe_account_id
-      },
       metadata: {
         spot_id,
+        host_id: spot.host_id,
         renter_id: userData.user.id,
         start_at,
-        end_at
+        end_at,
+        host_earnings: hostEarnings.toString()
       }
     });
 
@@ -147,6 +136,7 @@ serve(async (req) => {
         subtotal,
         platform_fee: platformFee,
         total_amount: totalAmount,
+        host_earnings: hostEarnings,
         stripe_payment_intent_id: paymentIntent.id,
         idempotency_key: idempotency_key || crypto.randomUUID()
       })
