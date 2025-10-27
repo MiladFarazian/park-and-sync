@@ -3,7 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Star, MapPin, Navigation } from 'lucide-react';
+import { Star, MapPin, Navigation, Footprints } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -465,7 +465,7 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, explore
                 {searchCenter && (
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span>{calculateDistance(searchCenter.lat, searchCenter.lng, selectedSpot.lat, selectedSpot.lng).toFixed(1)} mi</span>
-                    <span>•</span>
+                    <Footprints className="h-3 w-3" />
                     <span>{calculateWalkTime(calculateDistance(searchCenter.lat, searchCenter.lng, selectedSpot.lat, selectedSpot.lng))} min walk</span>
                   </div>
                 )}
