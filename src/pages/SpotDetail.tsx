@@ -3,6 +3,7 @@ import { ArrowLeft, Heart, Share, Star, MapPin, Calendar, Navigation, MessageCir
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -41,6 +42,7 @@ const SpotDetail = () => {
   const [spot, setSpot] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showDirections, setShowDirections] = useState(false);
 
   // Determine where to navigate back based on 'from' parameter
   const from = searchParams.get('from');
@@ -101,6 +103,42 @@ const SpotDetail = () => {
       fetchSpotDetails();
     }
   }, [id]);
+
+  const isMobile = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  };
+
+  const isIOS = () => {
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  };
+
+  const handleDirections = () => {
+    if (!spot?.address) return;
+
+    // On desktop, directly open Google Maps
+    if (!isMobile()) {
+      const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(spot.address)}`;
+      window.open(googleMapsUrl, '_blank');
+      return;
+    }
+
+    // On mobile, show options
+    setShowDirections(true);
+  };
+
+  const openGoogleMaps = () => {
+    if (!spot?.address) return;
+    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(spot.address)}`;
+    window.open(googleMapsUrl, '_blank');
+    setShowDirections(false);
+  };
+
+  const openAppleMaps = () => {
+    if (!spot?.address) return;
+    const appleMapsUrl = `http://maps.apple.com/?daddr=${encodeURIComponent(spot.address)}`;
+    window.location.href = appleMapsUrl;
+    setShowDirections(false);
+  };
 
   const fetchSpotDetails = async () => {
     try {
@@ -236,7 +274,7 @@ const SpotDetail = () => {
               <Calendar className="h-4 w-4 mr-2" />
               Book Now
             </Button>
-            <Button variant="outline" className="flex-1">
+            <Button variant="outline" className="flex-1" onClick={handleDirections}>
               <Navigation className="h-4 w-4 mr-2" />
               Directions
             </Button>
@@ -299,6 +337,43 @@ const SpotDetail = () => {
           <Button size="lg" onClick={() => navigate(`/book/${id}`)}>Book Now</Button>
         </div>
       </div>
+
+      {/* Directions Options Sheet (Mobile) */}
+      <Sheet open={showDirections} onOpenChange={setShowDirections}>
+        <SheetContent side="bottom" className="h-auto">
+          <SheetHeader>
+            <SheetTitle>Get Directions</SheetTitle>
+            <SheetDescription>Choose your preferred navigation app</SheetDescription>
+          </SheetHeader>
+          <div className="space-y-3 pt-4 pb-6">
+            <Button 
+              variant="outline" 
+              className="w-full h-14 text-base justify-start"
+              onClick={openGoogleMaps}
+            >
+              <Navigation className="h-5 w-5 mr-3" />
+              Open in Google Maps
+            </Button>
+            {isIOS() && (
+              <Button 
+                variant="outline" 
+                className="w-full h-14 text-base justify-start"
+                onClick={openAppleMaps}
+              >
+                <MapPin className="h-5 w-5 mr-3" />
+                Open in Apple Maps
+              </Button>
+            )}
+            <Button 
+              variant="ghost" 
+              className="w-full"
+              onClick={() => setShowDirections(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
