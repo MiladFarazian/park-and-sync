@@ -112,12 +112,14 @@ export type Database = {
           id: string
           idempotency_key: string | null
           platform_fee: number
+          refund_amount: number | null
           renter_id: string
           spot_id: string
           start_at: string
           status: Database["public"]["Enums"]["booking_status"]
           stripe_charge_id: string | null
           stripe_payment_intent_id: string | null
+          stripe_refund_id: string | null
           subtotal: number
           total_amount: number
           total_hours: number
@@ -135,12 +137,14 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           platform_fee: number
+          refund_amount?: number | null
           renter_id: string
           spot_id: string
           start_at: string
           status?: Database["public"]["Enums"]["booking_status"]
           stripe_charge_id?: string | null
           stripe_payment_intent_id?: string | null
+          stripe_refund_id?: string | null
           subtotal: number
           total_amount: number
           total_hours: number
@@ -158,12 +162,14 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           platform_fee?: number
+          refund_amount?: number | null
           renter_id?: string
           spot_id?: string
           start_at?: string
           status?: Database["public"]["Enums"]["booking_status"]
           stripe_charge_id?: string | null
           stripe_payment_intent_id?: string | null
+          stripe_refund_id?: string | null
           subtotal?: number
           total_amount?: number
           total_hours?: number
