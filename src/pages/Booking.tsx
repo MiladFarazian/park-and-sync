@@ -14,6 +14,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { differenceInHours, addHours, format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
+interface PaymentMethod {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+}
+
 const Booking = () => {
   const { spotId } = useParams<{ spotId: string }>();
   const [searchParams] = useSearchParams();
@@ -23,6 +31,8 @@ const Booking = () => {
   const [host, setHost] = useState<any>(null);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
   
@@ -49,6 +59,7 @@ const Booking = () => {
   
   const [editTimeOpen, setEditTimeOpen] = useState(false);
   const [editVehicleOpen, setEditVehicleOpen] = useState(false);
+  const [editPaymentOpen, setEditPaymentOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -76,7 +87,7 @@ const Booking = () => {
         setSpot(spotData);
         setHost(spotData.profiles);
 
-        // Fetch user's vehicles
+        // Fetch user's vehicles and payment methods
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           const { data: vehiclesData } = await supabase
@@ -88,6 +99,13 @@ const Booking = () => {
           if (vehiclesData && vehiclesData.length > 0) {
             setVehicles(vehiclesData);
             setSelectedVehicle(vehiclesData[0]); // Select first vehicle by default
+          }
+
+          // Fetch payment methods
+          const { data: paymentData } = await supabase.functions.invoke('get-payment-methods');
+          if (paymentData?.paymentMethods && paymentData.paymentMethods.length > 0) {
+            setPaymentMethods(paymentData.paymentMethods);
+            setSelectedPaymentMethod(paymentData.paymentMethods[0]); // Select first payment method
           }
         }
       } catch (error) {
@@ -520,21 +538,83 @@ const Booking = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-lg">Payment Method</h3>
-            <Button variant="ghost" size="icon">
-              <Edit2 className="h-4 w-4" />
-            </Button>
+            <Dialog open={editPaymentOpen} onOpenChange={setEditPaymentOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Edit2 className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Select Payment Method</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3 pt-4">
+                  {paymentMethods.map((method) => (
+                    <button
+                      key={method.id}
+                      onClick={() => {
+                        setSelectedPaymentMethod(method);
+                        setEditPaymentOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-accent transition-colors text-left"
+                    >
+                      <CreditCard className="h-5 w-5 text-muted-foreground" />
+                      <div className="flex-1">
+                        <div className="font-medium capitalize">
+                          {method.brand} •••• {method.last4}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Expires {method.expMonth}/{method.expYear}
+                        </div>
+                      </div>
+                      {selectedPaymentMethod?.id === method.id && (
+                        <Check className="h-5 w-5 text-primary" />
+                      )}
+                    </button>
+                  ))}
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate('/payment-methods')}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add New Payment Method
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
-          <div className="flex items-center gap-3">
-            <CreditCard className="h-5 w-5 text-muted-foreground" />
-            <div className="flex-1">
-              <div className="font-medium">Visa •••• 4242</div>
-              <div className="text-sm text-muted-foreground">Expires 12/26</div>
+          {selectedPaymentMethod ? (
+            <div className="flex items-center gap-3">
+              <CreditCard className="h-5 w-5 text-muted-foreground" />
+              <div className="flex-1">
+                <div className="font-medium capitalize">
+                  {selectedPaymentMethod.brand} •••• {selectedPaymentMethod.last4}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Expires {selectedPaymentMethod.expMonth}/{selectedPaymentMethod.expYear}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-xs bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 px-2 py-1 rounded">
+                <Check className="h-3 w-3" />
+                Verified
+              </div>
             </div>
-            <div className="flex items-center gap-1 text-xs bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 px-2 py-1 rounded">
-              <Check className="h-3 w-3" />
-              Verified
+          ) : (
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <CreditCard className="h-5 w-5" />
+              <div>
+                <div className="font-medium">No payment method</div>
+                <Button
+                  variant="link"
+                  className="h-auto p-0 text-xs text-primary"
+                  onClick={() => navigate('/payment-methods')}
+                >
+                  Add payment method
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </Card>
 
 
@@ -568,7 +648,7 @@ const Booking = () => {
             className="w-full h-14 text-lg"
             size="lg"
             onClick={handleBooking}
-            disabled={!startDateTime || !endDateTime || !pricing || !selectedVehicle || bookingLoading}
+            disabled={!startDateTime || !endDateTime || !pricing || !selectedVehicle || !selectedPaymentMethod || bookingLoading}
           >
             {bookingLoading ? 'Processing...' : `Book Now • $${pricing?.total || '0.00'}`}
           </Button>
