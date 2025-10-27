@@ -115,10 +115,10 @@ const SpotDetail = () => {
   const handleDirections = () => {
     if (!spot?.address) return;
 
-    // On desktop, directly open Google Maps
+    // On desktop, directly navigate to Google Maps
     if (!isMobile()) {
       const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(spot.address)}`;
-      window.open(googleMapsUrl, '_blank');
+      window.location.href = googleMapsUrl;
       return;
     }
 
@@ -129,8 +129,7 @@ const SpotDetail = () => {
   const openGoogleMaps = () => {
     if (!spot?.address) return;
     const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(spot.address)}`;
-    window.open(googleMapsUrl, '_blank');
-    setShowDirections(false);
+    window.location.href = googleMapsUrl;
   };
 
   const openAppleMaps = () => {
