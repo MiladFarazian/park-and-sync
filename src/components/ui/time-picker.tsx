@@ -18,12 +18,26 @@ interface TimePickerProps {
 export function TimePicker({ date, setDate, children }: TimePickerProps) {
   const [isOpen, setIsOpen] = React.useState(false);
 
-  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const hours = Array.from({ length: 12 }, (_, i) => i + 1); // 1-12
   const minutes = [0, 15, 30, 45];
 
-  const handleTimeChange = (hour: number, minute: number) => {
+  // Get current 12-hour format values
+  const currentHour24 = date.getHours();
+  const currentHour12 = currentHour24 === 0 ? 12 : currentHour24 > 12 ? currentHour24 - 12 : currentHour24;
+  const currentPeriod = currentHour24 >= 12 ? 'PM' : 'AM';
+
+  const handleTimeChange = (hour12: number, minute: number, period: string) => {
     const newDate = new Date(date);
-    newDate.setHours(hour);
+    let hour24 = hour12;
+    
+    // Convert 12-hour to 24-hour format
+    if (period === 'AM') {
+      hour24 = hour12 === 12 ? 0 : hour12;
+    } else {
+      hour24 = hour12 === 12 ? 12 : hour12 + 12;
+    }
+    
+    newDate.setHours(hour24);
     newDate.setMinutes(minute);
     setDate(newDate);
     setIsOpen(false);
@@ -53,16 +67,16 @@ export function TimePicker({ date, setDate, children }: TimePickerProps) {
         <div className="p-4">
           <p className="text-sm font-medium text-center mb-3">Select Time</p>
           <div className="flex gap-2 justify-center">
-            <ScrollArea className="h-[240px] w-20">
-              <div className="space-y-1">
+            <ScrollArea className="h-[240px] w-16">
+              <div className="space-y-1 pr-2">
                 {hours.map((hour) => (
                   <Button
                     key={`hour-${hour}`}
-                    variant={date.getHours() === hour ? "default" : "ghost"}
+                    variant={currentHour12 === hour ? "default" : "ghost"}
                     className="w-full justify-center text-sm h-10"
-                    onClick={() => handleTimeChange(hour, date.getMinutes())}
+                    onClick={() => handleTimeChange(hour, date.getMinutes(), currentPeriod)}
                   >
-                    {hour.toString().padStart(2, "0")}
+                    {hour}
                   </Button>
                 ))}
               </div>
@@ -70,16 +84,30 @@ export function TimePicker({ date, setDate, children }: TimePickerProps) {
             <div className="flex items-center">
               <span className="text-2xl font-bold">:</span>
             </div>
-            <ScrollArea className="h-[240px] w-20">
-              <div className="space-y-1">
+            <ScrollArea className="h-[240px] w-16">
+              <div className="space-y-1 pr-2">
                 {minutes.map((minute) => (
                   <Button
                     key={`minute-${minute}`}
                     variant={date.getMinutes() === minute ? "default" : "ghost"}
                     className="w-full justify-center text-sm h-10"
-                    onClick={() => handleTimeChange(date.getHours(), minute)}
+                    onClick={() => handleTimeChange(currentHour12, minute, currentPeriod)}
                   >
                     {minute.toString().padStart(2, "0")}
+                  </Button>
+                ))}
+              </div>
+            </ScrollArea>
+            <ScrollArea className="h-[240px] w-16">
+              <div className="space-y-1 pr-2">
+                {['AM', 'PM'].map((period) => (
+                  <Button
+                    key={period}
+                    variant={currentPeriod === period ? "default" : "ghost"}
+                    className="w-full justify-center text-sm h-10"
+                    onClick={() => handleTimeChange(currentHour12, date.getMinutes(), period)}
+                  >
+                    {period}
                   </Button>
                 ))}
               </div>
