@@ -14,6 +14,7 @@ import Messages from "./pages/Messages";
 import SearchResults from "./pages/SearchResults";
 import SpotDetail from "./pages/SpotDetail";
 import Booking from "./pages/Booking";
+import BookingConfirmation from "./pages/BookingConfirmation";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/search-results" element={<SearchResults />} />
             <Route path="/spot/:id" element={<SpotDetail />} />
             <Route path="/book/:spotId" element={<Booking />} />
+            <Route path="/booking-confirmation/:bookingId" element={<BookingConfirmation />} />
             <Route path="/personal-information" element={<PersonalInformation />} />
             <Route path="/my-vehicles" element={<MyVehicles />} />
             <Route path="/add-vehicle" element={<AddVehicle />} />

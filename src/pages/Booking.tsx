@@ -223,7 +223,8 @@ const Booking = () => {
         description: "Your booking has been confirmed",
       });
 
-      navigate('/bookings');
+      // Navigate to confirmation page with booking ID
+      navigate(`/booking-confirmation/${bookingData.booking_id}`);
     } catch (error) {
       console.error('Booking error:', error);
       toast({
