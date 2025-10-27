@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Clock, MapPin, Star, MessageCircle, Car, Calendar } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, MapPin, Star, MessageCircle, Car, Calendar, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -8,6 +8,17 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { differenceInHours, format } from 'date-fns';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const BookingConfirmation = () => {
   const { bookingId } = useParams<{ bookingId: string }>();
@@ -19,6 +30,8 @@ const BookingConfirmation = () => {
   const [host, setHost] = useState<any>(null);
   const [vehicle, setVehicle] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchBookingDetails = async () => {
@@ -89,6 +102,82 @@ const BookingConfirmation = () => {
         description: "Failed to open messages",
         variant: "destructive",
       });
+    }
+  };
+
+  const getCancellationPolicy = () => {
+    if (!booking) return { refundable: false, message: '' };
+    
+    const now = new Date();
+    const bookingStart = new Date(booking.start_at);
+    const bookingCreated = new Date(booking.created_at);
+    const gracePeriodEnd = new Date(bookingCreated.getTime() + 10 * 60 * 1000);
+    const oneHourBeforeStart = new Date(bookingStart.getTime() - 60 * 60 * 1000);
+
+    if (now <= gracePeriodEnd) {
+      return { refundable: true, message: 'Full refund - within 10-minute grace period' };
+    } else if (now <= oneHourBeforeStart) {
+      return { refundable: true, message: 'Full refund - more than 1 hour before start time' };
+    } else {
+      return { refundable: false, message: 'No refund - less than 1 hour before start time' };
+    }
+  };
+
+  const handleCancelBooking = async () => {
+    if (!booking) return;
+
+    setCancelling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('cancel-booking', {
+        body: { bookingId: booking.id }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Booking cancelled",
+        description: data.refundAmount > 0 
+          ? `Refund of $${data.refundAmount.toFixed(2)} will be processed within 5-10 business days`
+          : data.refundReason,
+      });
+
+      // Refresh booking details
+      const { data: updatedBooking } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          spots (
+            *,
+            spot_photos(url, is_primary),
+            profiles!spots_host_id_fkey(
+              id,
+              first_name,
+              last_name,
+              avatar_url,
+              rating
+            )
+          ),
+          vehicles (
+            *
+          )
+        `)
+        .eq('id', bookingId)
+        .single();
+
+      if (updatedBooking) {
+        setBooking(updatedBooking);
+      }
+
+      setCancelDialogOpen(false);
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to cancel booking",
+        variant: "destructive"
+      });
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -271,6 +360,50 @@ const BookingConfirmation = () => {
           >
             Find More Parking
           </Button>
+          
+          {/* Cancel Booking Button - Only show if not cancelled and not past */}
+          {booking.status !== 'canceled' && new Date(booking.end_at) > new Date() && (
+            <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="destructive" 
+                  className="w-full" 
+                  size="lg"
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Cancel Booking
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Cancel Booking?</AlertDialogTitle>
+                  <AlertDialogDescription className="space-y-2">
+                    <p>Are you sure you want to cancel this booking?</p>
+                    <div className="mt-4 p-3 bg-muted rounded-lg">
+                      <p className="font-semibold text-foreground">{spot?.title}</p>
+                      <p className="text-sm mt-1">{format(new Date(booking.start_at), 'MMM d, yyyy')}</p>
+                      <p className="text-sm">{format(new Date(booking.start_at), 'h:mm a')} - {format(new Date(booking.end_at), 'h:mm a')}</p>
+                      <div className="mt-3 pt-3 border-t">
+                        <p className="text-sm font-semibold text-foreground">
+                          {getCancellationPolicy().message}
+                        </p>
+                      </div>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={cancelling}>Keep Booking</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleCancelBooking}
+                    disabled={cancelling}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {cancelling ? 'Cancelling...' : 'Cancel Booking'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       </div>
     </div>

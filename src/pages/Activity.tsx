@@ -3,11 +3,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Calendar, DollarSign } from 'lucide-react';
+import { MapPin, Clock, Calendar, DollarSign, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const Activity = () => {
   const navigate = useNavigate();
@@ -15,6 +25,9 @@ const Activity = () => {
   const [activeTab, setActiveTab] = useState('upcoming');
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     fetchBookings();
@@ -72,6 +85,56 @@ const Activity = () => {
     return `${startTime} - ${endTime}`;
   };
 
+  const getCancellationPolicy = (booking: any) => {
+    const now = new Date();
+    const bookingStart = new Date(booking.start_at);
+    const bookingCreated = new Date(booking.created_at);
+    const gracePeriodEnd = new Date(bookingCreated.getTime() + 10 * 60 * 1000);
+    const oneHourBeforeStart = new Date(bookingStart.getTime() - 60 * 60 * 1000);
+
+    if (now <= gracePeriodEnd) {
+      return { refundable: true, message: 'Full refund - within 10-minute grace period' };
+    } else if (now <= oneHourBeforeStart) {
+      return { refundable: true, message: 'Full refund - more than 1 hour before start time' };
+    } else {
+      return { refundable: false, message: 'No refund - less than 1 hour before start time' };
+    }
+  };
+
+  const handleCancelBooking = async () => {
+    if (!selectedBooking) return;
+
+    setCancelling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('cancel-booking', {
+        body: { bookingId: selectedBooking.id }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Booking cancelled",
+        description: data.refundAmount > 0 
+          ? `Refund of $${data.refundAmount.toFixed(2)} will be processed within 5-10 business days`
+          : data.refundReason,
+      });
+
+      // Refresh bookings
+      await fetchBookings();
+      setCancelDialogOpen(false);
+      setSelectedBooking(null);
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to cancel booking",
+        variant: "destructive"
+      });
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const now = new Date();
   const upcomingBookings = bookings.filter(b => new Date(b.end_at) >= now);
   const pastBookings = bookings.filter(b => new Date(b.end_at) < now);
@@ -111,8 +174,20 @@ const Activity = () => {
         </div>
       </CardContent>
       <div className="p-4 pt-0 flex gap-2">
-        <Button variant="outline" className="flex-1" onClick={() => navigate(`/booking/${booking.id}`)}>View Details</Button>
-        {!isPast && <Button variant="default" className="flex-1">Get Directions</Button>}
+        <Button variant="outline" className="flex-1" onClick={() => navigate(`/booking-confirmation/${booking.id}`)}>View Details</Button>
+        {!isPast && booking.status !== 'canceled' && (
+          <Button 
+            variant="destructive" 
+            className="flex-1"
+            onClick={() => {
+              setSelectedBooking(booking);
+              setCancelDialogOpen(true);
+            }}
+          >
+            <XCircle className="h-4 w-4 mr-2" />
+            Cancel
+          </Button>
+        )}
       </div>
     </Card>
   );
@@ -195,6 +270,40 @@ const Activity = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Cancellation Confirmation Dialog */}
+      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Booking?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>Are you sure you want to cancel this booking?</p>
+              {selectedBooking && (
+                <div className="mt-4 p-3 bg-muted rounded-lg">
+                  <p className="font-semibold text-foreground">{selectedBooking.spots?.title}</p>
+                  <p className="text-sm mt-1">{formatDate(selectedBooking.start_at)}</p>
+                  <p className="text-sm">{formatTime(selectedBooking.start_at, selectedBooking.end_at)}</p>
+                  <div className="mt-3 pt-3 border-t">
+                    <p className="text-sm font-semibold text-foreground">
+                      {getCancellationPolicy(selectedBooking).message}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelling}>Keep Booking</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelBooking}
+              disabled={cancelling}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {cancelling ? 'Cancelling...' : 'Cancel Booking'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

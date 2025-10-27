@@ -45,7 +45,7 @@ serve(async (req) => {
     }
 
     // Check if user owns the booking
-    if (booking.user_id !== user.id) {
+    if (booking.renter_id !== user.id) {
       throw new Error('Unauthorized to cancel this booking');
     }
 
@@ -55,7 +55,7 @@ serve(async (req) => {
     }
 
     const now = new Date();
-    const bookingStart = new Date(booking.start_time);
+    const bookingStart = new Date(booking.start_at);
     const bookingCreated = new Date(booking.created_at);
     const gracePeriodEnd = new Date(bookingCreated.getTime() + 10 * 60 * 1000); // 10 minutes after booking
     const oneHourBeforeStart = new Date(bookingStart.getTime() - 60 * 60 * 1000);
@@ -66,11 +66,11 @@ serve(async (req) => {
     // Determine refund amount based on cancellation policy
     if (now <= gracePeriodEnd) {
       // Within 10-minute grace period - full refund
-      refundAmount = booking.total_price;
+      refundAmount = booking.total_amount;
       refundReason = 'Within 10-minute grace period';
     } else if (now <= oneHourBeforeStart) {
       // More than 1 hour before start time - full refund
-      refundAmount = booking.total_price;
+      refundAmount = booking.total_amount;
       refundReason = 'Cancelled more than 1 hour before start time';
     } else {
       // Less than 1 hour before start or after start - no refund
