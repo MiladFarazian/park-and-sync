@@ -5,3 +5,12 @@ verify_jwt = false
 
 [functions.stripe-webhooks]
 verify_jwt = false
+
+[functions.get-payment-methods]
+verify_jwt = true
+
+[functions.setup-payment-method]
+verify_jwt = true
+
+[functions.cancel-booking]
+verify_jwt = true
