@@ -77,9 +77,11 @@ serve(async (req) => {
     const totalAmount = subtotal + platformFee;
 
     // Initialize Stripe
-    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
-      apiVersion: '2025-08-27.basil',
-    });
+    const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');
+    if (!stripeSecret) {
+      throw new Error('Stripe secret key not configured');
+    }
+    const stripe = new Stripe(stripeSecret, {});
 
     // Get or create Stripe customer
     const { data: profile } = await supabase
