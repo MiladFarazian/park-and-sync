@@ -31,6 +31,22 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Clean up expired holds first
+    await supabase.rpc('cleanup_expired_holds');
+
+    // Try to get authenticated user (optional for search)
+    const authHeader = req.headers.get('Authorization');
+    let userId = null;
+    if (authHeader) {
+      try {
+        const token = authHeader.replace('Bearer ', '');
+        const { data: userData } = await supabase.auth.getUser(token);
+        userId = userData.user?.id || null;
+      } catch (e) {
+        // Ignore auth errors for search - it's optional
+      }
+    }
+
     const {
       latitude,
       longitude,
@@ -45,7 +61,7 @@ serve(async (req) => {
       min_price
     }: SearchRequest = await req.json();
 
-    console.log('Search request:', { latitude, longitude, radius, start_time, end_time });
+    console.log('Search request:', { latitude, longitude, radius, start_time, end_time, userId });
 
     // Build the query with geospatial search
     let query = supabase
@@ -128,7 +144,8 @@ serve(async (req) => {
           .rpc('check_spot_availability', {
             p_spot_id: spot.id,
             p_start_at: start_time,
-            p_end_at: end_time
+            p_end_at: end_time,
+            p_exclude_user_id: userId
           });
 
         if (isAvailable) {
