@@ -104,6 +104,16 @@ const PaymentMethods = () => {
   const [loading, setLoading] = useState(true);
   const [showAddCard, setShowAddCard] = useState(false);
 
+  const handleBack = () => {
+    // Check if there's history to go back to
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      // Fallback to home if no history
+      navigate('/');
+    }
+  };
+
   const fetchPaymentMethods = async () => {
     try {
       setLoading(true);
@@ -163,7 +173,7 @@ const PaymentMethods = () => {
     <div className="min-h-screen bg-background">
       <div className="container max-w-2xl mx-auto p-4 space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <Button variant="ghost" size="icon" onClick={handleBack}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
