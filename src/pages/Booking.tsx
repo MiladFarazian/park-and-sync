@@ -258,13 +258,27 @@ const Booking = () => {
                 <MapPin className="h-3 w-3" />
                 <span>{spot.address}</span>
               </div>
-              <div className="flex items-center gap-3 text-sm">
+              <div className="flex items-center gap-3 text-sm mb-3">
                 <div className="flex items-center gap-1">
                   <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                   <span className="font-semibold">4.9</span>
                   <span className="text-muted-foreground">(127)</span>
                 </div>
                 <span className="font-bold">${spot.hourly_rate}/hr</span>
+              </div>
+              <Separator className="my-3" />
+              <div className="flex items-center gap-3">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={host?.avatar_url} />
+                  <AvatarFallback>{hostInitial}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <div className="text-sm font-medium">Hosted by {hostName}</div>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                    <span>{host?.rating || '4.8'}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -418,23 +432,6 @@ const Booking = () => {
           </div>
         </Card>
 
-        {/* Host Info Card */}
-        <Card className="p-4">
-          <h3 className="font-bold text-lg mb-3">Hosted by</h3>
-          <div className="flex items-center gap-3">
-            <Avatar className="h-12 w-12">
-              <AvatarImage src={host?.avatar_url} />
-              <AvatarFallback>{hostInitial}</AvatarFallback>
-            </Avatar>
-            <div>
-              <div className="font-medium">{hostName}</div>
-              <div className="flex items-center gap-1 text-sm">
-                <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                <span>Host rating: {host?.rating || '4.8'}</span>
-              </div>
-            </div>
-          </div>
-        </Card>
 
         {/* Price Breakdown Card */}
         {pricing && (
