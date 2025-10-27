@@ -269,7 +269,14 @@ const SpotDetail = () => {
           </div>
 
           <div className="flex gap-3 mb-6">
-            <Button className="flex-1" onClick={() => navigate(`/book/${id}`)}>
+            <Button className="flex-1" onClick={() => {
+              const start = searchParams.get('start');
+              const end = searchParams.get('end');
+              const params = new URLSearchParams();
+              if (start) params.set('start', start);
+              if (end) params.set('end', end);
+              navigate(`/book/${id}${params.toString() ? `?${params.toString()}` : ''}`);
+            }}>
               <Calendar className="h-4 w-4 mr-2" />
               Book Now
             </Button>
@@ -333,7 +340,14 @@ const SpotDetail = () => {
               <span className="text-sm font-medium">{spot.rating || 'New'}</span>
             </div>
           </div>
-          <Button size="lg" onClick={() => navigate(`/book/${id}`)}>Book Now</Button>
+          <Button size="lg" onClick={() => {
+            const start = searchParams.get('start');
+            const end = searchParams.get('end');
+            const params = new URLSearchParams();
+            if (start) params.set('start', start);
+            if (end) params.set('end', end);
+            navigate(`/book/${id}${params.toString() ? `?${params.toString()}` : ''}`);
+          }}>Book Now</Button>
         </div>
       </div>
 

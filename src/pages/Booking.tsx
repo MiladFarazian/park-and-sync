@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 
 const Booking = () => {
   const { spotId } = useParams<{ spotId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [spot, setSpot] = useState<any>(null);
@@ -25,11 +26,26 @@ const Booking = () => {
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
   
-  // Auto-fill start time (1 hour from now) and end time (5 hours from now, so 4 hours duration)
-  const defaultStart = addHours(new Date(), 1);
-  const defaultEnd = addHours(defaultStart, 4);
-  const [startDateTime, setStartDateTime] = useState<Date>(defaultStart);
-  const [endDateTime, setEndDateTime] = useState<Date>(defaultEnd);
+  // Get times from URL params or use defaults (1 hour from now + 2 hours duration)
+  const getInitialTimes = () => {
+    const start = searchParams.get('start');
+    const end = searchParams.get('end');
+    
+    if (start && end) {
+      return {
+        start: new Date(start),
+        end: new Date(end)
+      };
+    }
+    
+    const defaultStart = addHours(new Date(), 1);
+    const defaultEnd = addHours(defaultStart, 2);
+    return { start: defaultStart, end: defaultEnd };
+  };
+  
+  const initialTimes = getInitialTimes();
+  const [startDateTime, setStartDateTime] = useState<Date>(initialTimes.start);
+  const [endDateTime, setEndDateTime] = useState<Date>(initialTimes.end);
   
   const [editTimeOpen, setEditTimeOpen] = useState(false);
   const [editVehicleOpen, setEditVehicleOpen] = useState(false);
