@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, ChevronDown, Building2, ArrowRight } from 'lucide-react';
+import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, ChevronDown, Building2, ArrowRight, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -38,6 +38,12 @@ const Profile = () => {
   const [avatarPreview, setAvatarPreview] = useState<string>('');
   const [isCropDialogOpen, setIsCropDialogOpen] = useState(false);
   const [tempImageSrc, setTempImageSrc] = useState<string>('');
+  const [stripeConnectStatus, setStripeConnectStatus] = useState<{
+    connected: boolean;
+    charges_enabled: boolean;
+    details_submitted: boolean;
+  } | null>(null);
+  const [isLoadingStripe, setIsLoadingStripe] = useState(false);
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -62,8 +68,40 @@ const Profile = () => {
         phone: profile.phone || '',
       });
       setAvatarPreview(profile.avatar_url || '');
+      
+      // Check Stripe Connect status for hosts
+      if (mode === 'host') {
+        checkStripeConnectStatus();
+      }
     }
-  }, [profile, reset]);
+  }, [profile, reset, mode]);
+
+  const checkStripeConnectStatus = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('check-stripe-connect-status');
+      if (error) throw error;
+      setStripeConnectStatus(data);
+    } catch (error) {
+      console.error('Error checking Stripe status:', error);
+    }
+  };
+
+  const handleStripeConnect = async () => {
+    setIsLoadingStripe(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-stripe-connect-link');
+      if (error) throw error;
+      
+      // Open Stripe onboarding in new tab
+      window.open(data.url, '_blank');
+      
+      toast.success('Opening Stripe onboarding...');
+    } catch (error: any) {
+      toast.error('Failed to connect Stripe: ' + error.message);
+    } finally {
+      setIsLoadingStripe(false);
+    }
+  };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -223,38 +261,59 @@ const Profile = () => {
     return 'Recently';
   };
 
-  const settingsItems = [
-    { 
-      icon: User, 
-      label: 'Personal Information', 
-      subtitle: 'Update your profile details',
-      onClick: () => navigate('/personal-information')
-    },
-    { 
-      icon: Car, 
-      label: 'My Vehicles', 
-      subtitle: 'Manage your cars',
-      onClick: () => navigate('/my-vehicles')
-    },
-    { 
-      icon: CreditCard, 
-      label: 'Payment Methods', 
-      subtitle: 'Cards and billing',
-      onClick: () => navigate('/payment-methods')
-    },
-    { 
-      icon: Bell, 
-      label: 'Notifications', 
-      subtitle: 'Manage your preferences',
-      onClick: () => navigate('/notifications')
-    },
-    { 
-      icon: Shield, 
-      label: 'Privacy & Security', 
-      subtitle: 'Account security settings',
-      onClick: () => navigate('/privacy-security')
-    }
-  ];
+  const settingsItems = mode === 'host' 
+    ? [
+        { 
+          icon: User, 
+          label: 'Personal Information', 
+          subtitle: 'Update your profile details',
+          onClick: () => navigate('/personal-information')
+        },
+        { 
+          icon: Bell, 
+          label: 'Notifications', 
+          subtitle: 'Manage your preferences',
+          onClick: () => navigate('/notifications')
+        },
+        { 
+          icon: Shield, 
+          label: 'Privacy & Security', 
+          subtitle: 'Account security settings',
+          onClick: () => navigate('/privacy-security')
+        }
+      ]
+    : [
+        { 
+          icon: User, 
+          label: 'Personal Information', 
+          subtitle: 'Update your profile details',
+          onClick: () => navigate('/personal-information')
+        },
+        { 
+          icon: Car, 
+          label: 'My Vehicles', 
+          subtitle: 'Manage your cars',
+          onClick: () => navigate('/my-vehicles')
+        },
+        { 
+          icon: CreditCard, 
+          label: 'Payment Methods', 
+          subtitle: 'Cards and billing',
+          onClick: () => navigate('/payment-methods')
+        },
+        { 
+          icon: Bell, 
+          label: 'Notifications', 
+          subtitle: 'Manage your preferences',
+          onClick: () => navigate('/notifications')
+        },
+        { 
+          icon: Shield, 
+          label: 'Privacy & Security', 
+          subtitle: 'Account security settings',
+          onClick: () => navigate('/privacy-security')
+        }
+      ];
 
   const handleNotificationToggle = async (field: 'notification_booking_updates' | 'notification_host_messages', value: boolean) => {
     try {
@@ -383,6 +442,66 @@ const Profile = () => {
                   List Your Spot
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Stripe Connect for Hosts */}
+        {mode === 'host' && (
+          <Card className="p-6 border-primary/20">
+            <div className="space-y-4">
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-primary/10 rounded-lg">
+                  <CreditCard className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-lg mb-1">Payment Setup</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {stripeConnectStatus?.charges_enabled 
+                      ? 'Your account is set up to receive payments'
+                      : 'Connect with Stripe to receive payments from renters'}
+                  </p>
+                  
+                  {stripeConnectStatus?.charges_enabled ? (
+                    <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                      <div className="h-2 w-2 rounded-full bg-green-600 dark:bg-green-400" />
+                      <span className="font-medium">Payment receiving enabled</span>
+                    </div>
+                  ) : stripeConnectStatus?.connected && stripeConnectStatus?.details_submitted ? (
+                    <div className="flex items-center gap-2 text-sm text-yellow-600 dark:text-yellow-400">
+                      <div className="h-2 w-2 rounded-full bg-yellow-600 dark:bg-yellow-400" />
+                      <span className="font-medium">Pending verification</span>
+                    </div>
+                  ) : (
+                    <Button 
+                      onClick={handleStripeConnect}
+                      disabled={isLoadingStripe}
+                      className="w-full"
+                    >
+                      {isLoadingStripe ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          Connect with Stripe
+                          <ExternalLink className="ml-2 h-4 w-4" />
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  
+                  {stripeConnectStatus?.connected && !stripeConnectStatus?.charges_enabled && (
+                    <Button 
+                      onClick={handleStripeConnect}
+                      disabled={isLoadingStripe}
+                      variant="outline"
+                      className="w-full mt-2"
+                    >
+                      Continue Setup
+                      <ExternalLink className="ml-2 h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </Card>
