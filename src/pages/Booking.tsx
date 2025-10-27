@@ -1,49 +1,91 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, MapPin } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { differenceInHours } from 'date-fns';
+import { differenceInHours, addHours, format } from 'date-fns';
 
 const Booking = () => {
   const { spotId } = useParams<{ spotId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [spot, setSpot] = useState<any>(null);
+  const [host, setHost] = useState<any>(null);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
-  const [startDateTime, setStartDateTime] = useState<string>('');
-  const [endDateTime, setEndDateTime] = useState<string>('');
+  
+  // Auto-fill start time (1 hour from now) and end time (5 hours from now, so 4 hours duration)
+  const defaultStart = addHours(new Date(), 1);
+  const defaultEnd = addHours(defaultStart, 4);
+  const [startDateTime, setStartDateTime] = useState<string>(format(defaultStart, "yyyy-MM-dd'T'HH:mm"));
+  const [endDateTime, setEndDateTime] = useState<string>(format(defaultEnd, "yyyy-MM-dd'T'HH:mm"));
+  
+  const [editTimeOpen, setEditTimeOpen] = useState(false);
+  const [editVehicleOpen, setEditVehicleOpen] = useState(false);
 
   useEffect(() => {
-    const fetchSpot = async () => {
+    const fetchData = async () => {
       if (!spotId) return;
       
-      const { data, error } = await supabase
-        .from('spots')
-        .select('*')
-        .eq('id', spotId)
-        .single();
+      try {
+        // Fetch spot with host info and first photo
+        const { data: spotData, error: spotError } = await supabase
+          .from('spots')
+          .select(`
+            *,
+            spot_photos(url, is_primary),
+            profiles!spots_host_id_fkey(
+              first_name,
+              last_name,
+              avatar_url,
+              rating
+            )
+          `)
+          .eq('id', spotId)
+          .single();
 
-      if (error) {
+        if (spotError) throw spotError;
+
+        setSpot(spotData);
+        setHost(spotData.profiles);
+
+        // Fetch user's vehicles
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: vehiclesData } = await supabase
+            .from('vehicles')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('is_primary', { ascending: false });
+          
+          if (vehiclesData && vehiclesData.length > 0) {
+            setVehicles(vehiclesData);
+            setSelectedVehicle(vehiclesData[0]); // Select first vehicle by default
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
         toast({
           title: "Error",
-          description: "Failed to load parking spot",
+          description: "Failed to load booking information",
           variant: "destructive",
         });
         navigate('/');
-        return;
+      } finally {
+        setLoading(false);
       }
-
-      setSpot(data);
-      setLoading(false);
     };
 
-    fetchSpot();
+    fetchData();
   }, [spotId, navigate, toast]);
 
   const calculateTotal = () => {
@@ -177,126 +219,260 @@ const Booking = () => {
 
   const pricing = calculateTotal();
 
+  const primaryPhoto = spot?.spot_photos?.find((p: any) => p.is_primary)?.url || spot?.spot_photos?.[0]?.url;
+  const hostName = host ? `${host.first_name || ''} ${host.last_name || ''}`.trim() : 'Host';
+  const hostInitial = hostName.charAt(0).toUpperCase();
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b bg-card">
+      <div className="border-b bg-card sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
-          <Button
-            variant="ghost"
-            onClick={() => navigate(`/spot/${spotId}`)}
-            className="mb-2"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to spot
-          </Button>
-          <h1 className="text-2xl font-bold">Book Parking Spot</h1>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate(-1)}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-xl font-bold">Order Summary</h1>
+          </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* Spot Details */}
-          <div className="space-y-4">
-            <div className="bg-card border rounded-lg p-6">
-              <h2 className="text-xl font-bold mb-4">{spot.title}</h2>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-start gap-2">
-                  <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                  <span className="text-muted-foreground">{spot.address}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Hourly Rate</span>
-                  <span className="font-semibold">${spot.hourly_rate}/hr</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Booking Form */}
-          <div className="space-y-6">
-            <div className="bg-card border rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Select Time</h3>
-              
-              <div className="space-y-4">
-                {/* Start Date & Time */}
-                <div className="space-y-2">
-                  <Label htmlFor="start" className="text-base font-semibold flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Start
-                  </Label>
-                  <Input
-                    id="start"
-                    type="datetime-local"
-                    value={startDateTime}
-                    onChange={(e) => setStartDateTime(e.target.value)}
-                    min={new Date().toISOString().slice(0, 16)}
-                    className="text-base"
-                  />
-                </div>
-
-                {/* End Date & Time */}
-                <div className="space-y-2">
-                  <Label htmlFor="end" className="text-base font-semibold flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    End
-                  </Label>
-                  <Input
-                    id="end"
-                    type="datetime-local"
-                    value={endDateTime}
-                    onChange={(e) => setEndDateTime(e.target.value)}
-                    min={startDateTime || new Date().toISOString().slice(0, 16)}
-                    className="text-base"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Pricing Breakdown */}
-            {pricing && (
-              <div className="bg-card border rounded-lg p-6">
-                <h3 className="text-lg font-semibold mb-4">Pricing Summary</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      ${spot.hourly_rate}/hr × {pricing.hours} hours
-                    </span>
-                    <span className="font-medium">${pricing.subtotal}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Service fee</span>
-                    <span className="font-medium">${pricing.platformFee}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between text-lg">
-                    <span className="font-bold">Total</span>
-                    <span className="font-bold text-primary">${pricing.total}</span>
-                  </div>
-                </div>
-              </div>
+      <div className="container mx-auto px-4 py-6 max-w-2xl space-y-4">
+        {/* Spot Overview Card */}
+        <Card className="p-4">
+          <div className="flex gap-4">
+            {primaryPhoto && (
+              <img 
+                src={primaryPhoto} 
+                alt={spot.title}
+                className="w-24 h-24 rounded-lg object-cover"
+              />
             )}
-
-            {/* Action Buttons */}
-            <div className="space-y-3">
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={handleBooking}
-                disabled={!startDateTime || !endDateTime || !pricing || bookingLoading}
-              >
-                {bookingLoading ? 'Processing...' : `Confirm & Pay $${pricing?.total || '0.00'}`}
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => navigate(`/spot/${spotId}`)}
-              >
-                Cancel
-              </Button>
+            <div className="flex-1">
+              <h2 className="font-bold text-lg mb-1">{spot.title}</h2>
+              <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
+                <MapPin className="h-3 w-3" />
+                <span>{spot.address}</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <div className="flex items-center gap-1">
+                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                  <span className="font-semibold">4.9</span>
+                  <span className="text-muted-foreground">(127)</span>
+                </div>
+                <span className="font-bold">${spot.hourly_rate}/hr</span>
+              </div>
             </div>
           </div>
+        </Card>
+
+        {/* Parking Time Card */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-lg">Parking Time</h3>
+            <Dialog open={editTimeOpen} onOpenChange={setEditTimeOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Edit2 className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit Parking Time</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-start">Start Time</Label>
+                    <Input
+                      id="edit-start"
+                      type="datetime-local"
+                      value={startDateTime}
+                      onChange={(e) => setStartDateTime(e.target.value)}
+                      min={new Date().toISOString().slice(0, 16)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-end">End Time</Label>
+                    <Input
+                      id="edit-end"
+                      type="datetime-local"
+                      value={endDateTime}
+                      onChange={(e) => setEndDateTime(e.target.value)}
+                      min={startDateTime}
+                    />
+                  </div>
+                  <Button className="w-full" onClick={() => setEditTimeOpen(false)}>
+                    Save Changes
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span>{format(new Date(startDateTime), 'EEEE, MMM d')}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span>{format(new Date(startDateTime), 'h:mm a')} - {format(new Date(endDateTime), 'h:mm a')}</span>
+              <span className="ml-auto bg-primary/10 text-primary px-2 py-0.5 rounded text-xs font-medium">
+                {pricing?.hours}h
+              </span>
+            </div>
+          </div>
+        </Card>
+
+        {/* Vehicle Card */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-lg">Vehicle</h3>
+            <Dialog open={editVehicleOpen} onOpenChange={setEditVehicleOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Edit2 className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Select Vehicle</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3 pt-4">
+                  {vehicles.map((vehicle) => (
+                    <button
+                      key={vehicle.id}
+                      onClick={() => {
+                        setSelectedVehicle(vehicle);
+                        setEditVehicleOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-accent transition-colors text-left"
+                    >
+                      <Car className="h-5 w-5 text-muted-foreground" />
+                      <div className="flex-1">
+                        <div className="font-medium">
+                          {vehicle.color} {vehicle.year} {vehicle.make} {vehicle.model}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          License: {vehicle.license_plate}
+                        </div>
+                      </div>
+                      {selectedVehicle?.id === vehicle.id && (
+                        <Check className="h-5 w-5 text-primary" />
+                      )}
+                    </button>
+                  ))}
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate('/add-vehicle')}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add New Vehicle
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+          {selectedVehicle ? (
+            <div className="flex items-center gap-3">
+              <Car className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <div className="font-medium">
+                  {selectedVehicle.color} {selectedVehicle.year} {selectedVehicle.make} {selectedVehicle.model}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  License: {selectedVehicle.license_plate}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <Car className="h-5 w-5" />
+              <span>No vehicle selected</span>
+            </div>
+          )}
+        </Card>
+
+        {/* Payment Method Card */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-lg">Payment Method</h3>
+            <Button variant="ghost" size="icon">
+              <Edit2 className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex items-center gap-3">
+            <CreditCard className="h-5 w-5 text-muted-foreground" />
+            <div className="flex-1">
+              <div className="font-medium">Visa •••• 4242</div>
+              <div className="text-sm text-muted-foreground">Expires 12/26</div>
+            </div>
+            <div className="flex items-center gap-1 text-xs bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 px-2 py-1 rounded">
+              <Check className="h-3 w-3" />
+              Verified
+            </div>
+          </div>
+        </Card>
+
+        {/* Host Info Card */}
+        <Card className="p-4">
+          <h3 className="font-bold text-lg mb-3">Hosted by</h3>
+          <div className="flex items-center gap-3">
+            <Avatar className="h-12 w-12">
+              <AvatarImage src={host?.avatar_url} />
+              <AvatarFallback>{hostInitial}</AvatarFallback>
+            </Avatar>
+            <div>
+              <div className="font-medium">{hostName}</div>
+              <div className="flex items-center gap-1 text-sm">
+                <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                <span>Host rating: {host?.rating || '4.8'}</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Price Breakdown Card */}
+        {pricing && (
+          <Card className="p-4">
+            <h3 className="font-bold text-lg mb-4">Price Breakdown</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  ${spot.hourly_rate}/hr × {pricing.hours} hours
+                </span>
+                <span className="font-medium">${pricing.subtotal}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Service fee</span>
+                <span className="font-medium">${pricing.platformFee}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between text-lg">
+                <span className="font-bold">Total</span>
+                <span className="font-bold">${pricing.total}</span>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Book Now Button */}
+        <div className="space-y-2 pb-6">
+          <Button
+            className="w-full h-14 text-lg"
+            size="lg"
+            onClick={handleBooking}
+            disabled={!startDateTime || !endDateTime || !pricing || !selectedVehicle || bookingLoading}
+          >
+            {bookingLoading ? 'Processing...' : `Book Now • $${pricing?.total || '0.00'}`}
+          </Button>
+          <p className="text-center text-xs text-muted-foreground">
+            You won't be charged until your booking is confirmed
+          </p>
         </div>
       </div>
     </div>
