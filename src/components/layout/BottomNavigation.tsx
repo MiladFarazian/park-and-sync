@@ -36,7 +36,7 @@ const BottomNavigation = () => {
               key={tab.id}
               onClick={() => navigate(tab.path)}
               className={cn(
-                "flex flex-col items-center gap-1 p-2 rounded-md transition-colors",
+                "flex flex-col items-center gap-1 pt-4 pb-2 px-2 rounded-md transition-colors",
                 isActive 
                   ? "text-primary" 
                   : "text-muted-foreground hover:text-foreground"
