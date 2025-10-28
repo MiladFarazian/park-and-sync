@@ -27,17 +27,30 @@ const Explore = () => {
   const [endTime, setEndTime] = useState<Date | null>(null);
 
   // Ensure end time is always after start time
-  const handleStartTimeChange = (date: Date) => {
-    setStartTime(date);
+  const validateAndSetTimes = (newStartTime: Date, newEndTime: Date | null) => {
+    let validatedEndTime = newEndTime;
+    
     // If end time is before or equal to new start time, set it to 2 hours after
-    if (endTime && endTime <= date) {
-      setEndTime(new Date(date.getTime() + 2 * 60 * 60 * 1000));
+    if (!validatedEndTime || validatedEndTime <= newStartTime) {
+      validatedEndTime = new Date(newStartTime.getTime() + 2 * 60 * 60 * 1000);
     }
+    
+    setStartTime(newStartTime);
+    setEndTime(validatedEndTime);
+    
+    return { startTime: newStartTime, endTime: validatedEndTime };
   };
+
+  const handleStartTimeChange = (date: Date) => {
+    const { startTime: validatedStart, endTime: validatedEnd } = validateAndSetTimes(date, endTime);
+    handleDateTimeUpdate(validatedStart, validatedEnd);
+  };
+  
   const handleEndTimeChange = (date: Date) => {
     // Only set if it's after start time
     if (startTime && date > startTime) {
       setEndTime(date);
+      handleDateTimeUpdate(startTime, date);
     }
   };
   const fetchTimeoutRef = useRef<NodeJS.Timeout>();
@@ -282,16 +295,12 @@ const Explore = () => {
                       newDate.setHours(startTime.getHours());
                       newDate.setMinutes(startTime.getMinutes());
                       handleStartTimeChange(newDate);
-                      handleDateTimeUpdate(newDate, endTime);
                     }
                   }} disabled={date => date < new Date()} initialFocus className="pointer-events-auto" />
                       </PopoverContent>
                     </Popover>
                     
-                    <TimePicker date={startTime} setDate={date => {
-                handleStartTimeChange(date);
-                handleDateTimeUpdate(date, endTime);
-              }}>
+                    <TimePicker date={startTime} setDate={handleStartTimeChange}>
                       <button className="flex items-center gap-1 hover:bg-accent/50 rounded px-1.5 py-1 transition-colors flex-shrink-0">
                         <Clock className="h-3 w-3 text-muted-foreground" />
                         <span className="whitespace-nowrap text-xs">{format(startTime, 'h:mma')}</span>
@@ -316,7 +325,6 @@ const Explore = () => {
                       newDate.setHours(endTime.getHours());
                       newDate.setMinutes(endTime.getMinutes());
                       handleEndTimeChange(newDate);
-                      handleDateTimeUpdate(startTime, newDate);
                     }
                   }} disabled={date => {
                     if (!startTime) return date < new Date();
@@ -330,10 +338,7 @@ const Explore = () => {
                       </PopoverContent>
                     </Popover>
                     
-                    <TimePicker date={endTime} setDate={date => {
-                handleEndTimeChange(date);
-                handleDateTimeUpdate(startTime, date);
-              }}>
+                    <TimePicker date={endTime} setDate={handleEndTimeChange}>
                       <button className="flex items-center gap-1 hover:bg-accent/50 rounded px-1.5 py-1 transition-colors flex-shrink-0">
                         <Clock className="h-3 w-3 text-muted-foreground" />
                         <span className="whitespace-nowrap text-xs">{format(endTime, 'h:mma')}</span>
