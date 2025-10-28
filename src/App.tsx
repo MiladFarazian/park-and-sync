@@ -25,6 +25,7 @@ import PaymentMethods from "./pages/PaymentMethods";
 import Notifications from "./pages/Notifications";
 import PrivacySecurity from "./pages/PrivacySecurity";
 import EditSpotAvailability from "./pages/EditSpotAvailability";
+import EditSpot from "./pages/EditSpot";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ModeProvider } from "./contexts/ModeContext";
 
@@ -57,7 +58,8 @@ const App = () => (
                   <Route path="/explore" element={<Explore />} />
                   <Route path="/add-spot" element={<AddSpot />} />
                   <Route path="/list-spot" element={<ListSpot />} />
-                  <Route path="/edit-availability/:spotId" element={<EditSpotAvailability />} />
+              <Route path="/edit-availability/:spotId" element={<EditSpotAvailability />} />
+              <Route path="/edit-spot/:spotId" element={<EditSpot />} />
                   <Route path="/activity" element={<Activity />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/messages" element={<Messages />} />
