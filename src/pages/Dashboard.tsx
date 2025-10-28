@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { formatAvailability } from '@/lib/formatAvailability';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('listings');
@@ -97,18 +98,6 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatAvailability = (rules: any[]) => {
-    if (!rules || rules.length === 0) return 'No schedule set';
-    
-    const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const availableDays = [...new Set(rules.filter(r => r.is_available).map(r => r.day_of_week))];
-    
-    if (availableDays.length === 0) return 'Unavailable';
-    if (availableDays.length === 7) return 'Available 24/7';
-    
-    return availableDays.map(d => DAYS[d]).join(', ');
   };
 
   const ListingCard = ({ listing }: { listing: any }) => (
@@ -214,39 +203,23 @@ const Dashboard = () => {
         </Button>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="listings">Listings ({listings.length})</TabsTrigger>
-          <TabsTrigger value="requests">Requests</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="listings" className="mt-6">
-          {listings.length === 0 ? (
-            <Card className="p-6 text-center">
-              <MapPin className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-muted-foreground mb-4">No listings yet</p>
-              <Button onClick={() => navigate('/list-spot')}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Your First Spot
-              </Button>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {listings.map((listing) => (
-                <ListingCard key={listing.id} listing={listing} />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="requests" className="space-y-3 mt-6">
-          <Card className="p-6 text-center">
-            <Calendar className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-            <p className="text-muted-foreground">No pending requests</p>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {/* Listings Grid */}
+      {listings.length === 0 ? (
+        <Card className="p-6 text-center">
+          <MapPin className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+          <p className="text-muted-foreground mb-4">No listings yet</p>
+          <Button onClick={() => navigate('/list-spot')}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Your First Spot
+          </Button>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          {listings.map((listing) => (
+            <ListingCard key={listing.id} listing={listing} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

@@ -203,7 +203,7 @@ const EditSpotAvailability = () => {
                 <div className="mb-4">
                   <h3 className="font-semibold mb-1">Recurring Weekly Schedule</h3>
                   <p className="text-sm text-muted-foreground">
-                    Set multiple time blocks for each day. Drag sliders to adjust hours.
+                    Set your availability windows for each day. Drag sliders to adjust hours.
                   </p>
                 </div>
                 <AvailabilityManager

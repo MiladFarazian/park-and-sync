@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar as CalendarIcon, Plus, Trash2, Clock } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -18,7 +20,7 @@ export interface DateOverride {
   is_available: boolean;
 }
 
-interface TimeBlock {
+interface TimeRange {
   start_time: string;
   end_time: string;
 }
@@ -31,18 +33,18 @@ interface DateOverrideManagerProps {
 export const DateOverrideManager = ({ 
   initialOverrides = [], 
   onChange 
-}) => {
+}: DateOverrideManagerProps) => {
   const groupByDate = (overrides: DateOverride[]) => {
-    const grouped: Record<string, { is_available: boolean; blocks: TimeBlock[] }> = {};
+    const grouped: Record<string, { is_available: boolean; windows: TimeRange[] }> = {};
     overrides.forEach(override => {
       if (!grouped[override.override_date]) {
         grouped[override.override_date] = {
           is_available: override.is_available,
-          blocks: []
+          windows: []
         };
       }
       if (override.start_time && override.end_time) {
-        grouped[override.override_date].blocks.push({
+        grouped[override.override_date].windows.push({
           start_time: override.start_time,
           end_time: override.end_time
         });
@@ -51,23 +53,23 @@ export const DateOverrideManager = ({
     return grouped;
   };
 
-  const [overrides, setOverrides] = useState<Record<string, { is_available: boolean; blocks: TimeBlock[] }>>(
+  const [overrides, setOverrides] = useState<Record<string, { is_available: boolean; windows: TimeRange[] }>>(
     groupByDate(initialOverrides)
   );
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('17:00');
-  const [isBlocked, setIsBlocked] = useState(true);
+  const [isUnavailable, setIsUnavailable] = useState(true);
 
   useEffect(() => {
     const result: DateOverride[] = [];
     Object.entries(overrides).forEach(([date, data]) => {
-      if (data.blocks.length > 0) {
-        data.blocks.forEach(block => {
+      if (data.windows.length > 0) {
+        data.windows.forEach(window => {
           result.push({
             override_date: date,
-            start_time: block.start_time,
-            end_time: block.end_time,
+            start_time: window.start_time,
+            end_time: window.end_time,
             is_available: data.is_available
           });
         });
@@ -97,15 +99,15 @@ export const DateOverrideManager = ({
     setOverrides({
       ...overrides,
       [dateStr]: {
-        is_available: !isBlocked,
-        blocks: [{ start_time: startTime, end_time: endTime }]
+        is_available: !isUnavailable,
+        windows: [{ start_time: startTime, end_time: endTime }]
       }
     });
     
     setSelectedDate(undefined);
     setStartTime('09:00');
     setEndTime('17:00');
-    setIsBlocked(true);
+    setIsUnavailable(true);
     toast.success('Date override added');
   };
 
@@ -116,15 +118,15 @@ export const DateOverrideManager = ({
     toast.success('Date override removed');
   };
 
-  const addTimeBlock = (dateStr: string) => {
+  const addAvailability = (dateStr: string) => {
     const override = overrides[dateStr];
-    const newBlock: TimeBlock = {
+    const newWindow: TimeRange = {
       start_time: '09:00',
       end_time: '17:00'
     };
 
-    if (hasOverlap(override.blocks, newBlock)) {
-      toast.error('Time range overlaps with existing block');
+    if (hasOverlap(override.windows, newWindow)) {
+      toast.error('Time range overlaps with existing availability');
       return;
     }
 
@@ -132,34 +134,34 @@ export const DateOverrideManager = ({
       ...overrides,
       [dateStr]: {
         ...override,
-        blocks: [...override.blocks, newBlock].sort((a, b) => 
+        windows: [...override.windows, newWindow].sort((a, b) => 
           timeToMinutes(a.start_time) - timeToMinutes(b.start_time)
         )
       }
     });
-    toast.success('Time block added');
+    toast.success('Availability added');
   };
 
-  const removeTimeBlock = (dateStr: string, blockIndex: number) => {
+  const removeAvailability = (dateStr: string, windowIndex: number) => {
     const override = overrides[dateStr];
     setOverrides({
       ...overrides,
       [dateStr]: {
         ...override,
-        blocks: override.blocks.filter((_, i) => i !== blockIndex)
+        windows: override.windows.filter((_, i) => i !== windowIndex)
       }
     });
-    toast.success('Time block removed');
+    toast.success('Availability removed');
   };
 
-  const updateTimeBlock = (dateStr: string, blockIndex: number, start: string, end: string) => {
+  const updateAvailability = (dateStr: string, windowIndex: number, start: string, end: string) => {
     const override = overrides[dateStr];
-    const blocks = [...override.blocks];
-    blocks[blockIndex] = { start_time: start, end_time: end };
-    
-    const otherBlocks = blocks.filter((_, i) => i !== blockIndex);
-    if (hasOverlap(otherBlocks, blocks[blockIndex])) {
-      toast.error('Time range overlaps with another block');
+    const windows = [...override.windows];
+    windows[windowIndex] = { start_time: start, end_time: end };
+
+    const otherWindows = windows.filter((_, i) => i !== windowIndex);
+    if (hasOverlap(otherWindows, windows[windowIndex])) {
+      toast.error('Time range overlaps with another availability');
       return;
     }
 
@@ -167,7 +169,7 @@ export const DateOverrideManager = ({
       ...overrides,
       [dateStr]: {
         ...override,
-        blocks: blocks.sort((a, b) => 
+        windows: windows.sort((a, b) => 
           timeToMinutes(a.start_time) - timeToMinutes(b.start_time)
         )
       }
@@ -184,13 +186,13 @@ export const DateOverrideManager = ({
     });
   };
 
-  const hasOverlap = (blocks: TimeBlock[], newBlock: TimeBlock): boolean => {
-    const newStart = timeToMinutes(newBlock.start_time);
-    const newEnd = timeToMinutes(newBlock.end_time);
+  const hasOverlap = (windows: TimeRange[], newWindow: TimeRange): boolean => {
+    const newStart = timeToMinutes(newWindow.start_time);
+    const newEnd = timeToMinutes(newWindow.end_time);
 
-    return blocks.some(block => {
-      const start = timeToMinutes(block.start_time);
-      const end = timeToMinutes(block.end_time);
+    return windows.some(window => {
+      const start = timeToMinutes(window.start_time);
+      const end = timeToMinutes(window.end_time);
       return (newStart < end && newEnd > start);
     });
   };
@@ -223,13 +225,14 @@ export const DateOverrideManager = ({
       <Card className="border-dashed">
         <CardContent className="p-4 space-y-4">
           <div>
-            <Label className="mb-2 block">Select Date</Label>
+            <Label htmlFor="date-picker">Select Date</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
+                  id="date-picker"
                   variant="outline"
                   className={cn(
-                    "w-full justify-start text-left font-normal",
+                    "w-full justify-start text-left font-normal mt-2",
                     !selectedDate && "text-muted-foreground"
                   )}
                 >
@@ -244,45 +247,43 @@ export const DateOverrideManager = ({
                   onSelect={setSelectedDate}
                   disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                   initialFocus
-                  className="pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
           </div>
 
           <div>
-            <Label className="mb-2 block">Time Range</Label>
-            <div className="space-y-2">
-              <div className="px-2">
-                <Slider
-                  value={[startMinutes, endMinutes]}
-                  min={0}
-                  max={1439}
-                  step={30}
-                  onValueChange={(values) => {
-                    setStartTime(minutesToTime(values[0]));
-                    setEndTime(minutesToTime(values[1]));
-                  }}
-                  className="w-full"
-                />
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground px-2">
+            <Label htmlFor="time-range">Time Range</Label>
+            <div className="space-y-2 mt-2">
+              <Slider
+                id="time-range"
+                value={[startMinutes, endMinutes]}
+                min={0}
+                max={1439}
+                step={15}
+                onValueChange={([start, end]) => {
+                  setStartTime(minutesToTime(start));
+                  setEndTime(minutesToTime(end));
+                }}
+              />
+              <div className="flex justify-between text-sm text-muted-foreground">
                 <span>{formatTime(startTime)}</span>
                 <span>{formatTime(endTime)}</span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <Label>Status</Label>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setIsBlocked(!isBlocked)}
-            >
-              {isBlocked ? 'Blocked' : 'Available'}
-            </Button>
+          <div>
+            <Label htmlFor="status">Status</Label>
+            <Select value={isUnavailable ? "unavailable" : "available"} onValueChange={(value) => setIsUnavailable(value === "unavailable")}>
+              <SelectTrigger id="status">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unavailable">Mark as Unavailable</SelectItem>
+                <SelectItem value="available">Mark as Available</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <Button onClick={addOverride} disabled={!selectedDate} className="w-full">
@@ -294,11 +295,9 @@ export const DateOverrideManager = ({
 
       {sortedDates.length === 0 ? (
         <Card className="border-dashed">
-          <CardContent className="p-6 text-center">
-            <CalendarIcon className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">
-              No date overrides set. Add specific dates to override your weekly schedule.
-            </p>
+          <CardContent className="p-6 text-center text-muted-foreground">
+            <CalendarIcon className="h-8 w-8 mx-auto mb-2" />
+            <p className="text-sm">No date overrides set</p>
           </CardContent>
         </Card>
       ) : (
@@ -307,23 +306,22 @@ export const DateOverrideManager = ({
             const override = overrides[dateStr];
 
             return (
-              <Card key={dateStr} className={cn(!override.is_available && "border-destructive/20 bg-destructive/5")}>
+              <Card key={dateStr}>
                 <CardContent className="p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="font-semibold">
+                    <div className="space-y-1">
+                      <div className="font-medium">
                         {format(new Date(dateStr + 'T00:00:00'), 'EEEE, MMMM d, yyyy')}
-                      </Label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleAvailability(dateStr)}
-                          className="h-auto p-0 text-xs"
-                        >
-                          {override.is_available ? '✓ Available' : '✕ Blocked'}
-                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={override.is_available ? "default" : "secondary"}>
+                          {override.is_available ? "Available" : "Unavailable"}
+                        </Badge>
+                        {override.windows.length > 0 && (
+                          <Badge variant="outline" className="text-xs">
+                            {override.windows.length} {override.windows.length === 1 ? 'availability' : 'availabilities'}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <Button
@@ -336,48 +334,45 @@ export const DateOverrideManager = ({
                     </Button>
                   </div>
 
-                  {override.blocks.map((block, blockIndex) => {
-                    const blockStartMinutes = timeToMinutes(block.start_time);
-                    const blockEndMinutes = timeToMinutes(block.end_time);
+                  {override.windows.map((window, windowIndex) => {
+                    const startMinutes = timeToMinutes(window.start_time);
+                    const endMinutes = timeToMinutes(window.end_time);
 
                     return (
-                      <div key={blockIndex} className="space-y-2 p-3 rounded-lg bg-background border">
+                      <div key={windowIndex} className="space-y-2 p-3 rounded-lg bg-background border">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Clock className="h-3.5 w-3.5" />
-                            <span>Block {blockIndex + 1}</span>
+                          <div className="flex items-center gap-2">
+                            <span>Availability {windowIndex + 1}</span>
                           </div>
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeTimeBlock(dateStr, blockIndex)}
+                            onClick={() => removeAvailability(dateStr, windowIndex)}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </div>
-                        
-                        <div className="px-2">
-                          <Slider
-                            value={[blockStartMinutes, blockEndMinutes]}
-                            min={0}
-                            max={1439}
-                            step={30}
-                            onValueChange={(values) => {
-                              updateTimeBlock(
-                                dateStr,
-                                blockIndex,
-                                minutesToTime(values[0]),
-                                minutesToTime(values[1])
-                              );
-                            }}
-                            className="w-full"
-                          />
-                        </div>
-                        
-                        <div className="flex justify-between text-xs text-muted-foreground px-2">
-                          <span>{formatTime(block.start_time)}</span>
-                          <span>{formatTime(block.end_time)}</span>
+
+                        <Slider
+                          value={[startMinutes, endMinutes]}
+                          min={0}
+                          max={1439}
+                          step={15}
+                          onValueChange={([start, end]) => 
+                            updateAvailability(
+                              dateStr, 
+                              windowIndex, 
+                              minutesToTime(start), 
+                              minutesToTime(end)
+                            )
+                          }
+                          className="my-4"
+                        />
+
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>{formatTime(window.start_time)}</span>
+                          <span>{formatTime(window.end_time)}</span>
                         </div>
                       </div>
                     );
@@ -387,11 +382,10 @@ export const DateOverrideManager = ({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => addTimeBlock(dateStr)}
                     className="w-full"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Time Range
+                    onClick={() => addAvailability(dateStr)}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Availability
                   </Button>
                 </CardContent>
               </Card>
