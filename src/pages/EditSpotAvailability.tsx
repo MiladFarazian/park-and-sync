@@ -104,8 +104,10 @@ const EditSpotAvailability = () => {
 
       if (deleteRulesError) throw deleteRulesError;
 
-      if (availabilityRules.length > 0) {
-        const rulesWithSpotId = availabilityRules.map(rule => ({
+      // Only insert available rules
+      const availableRules = availabilityRules.filter(r => r.is_available);
+      if (availableRules.length > 0) {
+        const rulesWithSpotId = availableRules.map(rule => ({
           spot_id: spotId,
           day_of_week: rule.day_of_week,
           start_time: rule.start_time,

@@ -3,11 +3,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Calendar as CalendarIcon, Plus, Trash2, Clock } from 'lucide-react';
-import { TimePicker } from '@/components/ui/time-picker';
+import { Slider } from '@/components/ui/slider';
+import { Calendar as CalendarIcon, Plus, Trash2 } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -54,9 +53,8 @@ export const DateOverrideManager: React.FC<DateOverrideManagerProps> = ({
     const newOverride: DateOverride = {
       override_date: dateStr,
       is_available: false,
-      start_time: '09:00',
-      end_time: '17:00',
-      reason: '',
+      start_time: '00:00',
+      end_time: '23:59',
     };
     
     setOverrides([...overrides, newOverride].sort((a, b) => 
@@ -77,17 +75,23 @@ export const DateOverrideManager: React.FC<DateOverrideManagerProps> = ({
     setOverrides(newOverrides);
   };
 
-  const parseTimeString = (timeStr: string): Date => {
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    const date = new Date();
-    date.setHours(hours, minutes, 0, 0);
-    return date;
+  const timeToMinutes = (time: string): number => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
   };
 
-  const formatTimeString = (date: Date): string => {
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${hours}:${minutes}`;
+  const minutesToTime = (minutes: number): string => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+  };
+
+  const formatTime = (time: string): string => {
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
   };
 
   return (
@@ -143,72 +147,64 @@ export const DateOverrideManager: React.FC<DateOverrideManagerProps> = ({
         </Card>
       ) : (
         <div className="space-y-3">
-          {overrides.map((override, index) => (
-            <Card key={index}>
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="font-semibold">
-                      {format(new Date(override.override_date + 'T00:00:00'), 'EEEE, MMMM d, yyyy')}
+          {overrides.map((override, index) => {
+            const startMinutes = timeToMinutes(override.start_time || '00:00');
+            const endMinutes = timeToMinutes(override.end_time || '23:59');
+
+            return (
+              <Card key={index}>
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="font-semibold">
+                        {format(new Date(override.override_date + 'T00:00:00'), 'EEEE, MMMM d, yyyy')}
+                      </Label>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeOverride(index)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={override.is_available}
+                      onCheckedChange={(checked) => 
+                        updateOverride(index, 'is_available', checked)
+                      }
+                    />
+                    <Label className="text-sm">
+                      {override.is_available ? 'Available' : 'Blocked'}
                     </Label>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeOverride(index)}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={override.is_available}
-                    onCheckedChange={(checked) => 
-                      updateOverride(index, 'is_available', checked)
-                    }
-                  />
-                  <Label className="text-sm">
-                    {override.is_available ? 'Available' : 'Blocked'}
-                  </Label>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">
-                    {override.is_available ? 'Custom Hours' : 'Blocked Hours'}
-                  </Label>
-                  <div className="flex items-center gap-2">
-                    <TimePicker
-                      date={override.start_time ? parseTimeString(override.start_time) : new Date(new Date().setHours(9, 0, 0, 0))}
-                      setDate={(date) => {
-                        updateOverride(index, 'start_time', formatTimeString(date));
-                      }}
-                    >
-                      <Button variant="outline" size="sm" className="text-xs">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {override.start_time || '09:00'}
-                      </Button>
-                    </TimePicker>
-                    
-                    <span className="text-sm text-muted-foreground">to</span>
-                    
-                    <TimePicker
-                      date={override.end_time ? parseTimeString(override.end_time) : new Date(new Date().setHours(17, 0, 0, 0))}
-                      setDate={(date) => {
-                        updateOverride(index, 'end_time', formatTimeString(date));
-                      }}
-                    >
-                      <Button variant="outline" size="sm" className="text-xs">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {override.end_time || '17:00'}
-                      </Button>
-                    </TimePicker>
+                  <div className="space-y-2">
+                    <div className="px-2">
+                      <Slider
+                        value={[startMinutes, endMinutes]}
+                        min={0}
+                        max={1439}
+                        step={30}
+                        onValueChange={(values) => {
+                          updateOverride(index, 'start_time', minutesToTime(values[0]));
+                          updateOverride(index, 'end_time', minutesToTime(values[1]));
+                        }}
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground px-2">
+                      <span>{formatTime(override.start_time || '00:00')}</span>
+                      <span>{formatTime(override.end_time || '23:59')}</span>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

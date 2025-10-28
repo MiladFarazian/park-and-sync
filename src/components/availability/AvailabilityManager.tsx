@@ -24,11 +24,22 @@ export const AvailabilityManager: React.FC<AvailabilityManagerProps> = ({
 }) => {
   // Initialize with one rule per day, default unavailable
   const getInitialRules = () => {
-    if (initialRules.length > 0) return initialRules;
+    if (initialRules.length > 0) {
+      // Ensure all 7 days are represented
+      const ruleMap = new Map(initialRules.map(r => [r.day_of_week, r]));
+      return DAYS.map((_, index) => 
+        ruleMap.get(index) || {
+          day_of_week: index,
+          start_time: '00:00',
+          end_time: '23:59',
+          is_available: false,
+        }
+      );
+    }
     return DAYS.map((_, index) => ({
       day_of_week: index,
-      start_time: '09:00',
-      end_time: '17:00',
+      start_time: '00:00',
+      end_time: '23:59',
       is_available: false,
     }));
   };
@@ -36,9 +47,8 @@ export const AvailabilityManager: React.FC<AvailabilityManagerProps> = ({
   const [rules, setRules] = useState<AvailabilityRule[]>(getInitialRules());
 
   useEffect(() => {
-    // Only return rules that are available
-    const availableRules = rules.filter(r => r.is_available);
-    onChange?.(availableRules);
+    // Return all rules, not just available ones
+    onChange?.(rules);
   }, [rules, onChange]);
 
   const updateDay = (dayIndex: number, field: keyof AvailabilityRule, value: any) => {
@@ -101,7 +111,7 @@ export const AvailabilityManager: React.FC<AvailabilityManagerProps> = ({
                       <Slider
                         value={[startMinutes, endMinutes]}
                         min={0}
-                        max={1440}
+                        max={1439}
                         step={30}
                         onValueChange={(values) => {
                           updateDay(dayIndex, 'start_time', minutesToTime(values[0]));
