@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
 import { Search, Send, Loader2, ArrowLeft } from 'lucide-react';
-import { useMessages } from '@/hooks/useMessages';
+import { useMessages, Message } from '@/hooks/useMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
@@ -16,14 +16,17 @@ import { useIsMobile } from '@/hooks/use-mobile';
 const Messages = () => {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
-  const { conversations, messages, loading, sendingMessage, loadMessages, sendMessage, subscribeToConversation } = useMessages();
+  const { conversations, loading, markAsRead } = useMessages();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [newUserProfile, setNewUserProfile] = useState<any>(null);
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [sendingMessage, setSendingMessage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   const conversationChannelRef = useRef<any>(null);
+  const mountedRef = useRef(true);
 
   // Auto-select conversation from URL parameter
   useEffect(() => {
@@ -59,25 +62,88 @@ const Messages = () => {
 
   // Load messages when conversation is selected and set up real-time subscription
   useEffect(() => {
+    if (!selectedConversation || !user) return;
+    mountedRef.current = true;
+
     // Clean up previous subscription
     if (conversationChannelRef.current) {
       supabase.removeChannel(conversationChannelRef.current);
       conversationChannelRef.current = null;
     }
 
-    if (selectedConversation) {
-      loadMessages(selectedConversation);
-      // Subscribe to real-time updates for this conversation
-      conversationChannelRef.current = subscribeToConversation(selectedConversation);
-    }
+    // Initial fetch
+    const loadMessages = async () => {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${user.id},recipient_id.eq.${selectedConversation}),and(sender_id.eq.${selectedConversation},recipient_id.eq.${user.id})`)
+        .order('created_at', { ascending: true });
+
+      if (!mountedRef.current) return;
+      if (!error && data) {
+        setMessages(data as Message[]);
+        // Mark messages as read
+        await markAsRead(selectedConversation);
+      }
+    };
+
+    loadMessages();
+
+    // Realtime subscription
+    conversationChannelRef.current = supabase
+      .channel(`conversation-${selectedConversation}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages'
+        },
+        (payload) => {
+          if (!mountedRef.current) return;
+          
+          setMessages(prev => {
+            if (payload.eventType === 'INSERT') {
+              const newMsg = payload.new as Message;
+              // Check if message is part of this conversation
+              const isInConversation = 
+                (newMsg.sender_id === user.id && newMsg.recipient_id === selectedConversation) ||
+                (newMsg.sender_id === selectedConversation && newMsg.recipient_id === user.id);
+              
+              if (!isInConversation) return prev;
+              if (prev.some(m => m.id === newMsg.id)) return prev;
+              
+              // Mark as read if from other user
+              if (newMsg.sender_id === selectedConversation) {
+                markAsRead(selectedConversation);
+              }
+              
+              return [...prev, newMsg].sort((a, b) => 
+                new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+              );
+            }
+            if (payload.eventType === 'UPDATE') {
+              const updatedMsg = payload.new as Message;
+              return prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m);
+            }
+            if (payload.eventType === 'DELETE') {
+              const deletedId = (payload.old as any)?.id;
+              return prev.filter(m => m.id !== deletedId);
+            }
+            return prev;
+          });
+        }
+      )
+      .subscribe();
 
     return () => {
+      mountedRef.current = false;
       if (conversationChannelRef.current) {
         supabase.removeChannel(conversationChannelRef.current);
         conversationChannelRef.current = null;
       }
     };
-  }, [selectedConversation]);
+  }, [selectedConversation, user]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -85,13 +151,46 @@ const Messages = () => {
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (!messageInput.trim() || !selectedConversation) return;
+    if (!messageInput.trim() || !selectedConversation || !user) return;
+
+    const messageText = messageInput.trim();
+    const tempId = `temp-${crypto.randomUUID()}`;
+    
+    // Optimistic update
+    const tempMessage: Message = {
+      id: tempId,
+      sender_id: user.id,
+      recipient_id: selectedConversation,
+      message: messageText,
+      created_at: new Date().toISOString(),
+      read_at: null
+    };
+    
+    setMessages(prev => [...prev, tempMessage]);
+    setMessageInput('');
 
     try {
-      await sendMessage(selectedConversation, messageInput);
-      setMessageInput('');
+      setSendingMessage(true);
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          sender_id: user.id,
+          recipient_id: selectedConversation,
+          message: messageText
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Remove temp message (realtime will add the real one)
+      setMessages(prev => prev.filter(m => m.id !== tempId));
     } catch (error) {
+      // Rollback on error
+      setMessages(prev => prev.filter(m => m.id !== tempId));
       toast.error('Failed to send message');
+    } finally {
+      setSendingMessage(false);
     }
   };
 

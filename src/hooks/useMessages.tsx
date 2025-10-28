@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -24,9 +24,8 @@ export interface Message {
 export const useMessages = () => {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sendingMessage, setSendingMessage] = useState(false);
+  const mountedRef = useRef(true);
 
   // Load conversations
   const loadConversations = async () => {
@@ -35,7 +34,6 @@ export const useMessages = () => {
     try {
       setLoading(true);
       
-      // Get all messages where user is sender or recipient
       const { data: allMessages, error } = await supabase
         .from('messages')
         .select('*')
@@ -43,8 +41,8 @@ export const useMessages = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      if (!mountedRef.current) return;
 
-      // Group by conversation partner
       const conversationMap = new Map<string, any>();
       
       for (const msg of allMessages || []) {
@@ -63,13 +61,11 @@ export const useMessages = () => {
         const conv = conversationMap.get(partnerId);
         conv.messages.push(msg);
         
-        // Count unread messages (messages sent to current user that are unread)
         if (msg.recipient_id === user.id && !msg.read_at) {
           conv.unread_count++;
         }
       }
 
-      // Get profiles for all conversation partners
       const partnerIds = Array.from(conversationMap.keys());
       if (partnerIds.length > 0) {
         const { data: profiles } = await supabase
@@ -77,7 +73,6 @@ export const useMessages = () => {
           .select('user_id, first_name, last_name, avatar_url')
           .in('user_id', partnerIds);
 
-        // Merge profile data
         const convs: Conversation[] = [];
         for (const [partnerId, conv] of conversationMap) {
           const profile = profiles?.find(p => p.user_id === partnerId);
@@ -92,87 +87,22 @@ export const useMessages = () => {
           });
         }
 
-        // Sort by most recent message
         convs.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
-        setConversations(convs);
+        if (mountedRef.current) {
+          setConversations(convs);
+        }
+      } else {
+        if (mountedRef.current) {
+          setConversations([]);
+        }
       }
     } catch (error) {
       console.error('Error loading conversations:', error);
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
-  };
-
-  // Load messages for a specific conversation
-  const loadMessages = async (userId: string) => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`and(sender_id.eq.${user.id},recipient_id.eq.${userId}),and(sender_id.eq.${userId},recipient_id.eq.${user.id})`)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      setMessages(data || []);
-
-      // Mark messages as read
-      await markAsRead(userId);
-    } catch (error) {
-      console.error('Error loading messages:', error);
-    }
-  };
-
-  // Set up real-time subscription for active conversation
-  const subscribeToConversation = (otherUserId: string) => {
-    if (!user) return null;
-
-    console.log('Setting up real-time subscription for conversation with:', otherUserId);
-
-    const channel = supabase
-      .channel(`messages:${user.id}:${otherUserId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages'
-        },
-        (payload) => {
-          console.log('Real-time message received:', payload);
-          const newMessage = payload.new as Message;
-          
-          // Check if this message is part of the current conversation
-          const isInConversation = 
-            (newMessage.sender_id === user.id && newMessage.recipient_id === otherUserId) ||
-            (newMessage.sender_id === otherUserId && newMessage.recipient_id === user.id);
-          
-          if (isInConversation) {
-            console.log('Message belongs to current conversation, adding to messages');
-            setMessages(prev => {
-              // Check if message already exists to avoid duplicates
-              if (prev.some(m => m.id === newMessage.id)) {
-                return prev;
-              }
-              return [...prev, newMessage];
-            });
-            
-            // If message is from other user, mark as read
-            if (newMessage.sender_id === otherUserId) {
-              markAsRead(otherUserId);
-            }
-            
-            // Refresh conversations list
-            loadConversations();
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log('Conversation subscription status:', status);
-      });
-
-    return channel;
   };
 
   // Mark messages as read
@@ -187,7 +117,6 @@ export const useMessages = () => {
         .eq('sender_id', senderId)
         .is('read_at', null);
       
-      // Update conversation unread count
       setConversations(prev => 
         prev.map(conv => 
           conv.user_id === senderId 
@@ -200,71 +129,47 @@ export const useMessages = () => {
     }
   };
 
-  // Send a message
-  const sendMessage = async (recipientId: string, message: string) => {
-    if (!user || !message.trim()) return;
-
-    try {
-      setSendingMessage(true);
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({
-          sender_id: user.id,
-          recipient_id: recipientId,
-          message: message.trim()
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      console.log('Message sent:', data);
-      
-      // Update conversations immediately
-      await loadConversations();
-    } catch (error) {
-      console.error('Error sending message:', error);
-      throw error;
-    } finally {
-      setSendingMessage(false);
-    }
-  };
-
   // Set up real-time subscription for conversations list
   useEffect(() => {
     if (!user) return;
+    mountedRef.current = true;
 
     loadConversations();
 
     const channel = supabase
-      .channel('messages-changes')
+      .channel('conversations-updates')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'messages',
-          filter: `recipient_id=eq.${user.id}`
+          table: 'messages'
         },
-        () => {
-          loadConversations();
+        (payload) => {
+          const msg = payload.new as Message;
+          const oldMsg = payload.old as any;
+          
+          // Only reload if this message involves the current user
+          if (payload.eventType === 'INSERT' && (msg.sender_id === user.id || msg.recipient_id === user.id)) {
+            loadConversations();
+          } else if (payload.eventType === 'UPDATE' && oldMsg && 
+                     (oldMsg.sender_id === user.id || oldMsg.recipient_id === user.id)) {
+            loadConversations();
+          }
         }
       )
       .subscribe();
 
     return () => {
+      mountedRef.current = false;
       supabase.removeChannel(channel);
     };
   }, [user]);
 
   return {
     conversations,
-    messages,
     loading,
-    sendingMessage,
-    loadMessages,
-    sendMessage,
     markAsRead,
-    subscribeToConversation
+    loadConversations
   };
 };
