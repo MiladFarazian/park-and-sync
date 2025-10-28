@@ -56,6 +56,28 @@ const Booking = () => {
   const initialTimes = getInitialTimes();
   const [startDateTime, setStartDateTime] = useState<Date>(initialTimes.start);
   const [endDateTime, setEndDateTime] = useState<Date>(initialTimes.end);
+
+  // Ensure end time is always after start time
+  const handleStartDateTimeChange = (date: Date) => {
+    setStartDateTime(date);
+    // If end time is before or equal to new start time, set it to 2 hours after
+    if (endDateTime <= date) {
+      setEndDateTime(new Date(date.getTime() + 2 * 60 * 60 * 1000));
+    }
+  };
+
+  const handleEndDateTimeChange = (date: Date) => {
+    // Only set if it's after start time
+    if (date > startDateTime) {
+      setEndDateTime(date);
+    } else {
+      toast({
+        title: "Invalid time",
+        description: "End time must be after start time",
+        variant: "destructive",
+      });
+    }
+  };
   
   const [editTimeOpen, setEditTimeOpen] = useState(false);
   const [editVehicleOpen, setEditVehicleOpen] = useState(false);
@@ -367,7 +389,7 @@ const Booking = () => {
                                 const newDate = new Date(date);
                                 newDate.setHours(startDateTime.getHours());
                                 newDate.setMinutes(startDateTime.getMinutes());
-                                setStartDateTime(newDate);
+                                handleStartDateTimeChange(newDate);
                               }
                             }}
                             disabled={(date) => date < new Date()}
@@ -379,7 +401,7 @@ const Booking = () => {
 
                       <span className="flex items-center px-2 text-muted-foreground">·</span>
 
-                      <TimePicker date={startDateTime} setDate={setStartDateTime}>
+                      <TimePicker date={startDateTime} setDate={handleStartDateTimeChange}>
                         <Button
                           variant="ghost"
                           className="justify-start text-left font-normal h-full rounded-none border-0 hover:bg-accent flex-shrink-0"
@@ -419,10 +441,17 @@ const Booking = () => {
                                 const newDate = new Date(date);
                                 newDate.setHours(endDateTime.getHours());
                                 newDate.setMinutes(endDateTime.getMinutes());
-                                setEndDateTime(newDate);
+                                handleEndDateTimeChange(newDate);
                               }
                             }}
-                            disabled={(date) => date < startDateTime}
+                            disabled={(date) => {
+                              // Disable dates before start date
+                              const startDateOnly = new Date(startDateTime);
+                              startDateOnly.setHours(0, 0, 0, 0);
+                              const checkDate = new Date(date);
+                              checkDate.setHours(0, 0, 0, 0);
+                              return checkDate < startDateOnly;
+                            }}
                             initialFocus
                             className="pointer-events-auto"
                           />
@@ -431,7 +460,7 @@ const Booking = () => {
 
                       <span className="flex items-center px-2 text-muted-foreground">·</span>
 
-                      <TimePicker date={endDateTime} setDate={setEndDateTime}>
+                      <TimePicker date={endDateTime} setDate={handleEndDateTimeChange}>
                         <Button
                           variant="ghost"
                           className="justify-start text-left font-normal h-full rounded-none border-0 hover:bg-accent flex-shrink-0"

@@ -29,6 +29,24 @@ const Home = () => {
   const [startTime, setStartTime] = useState(new Date());
   const [endTime, setEndTime] = useState(new Date(Date.now() + 2 * 60 * 60 * 1000)); // 2 hours later
 
+  // Ensure end time is always after start time
+  const handleStartTimeChange = (date: Date) => {
+    setStartTime(date);
+    // If end time is before or equal to new start time, set it to 2 hours after
+    if (endTime <= date) {
+      setEndTime(new Date(date.getTime() + 2 * 60 * 60 * 1000));
+    }
+  };
+
+  const handleEndTimeChange = (date: Date) => {
+    // Only set if it's after start time
+    if (date > startTime) {
+      setEndTime(date);
+    } else {
+      toast.error('End time must be after start time');
+    }
+  };
+
   useEffect(() => {
     // Fetch Mapbox public token
     (async () => {
@@ -351,7 +369,7 @@ const Home = () => {
                             const newDate = new Date(date);
                             newDate.setHours(startTime.getHours());
                             newDate.setMinutes(startTime.getMinutes());
-                            setStartTime(newDate);
+                            handleStartTimeChange(newDate);
                           }
                         }}
                         disabled={(date) => date < new Date()}
@@ -363,7 +381,7 @@ const Home = () => {
 
                   <span className="flex items-center px-2 text-muted-foreground">·</span>
 
-                  <TimePicker date={startTime} setDate={setStartTime}>
+                  <TimePicker date={startTime} setDate={handleStartTimeChange}>
                     <Button
                       variant="ghost"
                       className="justify-start text-left font-normal h-full rounded-none border-0 hover:bg-accent flex-shrink-0"
@@ -403,10 +421,17 @@ const Home = () => {
                             const newDate = new Date(date);
                             newDate.setHours(endTime.getHours());
                             newDate.setMinutes(endTime.getMinutes());
-                            setEndTime(newDate);
+                            handleEndTimeChange(newDate);
                           }
                         }}
-                        disabled={(date) => date < startTime}
+                        disabled={(date) => {
+                          // Disable dates before start date
+                          const startDateOnly = new Date(startTime);
+                          startDateOnly.setHours(0, 0, 0, 0);
+                          const checkDate = new Date(date);
+                          checkDate.setHours(0, 0, 0, 0);
+                          return checkDate < startDateOnly;
+                        }}
                         initialFocus
                         className="pointer-events-auto"
                       />
@@ -415,7 +440,7 @@ const Home = () => {
 
                   <span className="flex items-center px-2 text-muted-foreground">·</span>
 
-                  <TimePicker date={endTime} setDate={setEndTime}>
+                  <TimePicker date={endTime} setDate={handleEndTimeChange}>
                     <Button
                       variant="ghost"
                       className="justify-start text-left font-normal h-full rounded-none border-0 hover:bg-accent flex-shrink-0"

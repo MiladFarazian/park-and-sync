@@ -27,6 +27,22 @@ const Explore = () => {
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [endTime, setEndTime] = useState<Date | null>(null);
+
+  // Ensure end time is always after start time
+  const handleStartTimeChange = (date: Date) => {
+    setStartTime(date);
+    // If end time is before or equal to new start time, set it to 2 hours after
+    if (endTime && endTime <= date) {
+      setEndTime(new Date(date.getTime() + 2 * 60 * 60 * 1000));
+    }
+  };
+
+  const handleEndTimeChange = (date: Date) => {
+    // Only set if it's after start time
+    if (startTime && date > startTime) {
+      setEndTime(date);
+    }
+  };
   const fetchTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
@@ -307,7 +323,7 @@ const Explore = () => {
                               const newDate = new Date(date);
                               newDate.setHours(startTime.getHours());
                               newDate.setMinutes(startTime.getMinutes());
-                              setStartTime(newDate);
+                              handleStartTimeChange(newDate);
                               handleDateTimeUpdate();
                             }
                           }}
@@ -321,7 +337,7 @@ const Explore = () => {
                     <TimePicker
                       date={startTime}
                       setDate={(date) => {
-                        setStartTime(date);
+                        handleStartTimeChange(date);
                         handleDateTimeUpdate();
                       }}
                     >
@@ -355,11 +371,19 @@ const Explore = () => {
                               const newDate = new Date(date);
                               newDate.setHours(endTime.getHours());
                               newDate.setMinutes(endTime.getMinutes());
-                              setEndTime(newDate);
+                              handleEndTimeChange(newDate);
                               handleDateTimeUpdate();
                             }
                           }}
-                          disabled={(date) => date < (startTime || new Date())}
+                          disabled={(date) => {
+                            if (!startTime) return date < new Date();
+                            // Disable dates before start date
+                            const startDateOnly = new Date(startTime);
+                            startDateOnly.setHours(0, 0, 0, 0);
+                            const checkDate = new Date(date);
+                            checkDate.setHours(0, 0, 0, 0);
+                            return checkDate < startDateOnly;
+                          }}
                           initialFocus
                           className="pointer-events-auto"
                         />
@@ -369,7 +393,7 @@ const Explore = () => {
                     <TimePicker
                       date={endTime}
                       setDate={(date) => {
-                        setEndTime(date);
+                        handleEndTimeChange(date);
                         handleDateTimeUpdate();
                       }}
                     >
