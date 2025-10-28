@@ -103,13 +103,21 @@ const Messages = () => {
         (payload) => {
           if (!mountedRef.current) return;
           
+          console.log('[realtime]', payload.eventType, (payload.new as any)?.id);
+          
           setMessages(prev => {
             if (payload.eventType === 'INSERT') {
               const newMsg = payload.new as Message;
-              // Avoid duplicates
-              if (prev.some(m => m.id === newMsg.id)) return prev;
               
-              // Mark as read if from other user
+              // Avoid duplicates - check if this exact message already exists
+              if (prev.some(m => m.id === newMsg.id)) {
+                console.log('[realtime] duplicate detected, skipping:', newMsg.id);
+                return prev;
+              }
+              
+              console.log('[realtime] adding new message:', newMsg.id);
+              
+              // Mark as read if from other user (async, don't block state update)
               if (newMsg.sender_id === selectedConversation) {
                 markAsRead(selectedConversation);
               }
@@ -130,7 +138,9 @@ const Messages = () => {
           });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[realtime] subscription status:', status, `conversation-${selectedConversation}`);
+      });
 
     return () => {
       mountedRef.current = false;
