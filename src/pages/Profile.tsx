@@ -44,6 +44,7 @@ const Profile = () => {
     details_submitted: boolean;
   } | null>(null);
   const [isLoadingStripe, setIsLoadingStripe] = useState(false);
+  const [hasListedSpots, setHasListedSpots] = useState(false);
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -73,8 +74,28 @@ const Profile = () => {
       if (mode === 'host') {
         checkStripeConnectStatus();
       }
+      
+      // Check if user has listed any spots
+      checkUserSpots();
     }
   }, [profile, reset, mode]);
+
+  const checkUserSpots = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('spots')
+        .select('id')
+        .eq('host_id', user.id)
+        .limit(1);
+      
+      if (error) throw error;
+      setHasListedSpots(data && data.length > 0);
+    } catch (error) {
+      console.error('Error checking user spots:', error);
+    }
+  };
 
   const checkStripeConnectStatus = async () => {
     try {
@@ -424,7 +445,7 @@ const Profile = () => {
         </div>
 
         {/* Become a Host Widget */}
-        {mode === 'driver' && (
+        {mode === 'driver' && !hasListedSpots && (
           <Card className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
             <div className="flex items-start gap-4">
               <div className="p-3 bg-primary/10 rounded-lg">
