@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, ChevronDown, Building2, ArrowRight, ExternalLink } from 'lucide-react';
+import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, Building2, ArrowRight, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -17,8 +16,8 @@ import * as z from 'zod';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { ImageCropDialog } from '@/components/profile/ImageCropDialog';
+import ModeSwitcher from '@/components/layout/ModeSwitcher';
 import { useMode } from '@/contexts/ModeContext';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const profileSchema = z.object({
   first_name: z.string().trim().min(1, 'First name is required').max(50, 'First name must be less than 50 characters'),
@@ -336,22 +335,6 @@ const Profile = () => {
         }
       ];
 
-  const handleNotificationToggle = async (field: 'notification_booking_updates' | 'notification_host_messages', value: boolean) => {
-    try {
-      const { error } = await updateProfile({
-        [field]: value
-      });
-      
-      if (error) {
-        toast.error('Failed to update notification settings');
-      } else {
-        toast.success('Notification settings updated');
-      }
-    } catch (error) {
-      toast.error('An unexpected error occurred');
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Incomplete Profile Alert */}
@@ -377,21 +360,7 @@ const Profile = () => {
         <div className="flex justify-between items-start mb-6">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold">Profile</h1>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-primary-foreground hover:bg-primary-foreground/10">
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="bg-background">
-                <DropdownMenuItem 
-                  onClick={() => setMode(mode === 'driver' ? 'host' : 'driver')}
-                  className="cursor-pointer"
-                >
-                  Switch to {mode === 'driver' ? 'Host' : 'Driver'} Mode
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <ModeSwitcher />
           </div>
           <Button variant="secondary" size="sm" onClick={handleSignOut}>
             <LogOut className="h-4 w-4" />
@@ -413,10 +382,14 @@ const Profile = () => {
           <div className="flex-1 min-w-0">
             <h2 className="text-xl font-bold">{getDisplayName()}</h2>
             <p className="text-primary-foreground/80 text-sm">Member since {getMemberSince()}</p>
-            <div className="flex items-center gap-1 mt-1">
-              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-              <span className="font-semibold">New</span>
-              <span className="text-primary-foreground/80 text-sm">(No reviews yet)</span>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-1">
+                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                <span className="font-semibold">{profile?.rating ? profile.rating.toFixed(1) : 'New'}</span>
+              </div>
+              <span className="text-primary-foreground/80 text-sm">
+                {profile?.review_count ? `${profile.review_count} ${profile.review_count === 1 ? 'review' : 'reviews'}` : 'No reviews yet'}
+              </span>
             </div>
           </div>
           
@@ -428,22 +401,6 @@ const Profile = () => {
       </div>
 
       <div className="px-4 space-y-6">
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          <Card className="p-4 text-center">
-            <p className="text-2xl font-bold text-primary">0</p>
-            <p className="text-sm text-muted-foreground">Total Trips</p>
-          </Card>
-          <Card className="p-4 text-center">
-            <p className="text-2xl font-bold text-primary">New</p>
-            <p className="text-sm text-muted-foreground">Rating</p>
-          </Card>
-          <Card className="p-4 text-center">
-            <p className="text-2xl font-bold text-primary">0</p>
-            <p className="text-sm text-muted-foreground">Reviews</p>
-          </Card>
-        </div>
-
         {/* Become a Host Widget */}
         {mode === 'driver' && !hasListedSpots && (
           <Card className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
@@ -527,37 +484,6 @@ const Profile = () => {
             </div>
           </Card>
         )}
-
-        {/* Quick Settings */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Quick Settings</h3>
-          
-          <Card className="p-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="font-medium">Booking Updates</p>
-                <p className="text-sm text-muted-foreground">Get notified about bookings</p>
-              </div>
-              <Switch 
-                checked={profile?.notification_booking_updates ?? true}
-                onCheckedChange={(checked) => handleNotificationToggle('notification_booking_updates', checked)}
-              />
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="font-medium">Host Messages</p>
-                <p className="text-sm text-muted-foreground">Messages from hosts</p>
-              </div>
-              <Switch 
-                checked={profile?.notification_host_messages ?? true}
-                onCheckedChange={(checked) => handleNotificationToggle('notification_host_messages', checked)}
-              />
-            </div>
-          </Card>
-        </div>
 
         {/* Settings Menu */}
         <div className="space-y-3">
