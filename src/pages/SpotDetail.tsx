@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { formatAvailability } from '@/lib/formatAvailability';
 
 // Import the generated images
 import uscGarage from '@/assets/usc-garage.jpg';
@@ -157,6 +158,12 @@ const SpotDetail = () => {
             url,
             is_primary,
             sort_order
+          ),
+          availability_rules (
+            day_of_week,
+            start_time,
+            end_time,
+            is_available
           )
         `)
         .eq('id', id)
@@ -179,6 +186,7 @@ const SpotDetail = () => {
         rating: Number(spotData.profiles?.rating || 0),
         reviewCount: Number(spotData.profiles?.review_count || 0),
         images: transformedImages,
+        availability_rules: spotData.availability_rules || [],
         amenities: [
           ...(spotData.is_covered ? [{ icon: Shield, title: 'Covered Parking', subtitle: 'Protected from weather' }] : []),
           ...(spotData.is_secure ? [{ icon: Camera, title: 'Security', subtitle: 'Monitored parking area' }] : []),
@@ -284,6 +292,53 @@ const SpotDetail = () => {
               <Navigation className="h-4 w-4 mr-2" />
               Directions
             </Button>
+          </div>
+        </div>
+
+        <div>
+          <h2 className="text-xl font-semibold mb-3">Availability</h2>
+          <div className="p-4 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="h-5 w-5 text-primary" />
+              <p className="font-medium">{formatAvailability(spot.availability_rules)}</p>
+            </div>
+            {spot.availability_rules && spot.availability_rules.length > 0 && (
+              <div className="mt-3 space-y-1 text-sm text-muted-foreground">
+                {(() => {
+                  const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                  const availableDays = spot.availability_rules
+                    .filter((r: any) => r.is_available)
+                    .reduce((acc: any, rule: any) => {
+                      if (!acc[rule.day_of_week]) {
+                        acc[rule.day_of_week] = [];
+                      }
+                      acc[rule.day_of_week].push(rule);
+                      return acc;
+                    }, {});
+                  
+                  return Object.entries(availableDays).map(([day, rules]: [string, any]) => {
+                    const dayIndex = parseInt(day);
+                    const timeRanges = rules.map((r: any) => {
+                      const formatTime = (time: string) => {
+                        const [hours, minutes] = time.split(':');
+                        const hour = parseInt(hours);
+                        const ampm = hour >= 12 ? 'PM' : 'AM';
+                        const displayHour = hour % 12 || 12;
+                        return `${displayHour}:${minutes}${ampm}`;
+                      };
+                      return `${formatTime(r.start_time)}–${formatTime(r.end_time)}`;
+                    }).join(', ');
+                    
+                    return (
+                      <div key={day} className="flex justify-between">
+                        <span className="font-medium">{DAYS[dayIndex]}</span>
+                        <span>{timeRanges}</span>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            )}
           </div>
         </div>
 
