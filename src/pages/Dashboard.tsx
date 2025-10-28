@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Star, MapPin, Edit, Eye, TrendingUp, Calendar, Clock } from 'lucide-react';
+import { Plus, Star, MapPin, Edit, TrendingUp, Calendar, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -112,68 +112,74 @@ const Dashboard = () => {
   };
 
   const ListingCard = ({ listing }: { listing: any }) => (
-    <Card className="p-4">
-      <div className="flex gap-3">
-        <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0 relative">
-          <img 
-            src={listing.image} 
-            alt={listing.title}
-            className="w-full h-full object-cover rounded-lg"
-          />
-          <div className="absolute top-1 left-1">
-            <Badge variant="secondary" className="text-xs px-1.5 py-0.5">${listing.hourly_rate}/hr</Badge>
+    <Card 
+      className="p-0 overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+      onClick={() => navigate(`/spot/${listing.id}`)}
+    >
+      <div className="relative h-48 w-full bg-muted">
+        <img 
+          src={listing.image} 
+          alt={listing.title}
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute top-3 right-3">
+          <Badge 
+            className={listing.status === 'active' 
+              ? "bg-green-500 text-white hover:bg-green-600" 
+              : "bg-yellow-500 text-white hover:bg-yellow-600"
+            }
+          >
+            {listing.status === 'active' ? 'Active' : listing.status}
+          </Badge>
+        </div>
+        <div className="absolute bottom-3 left-3">
+          <Badge variant="secondary" className="text-sm px-2.5 py-1 font-semibold">
+            ${listing.hourly_rate}/hr
+          </Badge>
+        </div>
+      </div>
+      
+      <div className="p-4 space-y-3">
+        <div>
+          <h3 className="font-semibold text-lg leading-tight mb-1">{listing.title}</h3>
+          <div className="flex items-start gap-1.5 text-sm text-muted-foreground">
+            <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <span className="line-clamp-1">{listing.address}</span>
           </div>
         </div>
         
-        <div className="flex-1 space-y-2 min-w-0">
-          <div className="flex justify-between items-start gap-2">
-            <h3 className="font-semibold text-base leading-tight">{listing.title}</h3>
-            <Badge className={listing.status === 'active' ? "bg-green-100 text-green-800 hover:bg-green-100" : "bg-yellow-100 text-yellow-800 hover:bg-yellow-100"} variant="secondary">
-              {listing.status === 'active' ? 'Active' : listing.status}
-            </Badge>
-          </div>
-          
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <MapPin className="h-3 w-3 flex-shrink-0" />
-            <span className="truncate">{listing.address}</span>
-          </div>
-          
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Clock className="h-3 w-3 flex-shrink-0" />
-            <span className="truncate">{formatAvailability(listing.availability_rules)}</span>
-          </div>
-          
-          <div className="flex items-center justify-between pt-1">
-            <p className="font-bold text-lg">${listing.earnings.toFixed(2)}</p>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="text-xs px-2 py-1"
-                onClick={() => navigate(`/edit-availability/${listing.id}`)}
-              >
-                <Clock className="h-3 w-3 mr-1" />
-                Schedule
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="text-xs px-2 py-1"
-                onClick={() => navigate(`/edit-spot/${listing.id}`)}
-              >
-                <Edit className="h-3 w-3 mr-1" />
-                Edit
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="text-xs px-2 py-1"
-                onClick={() => navigate(`/spot/${listing.id}`)}
-              >
-                <Eye className="h-3 w-3 mr-1" />
-                View
-              </Button>
+        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Clock className="h-4 w-4 flex-shrink-0" />
+          <span className="truncate">{formatAvailability(listing.availability_rules)}</span>
+        </div>
+        
+        <div className="pt-2 border-t">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Total Earnings</p>
+              <p className="font-bold text-xl text-primary">${listing.earnings.toFixed(2)}</p>
             </div>
+          </div>
+          
+          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex-1"
+              onClick={() => navigate(`/edit-availability/${listing.id}`)}
+            >
+              <Clock className="h-4 w-4 mr-1.5" />
+              Schedule
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex-1"
+              onClick={() => navigate(`/edit-spot/${listing.id}`)}
+            >
+              <Edit className="h-4 w-4 mr-1.5" />
+              Edit
+            </Button>
           </div>
         </div>
       </div>
@@ -215,7 +221,7 @@ const Dashboard = () => {
           <TabsTrigger value="requests">Requests</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="listings" className="space-y-3 mt-6">
+        <TabsContent value="listings" className="mt-6">
           {listings.length === 0 ? (
             <Card className="p-6 text-center">
               <MapPin className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
@@ -226,9 +232,11 @@ const Dashboard = () => {
               </Button>
             </Card>
           ) : (
-            listings.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} />
-            ))
+            <div className="grid gap-4">
+              {listings.map((listing) => (
+                <ListingCard key={listing.id} listing={listing} />
+              ))}
+            </div>
           )}
         </TabsContent>
         

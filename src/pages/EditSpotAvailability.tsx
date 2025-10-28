@@ -2,18 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Calendar, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { AvailabilityManager, AvailabilityRule } from '@/components/availability/AvailabilityManager';
+import { DateOverrideManager, DateOverride } from '@/components/availability/DateOverrideManager';
 
 const EditSpotAvailability = () => {
   const navigate = useNavigate();
   const { spotId } = useParams<{ spotId: string }>();
   const [availabilityRules, setAvailabilityRules] = useState<AvailabilityRule[]>([]);
+  const [dateOverrides, setDateOverrides] = useState<DateOverride[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [spotTitle, setSpotTitle] = useState('');
+  const [activeTab, setActiveTab] = useState('weekly');
 
   useEffect(() => {
     const fetchAvailability = async () => {
@@ -55,6 +59,26 @@ const EditSpotAvailability = () => {
             is_available: rule.is_available ?? true,
           })));
         }
+
+        // Fetch existing date overrides
+        const { data: overridesData, error: overridesError } = await supabase
+          .from('calendar_overrides')
+          .select('*')
+          .eq('spot_id', spotId)
+          .gte('override_date', new Date().toISOString().split('T')[0]);
+
+        if (overridesError) throw overridesError;
+
+        if (overridesData) {
+          setDateOverrides(overridesData.map(override => ({
+            id: override.id,
+            override_date: override.override_date,
+            start_time: override.start_time || undefined,
+            end_time: override.end_time || undefined,
+            is_available: override.is_available,
+            reason: override.reason || undefined,
+          })));
+        }
       } catch (error) {
         console.error('Error fetching availability:', error);
         toast.error('Failed to load availability');
@@ -72,15 +96,14 @@ const EditSpotAvailability = () => {
     try {
       setIsSaving(true);
 
-      // Delete existing rules
-      const { error: deleteError } = await supabase
+      // Save weekly rules
+      const { error: deleteRulesError } = await supabase
         .from('availability_rules')
         .delete()
         .eq('spot_id', spotId);
 
-      if (deleteError) throw deleteError;
+      if (deleteRulesError) throw deleteRulesError;
 
-      // Insert new rules
       if (availabilityRules.length > 0) {
         const rulesWithSpotId = availabilityRules.map(rule => ({
           spot_id: spotId,
@@ -90,11 +113,37 @@ const EditSpotAvailability = () => {
           is_available: rule.is_available,
         }));
 
-        const { error: insertError } = await supabase
+        const { error: insertRulesError } = await supabase
           .from('availability_rules')
           .insert(rulesWithSpotId);
 
-        if (insertError) throw insertError;
+        if (insertRulesError) throw insertRulesError;
+      }
+
+      // Save date overrides
+      const { error: deleteOverridesError } = await supabase
+        .from('calendar_overrides')
+        .delete()
+        .eq('spot_id', spotId)
+        .gte('override_date', new Date().toISOString().split('T')[0]);
+
+      if (deleteOverridesError) throw deleteOverridesError;
+
+      if (dateOverrides.length > 0) {
+        const overridesWithSpotId = dateOverrides.map(override => ({
+          spot_id: spotId,
+          override_date: override.override_date,
+          start_time: override.start_time || null,
+          end_time: override.end_time || null,
+          is_available: override.is_available,
+          reason: override.reason || null,
+        }));
+
+        const { error: insertOverridesError } = await supabase
+          .from('calendar_overrides')
+          .insert(overridesWithSpotId);
+
+        if (insertOverridesError) throw insertOverridesError;
       }
 
       toast.success('Availability updated successfully');
@@ -130,26 +179,53 @@ const EditSpotAvailability = () => {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">Edit Availability</h1>
+            <h1 className="text-2xl font-bold">Manage Schedule</h1>
             <p className="text-sm text-muted-foreground">{spotTitle}</p>
           </div>
         </div>
 
         <Card>
-          <CardContent className="p-6 space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold mb-2">Availability Schedule</h2>
-              <p className="text-sm text-muted-foreground">
-                Set when your parking spot is available for booking
-              </p>
-            </div>
+          <CardContent className="p-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="weekly" className="gap-2">
+                  <Clock className="h-4 w-4" />
+                  Weekly Schedule
+                </TabsTrigger>
+                <TabsTrigger value="dates" className="gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Specific Dates
+                </TabsTrigger>
+              </TabsList>
 
-            <AvailabilityManager
-              initialRules={availabilityRules}
-              onChange={setAvailabilityRules}
-            />
+              <TabsContent value="weekly" className="space-y-4">
+                <div className="mb-4">
+                  <h3 className="font-semibold mb-1">Recurring Weekly Schedule</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Set your regular weekly availability pattern
+                  </p>
+                </div>
+                <AvailabilityManager
+                  initialRules={availabilityRules}
+                  onChange={setAvailabilityRules}
+                />
+              </TabsContent>
 
-            <div className="flex gap-3">
+              <TabsContent value="dates" className="space-y-4">
+                <div className="mb-4">
+                  <h3 className="font-semibold mb-1">Date-Specific Overrides</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Block dates or change availability for specific days
+                  </p>
+                </div>
+                <DateOverrideManager
+                  initialOverrides={dateOverrides}
+                  onChange={setDateOverrides}
+                />
+              </TabsContent>
+            </Tabs>
+
+            <div className="flex gap-3 mt-6 pt-6 border-t">
               <Button
                 type="button"
                 variant="outline"
