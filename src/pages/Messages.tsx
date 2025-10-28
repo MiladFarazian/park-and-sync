@@ -97,7 +97,8 @@ const Messages = () => {
         {
           event: '*',
           schema: 'public',
-          table: 'messages'
+          table: 'messages',
+          filter: `or(and(sender_id.eq.${user.id},recipient_id.eq.${selectedConversation}),and(sender_id.eq.${selectedConversation},recipient_id.eq.${user.id}))`
         },
         (payload) => {
           if (!mountedRef.current) return;
@@ -105,12 +106,7 @@ const Messages = () => {
           setMessages(prev => {
             if (payload.eventType === 'INSERT') {
               const newMsg = payload.new as Message;
-              // Check if message is part of this conversation
-              const isInConversation = 
-                (newMsg.sender_id === user.id && newMsg.recipient_id === selectedConversation) ||
-                (newMsg.sender_id === selectedConversation && newMsg.recipient_id === user.id);
-              
-              if (!isInConversation) return prev;
+              // Avoid duplicates
               if (prev.some(m => m.id === newMsg.id)) return prev;
               
               // Mark as read if from other user
@@ -183,8 +179,8 @@ const Messages = () => {
 
       if (error) throw error;
 
-      // Remove temp message (realtime will add the real one)
-      setMessages(prev => prev.filter(m => m.id !== tempId));
+      // Replace temp message immediately with server row
+      setMessages(prev => prev.map(m => (m.id === tempId ? (data as Message) : m)));
     } catch (error) {
       // Rollback on error
       setMessages(prev => prev.filter(m => m.id !== tempId));
@@ -334,7 +330,7 @@ const Messages = () => {
                   placeholder="Type a message..."
                   value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && !sendingMessage && handleSendMessage()}
+                  onKeyDown={(e) => e.key === 'Enter' && !sendingMessage && handleSendMessage()}
                   disabled={sendingMessage}
                 />
                 <Button 
