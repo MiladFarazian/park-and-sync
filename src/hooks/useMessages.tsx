@@ -124,6 +124,50 @@ export const useMessages = () => {
     }
   };
 
+  // Set up real-time subscription for active conversation
+  const subscribeToConversation = (otherUserId: string) => {
+    if (!user) return null;
+
+    const channel = supabase
+      .channel(`conversation-${user.id}-${otherUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `sender_id=eq.${otherUserId}`
+        },
+        (payload) => {
+          console.log('New message received:', payload);
+          if (payload.new.recipient_id === user.id) {
+            setMessages(prev => [...prev, payload.new as Message]);
+            markAsRead(otherUserId);
+            loadConversations();
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `sender_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('Message sent confirmed:', payload);
+          if (payload.new.recipient_id === otherUserId) {
+            // Message already added optimistically, just update conversations
+            loadConversations();
+          }
+        }
+      )
+      .subscribe();
+
+    return channel;
+  };
+
   // Mark messages as read
   const markAsRead = async (senderId: string) => {
     if (!user) return;
@@ -180,7 +224,7 @@ export const useMessages = () => {
     }
   };
 
-  // Set up real-time subscription
+  // Set up real-time subscription for conversations list
   useEffect(() => {
     if (!user) return;
 
@@ -214,6 +258,7 @@ export const useMessages = () => {
     sendingMessage,
     loadMessages,
     sendMessage,
-    markAsRead
+    markAsRead,
+    subscribeToConversation
   };
 };

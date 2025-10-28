@@ -16,13 +16,14 @@ import { useIsMobile } from '@/hooks/use-mobile';
 const Messages = () => {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
-  const { conversations, messages, loading, sendingMessage, loadMessages, sendMessage } = useMessages();
+  const { conversations, messages, loading, sendingMessage, loadMessages, sendMessage, subscribeToConversation } = useMessages();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [newUserProfile, setNewUserProfile] = useState<any>(null);
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+  const conversationChannelRef = useRef<any>(null);
 
   // Auto-select conversation from URL parameter
   useEffect(() => {
@@ -56,11 +57,26 @@ const Messages = () => {
     }
   };
 
-  // Load messages when conversation is selected
+  // Load messages when conversation is selected and set up real-time subscription
   useEffect(() => {
+    // Clean up previous subscription
+    if (conversationChannelRef.current) {
+      supabase.removeChannel(conversationChannelRef.current);
+      conversationChannelRef.current = null;
+    }
+
     if (selectedConversation) {
       loadMessages(selectedConversation);
+      // Subscribe to real-time updates for this conversation
+      conversationChannelRef.current = subscribeToConversation(selectedConversation);
     }
+
+    return () => {
+      if (conversationChannelRef.current) {
+        supabase.removeChannel(conversationChannelRef.current);
+        conversationChannelRef.current = null;
+      }
+    };
   }, [selectedConversation]);
 
   // Auto-scroll to bottom when messages change
