@@ -53,7 +53,9 @@ export const DateOverrideManager: React.FC<DateOverrideManagerProps> = ({
 
     const newOverride: DateOverride = {
       override_date: dateStr,
-      is_available: false, // Default to blocking the date
+      is_available: false,
+      start_time: '09:00',
+      end_time: '17:00',
       reason: '',
     };
     
@@ -172,51 +174,37 @@ export const DateOverrideManager: React.FC<DateOverrideManagerProps> = ({
                   </Label>
                 </div>
 
-                {override.is_available && (
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">
-                      Custom Hours (optional - leave empty for regular schedule)
-                    </Label>
-                    <div className="flex items-center gap-2">
-                      <TimePicker
-                        date={override.start_time ? parseTimeString(override.start_time) : new Date(new Date().setHours(9, 0, 0, 0))}
-                        setDate={(date) => {
-                          updateOverride(index, 'start_time', formatTimeString(date));
-                        }}
-                      >
-                        <Button variant="outline" size="sm" className="text-xs">
-                          <Clock className="h-3 w-3 mr-1" />
-                          {override.start_time || '09:00'}
-                        </Button>
-                      </TimePicker>
-                      
-                      <span className="text-sm text-muted-foreground">to</span>
-                      
-                      <TimePicker
-                        date={override.end_time ? parseTimeString(override.end_time) : new Date(new Date().setHours(17, 0, 0, 0))}
-                        setDate={(date) => {
-                          updateOverride(index, 'end_time', formatTimeString(date));
-                        }}
-                      >
-                        <Button variant="outline" size="sm" className="text-xs">
-                          <Clock className="h-3 w-3 mr-1" />
-                          {override.end_time || '17:00'}
-                        </Button>
-                      </TimePicker>
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-1 block">
-                    Reason (optional)
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">
+                    {override.is_available ? 'Custom Hours' : 'Blocked Hours'}
                   </Label>
-                  <Input
-                    placeholder={override.is_available ? "Special hours for event" : "Holiday, maintenance, etc."}
-                    value={override.reason || ''}
-                    onChange={(e) => updateOverride(index, 'reason', e.target.value)}
-                    className="text-sm"
-                  />
+                  <div className="flex items-center gap-2">
+                    <TimePicker
+                      date={override.start_time ? parseTimeString(override.start_time) : new Date(new Date().setHours(9, 0, 0, 0))}
+                      setDate={(date) => {
+                        updateOverride(index, 'start_time', formatTimeString(date));
+                      }}
+                    >
+                      <Button variant="outline" size="sm" className="text-xs">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {override.start_time || '09:00'}
+                      </Button>
+                    </TimePicker>
+                    
+                    <span className="text-sm text-muted-foreground">to</span>
+                    
+                    <TimePicker
+                      date={override.end_time ? parseTimeString(override.end_time) : new Date(new Date().setHours(17, 0, 0, 0))}
+                      setDate={(date) => {
+                        updateOverride(index, 'end_time', formatTimeString(date));
+                      }}
+                    >
+                      <Button variant="outline" size="sm" className="text-xs">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {override.end_time || '17:00'}
+                      </Button>
+                    </TimePicker>
+                  </div>
                 </div>
               </CardContent>
             </Card>

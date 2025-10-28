@@ -202,7 +202,7 @@ const EditSpotAvailability = () => {
                 <div className="mb-4">
                   <h3 className="font-semibold mb-1">Recurring Weekly Schedule</h3>
                   <p className="text-sm text-muted-foreground">
-                    Set your regular weekly availability pattern
+                    Toggle days on/off and drag the slider to set available hours
                   </p>
                 </div>
                 <AvailabilityManager
@@ -215,7 +215,7 @@ const EditSpotAvailability = () => {
                 <div className="mb-4">
                   <h3 className="font-semibold mb-1">Date-Specific Overrides</h3>
                   <p className="text-sm text-muted-foreground">
-                    Block dates or change availability for specific days
+                    Override specific dates with custom hours or block them entirely
                   </p>
                 </div>
                 <DateOverrideManager
