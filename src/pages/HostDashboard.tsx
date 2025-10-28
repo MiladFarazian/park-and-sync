@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Plus, Star, MapPin, Edit, Eye, TrendingUp, Calendar } from 'lucide-react';
+import { Plus, Star, MapPin, Edit, Eye, TrendingUp, Calendar, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { useNavigate } from 'react-router-dom';
 
 const HostDashboard = () => {
   const [activeTab, setActiveTab] = useState('listings');
+  const navigate = useNavigate();
 
   const listings = [
     {
@@ -69,6 +71,15 @@ const HostDashboard = () => {
           <div className="flex items-center justify-between pt-1">
             <p className="font-bold text-lg">${listing.earnings.toFixed(2)}</p>
             <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="text-xs px-2 py-1"
+                onClick={() => navigate(`/edit-availability/${listing.id}`)}
+              >
+                <Clock className="h-3 w-3 mr-1" />
+                Schedule
+              </Button>
               <Button variant="outline" size="sm" className="text-xs px-2 py-1">
                 <Edit className="h-3 w-3 mr-1" />
                 Edit

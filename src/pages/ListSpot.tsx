@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { AvailabilityManager, AvailabilityRule } from '@/components/availability/AvailabilityManager';
 
 const formSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
@@ -41,6 +42,7 @@ const ListSpot = () => {
   const [photos, setPhotos] = useState<File[]>([]);
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [availabilityRules, setAvailabilityRules] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchMapboxToken = async () => {
@@ -160,6 +162,26 @@ const ListSpot = () => {
 
       if (spotError) throw spotError;
 
+      // Insert availability rules
+      if (availabilityRules.length > 0 && spotData) {
+        const rulesWithSpotId = availabilityRules.map(rule => ({
+          spot_id: spotData.id,
+          day_of_week: rule.day_of_week,
+          start_time: rule.start_time,
+          end_time: rule.end_time,
+          is_available: rule.is_available,
+        }));
+
+        const { error: rulesError } = await supabase
+          .from('availability_rules')
+          .insert(rulesWithSpotId);
+
+        if (rulesError) {
+          console.error('Error inserting availability rules:', rulesError);
+          toast.error('Spot created but availability rules failed to save');
+        }
+      }
+
       // TODO: Handle photo uploads to storage
       // For now, just show success
       
@@ -204,7 +226,7 @@ const ListSpot = () => {
           <div>
             <h1 className="text-2xl font-bold">List Your Spot</h1>
             <p className="text-sm text-muted-foreground">
-              Step {currentStep} of 5
+              Step {currentStep} of 6
             </p>
           </div>
         </div>
@@ -390,8 +412,45 @@ const ListSpot = () => {
             </Card>
           )}
 
-          {/* Step 4: Photos */}
+          {/* Step 4: Availability */}
           {currentStep === 4 && (
+            <Card>
+              <CardContent className="p-6 space-y-6">
+                <div>
+                  <h2 className="text-xl font-semibold mb-2">Availability</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Set when your parking spot is available
+                  </p>
+                </div>
+
+                <AvailabilityManager
+                  initialRules={availabilityRules}
+                  onChange={setAvailabilityRules}
+                />
+
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setCurrentStep(3)}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    type="button"
+                    className="flex-1"
+                    onClick={() => setCurrentStep(5)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 5: Photos */}
+          {currentStep === 5 && (
             <Card>
               <CardContent className="p-6 space-y-6">
                 <div>
@@ -439,14 +498,14 @@ const ListSpot = () => {
                     type="button"
                     variant="outline"
                     className="flex-1"
-                    onClick={() => setCurrentStep(3)}
+                    onClick={() => setCurrentStep(4)}
                   >
                     Back
                   </Button>
                   <Button
                     type="button"
                     className="flex-1"
-                    onClick={() => setCurrentStep(5)}
+                    onClick={() => setCurrentStep(6)}
                   >
                     Next
                   </Button>
@@ -455,8 +514,8 @@ const ListSpot = () => {
             </Card>
           )}
 
-          {/* Step 5: Review */}
-          {currentStep === 5 && (
+          {/* Step 6: Review */}
+          {currentStep === 6 && (
             <Card>
               <CardContent className="p-6 space-y-6">
                 <div>
@@ -528,6 +587,28 @@ const ListSpot = () => {
                       <p className="text-sm text-muted-foreground">No photos uploaded</p>
                     )}
                   </div>
+
+                  <div className="p-4 rounded-lg bg-muted/50">
+                    <h3 className="font-semibold text-sm mb-3">Availability</h3>
+                    {availabilityRules.length > 0 ? (
+                      <div className="space-y-1 text-sm">
+                        {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, index) => {
+                          const dayRules = availabilityRules.filter(r => r.day_of_week === index);
+                          if (dayRules.length === 0) return null;
+                          return (
+                            <div key={index} className="flex justify-between">
+                              <span className="text-muted-foreground">{day}:</span>
+                              <span className="font-medium">
+                                {dayRules.map(r => `${r.start_time}-${r.end_time}`).join(', ')}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No availability set</p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex gap-3">
@@ -535,7 +616,7 @@ const ListSpot = () => {
                     type="button"
                     variant="outline"
                     className="flex-1"
-                    onClick={() => setCurrentStep(4)}
+                    onClick={() => setCurrentStep(5)}
                   >
                     Back
                   </Button>
