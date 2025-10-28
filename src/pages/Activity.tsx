@@ -165,10 +165,7 @@ const Activity = () => {
 
   const BookingCard = ({ booking, isPast = false }: { booking: any; isPast?: boolean }) => {
     const isHost = booking.userRole === 'host';
-    const otherPartyId = isHost ? booking.profiles?.user_id : booking.spots?.profiles?.user_id;
-    const otherPartyName = isHost 
-      ? `${booking.profiles?.first_name || ''} ${booking.profiles?.last_name || ''}`.trim() || 'Driver'
-      : `${booking.spots?.profiles?.first_name || ''} ${booking.spots?.profiles?.last_name || ''}`.trim() || 'Host';
+    const otherPartyId = isHost ? booking.renter_id : booking.spots?.host_id;
 
     return (
       <Card>
@@ -183,11 +180,6 @@ const Activity = () => {
                 <MapPin className="h-3 w-3" />
                 {booking.spots?.address || 'Address not available'}
               </p>
-              {isHost && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Driver: {otherPartyName}
-                </p>
-              )}
             </div>
             <Badge variant={isPast ? 'secondary' : 'default'}>
               {booking.status === 'canceled' ? 'Canceled' : (booking.status === 'paid' ? (isPast ? 'Completed' : 'Confirmed') : booking.status)}
