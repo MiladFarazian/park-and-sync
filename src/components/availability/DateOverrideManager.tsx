@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -28,7 +28,7 @@ interface DateOverrideManagerProps {
   onChange?: (overrides: DateOverride[]) => void;
 }
 
-export const DateOverrideManager: React.FC<DateOverrideManagerProps> = ({ 
+export const DateOverrideManager = ({ 
   initialOverrides = [], 
   onChange 
 }) => {

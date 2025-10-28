@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,7 @@ interface AvailabilityManagerProps {
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-export const AvailabilityManager: React.FC<AvailabilityManagerProps> = ({ 
+export const AvailabilityManager = ({ 
   initialRules = [], 
   onChange 
 }) => {
