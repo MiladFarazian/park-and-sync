@@ -128,42 +128,49 @@ export const useMessages = () => {
   const subscribeToConversation = (otherUserId: string) => {
     if (!user) return null;
 
+    console.log('Setting up real-time subscription for conversation with:', otherUserId);
+
     const channel = supabase
-      .channel(`conversation-${user.id}-${otherUserId}`)
+      .channel(`messages:${user.id}:${otherUserId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'messages',
-          filter: `sender_id=eq.${otherUserId}`
+          table: 'messages'
         },
         (payload) => {
-          console.log('New message received:', payload);
-          if (payload.new.recipient_id === user.id) {
-            setMessages(prev => [...prev, payload.new as Message]);
-            markAsRead(otherUserId);
+          console.log('Real-time message received:', payload);
+          const newMessage = payload.new as Message;
+          
+          // Check if this message is part of the current conversation
+          const isInConversation = 
+            (newMessage.sender_id === user.id && newMessage.recipient_id === otherUserId) ||
+            (newMessage.sender_id === otherUserId && newMessage.recipient_id === user.id);
+          
+          if (isInConversation) {
+            console.log('Message belongs to current conversation, adding to messages');
+            setMessages(prev => {
+              // Check if message already exists to avoid duplicates
+              if (prev.some(m => m.id === newMessage.id)) {
+                return prev;
+              }
+              return [...prev, newMessage];
+            });
+            
+            // If message is from other user, mark as read
+            if (newMessage.sender_id === otherUserId) {
+              markAsRead(otherUserId);
+            }
+            
+            // Refresh conversations list
             loadConversations();
           }
         }
       )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `sender_id=eq.${user.id}`
-        },
-        (payload) => {
-          console.log('Message sent confirmed:', payload);
-          if (payload.new.recipient_id === otherUserId) {
-            // Message already added optimistically, just update conversations
-            loadConversations();
-          }
-        }
-      )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Conversation subscription status:', status);
+      });
 
     return channel;
   };
@@ -211,10 +218,9 @@ export const useMessages = () => {
 
       if (error) throw error;
 
-      // Add to messages list
-      setMessages(prev => [...prev, data]);
+      console.log('Message sent:', data);
       
-      // Update conversations
+      // Update conversations immediately
       await loadConversations();
     } catch (error) {
       console.error('Error sending message:', error);
