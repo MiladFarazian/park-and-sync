@@ -268,17 +268,23 @@ const Activity = () => {
               <Card>
                 <CardContent className="p-8 text-center">
                   <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="font-semibold mb-2">No upcoming bookings</h3>
+                  <h3 className="font-semibold mb-2">
+                    {mode === 'host' ? 'No upcoming reservations' : 'No upcoming bookings'}
+                  </h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Start exploring parking spots near you
+                    {mode === 'host' 
+                      ? 'Reservations for your spots will appear here' 
+                      : 'Start exploring parking spots near you'}
                   </p>
-                  <Button onClick={() => {
-                    const now = new Date();
-                    const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-                    navigate(`/explore?start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
-                  }}>
-                    Find Parking
-                  </Button>
+                  {mode === 'driver' && (
+                    <Button onClick={() => {
+                      const now = new Date();
+                      const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+                      navigate(`/explore?start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
+                    }}>
+                      Find Parking
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ) : (
