@@ -451,14 +451,23 @@ const Booking = () => {
             </Dialog>
           </div>
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm">
-              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-              <span>{format(startDateTime, 'EEEE, MMM d')}</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span>{format(startDateTime, 'h:mm a')} - {format(endDateTime, 'h:mm a')}</span>
-              <span className="ml-auto bg-primary/10 text-primary px-2 py-0.5 rounded text-xs font-medium">
+            <div className="flex items-start gap-2 text-sm">
+              <CalendarIcon className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+              <div className="flex flex-col gap-1 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">Start:</span>
+                  <span>{format(startDateTime, 'MMM d, yyyy')}</span>
+                  <span className="text-muted-foreground">at</span>
+                  <span>{format(startDateTime, 'h:mm a')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">End:</span>
+                  <span>{format(endDateTime, 'MMM d, yyyy')}</span>
+                  <span className="text-muted-foreground">at</span>
+                  <span>{format(endDateTime, 'h:mm a')}</span>
+                </div>
+              </div>
+              <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs font-medium">
                 {pricing?.hours}h
               </span>
             </div>
