@@ -62,7 +62,7 @@ const AppLayout = ({
               </Button>
             </div>
           </header>}
-        <div className="min-h-screen bg-background pb-16">
+        <div className="min-h-screen bg-background pb-24">
           <div className="max-w-md mx-auto">
             {children}
           </div>
