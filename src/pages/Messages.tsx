@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Search, Send, Loader2 } from 'lucide-react';
 import { useMessages } from '@/hooks/useMessages';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -16,6 +17,7 @@ const Messages = () => {
   const [searchParams] = useSearchParams();
   const { conversations, messages, loading, sendingMessage, loadMessages, sendMessage } = useMessages();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [newUserProfile, setNewUserProfile] = useState<any>(null);
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -23,16 +25,34 @@ const Messages = () => {
   // Auto-select conversation from URL parameter
   useEffect(() => {
     const userIdFromUrl = searchParams.get('userId');
-    if (userIdFromUrl && conversations.length > 0) {
+    if (userIdFromUrl) {
       const existingConv = conversations.find(c => c.user_id === userIdFromUrl);
       if (existingConv) {
         setSelectedConversation(userIdFromUrl);
+        setNewUserProfile(null);
       } else {
-        // Start new conversation with this user
+        // Start new conversation - fetch user profile
+        fetchNewUserProfile(userIdFromUrl);
         setSelectedConversation(userIdFromUrl);
       }
     }
   }, [searchParams, conversations]);
+
+  const fetchNewUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name, avatar_url')
+        .eq('user_id', userId)
+        .single();
+
+      if (error) throw error;
+      setNewUserProfile(data);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      toast.error('Failed to load user profile');
+    }
+  };
 
   // Load messages when conversation is selected
   useEffect(() => {
@@ -62,6 +82,11 @@ const Messages = () => {
   );
 
   const selectedConvData = conversations.find(c => c.user_id === selectedConversation);
+  
+  // Use new user profile if starting a new conversation
+  const displayName = selectedConvData?.name || 
+    (newUserProfile ? `${newUserProfile.first_name || ''} ${newUserProfile.last_name || ''}`.trim() || 'User' : 'User');
+  const displayAvatar = selectedConvData?.avatar_url || newUserProfile?.avatar_url;
 
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-4">
@@ -134,13 +159,13 @@ const Messages = () => {
             <div className="p-4 border-b">
               <div className="flex items-center gap-3">
                 <Avatar>
-                  <AvatarImage src={selectedConvData?.avatar_url} />
+                  <AvatarImage src={displayAvatar} />
                   <AvatarFallback>
-                    {selectedConvData?.name.split(' ').map(n => n[0]).join('')}
+                    {displayName.split(' ').map(n => n[0]).join('')}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="font-semibold">{selectedConvData?.name}</p>
+                  <p className="font-semibold">{displayName}</p>
                   <p className="text-sm text-muted-foreground">Active</p>
                 </div>
               </div>

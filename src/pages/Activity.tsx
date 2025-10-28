@@ -38,7 +38,8 @@ const Activity = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      // Fetch bookings where user is the renter
+      const { data: renterBookings, error: renterError } = await supabase
         .from('bookings')
         .select(`
           *,
@@ -56,9 +57,36 @@ const Activity = () => {
         .eq('renter_id', user.id)
         .order('start_at', { ascending: false });
 
-      if (error) throw error;
+      if (renterError) throw renterError;
 
-      setBookings(data || []);
+      // Fetch bookings where user is the host
+      const { data: hostBookings, error: hostError } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          spots!inner (
+            title,
+            address,
+            host_id
+          ),
+          profiles!bookings_renter_id_fkey(
+            user_id,
+            first_name,
+            last_name
+          )
+        `)
+        .eq('spots.host_id', user.id)
+        .order('start_at', { ascending: false });
+
+      if (hostError) throw hostError;
+
+      // Combine and mark bookings with role
+      const allBookings = [
+        ...(renterBookings || []).map(b => ({ ...b, userRole: 'renter' })),
+        ...(hostBookings || []).map(b => ({ ...b, userRole: 'host' }))
+      ].sort((a, b) => new Date(b.start_at).getTime() - new Date(a.start_at).getTime());
+
+      setBookings(allBookings);
     } catch (error) {
       console.error('Error fetching bookings:', error);
       toast({
@@ -145,70 +173,85 @@ const Activity = () => {
   const upcomingBookings = bookings.filter(b => new Date(b.end_at) >= now && b.status !== 'canceled');
   const pastBookings = bookings.filter(b => new Date(b.end_at) < now || b.status === 'canceled');
 
-  const BookingCard = ({ booking, isPast = false }: { booking: any; isPast?: boolean }) => (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex justify-between items-start mb-3">
-          <div>
-            <h3 className="font-semibold">{booking.spots?.title || 'Parking Spot'}</h3>
-            <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-              <MapPin className="h-3 w-3" />
-              {booking.spots?.address || 'Address not available'}
-            </p>
-          </div>
-          <Badge variant={isPast ? 'secondary' : 'default'}>
-            {booking.status === 'canceled' ? 'Canceled' : (booking.status === 'paid' ? (isPast ? 'Completed' : 'Confirmed') : booking.status)}
-          </Badge>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span>{formatDate(booking.start_at)}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <span>{formatTime(booking.start_at, booking.end_at)}</span>
-          </div>
-        </div>
+  const BookingCard = ({ booking, isPast = false }: { booking: any; isPast?: boolean }) => {
+    const isHost = booking.userRole === 'host';
+    const otherPartyId = isHost ? booking.profiles?.user_id : booking.spots?.profiles?.user_id;
+    const otherPartyName = isHost 
+      ? `${booking.profiles?.first_name || ''} ${booking.profiles?.last_name || ''}`.trim() || 'Driver'
+      : `${booking.spots?.profiles?.first_name || ''} ${booking.spots?.profiles?.last_name || ''}`.trim() || 'Host';
 
-        <div className="mt-3 pt-3 border-t flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-muted-foreground" />
-            <span className="font-semibold text-lg">${Number(booking.total_amount).toFixed(2)}</span>
+    return (
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex justify-between items-start mb-3">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="font-semibold">{booking.spots?.title || 'Parking Spot'}</h3>
+                {isHost && <Badge variant="outline" className="text-xs">As Host</Badge>}
+              </div>
+              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                {booking.spots?.address || 'Address not available'}
+              </p>
+              {isHost && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Driver: {otherPartyName}
+                </p>
+              )}
+            </div>
+            <Badge variant={isPast ? 'secondary' : 'default'}>
+              {booking.status === 'canceled' ? 'Canceled' : (booking.status === 'paid' ? (isPast ? 'Completed' : 'Confirmed') : booking.status)}
+            </Badge>
           </div>
-        </div>
-      </CardContent>
-      <div className="p-4 pt-0 flex gap-2">
-        <Button variant="outline" className="flex-1" onClick={() => navigate(`/booking-confirmation/${booking.id}`)}>View Details</Button>
-        <Button 
-          variant="outline" 
-          size="icon"
-          onClick={() => {
-            const hostId = booking.spots?.profiles?.user_id;
-            if (hostId) {
-              navigate(`/messages?userId=${hostId}`);
-            }
-          }}
-          disabled={!booking.spots?.profiles?.user_id}
-        >
-          <MessageCircle className="h-4 w-4" />
-        </Button>
-        {!isPast && booking.status !== 'canceled' && (
+          
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span>{formatDate(booking.start_at)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span>{formatTime(booking.start_at, booking.end_at)}</span>
+            </div>
+          </div>
+
+          <div className="mt-3 pt-3 border-t flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-muted-foreground" />
+              <span className="font-semibold text-lg">${Number(booking.total_amount).toFixed(2)}</span>
+            </div>
+          </div>
+        </CardContent>
+        <div className="p-4 pt-0 flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={() => navigate(`/booking-confirmation/${booking.id}`)}>View Details</Button>
           <Button 
-            variant="destructive" 
+            variant="outline" 
             size="icon"
             onClick={() => {
-              setSelectedBooking(booking);
-              setCancelDialogOpen(true);
+              if (otherPartyId) {
+                navigate(`/messages?userId=${otherPartyId}`);
+              }
             }}
+            disabled={!otherPartyId}
           >
-            <XCircle className="h-4 w-4" />
+            <MessageCircle className="h-4 w-4" />
           </Button>
-        )}
-      </div>
-    </Card>
-  );
+          {!isPast && booking.status !== 'canceled' && !isHost && (
+            <Button 
+              variant="destructive" 
+              size="icon"
+              onClick={() => {
+                setSelectedBooking(booking);
+                setCancelDialogOpen(true);
+              }}
+            >
+              <XCircle className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </Card>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20">
