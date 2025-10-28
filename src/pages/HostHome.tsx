@@ -73,7 +73,7 @@ const HostHome = () => {
   }
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 pb-20">
       {/* Header */}
       <div className="pt-4">
         <h1 className="text-2xl font-bold">Host Dashboard</h1>

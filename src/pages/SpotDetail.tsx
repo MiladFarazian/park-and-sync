@@ -2,11 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Heart, Share, Star, MapPin, Calendar, Navigation, MessageCircle, Phone, Camera, Clock, Shield, Zap, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import BookingModal from '@/components/booking/BookingModal';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { formatAvailability } from '@/lib/formatAvailability';
+import { useMode } from '@/contexts/ModeContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 // Import the generated images
 import uscGarage from '@/assets/usc-garage.jpg';
@@ -38,12 +43,16 @@ import griffithObservatoryArea from '@/assets/griffith-observatory-area.jpg';
 const SpotDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { mode } = useMode();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [spot, setSpot] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showDirections, setShowDirections] = useState(false);
+  const [bookingOpen, setBookingOpen] = useState(false);
+  const [isOwnSpot, setIsOwnSpot] = useState(false);
 
   // Determine where to navigate back based on 'from' parameter
   const from = searchParams.get('from');
@@ -103,7 +112,7 @@ const SpotDetail = () => {
     if (id) {
       fetchSpotDetails();
     }
-  }, [id]);
+  }, [id, user]);
 
   const isMobile = () => {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -138,6 +147,18 @@ const SpotDetail = () => {
     const appleMapsUrl = `http://maps.apple.com/?daddr=${encodeURIComponent(spot.address)}`;
     window.location.href = appleMapsUrl;
     setShowDirections(false);
+  };
+
+  const handleBookNow = () => {
+    if (mode === 'host') {
+      toast.error('Switch to Driver Mode to book parking spots');
+      return;
+    }
+    if (isOwnSpot) {
+      toast.error("You cannot book your own spot");
+      return;
+    }
+    setBookingOpen(true);
   };
 
   const fetchSpotDetails = async () => {
@@ -179,14 +200,18 @@ const SpotDetail = () => {
         ? photos.sort((a, b) => a.sort_order - b.sort_order).map(photo => imageMap[photo.url] || photo.url)
         : ['/placeholder.svg'];
 
-      setSpot({
+      const transformedData = {
         ...spotData,
+        id: spotData.id,
+        title: spotData.title,
+        address: spotData.address,
         hourlyRate: Number(spotData.hourly_rate),
         dailyRate: spotData.daily_rate ? Number(spotData.daily_rate) : null,
         rating: Number(spotData.profiles?.rating || 0),
         reviewCount: Number(spotData.profiles?.review_count || 0),
         images: transformedImages,
         availability_rules: spotData.availability_rules || [],
+        host_id: spotData.host_id,
         amenities: [
           ...(spotData.is_covered ? [{ icon: Shield, title: 'Covered Parking', subtitle: 'Protected from weather' }] : []),
           ...(spotData.is_secure ? [{ icon: Camera, title: 'Security', subtitle: 'Monitored parking area' }] : []),
@@ -200,7 +225,14 @@ const SpotDetail = () => {
           responseTime: 'Usually responds within a few hours'
         },
         reviewsList: []
-      });
+      };
+
+      setSpot(transformedData);
+      
+      // Check if user owns this spot
+      if (user && transformedData.host_id) {
+        setIsOwnSpot(user.id === transformedData.host_id);
+      }
     } catch (err) {
       setError('An unexpected error occurred');
     } finally {
@@ -231,7 +263,7 @@ const SpotDetail = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background pb-20">
       {/* Image Gallery */}
       <div className="relative h-80">
         <img 
@@ -241,7 +273,7 @@ const SpotDetail = () => {
           className="w-full h-full object-cover"
         />
         
-        <div className="absolute top-4 left-4 right-4 flex justify-between">
+        <div className="absolute top-4 left-4 right-4 flex justify-between z-10">
           <Button variant="secondary" size="sm" onClick={() => navigate(backUrl)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -277,17 +309,21 @@ const SpotDetail = () => {
           </div>
 
           <div className="flex gap-3 mb-6">
-            <Button className="flex-1" onClick={() => {
-              const start = searchParams.get('start');
-              const end = searchParams.get('end');
-              const params = new URLSearchParams();
-              if (start) params.set('start', start);
-              if (end) params.set('end', end);
-              navigate(`/book/${id}${params.toString() ? `?${params.toString()}` : ''}`);
-            }}>
-              <Calendar className="h-4 w-4 mr-2" />
-              Book Now
-            </Button>
+            {isOwnSpot ? (
+              <Button className="flex-1" variant="outline" disabled>
+                You're the host of this spot
+              </Button>
+            ) : mode === 'host' ? (
+              <Button className="flex-1" variant="outline" onClick={handleBookNow}>
+                <Calendar className="h-4 w-4 mr-2" />
+                Switch to Driver Mode to Book
+              </Button>
+            ) : (
+              <Button className="flex-1" onClick={handleBookNow}>
+                <Calendar className="h-4 w-4 mr-2" />
+                Book Now
+              </Button>
+            )}
             <Button variant="outline" className="flex-1" onClick={handleDirections}>
               <Navigation className="h-4 w-4 mr-2" />
               Directions
@@ -386,8 +422,8 @@ const SpotDetail = () => {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4">
-        <div className="max-w-md mx-auto flex items-center justify-between">
+      <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 z-10">
+        <div className="max-w-md mx-auto flex items-center justify-between gap-4">
           <div>
             <p className="text-lg font-bold">${spot.hourlyRate} / hour</p>
             <div className="flex items-center gap-1">
@@ -395,14 +431,19 @@ const SpotDetail = () => {
               <span className="text-sm font-medium">{spot.rating || 'New'}</span>
             </div>
           </div>
-          <Button size="lg" onClick={() => {
-            const start = searchParams.get('start');
-            const end = searchParams.get('end');
-            const params = new URLSearchParams();
-            if (start) params.set('start', start);
-            if (end) params.set('end', end);
-            navigate(`/book/${id}${params.toString() ? `?${params.toString()}` : ''}`);
-          }}>Book Now</Button>
+          {isOwnSpot ? (
+            <Button size="lg" variant="outline" disabled>
+              You're the host
+            </Button>
+          ) : mode === 'host' ? (
+            <Button size="lg" variant="outline" onClick={handleBookNow}>
+              Switch to Driver Mode
+            </Button>
+          ) : (
+            <Button size="lg" onClick={handleBookNow}>
+              Book Now
+            </Button>
+          )}
         </div>
       </div>
 
@@ -432,16 +473,16 @@ const SpotDetail = () => {
                 Open in Apple Maps
               </Button>
             )}
-            <Button 
-              variant="ghost" 
-              className="w-full"
-              onClick={() => setShowDirections(false)}
-            >
-              Cancel
-            </Button>
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Booking Modal */}
+      <BookingModal
+        open={bookingOpen}
+        onOpenChange={setBookingOpen}
+        spot={spot}
+      />
     </div>
   );
 };

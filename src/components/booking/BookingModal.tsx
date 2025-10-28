@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Calendar, Clock, CreditCard, X, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, Clock, CreditCard, X, ChevronRight, AlertCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,8 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format, addHours, differenceInHours } from 'date-fns';
+import { useMode } from '@/contexts/ModeContext';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface BookingModalProps {
   open: boolean;
@@ -18,15 +20,28 @@ interface BookingModalProps {
     hourlyRate: number;
     dailyRate?: number;
     address: string;
+    host_id?: string;
   };
 }
 
 const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
   const { toast } = useToast();
+  const { mode } = useMode();
   const today = new Date().toISOString().split('T')[0];
   const [startDateTime, setStartDateTime] = useState<string>('');
   const [endDateTime, setEndDateTime] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [isOwnSpot, setIsOwnSpot] = useState(false);
+
+  useEffect(() => {
+    const checkOwnership = async () => {
+      if (open && spot.host_id) {
+        const { data: { user } } = await supabase.auth.getUser();
+        setIsOwnSpot(user?.id === spot.host_id);
+      }
+    };
+    checkOwnership();
+  }, [open, spot.host_id]);
 
   const calculateTotal = () => {
     if (!startDateTime || !endDateTime) {
@@ -67,6 +82,15 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
   };
 
   const handleBooking = async () => {
+    if (mode === 'host') {
+      toast({
+        title: "Switch to Driver Mode",
+        description: "Please switch to Driver Mode to book parking spots",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!startDateTime || !endDateTime) {
       toast({
         title: "Missing information",
@@ -95,6 +119,16 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
         toast({
           title: "Authentication required",
           description: "Please sign in to book this spot",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check for self-booking
+      if (user.id === spot.host_id) {
+        toast({
+          title: "Cannot book own spot",
+          description: "You're the host of this spot",
           variant: "destructive",
         });
         return;
@@ -157,6 +191,26 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Self-booking warning */}
+          {isOwnSpot && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                You're the host of this spot. You cannot book your own listing.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Mode warning */}
+          {mode === 'host' && !isOwnSpot && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Switch to Driver Mode to book this spot.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Start Date & Time */}
           <div className="space-y-2">
             <Label htmlFor="start" className="text-base font-semibold flex items-center gap-2">
@@ -222,7 +276,7 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
               className="w-full"
               size="lg"
               onClick={handleBooking}
-              disabled={!startDateTime || !endDateTime || !pricing || loading}
+              disabled={!startDateTime || !endDateTime || !pricing || loading || isOwnSpot || mode === 'host'}
             >
               {loading ? (
                 'Processing...'

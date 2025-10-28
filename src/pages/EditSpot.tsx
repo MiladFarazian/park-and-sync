@@ -8,9 +8,19 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign } from 'lucide-react';
+import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const formSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
@@ -33,6 +43,8 @@ const EditSpot = () => {
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const {
     register,
@@ -94,6 +106,59 @@ const EditSpot = () => {
         ? prev.filter((id) => id !== amenityId)
         : [...prev, amenityId]
     );
+  };
+
+  const handleDelete = async () => {
+    if (!spotId || isDeleting) return;
+
+    try {
+      setIsDeleting(true);
+
+      // Check for future bookings
+      const { data: futureBookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('spot_id', spotId)
+        .gt('end_at', new Date().toISOString())
+        .in('status', ['pending', 'paid']);
+
+      if (bookingsError) throw bookingsError;
+
+      if (futureBookings && futureBookings.length > 0) {
+        toast.error('Cannot delete spot with future bookings. Please cancel them first or archive the listing.');
+        setShowDeleteDialog(false);
+        return;
+      }
+
+      // Delete spot photos first (if any)
+      await supabase
+        .from('spot_photos')
+        .delete()
+        .eq('spot_id', spotId);
+
+      // Delete availability rules
+      await supabase
+        .from('availability_rules')
+        .delete()
+        .eq('spot_id', spotId);
+
+      // Delete the spot
+      const { error: deleteError } = await supabase
+        .from('spots')
+        .delete()
+        .eq('id', spotId);
+
+      if (deleteError) throw deleteError;
+
+      toast.success('Listing deleted successfully');
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error deleting spot:', error);
+      toast.error('Failed to delete listing');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+    }
   };
 
   const onSubmit = async (data: any) => {
@@ -278,7 +343,53 @@ const EditSpot = () => {
             </CardContent>
           </Card>
         </form>
+
+        {/* Delete Listing Section */}
+        <Card className="border-destructive">
+          <CardContent className="p-6">
+            <div className="space-y-3">
+              <div>
+                <h2 className="text-xl font-semibold text-destructive">Danger Zone</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Permanently delete this listing
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="destructive"
+                className="w-full"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Listing
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete listing?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action permanently removes the spot, its availability, and future bookings. 
+              Past bookings and earnings remain in history. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
