@@ -11,7 +11,7 @@ const BottomNavigation = () => {
 
   const tabs = mode === 'host' 
     ? [
-        { id: 'home', label: 'Home', icon: Home, path: '/dashboard' },
+        { id: 'home', label: 'Home', icon: Home, path: '/host-home' },
         { id: 'listings', label: 'Listings', icon: List, path: '/dashboard' },
         { id: 'reservations', label: 'Reservations', icon: Calendar, path: '/activity' },
         { id: 'messages', label: 'Messages', icon: MessageCircle, path: '/messages' },

@@ -196,8 +196,8 @@ const Dashboard = () => {
       {/* Header with Add Button */}
       <div className="pt-4 flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold">Host Dashboard</h1>
-          <p className="text-muted-foreground">Manage your listings</p>
+          <h1 className="text-2xl font-bold">My Listings</h1>
+          <p className="text-muted-foreground">Manage your parking spots</p>
         </div>
         <Button 
           className="bg-primary text-primary-foreground"
@@ -206,35 +206,6 @@ const Dashboard = () => {
           <Plus className="h-4 w-4 mr-2" />
           Add Spot
         </Button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card className="p-4 bg-primary text-primary-foreground">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              <span className="text-sm opacity-90">Earnings</span>
-            </div>
-            <div>
-              <p className="text-2xl font-bold">${stats.totalEarnings.toFixed(2)}</p>
-              <p className="text-sm opacity-75">Total earned</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-4 bg-primary text-primary-foreground">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              <span className="text-sm opacity-90">Bookings</span>
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{stats.totalBookings}</p>
-              <p className="text-sm opacity-75">Completed</p>
-            </div>
-          </div>
-        </Card>
       </div>
 
       {/* Tabs */}
