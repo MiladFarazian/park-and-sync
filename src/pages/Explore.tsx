@@ -211,13 +211,16 @@ const Explore = () => {
       fetchNearbySpots(center, radiusMeters, false); // Don't show loading on map movement
     }, 800); // Longer debounce to reduce requests
   };
-  const handleDateTimeUpdate = () => {
+  const handleDateTimeUpdate = (newStartTime?: Date, newEndTime?: Date) => {
+    const effectiveStartTime = newStartTime || startTime;
+    const effectiveEndTime = newEndTime || endTime;
+    
     // Update URL params
     const params = new URLSearchParams();
     params.set('lat', userLocation.lat.toString());
     params.set('lng', userLocation.lng.toString());
-    if (startTime) params.set('start', startTime.toISOString());
-    if (endTime) params.set('end', endTime.toISOString());
+    if (effectiveStartTime) params.set('start', effectiveStartTime.toISOString());
+    if (effectiveEndTime) params.set('end', effectiveEndTime.toISOString());
     if (searchQuery) params.set('q', searchQuery);
     navigate(`/explore?${params.toString()}`, {
       replace: true
@@ -279,7 +282,7 @@ const Explore = () => {
                       newDate.setHours(startTime.getHours());
                       newDate.setMinutes(startTime.getMinutes());
                       handleStartTimeChange(newDate);
-                      handleDateTimeUpdate();
+                      handleDateTimeUpdate(newDate, endTime);
                     }
                   }} disabled={date => date < new Date()} initialFocus className="pointer-events-auto" />
                       </PopoverContent>
@@ -287,7 +290,7 @@ const Explore = () => {
                     
                     <TimePicker date={startTime} setDate={date => {
                 handleStartTimeChange(date);
-                handleDateTimeUpdate();
+                handleDateTimeUpdate(date, endTime);
               }}>
                       <button className="flex items-center gap-1 hover:bg-accent/50 rounded px-1.5 py-1 transition-colors flex-shrink-0">
                         <Clock className="h-3 w-3 text-muted-foreground" />
@@ -313,7 +316,7 @@ const Explore = () => {
                       newDate.setHours(endTime.getHours());
                       newDate.setMinutes(endTime.getMinutes());
                       handleEndTimeChange(newDate);
-                      handleDateTimeUpdate();
+                      handleDateTimeUpdate(startTime, newDate);
                     }
                   }} disabled={date => {
                     if (!startTime) return date < new Date();
@@ -329,7 +332,7 @@ const Explore = () => {
                     
                     <TimePicker date={endTime} setDate={date => {
                 handleEndTimeChange(date);
-                handleDateTimeUpdate();
+                handleDateTimeUpdate(startTime, date);
               }}>
                       <button className="flex items-center gap-1 hover:bg-accent/50 rounded px-1.5 py-1 transition-colors flex-shrink-0">
                         <Clock className="h-3 w-3 text-muted-foreground" />
