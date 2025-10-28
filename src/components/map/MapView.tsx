@@ -64,6 +64,13 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, explore
     if (exploreParams?.q) params.set('q', exploreParams.q);
     return `/spot/${spotId}?${params.toString()}`;
   };
+
+  const buildBookingUrl = (spotId: string) => {
+    const params = new URLSearchParams();
+    if (exploreParams?.start) params.set('start', exploreParams.start);
+    if (exploreParams?.end) params.set('end', exploreParams.end);
+    return `/book/${spotId}${params.toString() ? `?${params.toString()}` : ''}`;
+  };
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<mapboxgl.Marker[]>([]);
@@ -490,7 +497,7 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, explore
               </Button>
               <Button 
                 className="flex-1 text-sm"
-                onClick={() => navigate(`/book/${selectedSpot.id}`)}
+                onClick={() => navigate(buildBookingUrl(selectedSpot.id))}
               >
                 <Navigation className="h-4 w-4 mr-1" />
                 Book Now
