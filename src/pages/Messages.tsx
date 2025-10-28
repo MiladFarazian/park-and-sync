@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
-import { Search, Send, Loader2, ArrowLeft } from 'lucide-react';
+import { Search, Send, Loader2, ArrowLeft, Paperclip, X, Check, CheckCheck } from 'lucide-react';
 import { useMessages, Message } from '@/hooks/useMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,7 +23,11 @@ const Messages = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
   const conversationChannelRef = useRef<any>(null);
   const mountedRef = useRef(true);
@@ -156,47 +160,114 @@ const Messages = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/webm'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Invalid file type. Please select an image or video.');
+      return;
+    }
+
+    // Validate file size (50MB)
+    if (file.size > 52428800) {
+      toast.error('File size too large. Maximum size is 50MB.');
+      return;
+    }
+
+    setSelectedMedia(file);
+    setMediaPreview(URL.createObjectURL(file));
+  };
+
+  const handleRemoveMedia = () => {
+    if (mediaPreview) {
+      URL.revokeObjectURL(mediaPreview);
+    }
+    setSelectedMedia(null);
+    setMediaPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleSendMessage = async () => {
-    if (!messageInput.trim() || !selectedConversation || !user) return;
+    if ((!messageInput.trim() && !selectedMedia) || !selectedConversation || !user) return;
 
     const messageText = messageInput.trim();
     const tempId = `temp-${crypto.randomUUID()}`;
     
-    // Optimistic update
-    const tempMessage: Message = {
-      id: tempId,
-      sender_id: user.id,
-      recipient_id: selectedConversation,
-      message: messageText,
-      created_at: new Date().toISOString(),
-      read_at: null
-    };
-    
-    setMessages(prev => [...prev, tempMessage]);
-    setMessageInput('');
+    let mediaUrl: string | null = null;
+    let mediaType: string | null = null;
 
     try {
       setSendingMessage(true);
+
+      // Upload media if selected
+      if (selectedMedia) {
+        setUploadingMedia(true);
+        const fileExt = selectedMedia.name.split('.').pop();
+        const fileName = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('message-media')
+          .upload(fileName, selectedMedia);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('message-media')
+          .getPublicUrl(fileName);
+
+        mediaUrl = publicUrl;
+        mediaType = selectedMedia.type;
+        setUploadingMedia(false);
+      }
+
+      // Optimistic update
+      const tempMessage: Message = {
+        id: tempId,
+        sender_id: user.id,
+        recipient_id: selectedConversation,
+        message: messageText || '',
+        created_at: new Date().toISOString(),
+        read_at: null,
+        delivered_at: null,
+        media_url: mediaUrl,
+        media_type: mediaType
+      };
+      
+      setMessages(prev => [...prev, tempMessage]);
+      setMessageInput('');
+      handleRemoveMedia();
+
+      // Insert message
       const { data, error } = await supabase
         .from('messages')
         .insert({
           sender_id: user.id,
           recipient_id: selectedConversation,
-          message: messageText
+          message: messageText || '',
+          media_url: mediaUrl,
+          media_type: mediaType,
+          delivered_at: new Date().toISOString()
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      // Replace temp message immediately with server row
+      // Replace temp message with server row
       setMessages(prev => prev.map(m => (m.id === tempId ? (data as Message) : m)));
     } catch (error) {
       // Rollback on error
       setMessages(prev => prev.filter(m => m.id !== tempId));
       toast.error('Failed to send message');
+      console.error('Error sending message:', error);
     } finally {
       setSendingMessage(false);
+      setUploadingMedia(false);
     }
   };
 
@@ -305,6 +376,9 @@ const Messages = () => {
                 ) : (
                   messages.map((message) => {
                     const isMe = message.sender_id === user?.id;
+                    const isVideo = message.media_type?.startsWith('video/');
+                    const isImage = message.media_type?.startsWith('image/');
+                    
                     return (
                       <div
                         key={message.id}
@@ -317,15 +391,53 @@ const Messages = () => {
                               : 'bg-muted'
                           }`}
                         >
-                          <p className="text-sm">{message.message}</p>
-                          <p className={`text-xs mt-1 ${
+                          {/* Media content */}
+                          {message.media_url && (
+                            <div className="mb-2">
+                              {isImage && (
+                                <img 
+                                  src={message.media_url} 
+                                  alt="Shared media"
+                                  className="rounded-md max-w-full h-auto max-h-64 object-cover"
+                                />
+                              )}
+                              {isVideo && (
+                                <video 
+                                  src={message.media_url} 
+                                  controls
+                                  className="rounded-md max-w-full h-auto max-h-64"
+                                />
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Text content */}
+                          {message.message && (
+                            <p className="text-sm">{message.message}</p>
+                          )}
+                          
+                          {/* Timestamp and status */}
+                          <div className={`flex items-center gap-1 mt-1 ${
                             isMe ? 'text-primary-foreground/70' : 'text-muted-foreground'
                           }`}>
-                            {new Date(message.created_at).toLocaleTimeString('en-US', { 
-                              hour: 'numeric', 
-                              minute: '2-digit' 
-                            })}
-                          </p>
+                            <span className="text-xs">
+                              {new Date(message.created_at).toLocaleTimeString('en-US', { 
+                                hour: 'numeric', 
+                                minute: '2-digit' 
+                              })}
+                            </span>
+                            {isMe && (
+                              <>
+                                {message.read_at ? (
+                                  <CheckCheck className="h-3 w-3" />
+                                ) : message.delivered_at ? (
+                                  <CheckCheck className="h-3 w-3 opacity-50" />
+                                ) : (
+                                  <Check className="h-3 w-3 opacity-50" />
+                                )}
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -335,20 +447,63 @@ const Messages = () => {
               </div>
             </ScrollArea>
             <div className="p-4 border-t">
+              {/* Media preview */}
+              {mediaPreview && (
+                <div className="mb-2 relative inline-block">
+                  <div className="relative">
+                    {selectedMedia?.type.startsWith('image/') ? (
+                      <img 
+                        src={mediaPreview} 
+                        alt="Preview"
+                        className="h-20 w-20 object-cover rounded-md"
+                      />
+                    ) : (
+                      <video 
+                        src={mediaPreview}
+                        className="h-20 w-20 object-cover rounded-md"
+                      />
+                    )}
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute -top-2 -right-2 h-6 w-6"
+                      onClick={handleRemoveMedia}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
               <div className="flex gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,video/webm"
+                  onChange={handleMediaSelect}
+                  className="hidden"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={sendingMessage || uploadingMedia}
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
                 <Input
                   placeholder="Type a message..."
                   value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !sendingMessage && handleSendMessage()}
-                  disabled={sendingMessage}
+                  onKeyDown={(e) => e.key === 'Enter' && !sendingMessage && !uploadingMedia && handleSendMessage()}
+                  disabled={sendingMessage || uploadingMedia}
                 />
                 <Button 
                   onClick={handleSendMessage} 
                   size="icon"
-                  disabled={sendingMessage || !messageInput.trim()}
+                  disabled={sendingMessage || uploadingMedia || (!messageInput.trim() && !selectedMedia)}
                 >
-                  {sendingMessage ? (
+                  {sendingMessage || uploadingMedia ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Send className="h-4 w-4" />

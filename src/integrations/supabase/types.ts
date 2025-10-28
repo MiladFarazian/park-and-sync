@@ -245,7 +245,10 @@ export type Database = {
         Row: {
           booking_id: string | null
           created_at: string
+          delivered_at: string | null
           id: string
+          media_type: string | null
+          media_url: string | null
           message: string
           read_at: string | null
           recipient_id: string
@@ -254,7 +257,10 @@ export type Database = {
         Insert: {
           booking_id?: string | null
           created_at?: string
+          delivered_at?: string | null
           id?: string
+          media_type?: string | null
+          media_url?: string | null
           message: string
           read_at?: string | null
           recipient_id: string
@@ -263,7 +269,10 @@ export type Database = {
         Update: {
           booking_id?: string | null
           created_at?: string
+          delivered_at?: string | null
           id?: string
+          media_type?: string | null
+          media_url?: string | null
           message?: string
           read_at?: string | null
           recipient_id?: string

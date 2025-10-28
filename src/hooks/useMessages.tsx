@@ -19,6 +19,9 @@ export interface Message {
   message: string;
   created_at: string;
   read_at: string | null;
+  delivered_at: string | null;
+  media_url: string | null;
+  media_type: string | null;
 }
 
 export const useMessages = () => {
@@ -166,10 +169,14 @@ export const useMessages = () => {
     };
   }, [user]);
 
+  // Calculate total unread count
+  const totalUnreadCount = conversations.reduce((sum, conv) => sum + conv.unread_count, 0);
+
   return {
     conversations,
     loading,
     markAsRead,
-    loadConversations
+    loadConversations,
+    totalUnreadCount
   };
 };

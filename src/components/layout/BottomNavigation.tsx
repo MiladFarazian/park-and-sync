@@ -3,11 +3,14 @@ import { Home, Calendar, MessageCircle, User, List } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useMode } from '@/contexts/ModeContext';
+import { useMessages } from '@/hooks/useMessages';
+import { Badge } from '@/components/ui/badge';
 
 const BottomNavigation = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { mode } = useMode();
+  const { totalUnreadCount } = useMessages();
 
   const tabs = mode === 'host' 
     ? [
@@ -36,13 +39,23 @@ const BottomNavigation = () => {
               key={tab.id}
               onClick={() => navigate(tab.path)}
               className={cn(
-                "flex flex-col items-center gap-1 pt-4 pb-2 px-2 rounded-md transition-colors",
+                "flex flex-col items-center gap-1 pt-4 pb-2 px-2 rounded-md transition-colors relative",
                 isActive 
                   ? "text-primary" 
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Icon className="h-5 w-5" />
+              <div className="relative">
+                <Icon className="h-5 w-5" />
+                {tab.id === 'messages' && totalUnreadCount > 0 && (
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-2 -right-2 h-4 w-4 p-0 flex items-center justify-center text-[10px]"
+                  >
+                    {totalUnreadCount > 9 ? '9+' : totalUnreadCount}
+                  </Badge>
+                )}
+              </div>
               <span className="text-xs font-medium">{tab.label}</span>
             </button>
           );
