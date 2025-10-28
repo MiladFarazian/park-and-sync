@@ -76,14 +76,48 @@ export const AvailabilityManager = ({
 
   const addAvailability = (dayIndex: number) => {
     const windows = availabilityWindows[dayIndex];
-    const newWindow: TimeRange = {
+    
+    // Find a non-overlapping default time range
+    let newWindow: TimeRange = {
       start_time: '09:00',
       end_time: '17:00',
     };
 
-    if (hasOverlap(windows, newWindow)) {
-      toast.error('Time range overlaps with existing availability');
-      return;
+    // If there are existing windows, try to place the new one after the last one
+    if (windows.length > 0) {
+      const sortedWindows = [...windows].sort((a, b) => 
+        timeToMinutes(a.start_time) - timeToMinutes(b.start_time)
+      );
+      
+      const lastWindow = sortedWindows[sortedWindows.length - 1];
+      const lastEndMinutes = timeToMinutes(lastWindow.end_time);
+      
+      // If there's room after the last window (before midnight)
+      if (lastEndMinutes < 1380) { // 23:00
+        const newStartMinutes = Math.min(lastEndMinutes, 1380);
+        const newEndMinutes = Math.min(newStartMinutes + 120, 1439); // 2 hours later or end of day
+        newWindow = {
+          start_time: minutesToTime(newStartMinutes),
+          end_time: minutesToTime(newEndMinutes),
+        };
+      } else {
+        // Try to find a gap between existing windows
+        for (let i = 0; i < sortedWindows.length - 1; i++) {
+          const currentEnd = timeToMinutes(sortedWindows[i].end_time);
+          const nextStart = timeToMinutes(sortedWindows[i + 1].start_time);
+          const gap = nextStart - currentEnd;
+          
+          if (gap >= 60) { // At least 1 hour gap
+            const newStartMinutes = currentEnd;
+            const newEndMinutes = Math.min(currentEnd + 120, nextStart); // 2 hours or fill gap
+            newWindow = {
+              start_time: minutesToTime(newStartMinutes),
+              end_time: minutesToTime(newEndMinutes),
+            };
+            break;
+          }
+        }
+      }
     }
 
     setAvailabilityWindows({
@@ -133,7 +167,8 @@ export const AvailabilityManager = ({
     return windows.some(window => {
       const start = timeToMinutes(window.start_time);
       const end = timeToMinutes(window.end_time);
-      return (newStart < end && newEnd > start);
+      // Check for actual overlap (not just touching at endpoints)
+      return (newStart < end && newEnd > start && !(newStart === end || newEnd === start));
     });
   };
 
