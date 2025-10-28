@@ -1,14 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown, Plus, Trash2, Clock } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export interface AvailabilityRule {
-  day_of_week: number; // 0 = Sunday, 6 = Saturday
-  start_time: string; // HH:MM format
-  end_time: string; // HH:MM format
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
   is_available: boolean;
+}
+
+interface TimeBlock {
+  start_time: string;
+  end_time: string;
 }
 
 interface AvailabilityManagerProps {
@@ -16,48 +25,120 @@ interface AvailabilityManagerProps {
   onChange?: (rules: AvailabilityRule[]) => void;
 }
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export const AvailabilityManager: React.FC<AvailabilityManagerProps> = ({ 
   initialRules = [], 
   onChange 
 }) => {
-  // Initialize with one rule per day, default unavailable
-  const getInitialRules = () => {
-    if (initialRules.length > 0) {
-      // Ensure all 7 days are represented
-      const ruleMap = new Map(initialRules.map(r => [r.day_of_week, r]));
-      return DAYS.map((_, index) => 
-        ruleMap.get(index) || {
-          day_of_week: index,
-          start_time: '00:00',
-          end_time: '23:59',
-          is_available: false,
-        }
-      );
+  const groupByDay = (rules: AvailabilityRule[]) => {
+    const grouped: Record<number, TimeBlock[]> = {};
+    for (let i = 0; i < 7; i++) {
+      grouped[i] = [];
     }
-    return DAYS.map((_, index) => ({
-      day_of_week: index,
-      start_time: '00:00',
-      end_time: '23:59',
-      is_available: false,
-    }));
+    rules.forEach(rule => {
+      if (rule.is_available) {
+        grouped[rule.day_of_week].push({
+          start_time: rule.start_time,
+          end_time: rule.end_time
+        });
+      }
+    });
+    return grouped;
   };
 
-  const [rules, setRules] = useState<AvailabilityRule[]>(getInitialRules());
+  const [timeBlocks, setTimeBlocks] = useState<Record<number, TimeBlock[]>>(groupByDay(initialRules));
+  const [openDays, setOpenDays] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    // Return all rules, not just available ones
+    const rules: AvailabilityRule[] = [];
+    Object.entries(timeBlocks).forEach(([day, blocks]) => {
+      const dayNum = parseInt(day);
+      if (blocks.length > 0) {
+        blocks.forEach(block => {
+          rules.push({
+            day_of_week: dayNum,
+            start_time: block.start_time,
+            end_time: block.end_time,
+            is_available: true
+          });
+        });
+      } else {
+        rules.push({
+          day_of_week: dayNum,
+          start_time: '00:00',
+          end_time: '23:59',
+          is_available: false
+        });
+      }
+    });
     onChange?.(rules);
-  }, [rules, onChange]);
+  }, [timeBlocks, onChange]);
 
-  const updateDay = (dayIndex: number, field: keyof AvailabilityRule, value: any) => {
-    const newRules = [...rules];
-    const ruleIndex = newRules.findIndex(r => r.day_of_week === dayIndex);
-    if (ruleIndex !== -1) {
-      newRules[ruleIndex] = { ...newRules[ruleIndex], [field]: value };
-      setRules(newRules);
+  const addTimeBlock = (dayIndex: number) => {
+    const blocks = timeBlocks[dayIndex];
+    const newBlock: TimeBlock = {
+      start_time: '09:00',
+      end_time: '17:00'
+    };
+
+    if (hasOverlap(blocks, newBlock)) {
+      toast.error('Time range overlaps with existing block');
+      return;
     }
+
+    setTimeBlocks({
+      ...timeBlocks,
+      [dayIndex]: [...blocks, newBlock].sort((a, b) => 
+        timeToMinutes(a.start_time) - timeToMinutes(b.start_time)
+      )
+    });
+    toast.success('Time block added');
+  };
+
+  const removeTimeBlock = (dayIndex: number, blockIndex: number) => {
+    setTimeBlocks({
+      ...timeBlocks,
+      [dayIndex]: timeBlocks[dayIndex].filter((_, i) => i !== blockIndex)
+    });
+    toast.success('Time block removed');
+  };
+
+  const updateTimeBlock = (dayIndex: number, blockIndex: number, start: string, end: string) => {
+    const blocks = [...timeBlocks[dayIndex]];
+    blocks[blockIndex] = { start_time: start, end_time: end };
+    
+    const otherBlocks = blocks.filter((_, i) => i !== blockIndex);
+    if (hasOverlap(otherBlocks, blocks[blockIndex])) {
+      toast.error('Time range overlaps with another block');
+      return;
+    }
+
+    setTimeBlocks({
+      ...timeBlocks,
+      [dayIndex]: blocks.sort((a, b) => 
+        timeToMinutes(a.start_time) - timeToMinutes(b.start_time)
+      )
+    });
+  };
+
+  const set24Hours = (dayIndex: number) => {
+    setTimeBlocks({
+      ...timeBlocks,
+      [dayIndex]: [{ start_time: '00:00', end_time: '23:59' }]
+    });
+    toast.success('Set to 24 hours');
+  };
+
+  const hasOverlap = (blocks: TimeBlock[], newBlock: TimeBlock): boolean => {
+    const newStart = timeToMinutes(newBlock.start_time);
+    const newEnd = timeToMinutes(newBlock.end_time);
+
+    return blocks.some(block => {
+      const start = timeToMinutes(block.start_time);
+      const end = timeToMinutes(block.end_time);
+      return (newStart < end && newEnd > start);
+    });
   };
 
   const timeToMinutes = (time: string): number => {
@@ -79,58 +160,123 @@ export const AvailabilityManager: React.FC<AvailabilityManagerProps> = ({
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
+  const toggleDay = (dayIndex: number) => {
+    const newOpenDays = new Set(openDays);
+    if (newOpenDays.has(dayIndex)) {
+      newOpenDays.delete(dayIndex);
+    } else {
+      newOpenDays.add(dayIndex);
+    }
+    setOpenDays(newOpenDays);
+  };
+
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="space-y-4">
-          {DAYS.map((day, dayIndex) => {
-            const rule = rules.find(r => r.day_of_week === dayIndex);
-            if (!rule) return null;
+    <div className="space-y-2">
+      {DAYS.map((day, dayIndex) => {
+        const blocks = timeBlocks[dayIndex];
+        const isOpen = openDays.has(dayIndex);
 
-            const startMinutes = timeToMinutes(rule.start_time);
-            const endMinutes = timeToMinutes(rule.end_time);
-
-            return (
-              <div key={dayIndex} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium w-12">{day}</Label>
+        return (
+          <Collapsible key={dayIndex} open={isOpen} onOpenChange={() => toggleDay(dayIndex)}>
+            <Card className={cn(blocks.length > 0 && "border-primary/20 bg-primary/5")}>
+              <CollapsibleTrigger asChild>
+                <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <ChevronDown className={cn(
+                      "h-4 w-4 text-muted-foreground transition-transform",
+                      isOpen && "transform rotate-180"
+                    )} />
+                    <Label className="text-base font-semibold cursor-pointer">{day}</Label>
+                  </div>
                   <div className="flex items-center gap-2">
-                    <Switch
-                      checked={rule.is_available}
-                      onCheckedChange={(checked) => updateDay(dayIndex, 'is_available', checked)}
-                    />
-                    <span className="text-xs text-muted-foreground w-20">
-                      {rule.is_available ? 'Available' : 'Unavailable'}
-                    </span>
+                    {blocks.length > 0 ? (
+                      <span className="text-sm text-muted-foreground">
+                        {blocks.length} {blocks.length === 1 ? 'block' : 'blocks'}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">Unavailable</span>
+                    )}
                   </div>
                 </div>
-                
-                {rule.is_available && (
-                  <div className="space-y-2">
-                    <div className="px-2">
-                      <Slider
-                        value={[startMinutes, endMinutes]}
-                        min={0}
-                        max={1439}
-                        step={30}
-                        onValueChange={(values) => {
-                          updateDay(dayIndex, 'start_time', minutesToTime(values[0]));
-                          updateDay(dayIndex, 'end_time', minutesToTime(values[1]));
-                        }}
-                        className="w-full"
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-muted-foreground px-2">
-                      <span>{formatTime(rule.start_time)}</span>
-                      <span>{formatTime(rule.end_time)}</span>
-                    </div>
+              </CollapsibleTrigger>
+              
+              <CollapsibleContent>
+                <CardContent className="pt-0 pb-4 px-4 space-y-3">
+                  {blocks.map((block, blockIndex) => {
+                    const startMinutes = timeToMinutes(block.start_time);
+                    const endMinutes = timeToMinutes(block.end_time);
+
+                    return (
+                      <div key={blockIndex} className="space-y-2 p-3 rounded-lg bg-background border">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Clock className="h-3.5 w-3.5" />
+                            <span>Block {blockIndex + 1}</span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeTimeBlock(dayIndex, blockIndex)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                        
+                        <div className="px-2">
+                          <Slider
+                            value={[startMinutes, endMinutes]}
+                            min={0}
+                            max={1439}
+                            step={30}
+                            onValueChange={(values) => {
+                              updateTimeBlock(
+                                dayIndex, 
+                                blockIndex, 
+                                minutesToTime(values[0]), 
+                                minutesToTime(values[1])
+                              );
+                            }}
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div className="flex justify-between text-xs text-muted-foreground px-2">
+                          <span>{formatTime(block.start_time)}</span>
+                          <span>{formatTime(block.end_time)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addTimeBlock(dayIndex)}
+                      className="flex-1"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Time Range
+                    </Button>
+                    {blocks.length !== 1 || blocks[0].start_time !== '00:00' || blocks[0].end_time !== '23:59' ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => set24Hours(dayIndex)}
+                      >
+                        24 Hours
+                      </Button>
+                    ) : null}
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+        );
+      })}
+    </div>
   );
 };

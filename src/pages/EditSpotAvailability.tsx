@@ -76,7 +76,6 @@ const EditSpotAvailability = () => {
             start_time: override.start_time || undefined,
             end_time: override.end_time || undefined,
             is_available: override.is_available,
-            reason: override.reason || undefined,
           })));
         }
       } catch (error) {
@@ -138,7 +137,7 @@ const EditSpotAvailability = () => {
           start_time: override.start_time || null,
           end_time: override.end_time || null,
           is_available: override.is_available,
-          reason: override.reason || null,
+          reason: null,
         }));
 
         const { error: insertOverridesError } = await supabase
@@ -196,7 +195,7 @@ const EditSpotAvailability = () => {
                 </TabsTrigger>
                 <TabsTrigger value="dates" className="gap-2">
                   <Calendar className="h-4 w-4" />
-                  Specific Dates
+                  Date Override
                 </TabsTrigger>
               </TabsList>
 
@@ -204,7 +203,7 @@ const EditSpotAvailability = () => {
                 <div className="mb-4">
                   <h3 className="font-semibold mb-1">Recurring Weekly Schedule</h3>
                   <p className="text-sm text-muted-foreground">
-                    Toggle days on/off and drag the slider to set available hours
+                    Set multiple time blocks for each day. Drag sliders to adjust hours.
                   </p>
                 </div>
                 <AvailabilityManager
@@ -215,9 +214,9 @@ const EditSpotAvailability = () => {
 
               <TabsContent value="dates" className="space-y-4">
                 <div className="mb-4">
-                  <h3 className="font-semibold mb-1">Date-Specific Overrides</h3>
+                  <h3 className="font-semibold mb-1">Date Override</h3>
                   <p className="text-sm text-muted-foreground">
-                    Override specific dates with custom hours or block them entirely
+                    Override your weekly schedule for specific dates
                   </p>
                 </div>
                 <DateOverrideManager
