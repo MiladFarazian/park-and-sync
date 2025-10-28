@@ -5,12 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
-import { Search, Send, Loader2 } from 'lucide-react';
+import { Search, Send, Loader2, ArrowLeft } from 'lucide-react';
 import { useMessages } from '@/hooks/useMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Messages = () => {
   const { user } = useAuth();
@@ -21,6 +22,7 @@ const Messages = () => {
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   // Auto-select conversation from URL parameter
   useEffect(() => {
@@ -91,7 +93,7 @@ const Messages = () => {
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-4">
       {/* Conversations List */}
-      <Card className="w-full md:w-80 flex flex-col">
+      <Card className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col`}>
         <div className="p-4 border-b">
           <h1 className="text-2xl font-bold mb-4">Messages</h1>
           <div className="relative">
@@ -153,11 +155,14 @@ const Messages = () => {
       </Card>
 
       {/* Messages Area */}
-      <Card className="hidden md:flex flex-1 flex-col">
+      <Card className={`${selectedConversation && isMobile ? 'flex' : 'hidden'} md:flex flex-1 flex-col`}>
         {selectedConversation ? (
           <>
             <div className="p-4 border-b">
               <div className="flex items-center gap-3">
+                <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelectedConversation(null)}>
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
                 <Avatar>
                   <AvatarImage src={displayAvatar} />
                   <AvatarFallback>

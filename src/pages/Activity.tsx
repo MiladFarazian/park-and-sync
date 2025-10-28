@@ -46,12 +46,7 @@ const Activity = () => {
           spots (
             title,
             address,
-            host_id,
-            profiles!spots_host_id_fkey(
-              user_id,
-              first_name,
-              last_name
-            )
+            host_id
           )
         `)
         .eq('renter_id', user.id)
@@ -68,11 +63,6 @@ const Activity = () => {
             title,
             address,
             host_id
-          ),
-          profiles!bookings_renter_id_fkey(
-            user_id,
-            first_name,
-            last_name
           )
         `)
         .eq('spots.host_id', user.id)
