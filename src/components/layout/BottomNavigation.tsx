@@ -25,8 +25,8 @@ const BottomNavigation = () => {
       ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
-      <div className="flex items-center justify-around h-16 max-w-md mx-auto">
+    <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50 pb-safe">
+      <div className="flex items-center justify-around h-16 max-w-md mx-auto pb-4">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = location.pathname === tab.path;
