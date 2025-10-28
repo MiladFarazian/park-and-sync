@@ -136,8 +136,8 @@ const Activity = () => {
   };
 
   const now = new Date();
-  const upcomingBookings = bookings.filter(b => new Date(b.end_at) >= now);
-  const pastBookings = bookings.filter(b => new Date(b.end_at) < now);
+  const upcomingBookings = bookings.filter(b => new Date(b.end_at) >= now && b.status !== 'canceled');
+  const pastBookings = bookings.filter(b => new Date(b.end_at) < now || b.status === 'canceled');
 
   const BookingCard = ({ booking, isPast = false }: { booking: any; isPast?: boolean }) => (
     <Card>
@@ -151,7 +151,7 @@ const Activity = () => {
             </p>
           </div>
           <Badge variant={isPast ? 'secondary' : 'default'}>
-            {booking.status === 'paid' ? (isPast ? 'Completed' : 'Confirmed') : booking.status}
+            {booking.status === 'canceled' ? 'Canceled' : (booking.status === 'paid' ? (isPast ? 'Completed' : 'Confirmed') : booking.status)}
           </Badge>
         </div>
         
