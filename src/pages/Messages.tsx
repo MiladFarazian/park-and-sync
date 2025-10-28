@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,11 +13,26 @@ import { toast } from 'sonner';
 
 const Messages = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const { conversations, messages, loading, sendingMessage, loadMessages, sendMessage } = useMessages();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-select conversation from URL parameter
+  useEffect(() => {
+    const userIdFromUrl = searchParams.get('userId');
+    if (userIdFromUrl && conversations.length > 0) {
+      const existingConv = conversations.find(c => c.user_id === userIdFromUrl);
+      if (existingConv) {
+        setSelectedConversation(userIdFromUrl);
+      } else {
+        // Start new conversation with this user
+        setSelectedConversation(userIdFromUrl);
+      }
+    }
+  }, [searchParams, conversations]);
 
   // Load messages when conversation is selected
   useEffect(() => {

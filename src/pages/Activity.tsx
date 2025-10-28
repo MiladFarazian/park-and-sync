@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Calendar, DollarSign, XCircle } from 'lucide-react';
+import { MapPin, Clock, Calendar, DollarSign, XCircle, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -44,7 +44,13 @@ const Activity = () => {
           *,
           spots (
             title,
-            address
+            address,
+            host_id,
+            profiles!spots_host_id_fkey(
+              user_id,
+              first_name,
+              last_name
+            )
           )
         `)
         .eq('renter_id', user.id)
@@ -175,17 +181,29 @@ const Activity = () => {
       </CardContent>
       <div className="p-4 pt-0 flex gap-2">
         <Button variant="outline" className="flex-1" onClick={() => navigate(`/booking-confirmation/${booking.id}`)}>View Details</Button>
+        <Button 
+          variant="outline" 
+          size="icon"
+          onClick={() => {
+            const hostId = booking.spots?.profiles?.user_id;
+            if (hostId) {
+              navigate(`/messages?userId=${hostId}`);
+            }
+          }}
+          disabled={!booking.spots?.profiles?.user_id}
+        >
+          <MessageCircle className="h-4 w-4" />
+        </Button>
         {!isPast && booking.status !== 'canceled' && (
           <Button 
             variant="destructive" 
-            className="flex-1"
+            size="icon"
             onClick={() => {
               setSelectedBooking(booking);
               setCancelDialogOpen(true);
             }}
           >
-            <XCircle className="h-4 w-4 mr-2" />
-            Cancel
+            <XCircle className="h-4 w-4" />
           </Button>
         )}
       </div>

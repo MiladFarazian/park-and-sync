@@ -93,8 +93,8 @@ const BookingConfirmation = () => {
         return;
       }
 
-      // Navigate to messages page
-      navigate('/messages');
+      // Navigate to messages page with host's user_id
+      navigate(`/messages?userId=${host.id}`);
     } catch (error) {
       console.error('Error navigating to messages:', error);
       toast({
