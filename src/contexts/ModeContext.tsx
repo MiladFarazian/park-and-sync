@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 type Mode = 'driver' | 'host';
 
@@ -11,7 +11,7 @@ interface ModeContextType {
 
 const ModeContext = createContext<ModeContextType | undefined>(undefined);
 
-export const ModeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const ModeProvider = ({ children }: { children: ReactNode }) => {
   // Always start in driver mode
   const [mode, setModeState] = useState<Mode>('driver');
   const [isLoading, setIsLoading] = useState(false);
