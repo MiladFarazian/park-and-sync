@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useMode } from '@/contexts/ModeContext';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,6 +23,7 @@ import {
 const Activity = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { mode } = useMode();
   const [activeTab, setActiveTab] = useState('upcoming');
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,52 +33,52 @@ const Activity = () => {
 
   useEffect(() => {
     fetchBookings();
-  }, []);
+  }, [mode]);
 
   const fetchBookings = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch bookings where user is the renter
-      const { data: renterBookings, error: renterError } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          spots (
-            title,
-            address,
-            host_id
-          )
-        `)
-        .eq('renter_id', user.id)
-        .order('start_at', { ascending: false });
+      let bookingsData: any[] = [];
 
-      if (renterError) throw renterError;
+      if (mode === 'driver') {
+        // Driver mode: only show bookings where user is the renter
+        const { data: renterBookings, error: renterError } = await supabase
+          .from('bookings')
+          .select(`
+            *,
+            spots (
+              title,
+              address,
+              host_id
+            )
+          `)
+          .eq('renter_id', user.id)
+          .order('start_at', { ascending: false });
 
-      // Fetch bookings where user is the host
-      const { data: hostBookings, error: hostError } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          spots!inner (
-            title,
-            address,
-            host_id
-          )
-        `)
-        .eq('spots.host_id', user.id)
-        .order('start_at', { ascending: false });
+        if (renterError) throw renterError;
+        bookingsData = (renterBookings || []).map(b => ({ ...b, userRole: 'renter' }));
+      } else {
+        // Host mode: only show bookings for user's spots
+        const { data: hostBookings, error: hostError } = await supabase
+          .from('bookings')
+          .select(`
+            *,
+            spots!inner (
+              title,
+              address,
+              host_id
+            )
+          `)
+          .eq('spots.host_id', user.id)
+          .order('start_at', { ascending: false });
 
-      if (hostError) throw hostError;
+        if (hostError) throw hostError;
+        bookingsData = (hostBookings || []).map(b => ({ ...b, userRole: 'host' }));
+      }
 
-      // Combine and mark bookings with role
-      const allBookings = [
-        ...(renterBookings || []).map(b => ({ ...b, userRole: 'renter' })),
-        ...(hostBookings || []).map(b => ({ ...b, userRole: 'host' }))
-      ].sort((a, b) => new Date(b.start_at).getTime() - new Date(a.start_at).getTime());
-
-      setBookings(allBookings);
+      setBookings(bookingsData);
     } catch (error) {
       console.error('Error fetching bookings:', error);
       toast({
@@ -218,7 +220,7 @@ const Activity = () => {
           >
             <MessageCircle className="h-4 w-4" />
           </Button>
-          {!isPast && booking.status !== 'canceled' && !isHost && (
+          {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && (
             <Button 
               variant="destructive" 
               size="icon"
@@ -239,8 +241,10 @@ const Activity = () => {
     <div className="min-h-screen bg-background pb-20">
       <div className="p-4 space-y-4">
         <div>
-          <h1 className="text-2xl font-bold">My Bookings</h1>
-          <p className="text-sm text-muted-foreground">View your parking reservations</p>
+          <h1 className="text-2xl font-bold">{mode === 'host' ? 'Reservations' : 'My Bookings'}</h1>
+          <p className="text-sm text-muted-foreground">
+            {mode === 'host' ? 'Manage reservations at your spots' : 'View your parking reservations'}
+          </p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
