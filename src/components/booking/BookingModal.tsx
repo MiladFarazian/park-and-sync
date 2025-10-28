@@ -35,13 +35,24 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
 
   useEffect(() => {
     const checkOwnership = async () => {
-      if (open && spot.host_id) {
+      if (open) {
         const { data: { user } } = await supabase.auth.getUser();
-        setIsOwnSpot(user?.id === spot.host_id);
+        // Check both spot.host_id and fetch from database as backup
+        if (spot.host_id) {
+          setIsOwnSpot(user?.id === spot.host_id);
+        } else {
+          // Fallback: fetch host_id from database
+          const { data: spotData } = await supabase
+            .from('spots')
+            .select('host_id')
+            .eq('id', spot.id)
+            .single();
+          setIsOwnSpot(user?.id === spotData?.host_id);
+        }
       }
     };
     checkOwnership();
-  }, [open, spot.host_id]);
+  }, [open, spot.id, spot.host_id]);
 
   const calculateTotal = () => {
     if (!startDateTime || !endDateTime) {
