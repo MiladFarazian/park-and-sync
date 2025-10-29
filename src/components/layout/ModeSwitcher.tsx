@@ -32,9 +32,9 @@ const ModeSwitcher = () => {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
-          variant="ghost"
+          variant="outline"
           className={cn(
-            "flex items-center gap-2 h-9 px-3 bg-white/20 hover:bg-white/30 text-primary-foreground border border-white/30",
+            "flex items-center gap-2 h-9 px-3",
             isLoading && "opacity-50 cursor-not-allowed"
           )}
           disabled={isLoading}
