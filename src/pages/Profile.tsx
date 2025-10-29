@@ -355,49 +355,64 @@ const Profile = () => {
         </div>
       )}
 
-      {/* Header with solid blue background */}
-      <div className="bg-primary text-primary-foreground p-6 rounded-b-2xl">
+      {/* Header with gradient background */}
+      <div className="bg-gradient-to-br from-primary via-primary to-primary/90 text-primary-foreground p-6 rounded-b-3xl shadow-lg">
         <div className="flex justify-between items-start mb-6">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold">Profile</h1>
             <ModeSwitcher />
           </div>
-          <Button variant="secondary" size="sm" onClick={handleSignOut}>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleSignOut}
+            className="hover:bg-white/20 text-primary-foreground"
+          >
             <LogOut className="h-4 w-4" />
           </Button>
         </div>
         
-        {/* Profile Info */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="relative">
-            <Avatar className="h-20 w-20">
-              <AvatarImage src={profile?.avatar_url} />
-              <AvatarFallback className="text-xl">{getInitials()}</AvatarFallback>
-            </Avatar>
-            <div className="absolute bottom-0 right-0 bg-background rounded-full p-1">
-              <Edit className="h-3 w-3" />
-            </div>
-          </div>
-          
-          <div className="flex-1 min-w-0">
-            <h2 className="text-xl font-bold">{getDisplayName()}</h2>
-            <p className="text-primary-foreground/80 text-sm">Member since {getMemberSince()}</p>
-            <div className="flex items-center gap-2 mt-1">
-              <div className="flex items-center gap-1">
-                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                <span className="font-semibold">{profile?.rating ? profile.rating.toFixed(1) : 'New'}</span>
+        {/* Profile Info Card */}
+        <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-primary-foreground">
+          <div className="p-6">
+            <div className="flex items-start gap-4">
+              <Avatar className="h-24 w-24 border-4 border-white/30 shadow-lg">
+                <AvatarImage src={profile?.avatar_url} />
+                <AvatarFallback className="text-2xl bg-white/20">{getInitials()}</AvatarFallback>
+              </Avatar>
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div>
+                    <h2 className="text-2xl font-bold mb-1">{getDisplayName()}</h2>
+                    <p className="text-primary-foreground/70 text-sm">Member since {getMemberSince()}</p>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleEditClick}
+                    className="hover:bg-white/20 text-primary-foreground flex-shrink-0"
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
+                </div>
+                
+                <div className="flex items-center gap-3 mt-3">
+                  <div className="flex items-center gap-1.5 bg-white/20 px-3 py-1.5 rounded-full">
+                    <Star className="h-4 w-4 fill-yellow-300 text-yellow-300" />
+                    <span className="font-semibold text-sm">
+                      {profile?.rating ? profile.rating.toFixed(1) : 'New'}
+                    </span>
+                  </div>
+                  <span className="text-primary-foreground/70 text-sm">
+                    {profile?.review_count ? `${profile.review_count} ${profile.review_count === 1 ? 'review' : 'reviews'}` : 'No reviews yet'}
+                  </span>
+                </div>
               </div>
-              <span className="text-primary-foreground/80 text-sm">
-                {profile?.review_count ? `${profile.review_count} ${profile.review_count === 1 ? 'review' : 'reviews'}` : 'No reviews yet'}
-              </span>
             </div>
           </div>
-          
-          <Button variant="secondary" size="sm" className="flex-shrink-0" onClick={handleEditClick}>
-            <Edit className="h-4 w-4 mr-1" />
-            Edit
-          </Button>
-        </div>
+        </Card>
       </div>
 
       <div className="px-4 space-y-6">
