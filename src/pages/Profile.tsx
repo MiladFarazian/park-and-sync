@@ -374,38 +374,38 @@ const Profile = () => {
         
         {/* Profile Info Card */}
         <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-primary-foreground">
-          <div className="p-6">
-            <div className="flex items-start gap-4">
-              <Avatar className="h-24 w-24 border-4 border-white/30 shadow-lg">
+          <div className="p-4">
+            <div className="flex items-center gap-4">
+              <Avatar className="h-20 w-20 border-3 border-white/30 shadow-lg flex-shrink-0">
                 <AvatarImage src={profile?.avatar_url} />
-                <AvatarFallback className="text-2xl bg-white/20">{getInitials()}</AvatarFallback>
+                <AvatarFallback className="text-xl bg-white/20">{getInitials()}</AvatarFallback>
               </Avatar>
               
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2 mb-2">
-                  <div>
-                    <h2 className="text-2xl font-bold mb-1">{getDisplayName()}</h2>
-                    <p className="text-primary-foreground/70 text-sm">Member since {getMemberSince()}</p>
-                  </div>
+                  <h2 className="text-xl font-bold">{getDisplayName()}</h2>
                   <Button 
                     variant="ghost" 
                     size="sm" 
                     onClick={handleEditClick}
-                    className="hover:bg-white/20 text-primary-foreground flex-shrink-0"
+                    className="hover:bg-white/20 text-primary-foreground flex-shrink-0 h-8"
                   >
-                    <Edit className="h-4 w-4 mr-1" />
+                    <Edit className="h-3.5 w-3.5 mr-1" />
                     Edit
                   </Button>
                 </div>
                 
-                <div className="flex items-center gap-3 mt-3">
-                  <div className="flex items-center gap-1.5 bg-white/20 px-3 py-1.5 rounded-full">
-                    <Star className="h-4 w-4 fill-yellow-300 text-yellow-300" />
-                    <span className="font-semibold text-sm">
+                <p className="text-primary-foreground/70 text-xs mb-1">Member since</p>
+                <p className="text-primary-foreground/90 text-sm font-medium mb-2">{getMemberSince()}</p>
+                
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 bg-white/20 px-2 py-1 rounded-full">
+                    <Star className="h-3.5 w-3.5 fill-yellow-300 text-yellow-300" />
+                    <span className="font-semibold text-xs">
                       {profile?.rating ? profile.rating.toFixed(1) : 'New'}
                     </span>
                   </div>
-                  <span className="text-primary-foreground/70 text-sm">
+                  <span className="text-primary-foreground/70 text-xs">
                     {profile?.review_count ? `${profile.review_count} ${profile.review_count === 1 ? 'review' : 'reviews'}` : 'No reviews yet'}
                   </span>
                 </div>
