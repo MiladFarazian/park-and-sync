@@ -119,8 +119,7 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, explore
       zoom: 14 // Start at neighborhood zoom level
     });
 
-    // Add navigation controls
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    // Don't add navigation controls to avoid overlap with search bar
 
     // Mark map as ready when loaded
     map.current.on('load', () => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Loader2, Search, X, MapPin, Calendar, Clock, ArrowRight } from 'lucide-react';
+import { Loader2, Search, X, MapPin, Calendar, Clock, ArrowRight, Navigation } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,6 +25,7 @@ const Explore = () => {
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [endTime, setEndTime] = useState<Date | null>(null);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
   // Ensure end time is always after start time
   const validateAndSetTimes = (newStartTime: Date, newEndTime: Date | null) => {
@@ -54,6 +55,26 @@ const Explore = () => {
     }
   };
   const fetchTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Function to reverse geocode coordinates to address
+  const reverseGeocode = async (lat: number, lng: number) => {
+    if (!mapboxToken) return null;
+    
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxToken}&types=address,neighborhood,place`
+      );
+      const data = await response.json();
+      
+      if (data.features && data.features.length > 0) {
+        return data.features[0].place_name;
+      }
+    } catch (error) {
+      console.error('Error reverse geocoding:', error);
+    }
+    return null;
+  };
+
   useEffect(() => {
     fetchMapboxToken();
 
@@ -69,7 +90,14 @@ const Explore = () => {
         lng: parseFloat(lng)
       };
       setUserLocation(location);
-      if (query) setSearchQuery(query);
+      if (query) {
+        setSearchQuery(query);
+      } else if (mapboxToken) {
+        // Get address for the location
+        reverseGeocode(location.lat, location.lng).then(address => {
+          if (address) setSearchQuery(address);
+        });
+      }
       // Fetch spots for the initial location
       const startDate = start ? new Date(start) : new Date();
       const endDate = end ? new Date(end) : new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -79,24 +107,34 @@ const Explore = () => {
     } else {
       // Get user's current location
       if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(position => {
+        navigator.geolocation.getCurrentPosition(async (position) => {
           const location = {
             lat: position.coords.latitude,
             lng: position.coords.longitude
           };
           setUserLocation(location);
+          
+          // Get address for current location
+          if (mapboxToken) {
+            const address = await reverseGeocode(location.lat, location.lng);
+            if (address) setSearchQuery(address);
+          }
+          
           fetchNearbySpots(location, 15000, true);
         }, error => {
           console.log('Location access denied, using default location');
           fetchNearbySpots(userLocation, 15000, true);
+          // Set default location name
+          setSearchQuery('University Park, Los Angeles');
         });
       } else {
         fetchNearbySpots(userLocation, 15000, true);
+        setSearchQuery('University Park, Los Angeles');
       }
       if (start) setStartTime(new Date(start));
       if (end) setEndTime(new Date(end));
     }
-  }, [searchParams]);
+  }, [searchParams, mapboxToken]);
   const fetchMapboxToken = async () => {
     try {
       const {
@@ -179,6 +217,31 @@ const Explore = () => {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleSearchSubmit();
+    }
+  };
+
+  const handleGoToCurrentLocation = () => {
+    setIsLoadingLocation(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        const location = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        setUserLocation(location);
+        
+        // Get address for current location
+        if (mapboxToken) {
+          const address = await reverseGeocode(location.lat, location.lng);
+          if (address) setSearchQuery(address);
+        }
+        
+        fetchNearbySpots(location, 15000, false);
+        setIsLoadingLocation(false);
+      }, error => {
+        console.error('Error getting location:', error);
+        setIsLoadingLocation(false);
+      });
     }
   };
   const clearSearch = () => {
@@ -386,6 +449,20 @@ const Explore = () => {
             </Card>
           </div>}
       </div>
+      {/* Current Location Button */}
+      <button
+        onClick={handleGoToCurrentLocation}
+        disabled={isLoadingLocation}
+        className="absolute bottom-28 right-4 z-10 p-3 bg-background/95 backdrop-blur-sm shadow-lg rounded-full hover:bg-accent transition-colors disabled:opacity-50"
+        title="Go to current location"
+      >
+        {isLoadingLocation ? (
+          <Loader2 className="h-5 w-5 animate-spin" />
+        ) : (
+          <Navigation className="h-5 w-5" />
+        )}
+      </button>
+
       <MapView spots={parkingSpots} searchCenter={userLocation} onVisibleSpotsChange={() => {}} onMapMove={handleMapMove} exploreParams={{
       lat: userLocation?.lat.toString(),
       lng: userLocation?.lng.toString(),
