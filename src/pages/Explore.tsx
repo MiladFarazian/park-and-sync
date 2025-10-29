@@ -159,6 +159,28 @@ const Explore = () => {
     // Fetch spots for the new search location
     fetchNearbySpots(newLocation, 15000, false);
   };
+
+  const handleSearchSubmit = async () => {
+    if (!searchQuery.trim() || !mapboxToken) return;
+    
+    // Search for the location
+    try {
+      const response = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?access_token=${mapboxToken}&limit=1&types=place,locality,neighborhood,address,poi`);
+      const data = await response.json();
+      
+      if (data.features && data.features.length > 0) {
+        handleSelectLocation(data.features[0]);
+      }
+    } catch (error) {
+      console.error('Error searching location:', error);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearchSubmit();
+    }
+  };
   const clearSearch = () => {
     setSearchQuery('');
     setSuggestions([]);
@@ -253,15 +275,30 @@ const Explore = () => {
         </div>
       </div>;
   }
-  return <div className="h-[calc(100vh-64px)] relative pb-24 md:pb-0">
+  return <div className="h-[calc(100vh-64px)] relative">
       <div className="absolute top-4 left-4 right-4 z-10 space-y-2">
         <div className="relative max-w-md mx-auto">
-          <div className="relative">
-            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input value={searchQuery} onChange={handleSearchChange} onFocus={() => setShowSuggestions(true)} placeholder="Search by location, address, or landmark..." className="pl-10 pr-10 bg-background/95 backdrop-blur-sm shadow-lg" />
-            {searchQuery && <button onClick={clearSearch} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                <X className="h-4 w-4" />
-              </button>}
+          <div className="relative flex gap-2">
+            <div className="relative flex-1">
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input 
+                value={searchQuery} 
+                onChange={handleSearchChange} 
+                onFocus={() => setShowSuggestions(true)} 
+                onKeyDown={handleKeyDown}
+                placeholder="Search by location, address, or landmark..." 
+                className="pl-10 pr-10 bg-background/95 backdrop-blur-sm shadow-lg" 
+              />
+              {searchQuery && <button onClick={clearSearch} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>}
+            </div>
+            <button 
+              onClick={handleSearchSubmit}
+              className="flex-shrink-0 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors shadow-lg"
+            >
+              <Search className="h-4 w-4" />
+            </button>
             
             {showSuggestions && suggestions.length > 0 && <Card className="absolute top-full mt-2 w-full bg-background shadow-lg max-h-80 overflow-y-auto z-20">
                 {suggestions.map((suggestion, index) => <button key={index} onMouseDown={e => {
