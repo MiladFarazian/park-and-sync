@@ -93,7 +93,7 @@ const Messages = () => {
 
     loadMessages();
 
-    // Realtime subscription
+    // Realtime subscription - listen to all messages involving this user
     conversationChannelRef.current = supabase
       .channel(`conversation-${selectedConversation}`)
       .on(
@@ -101,17 +101,26 @@ const Messages = () => {
         {
           event: '*',
           schema: 'public',
-          table: 'messages',
-          filter: `or(and(sender_id.eq.${user.id},recipient_id.eq.${selectedConversation}),and(sender_id.eq.${selectedConversation},recipient_id.eq.${user.id}))`
+          table: 'messages'
         },
         (payload) => {
           if (!mountedRef.current) return;
           
-          console.log('[realtime]', payload.eventType, (payload.new as any)?.id);
+          const newMsg = payload.new as Message;
+          const oldMsg = payload.old as any;
+          
+          // Filter to only messages in this conversation
+          const isRelevant = (msg: Message | any) => {
+            return (msg.sender_id === user.id && msg.recipient_id === selectedConversation) ||
+                   (msg.sender_id === selectedConversation && msg.recipient_id === user.id);
+          };
+          
+          console.log('[realtime]', payload.eventType, newMsg?.id || oldMsg?.id);
           
           setMessages(prev => {
             if (payload.eventType === 'INSERT') {
-              const newMsg = payload.new as Message;
+              // Only process if relevant to this conversation
+              if (!isRelevant(newMsg)) return prev;
               
               // Avoid duplicates - check if this exact message already exists
               if (prev.some(m => m.id === newMsg.id)) {
@@ -131,12 +140,12 @@ const Messages = () => {
               );
             }
             if (payload.eventType === 'UPDATE') {
-              const updatedMsg = payload.new as Message;
-              return prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m);
+              if (!isRelevant(newMsg)) return prev;
+              return prev.map(m => m.id === newMsg.id ? { ...m, ...newMsg } : m);
             }
             if (payload.eventType === 'DELETE') {
-              const deletedId = (payload.old as any)?.id;
-              return prev.filter(m => m.id !== deletedId);
+              if (!isRelevant(oldMsg)) return prev;
+              return prev.filter(m => m.id !== oldMsg.id);
             }
             return prev;
           });
