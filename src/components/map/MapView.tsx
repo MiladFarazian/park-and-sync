@@ -172,6 +172,19 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, explore
     });
   }, [mapboxToken]);
 
+  // Move map when search center changes
+  useEffect(() => {
+    if (!map.current || !mapReady || !searchCenter) return;
+    
+    // Fly to the new search center location
+    map.current.flyTo({
+      center: [searchCenter.lng, searchCenter.lat],
+      zoom: 14,
+      essential: true,
+      duration: 1500
+    });
+  }, [searchCenter, mapReady]);
+
   // Add markers for spots
   useEffect(() => {
     if (!map.current || !mapReady) return;
