@@ -185,45 +185,62 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, explore
     // Create a custom element for the search marker
     const el = document.createElement('div');
     el.className = 'search-location-marker';
-    el.style.width = '32px';
-    el.style.height = '32px';
-    el.style.backgroundImage = 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`
-      <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="16" cy="16" r="14" fill="hsl(250, 100%, 65%)" stroke="white" stroke-width="3" opacity="0.9"/>
-        <circle cx="16" cy="16" r="6" fill="white"/>
+    el.style.width = '40px';
+    el.style.height = '40px';
+    el.style.position = 'relative';
+    
+    // Create the marker HTML
+    el.innerHTML = `
+      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+        <circle cx="20" cy="20" r="18" fill="hsl(250, 100%, 65%)" stroke="white" stroke-width="3" opacity="0.9"/>
+        <circle cx="20" cy="20" r="8" fill="white"/>
+        <circle cx="20" cy="20" r="4" fill="hsl(250, 100%, 65%)"/>
       </svg>
-    `) + '")';
-    el.style.backgroundSize = 'contain';
-    el.style.cursor = 'pointer';
+    `;
 
     // Add pulsing animation
-    el.style.animation = 'pulse 2s infinite';
-    
-    // Add CSS animation if not already added
+    const style = document.createElement('style');
     if (!document.getElementById('marker-pulse-style')) {
-      const style = document.createElement('style');
       style.id = 'marker-pulse-style';
       style.textContent = `
-        @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.7; transform: scale(1.1); }
+        @keyframes marker-pulse {
+          0%, 100% { 
+            opacity: 1; 
+            transform: scale(1); 
+          }
+          50% { 
+            opacity: 0.8; 
+            transform: scale(1.15); 
+          }
+        }
+        .search-location-marker {
+          animation: marker-pulse 2s ease-in-out infinite;
         }
       `;
       document.head.appendChild(style);
     }
 
-    // Create marker at search center
-    searchMarker.current = new mapboxgl.Marker(el)
-      .setLngLat([searchCenter.lng, searchCenter.lat])
-      .addTo(map.current);
-    
-    // Fly to the new search center location
+    // Fly to the new search center location first
     map.current.flyTo({
       center: [searchCenter.lng, searchCenter.lat],
       zoom: 14,
       essential: true,
       duration: 1500
     });
+
+    // Add marker after a short delay to ensure map has moved
+    setTimeout(() => {
+      if (map.current && searchCenter) {
+        searchMarker.current = new mapboxgl.Marker({
+          element: el,
+          anchor: 'center'
+        })
+          .setLngLat([searchCenter.lng, searchCenter.lat])
+          .addTo(map.current);
+        
+        console.log('Search marker added at:', searchCenter.lat, searchCenter.lng);
+      }
+    }, 100);
 
     // Cleanup function
     return () => {
