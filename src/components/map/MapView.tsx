@@ -74,6 +74,7 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, explore
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<mapboxgl.Marker[]>([]);
+  const searchMarker = useRef<mapboxgl.Marker | null>(null);
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -176,6 +177,46 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, explore
   useEffect(() => {
     if (!map.current || !mapReady || !searchCenter) return;
     
+    // Remove existing search marker if any
+    if (searchMarker.current) {
+      searchMarker.current.remove();
+    }
+
+    // Create a custom element for the search marker
+    const el = document.createElement('div');
+    el.className = 'search-location-marker';
+    el.style.width = '32px';
+    el.style.height = '32px';
+    el.style.backgroundImage = 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`
+      <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="16" cy="16" r="14" fill="hsl(250, 100%, 65%)" stroke="white" stroke-width="3" opacity="0.9"/>
+        <circle cx="16" cy="16" r="6" fill="white"/>
+      </svg>
+    `) + '")';
+    el.style.backgroundSize = 'contain';
+    el.style.cursor = 'pointer';
+
+    // Add pulsing animation
+    el.style.animation = 'pulse 2s infinite';
+    
+    // Add CSS animation if not already added
+    if (!document.getElementById('marker-pulse-style')) {
+      const style = document.createElement('style');
+      style.id = 'marker-pulse-style';
+      style.textContent = `
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.7; transform: scale(1.1); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    // Create marker at search center
+    searchMarker.current = new mapboxgl.Marker(el)
+      .setLngLat([searchCenter.lng, searchCenter.lat])
+      .addTo(map.current);
+    
     // Fly to the new search center location
     map.current.flyTo({
       center: [searchCenter.lng, searchCenter.lat],
@@ -183,6 +224,14 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, explore
       essential: true,
       duration: 1500
     });
+
+    // Cleanup function
+    return () => {
+      if (searchMarker.current) {
+        searchMarker.current.remove();
+        searchMarker.current = null;
+      }
+    };
   }, [searchCenter, mapReady]);
 
   // Add markers for spots
