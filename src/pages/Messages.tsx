@@ -117,18 +117,21 @@ const Messages = () => {
   });
   useEffect(() => {
     const userIdFromUrl = searchParams.get('userId');
-    if (userIdFromUrl) {
-      const existingConv = conversations.find(c => c.user_id === userIdFromUrl);
-      if (existingConv) {
-        setSelectedConversation(userIdFromUrl);
-        setNewUserProfile(null);
-      } else {
-        // Start new conversation - fetch user profile
-        fetchNewUserProfile(userIdFromUrl);
-        setSelectedConversation(userIdFromUrl);
-      }
+    if (!userIdFromUrl) return;
+
+    // Only react when the URL target actually changes to prevent resets
+    if (selectedConversation === userIdFromUrl) return;
+
+    const existingConv = conversations.find(c => c.user_id === userIdFromUrl);
+    if (existingConv) {
+      setSelectedConversation(userIdFromUrl);
+      setNewUserProfile(null);
+    } else {
+      // Start new conversation - fetch user profile once
+      fetchNewUserProfile(userIdFromUrl);
+      setSelectedConversation(userIdFromUrl);
     }
-  }, [searchParams, conversations]);
+  }, [searchParams, conversations, selectedConversation]);
 
   const fetchNewUserProfile = async (userId: string) => {
     try {
