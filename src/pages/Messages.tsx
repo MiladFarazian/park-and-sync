@@ -12,6 +12,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
+import { sendMessage as sendMessageLib } from '@/lib/sendMessage';
 
 const Messages = () => {
   const { user } = useAuth();
@@ -29,8 +31,6 @@ const Messages = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
-  const conversationChannelRef = useRef<any>(null);
-  const mountedRef = useRef(true);
 
   // Auto-select conversation from URL parameter
   useEffect(() => {
@@ -64,164 +64,38 @@ const Messages = () => {
     }
   };
 
-  // Load messages when conversation is selected and set up real-time subscription
+  // Load initial messages when conversation is selected
   useEffect(() => {
     if (!selectedConversation || !user) return;
-    
-    let cancelled = false;
-    mountedRef.current = true;
 
-    async function setupConversation() {
-      // Ensure socket has valid auth token before subscribing
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session || cancelled) return;
-      
-      supabase.realtime.setAuth(session.access_token);
-      console.log('[realtime] Socket auth set for conversation:', selectedConversation);
-
-      // Clean up previous subscription
-      if (conversationChannelRef.current) {
-        await supabase.removeChannel(conversationChannelRef.current);
-        conversationChannelRef.current = null;
-      }
-
-      // Initial fetch
+    const loadInitialMessages = async () => {
       const { data, error } = await supabase
         .from('messages')
         .select('*')
         .or(`and(sender_id.eq.${user.id},recipient_id.eq.${selectedConversation}),and(sender_id.eq.${selectedConversation},recipient_id.eq.${user.id})`)
         .order('created_at', { ascending: true });
 
-      if (cancelled || !mountedRef.current) return;
       if (!error && data) {
         setMessages(data as Message[]);
         await markAsRead(selectedConversation);
       }
-
-      // Setup Realtime subscription with proper filters
-      const handleMessage = (payload: any) => {
-        if (cancelled || !mountedRef.current) return;
-        const newMsg = payload.new as Message;
-        
-        console.log('[realtime]', payload.eventType, newMsg.id);
-        
-        setMessages(prev => {
-          // Dedupe by id (handles optimistic + realtime + insert response)
-          if (prev.some(m => m.id === newMsg.id)) {
-            console.log('[realtime] duplicate detected, skipping:', newMsg.id);
-            return prev;
-          }
-          
-          console.log('[realtime] adding new message:', newMsg.id);
-          
-          // Mark as read if from other user
-          if (newMsg.sender_id === selectedConversation) {
-            setTimeout(() => markAsRead(selectedConversation), 0);
-          }
-          
-          const next = [...prev, newMsg];
-          next.sort((a, b) => {
-            const ta = new Date(a.created_at).getTime();
-            const tb = new Date(b.created_at).getTime();
-            return ta === tb ? String(a.id).localeCompare(String(b.id)) : ta - tb;
-          });
-          return next;
-        });
-      };
-
-      const channel = supabase
-        .channel(`messages:${user.id}:${selectedConversation}`, {
-          config: { broadcast: { ack: true } }
-        })
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `sender_id=eq.${user.id},recipient_id=eq.${selectedConversation}`
-        }, handleMessage)
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `sender_id=eq.${selectedConversation},recipient_id=eq.${user.id}`
-        }, handleMessage)
-        .on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages',
-          filter: `sender_id=eq.${user.id},recipient_id=eq.${selectedConversation}`
-        }, (payload) => {
-          if (cancelled || !mountedRef.current) return;
-          const updatedMsg = payload.new as Message;
-          setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
-        })
-        .on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages',
-          filter: `sender_id=eq.${selectedConversation},recipient_id=eq.${user.id}`
-        }, (payload) => {
-          if (cancelled || !mountedRef.current) return;
-          const updatedMsg = payload.new as Message;
-          setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
-        })
-        .subscribe((status) => {
-          console.log('[realtime] subscription status:', status, `${user.id}:${selectedConversation}`);
-        });
-
-      conversationChannelRef.current = channel;
-    }
-
-    setupConversation();
-
-    return () => {
-      cancelled = true;
-      mountedRef.current = false;
-      if (conversationChannelRef.current) {
-        supabase.removeChannel(conversationChannelRef.current);
-        conversationChannelRef.current = null;
-      }
     };
-  }, [selectedConversation, user]);
 
-  // Safety net: refetch missed messages on tab focus (handles network drops)
+    loadInitialMessages();
+  }, [selectedConversation, user, markAsRead]);
+
+  // Set up real-time subscription with the dedicated hook
+  useRealtimeMessages(selectedConversation, user?.id, setMessages);
+
+  // Mark messages as read when receiving from other user
   useEffect(() => {
-    if (!selectedConversation || !user) return;
+    if (!selectedConversation || !user || messages.length === 0) return;
 
-    const refetchSinceLast = async () => {
-      if (messages.length === 0) return;
-      
-      const lastMsg = messages[messages.length - 1];
-      const { data } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`and(sender_id.eq.${user.id},recipient_id.eq.${selectedConversation}),and(sender_id.eq.${selectedConversation},recipient_id.eq.${user.id})`)
-        .gt('created_at', lastMsg.created_at)
-        .order('created_at', { ascending: true });
-
-      if (data && data.length > 0) {
-        console.log('[refetch] Found missed messages:', data.length);
-        setMessages(prev => {
-          const merged = [...prev];
-          for (const msg of data) {
-            if (!merged.some(m => m.id === msg.id)) {
-              merged.push(msg as Message);
-            }
-          }
-          merged.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-          return merged;
-        });
-      }
-    };
-
-    const onFocus = () => {
-      console.log('[refetch] Tab focused, checking for missed messages');
-      refetchSinceLast();
-    };
-
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [selectedConversation, user, messages.length]);
+    const latestMsg = messages[messages.length - 1];
+    if (latestMsg.sender_id === selectedConversation && !latestMsg.read_at) {
+      markAsRead(selectedConversation);
+    }
+  }, [messages, selectedConversation, user, markAsRead]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -264,8 +138,6 @@ const Messages = () => {
     if ((!messageInput.trim() && !selectedMedia) || !selectedConversation || !user) return;
 
     const messageText = messageInput.trim();
-    const tempId = `temp-${crypto.randomUUID()}`;
-    
     let mediaUrl: string | null = null;
     let mediaType: string | null = null;
 
@@ -278,7 +150,7 @@ const Messages = () => {
         const fileExt = selectedMedia.name.split('.').pop();
         const fileName = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
         
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('message-media')
           .upload(fileName, selectedMedia);
 
@@ -293,44 +165,25 @@ const Messages = () => {
         setUploadingMedia(false);
       }
 
-      // Optimistic update
-      const tempMessage: Message = {
-        id: tempId,
-        sender_id: user.id,
-        recipient_id: selectedConversation,
-        message: messageText || '',
-        created_at: new Date().toISOString(),
-        read_at: null,
-        delivered_at: null,
-        media_url: mediaUrl,
-        media_type: mediaType
-      };
-      
-      setMessages(prev => [...prev, tempMessage]);
+      // Clear input immediately for better UX
+      const textToSend = messageText;
       setMessageInput('');
       handleRemoveMedia();
 
-      // Insert message
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({
-          sender_id: user.id,
-          recipient_id: selectedConversation,
-          message: messageText || '',
-          media_url: mediaUrl,
-          media_type: mediaType,
-          delivered_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Replace temp message with server row
-      setMessages(prev => prev.map(m => (m.id === tempId ? (data as Message) : m)));
+      // Use the bulletproof send function
+      await sendMessageLib({
+        recipientId: selectedConversation,
+        senderId: user.id,
+        messageText: textToSend || '',
+        mediaUrl,
+        mediaType,
+        setMessages,
+        onError: (error) => {
+          toast.error('Failed to send message');
+          console.error('Error sending message:', error);
+        }
+      });
     } catch (error) {
-      // Rollback on error
-      setMessages(prev => prev.filter(m => m.id !== tempId));
       toast.error('Failed to send message');
       console.error('Error sending message:', error);
     } finally {
