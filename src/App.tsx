@@ -35,6 +35,13 @@ import { ModeProvider } from "./contexts/ModeContext";
 const queryClient = new QueryClient();
 
 const App = () => {
+  // Environment verification for debugging cross-build issues
+  useEffect(() => {
+    console.log('[ENV] VITE_SUPABASE_URL =', import.meta.env.VITE_SUPABASE_URL);
+    console.log('[ENV] VITE_SUPABASE_ANON_KEY set?', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+    console.log('[ENV] Current URL:', window.location.origin);
+  }, []);
+
   // CRITICAL: Keep Realtime socket authorized after token refresh/sign-in
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {

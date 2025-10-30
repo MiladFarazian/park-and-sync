@@ -23,6 +23,8 @@ export async function sendMessage({
   const clientId = crypto.randomUUID();
   const tempId = `temp-${clientId}`;
 
+  console.time('[PERF] send:optimistic-render');
+  
   // Optimistic update - add message immediately
   const optimisticMessage: Message = {
     id: tempId,
@@ -37,7 +39,10 @@ export async function sendMessage({
   };
 
   // Add optimistic message (no in-place mutation)
-  setMessages(prev => [...prev, optimisticMessage]);
+  setMessages(prev => {
+    console.timeEnd('[PERF] send:optimistic-render');
+    return [...prev, optimisticMessage];
+  });
 
   // 1) Broadcast immediately for instant cross-client echo
   const channel = supabase.channel(`messages:${recipientId}:${senderId}`);
@@ -56,6 +61,9 @@ export async function sendMessage({
   });
 
   // 2) Fire-and-forget insert (non-blocking)
+  console.time('[PERF] send:insert-request');
+  const insertStartTime = performance.now();
+  
   supabase
     .from('messages')
     .insert({
@@ -68,6 +76,9 @@ export async function sendMessage({
       client_id: clientId,
     })
     .then(({ error }) => {
+      console.timeEnd('[PERF] send:insert-request');
+      console.log('[PERF] send:insert-latency-ms', performance.now() - insertStartTime);
+      
       if (error) {
         console.error('Error sending message:', error);
         // Mark message as error (keep in UI to allow retry)

@@ -57,7 +57,9 @@ export function useRealtimeMessages(
       // Handler for postgres_changes (reconcile with canonical row)
       const handleNewMessage = (payload: any) => {
         if (cancelled) return;
+        const realtimeLatency = performance.now();
         const msg = payload.new as Message & { client_id?: string };
+        console.log('[PERF] realtime:postgres-insert-latency-ms', realtimeLatency - new Date(msg.created_at).getTime());
 
         setMessages(prev => {
           // Dedupe by id OR client_id (handles optimistic reconciliation)
