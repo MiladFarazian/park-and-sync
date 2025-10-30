@@ -9,11 +9,31 @@ export function useRealtimeMessages(
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
 ) {
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const pendingUpdatesRef = useRef<Array<() => void>>([]);
+  const batchTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!conversationUserId || !currentUserId) return;
     
     let cancelled = false;
+
+    // Batch multiple Realtime events into single state update (60fps = ~16ms batching)
+    const batchUpdate = (updateFn: () => void) => {
+      pendingUpdatesRef.current.push(updateFn);
+      
+      if (!batchTimeoutRef.current) {
+        batchTimeoutRef.current = window.requestAnimationFrame(() => {
+          if (cancelled) return;
+          
+          const updates = pendingUpdatesRef.current;
+          pendingUpdatesRef.current = [];
+          batchTimeoutRef.current = null;
+          
+          // Apply all pending updates in one batch
+          updates.forEach(fn => fn());
+        });
+      }
+    };
 
     async function setupChannel() {
       const { data: { session } } = await supabase.auth.getSession();
@@ -34,23 +54,25 @@ export function useRealtimeMessages(
         if (cancelled) return;
         const msg = payload.payload as Message & { client_id?: string };
 
-        setMessages(prev => {
-          // Dedupe by client_id
-          if (prev.some(m => m.client_id === msg.client_id || m.id === msg.id)) return prev;
-          
-          const ephemeral = {
-            ...msg,
-            id: `temp-${msg.client_id}`,
-            status: 'sending' as const,
-          };
-          
-          const next = [...prev, ephemeral];
-          next.sort((a, b) => {
-            const ta = new Date(a.created_at).getTime();
-            const tb = new Date(b.created_at).getTime();
-            return ta === tb ? String(a.id).localeCompare(String(b.id)) : ta - tb;
+        batchUpdate(() => {
+          setMessages(prev => {
+            // Dedupe by client_id
+            if (prev.some(m => m.client_id === msg.client_id || m.id === msg.id)) return prev;
+            
+            const ephemeral = {
+              ...msg,
+              id: `temp-${msg.client_id}`,
+              status: 'sending' as const,
+            };
+            
+            const next = [...prev, ephemeral];
+            next.sort((a, b) => {
+              const ta = new Date(a.created_at).getTime();
+              const tb = new Date(b.created_at).getTime();
+              return ta === tb ? String(a.id).localeCompare(String(b.id)) : ta - tb;
+            });
+            return next;
           });
-          return next;
         });
       };
 
@@ -61,32 +83,34 @@ export function useRealtimeMessages(
         const msg = payload.new as Message & { client_id?: string };
         console.log('[PERF] realtime:postgres-insert-latency-ms', realtimeLatency - new Date(msg.created_at).getTime());
 
-        setMessages(prev => {
-          // Dedupe by id OR client_id (handles optimistic reconciliation)
-          const existingIndex = prev.findIndex(m => 
-            m.id === msg.id || 
-            (msg.client_id && m.id === `temp-${msg.client_id}`) ||
-            (msg.client_id && m.id === `error-${msg.client_id}`)
-          );
+        batchUpdate(() => {
+          setMessages(prev => {
+            // Dedupe by id OR client_id (handles optimistic reconciliation)
+            const existingIndex = prev.findIndex(m => 
+              m.id === msg.id || 
+              (msg.client_id && m.id === `temp-${msg.client_id}`) ||
+              (msg.client_id && m.id === `error-${msg.client_id}`)
+            );
 
-          if (existingIndex !== -1) {
-            // Replace optimistic message with real one
-            const next = [...prev];
-            next[existingIndex] = msg;
+            if (existingIndex !== -1) {
+              // Replace optimistic message with real one
+              const next = [...prev];
+              next[existingIndex] = msg;
+              return next;
+            }
+
+            // New message - add and sort
+            const next = [...prev, msg];
+            
+            // Sort by created_at, then by id for timestamp collisions
+            next.sort((a, b) => {
+              const ta = new Date(a.created_at).getTime();
+              const tb = new Date(b.created_at).getTime();
+              return ta === tb ? String(a.id).localeCompare(String(b.id)) : ta - tb;
+            });
+
             return next;
-          }
-
-          // New message - add and sort
-          const next = [...prev, msg];
-          
-          // Sort by created_at, then by id for timestamp collisions
-          next.sort((a, b) => {
-            const ta = new Date(a.created_at).getTime();
-            const tb = new Date(b.created_at).getTime();
-            return ta === tb ? String(a.id).localeCompare(String(b.id)) : ta - tb;
           });
-
-          return next;
         });
       };
 
@@ -118,7 +142,9 @@ export function useRealtimeMessages(
         }, (payload) => {
           if (cancelled) return;
           const updatedMsg = payload.new as Message;
-          setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
+          batchUpdate(() => {
+            setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
+          });
         })
         .on('postgres_changes', {
           event: 'UPDATE',
@@ -128,7 +154,9 @@ export function useRealtimeMessages(
         }, (payload) => {
           if (cancelled) return;
           const updatedMsg = payload.new as Message;
-          setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
+          batchUpdate(() => {
+            setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
+          });
         })
         .subscribe((status) => {
           console.log('[realtime] Subscription status:', status, `${currentUserId}:${conversationUserId}`);
@@ -178,6 +206,11 @@ export function useRealtimeMessages(
 
     return () => {
       cancelled = true;
+      if (batchTimeoutRef.current) {
+        cancelAnimationFrame(batchTimeoutRef.current);
+        batchTimeoutRef.current = null;
+      }
+      pendingUpdatesRef.current = [];
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;

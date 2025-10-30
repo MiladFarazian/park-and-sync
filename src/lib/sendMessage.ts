@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Message } from '@/hooks/useMessages';
 
-export async function sendMessage({
+export function sendMessage({
   recipientId,
   senderId,
   messageText,
@@ -15,7 +15,7 @@ export async function sendMessage({
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   onSuccess?: () => void;
   onError?: (error: any) => void;
-}): Promise<string> {
+}): string {
   const clientId = crypto.randomUUID();
   const tempId = `temp-${clientId}`;
 

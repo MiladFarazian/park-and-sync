@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 import { sendMessage as sendMessageLib } from '@/lib/sendMessage';
+import { compressImage } from '@/lib/compressImage';
 import { Virtuoso } from 'react-virtuoso';
 
 // Memoized message item component for performance
@@ -212,18 +213,20 @@ const Messages = () => {
     }
   };
 
-  const handleSendMessage = async () => {
+  const handleSendMessage = () => {
     if ((!messageInput.trim() && !selectedMedia) || !selectedConversation || !user) return;
 
     const messageText = messageInput.trim();
     const mediaToUpload = selectedMedia;
 
+    console.time('[PERF] send:total');
+    
     // CRITICAL: Clear input immediately (send without media first)
     setMessageInput('');
     handleRemoveMedia();
 
-    // Fire-and-forget: render optimistic bubble + broadcast + insert (non-blocking)
-    const clientId = await sendMessageLib({
+    // Fire-and-forget: render optimistic bubble + broadcast + insert (non-blocking, <10ms)
+    const clientId = sendMessageLib({
       recipientId: selectedConversation,
       senderId: user.id,
       messageText: messageText || '',
@@ -233,48 +236,78 @@ const Messages = () => {
         console.error('Error sending message:', error);
       }
     });
+    
+    console.timeEnd('[PERF] send:total');
 
     // Background upload (if media selected) - doesn't block send
     if (mediaToUpload) {
       setUploadingMedia(true);
       
-      try {
-        const fileExt = mediaToUpload.name.split('.').pop();
-        const fileName = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('message-media')
-          .upload(fileName, mediaToUpload, {
-            cacheControl: '3600',
-            upsert: false,
-            contentType: mediaToUpload.type
-          });
+      (async () => {
+        try {
+          console.time('[PERF] media:compression');
+          const compressedFile = await compressImage(mediaToUpload);
+          console.timeEnd('[PERF] media:compression');
+          
+          console.time('[PERF] media:upload');
+          const fileExt = compressedFile.name.split('.').pop();
+          const fileName = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('message-media')
+            .upload(fileName, compressedFile, {
+              cacheControl: '3600',
+              upsert: false,
+              contentType: compressedFile.type
+            });
 
-        if (uploadError) throw uploadError;
+          if (uploadError) throw uploadError;
+          console.timeEnd('[PERF] media:upload');
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('message-media')
-          .getPublicUrl(fileName);
+          const { data: { publicUrl } } = supabase.storage
+            .from('message-media')
+            .getPublicUrl(fileName);
 
-        // Get the real DB id by client_id
-        const { data: row } = await supabase
-          .from('messages')
-          .select('id')
-          .eq('client_id', clientId)
-          .single();
+          // Get the real DB id by client_id (retry up to 3 times with backoff)
+          let row = null;
+          for (let i = 0; i < 3; i++) {
+            const { data } = await supabase
+              .from('messages')
+              .select('id')
+              .eq('client_id', clientId)
+              .maybeSingle();
+            
+            if (data) {
+              row = data;
+              break;
+            }
+            
+            // Wait before retry (exponential backoff: 100ms, 200ms, 400ms)
+            await new Promise(r => setTimeout(r, 100 * Math.pow(2, i)));
+          }
 
-        if (row?.id) {
-          // Update the message with media (Realtime UPDATE will show it)
-          await supabase.from('messages')
-            .update({ media_url: publicUrl, media_type: mediaToUpload.type })
-            .eq('id', row.id);
+          if (row?.id) {
+            // Update the message with media (Realtime UPDATE will show it)
+            await supabase.from('messages')
+              .update({ media_url: publicUrl, media_type: compressedFile.type })
+              .eq('id', row.id);
+          } else {
+            throw new Error('Message not found after upload');
+          }
+        } catch (error) {
+          toast.error('Failed to upload media');
+          console.error('Error uploading media:', error);
+          
+          // Mark message as error
+          setMessages(prev => prev.map(m =>
+            m.client_id === clientId
+              ? { ...m, id: `error-${clientId}` }
+              : m
+          ));
+        } finally {
+          setUploadingMedia(false);
         }
-      } catch (error) {
-        toast.error('Failed to upload media');
-        console.error('Error uploading media:', error);
-      } finally {
-        setUploadingMedia(false);
-      }
+      })();
     }
   };
 
