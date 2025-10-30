@@ -187,7 +187,6 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, explore
     el.className = 'search-location-marker';
     el.style.width = '40px';
     el.style.height = '40px';
-    el.style.position = 'relative';
     
     // Create the marker HTML
     el.innerHTML = `
