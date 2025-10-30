@@ -67,129 +67,115 @@ const Messages = () => {
   // Load messages when conversation is selected and set up real-time subscription
   useEffect(() => {
     if (!selectedConversation || !user) return;
+    
+    let cancelled = false;
     mountedRef.current = true;
 
-    // Clean up previous subscription
-    if (conversationChannelRef.current) {
-      supabase.removeChannel(conversationChannelRef.current);
-      conversationChannelRef.current = null;
-    }
+    async function setupConversation() {
+      // Ensure socket has valid auth token before subscribing
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || cancelled) return;
+      
+      supabase.realtime.setAuth(session.access_token);
+      console.log('[realtime] Socket auth set for conversation:', selectedConversation);
 
-    // Initial fetch
-    const loadMessages = async () => {
+      // Clean up previous subscription
+      if (conversationChannelRef.current) {
+        await supabase.removeChannel(conversationChannelRef.current);
+        conversationChannelRef.current = null;
+      }
+
+      // Initial fetch
       const { data, error } = await supabase
         .from('messages')
         .select('*')
         .or(`and(sender_id.eq.${user.id},recipient_id.eq.${selectedConversation}),and(sender_id.eq.${selectedConversation},recipient_id.eq.${user.id})`)
         .order('created_at', { ascending: true });
 
-      if (!mountedRef.current) return;
+      if (cancelled || !mountedRef.current) return;
       if (!error && data) {
         setMessages(data as Message[]);
-        // Mark messages as read
         await markAsRead(selectedConversation);
       }
-    };
 
-    loadMessages();
+      // Setup Realtime subscription with proper filters
+      const handleMessage = (payload: any) => {
+        if (cancelled || !mountedRef.current) return;
+        const newMsg = payload.new as Message;
+        
+        console.log('[realtime]', payload.eventType, newMsg.id);
+        
+        setMessages(prev => {
+          // Dedupe by id (handles optimistic + realtime + insert response)
+          if (prev.some(m => m.id === newMsg.id)) {
+            console.log('[realtime] duplicate detected, skipping:', newMsg.id);
+            return prev;
+          }
+          
+          console.log('[realtime] adding new message:', newMsg.id);
+          
+          // Mark as read if from other user
+          if (newMsg.sender_id === selectedConversation) {
+            setTimeout(() => markAsRead(selectedConversation), 0);
+          }
+          
+          const next = [...prev, newMsg];
+          next.sort((a, b) => {
+            const ta = new Date(a.created_at).getTime();
+            const tb = new Date(b.created_at).getTime();
+            return ta === tb ? String(a.id).localeCompare(String(b.id)) : ta - tb;
+          });
+          return next;
+        });
+      };
 
-    // Realtime subscription - filter at Postgres level for efficiency
-    conversationChannelRef.current = supabase
-      .channel(`conversation-${selectedConversation}`)
-      .on(
-        'postgres_changes',
-        {
+      const channel = supabase
+        .channel(`messages:${user.id}:${selectedConversation}`, {
+          config: { broadcast: { ack: true } }
+        })
+        .on('postgres_changes', {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
           filter: `sender_id=eq.${user.id},recipient_id=eq.${selectedConversation}`
-        },
-        (payload) => {
-          if (!mountedRef.current) return;
-          const newMsg = payload.new as Message;
-          
-          console.log('[realtime] INSERT from me:', newMsg.id);
-          
-          setMessages(prev => {
-            // Check for duplicate (optimistic message already replaced by insert response)
-            if (prev.some(m => m.id === newMsg.id)) {
-              console.log('[realtime] duplicate detected, skipping:', newMsg.id);
-              return prev;
-            }
-            
-            console.log('[realtime] adding new message:', newMsg.id);
-            return [...prev, newMsg].sort((a, b) => {
-              const timeCompare = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-              return timeCompare !== 0 ? timeCompare : a.id.localeCompare(b.id);
-            });
-          });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
+        }, handleMessage)
+        .on('postgres_changes', {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
           filter: `sender_id=eq.${selectedConversation},recipient_id=eq.${user.id}`
-        },
-        (payload) => {
-          if (!mountedRef.current) return;
-          const newMsg = payload.new as Message;
-          
-          console.log('[realtime] INSERT from other user:', newMsg.id);
-          
-          setMessages(prev => {
-            // Check for duplicate
-            if (prev.some(m => m.id === newMsg.id)) {
-              console.log('[realtime] duplicate detected, skipping:', newMsg.id);
-              return prev;
-            }
-            
-            console.log('[realtime] adding new message and marking read:', newMsg.id);
-            // Mark as read asynchronously
-            markAsRead(selectedConversation);
-            
-            return [...prev, newMsg].sort((a, b) => {
-              const timeCompare = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-              return timeCompare !== 0 ? timeCompare : a.id.localeCompare(b.id);
-            });
-          });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
+        }, handleMessage)
+        .on('postgres_changes', {
           event: 'UPDATE',
           schema: 'public',
           table: 'messages',
           filter: `sender_id=eq.${user.id},recipient_id=eq.${selectedConversation}`
-        },
-        (payload) => {
-          if (!mountedRef.current) return;
+        }, (payload) => {
+          if (cancelled || !mountedRef.current) return;
           const updatedMsg = payload.new as Message;
           setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
+        })
+        .on('postgres_changes', {
           event: 'UPDATE',
           schema: 'public',
           table: 'messages',
           filter: `sender_id=eq.${selectedConversation},recipient_id=eq.${user.id}`
-        },
-        (payload) => {
-          if (!mountedRef.current) return;
+        }, (payload) => {
+          if (cancelled || !mountedRef.current) return;
           const updatedMsg = payload.new as Message;
           setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
-        }
-      )
-      .subscribe((status) => {
-        console.log('[realtime] subscription status:', status, `conversation-${selectedConversation}`);
-      });
+        })
+        .subscribe((status) => {
+          console.log('[realtime] subscription status:', status, `${user.id}:${selectedConversation}`);
+        });
+
+      conversationChannelRef.current = channel;
+    }
+
+    setupConversation();
 
     return () => {
+      cancelled = true;
       mountedRef.current = false;
       if (conversationChannelRef.current) {
         supabase.removeChannel(conversationChannelRef.current);
@@ -197,6 +183,45 @@ const Messages = () => {
       }
     };
   }, [selectedConversation, user]);
+
+  // Safety net: refetch missed messages on tab focus (handles network drops)
+  useEffect(() => {
+    if (!selectedConversation || !user) return;
+
+    const refetchSinceLast = async () => {
+      if (messages.length === 0) return;
+      
+      const lastMsg = messages[messages.length - 1];
+      const { data } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${user.id},recipient_id.eq.${selectedConversation}),and(sender_id.eq.${selectedConversation},recipient_id.eq.${user.id})`)
+        .gt('created_at', lastMsg.created_at)
+        .order('created_at', { ascending: true });
+
+      if (data && data.length > 0) {
+        console.log('[refetch] Found missed messages:', data.length);
+        setMessages(prev => {
+          const merged = [...prev];
+          for (const msg of data) {
+            if (!merged.some(m => m.id === msg.id)) {
+              merged.push(msg as Message);
+            }
+          }
+          merged.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          return merged;
+        });
+      }
+    };
+
+    const onFocus = () => {
+      console.log('[refetch] Tab focused, checking for missed messages');
+      refetchSinceLast();
+    };
+
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [selectedConversation, user, messages.length]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {

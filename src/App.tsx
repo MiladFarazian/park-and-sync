@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import AppLayout from "./components/layout/AppLayout";
 import Home from "./pages/Home";
 import Explore from "./pages/Explore";
@@ -32,7 +34,23 @@ import { ModeProvider } from "./contexts/ModeContext";
 
 const queryClient = new QueryClient();
 
-const App = () => (
+const App = () => {
+  // CRITICAL: Keep Realtime socket authorized after token refresh/sign-in
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      supabase.realtime.setAuth(session?.access_token ?? '');
+      console.log('[realtime-auth] Updated socket token:', session?.access_token ? 'present' : 'none');
+    });
+
+    // Set initial auth
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      supabase.realtime.setAuth(session?.access_token ?? '');
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  return (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <ModeProvider>
@@ -72,11 +90,12 @@ const App = () => (
               </AppLayout>
             } />
           </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-      </ModeProvider>
-    </AuthProvider>
+    </BrowserRouter>
+  </TooltipProvider>
+  </ModeProvider>
+  </AuthProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;
