@@ -198,19 +198,39 @@ const Messages = () => {
     if ((!messageInput.trim() && !selectedMedia) || !selectedConversation || !user) return;
 
     const messageText = messageInput.trim();
-    let mediaUrl: string | null = null;
-    let mediaType: string | null = null;
+    const mediaToUpload = selectedMedia;
 
-    // Upload media if selected (this is the ONLY thing we await)
-    if (selectedMedia) {
+    // CRITICAL: Clear input immediately (send without media first)
+    setMessageInput('');
+    handleRemoveMedia();
+
+    // Fire-and-forget: render optimistic bubble + broadcast + insert (non-blocking)
+    const clientId = await sendMessageLib({
+      recipientId: selectedConversation,
+      senderId: user.id,
+      messageText: messageText || '',
+      setMessages,
+      onError: (error) => {
+        toast.error('Failed to send message');
+        console.error('Error sending message:', error);
+      }
+    });
+
+    // Background upload (if media selected) - doesn't block send
+    if (mediaToUpload) {
+      setUploadingMedia(true);
+      
       try {
-        setUploadingMedia(true);
-        const fileExt = selectedMedia.name.split('.').pop();
+        const fileExt = mediaToUpload.name.split('.').pop();
         const fileName = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
           .from('message-media')
-          .upload(fileName, selectedMedia);
+          .upload(fileName, mediaToUpload, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: mediaToUpload.type
+          });
 
         if (uploadError) throw uploadError;
 
@@ -218,36 +238,26 @@ const Messages = () => {
           .from('message-media')
           .getPublicUrl(fileName);
 
-        mediaUrl = publicUrl;
-        mediaType = selectedMedia.type;
+        // Get the real DB id by client_id
+        const { data: row } = await supabase
+          .from('messages')
+          .select('id')
+          .eq('client_id', clientId)
+          .single();
+
+        if (row?.id) {
+          // Update the message with media (Realtime UPDATE will show it)
+          await supabase.from('messages')
+            .update({ media_url: publicUrl, media_type: mediaToUpload.type })
+            .eq('id', row.id);
+        }
       } catch (error) {
         toast.error('Failed to upload media');
         console.error('Error uploading media:', error);
-        setUploadingMedia(false);
-        return;
       } finally {
         setUploadingMedia(false);
       }
     }
-
-    // CRITICAL: Clear input immediately (no await after this point)
-    const textToSend = messageText;
-    setMessageInput('');
-    handleRemoveMedia();
-
-    // Fire-and-forget: render optimistic bubble + broadcast + insert (non-blocking)
-    sendMessageLib({
-      recipientId: selectedConversation,
-      senderId: user.id,
-      messageText: textToSend || '',
-      mediaUrl,
-      mediaType,
-      setMessages,
-      onError: (error) => {
-        toast.error('Failed to send message');
-        console.error('Error sending message:', error);
-      }
-    });
   };
 
   const filteredConversations = conversations.filter(conv =>
@@ -417,8 +427,7 @@ const Messages = () => {
                   placeholder="Type a message..."
                   value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !uploadingMedia && handleSendMessage()}
-                  disabled={uploadingMedia}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                 />
                 <Button 
                   onClick={handleSendMessage} 

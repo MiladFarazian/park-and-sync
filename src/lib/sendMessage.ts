@@ -5,8 +5,6 @@ export async function sendMessage({
   recipientId,
   senderId,
   messageText,
-  mediaUrl,
-  mediaType,
   setMessages,
   onSuccess,
   onError,
@@ -14,12 +12,10 @@ export async function sendMessage({
   recipientId: string;
   senderId: string;
   messageText: string;
-  mediaUrl: string | null;
-  mediaType: string | null;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   onSuccess?: () => void;
   onError?: (error: any) => void;
-}) {
+}): Promise<string> {
   const clientId = crypto.randomUUID();
   const tempId = `temp-${clientId}`;
 
@@ -34,8 +30,9 @@ export async function sendMessage({
     created_at: new Date().toISOString(),
     read_at: null,
     delivered_at: null,
-    media_url: mediaUrl,
-    media_type: mediaType,
+    media_url: null,
+    media_type: null,
+    client_id: clientId,
   };
 
   // Add optimistic message (no in-place mutation)
@@ -54,8 +51,8 @@ export async function sendMessage({
       sender_id: senderId,
       recipient_id: recipientId,
       message: messageText,
-      media_url: mediaUrl,
-      media_type: mediaType,
+      media_url: null,
+      media_type: null,
       created_at: optimisticMessage.created_at,
     }
   });
@@ -70,8 +67,6 @@ export async function sendMessage({
       sender_id: senderId,
       recipient_id: recipientId,
       message: messageText,
-      media_url: mediaUrl,
-      media_type: mediaType,
       delivered_at: new Date().toISOString(),
       client_id: clientId,
     })
@@ -91,4 +86,6 @@ export async function sendMessage({
         onSuccess?.();
       }
     });
+
+  return clientId;
 }
