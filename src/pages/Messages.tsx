@@ -37,6 +37,10 @@ const MessageItem = memo(({ message, isMe }: { message: Message; isMe: boolean }
                 src={message.media_url} 
                 alt="Shared media"
                 className="rounded-md max-w-full h-auto max-h-64 object-cover"
+                onError={(e) => {
+                  console.error('Failed to load image:', message.media_url);
+                  e.currentTarget.style.display = 'none';
+                }}
               />
             )}
             {isVideo && (
@@ -44,6 +48,9 @@ const MessageItem = memo(({ message, isMe }: { message: Message; isMe: boolean }
                 src={message.media_url} 
                 controls
                 className="rounded-md max-w-full h-auto max-h-64"
+                onError={(e) => {
+                  console.error('Failed to load video:', message.media_url);
+                }}
               />
             )}
           </div>
@@ -143,6 +150,17 @@ const Messages = () => {
       if (!error && data) {
         setMessages(data as Message[]);
         await markAsRead(selectedConversation);
+        
+        // Scroll to bottom after messages load
+        setTimeout(() => {
+          if (virtuosoRef.current && data.length > 0) {
+            virtuosoRef.current.scrollToIndex({
+              index: data.length - 1,
+              align: 'end',
+              behavior: 'auto'
+            });
+          }
+        }, 100);
       }
     };
 
