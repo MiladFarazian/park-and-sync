@@ -91,7 +91,7 @@ MessageItem.displayName = 'MessageItem';
 
 const Messages = () => {
   const { user } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { conversations, loading, markAsRead } = useMessages();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [newUserProfile, setNewUserProfile] = useState<any>(null);
@@ -423,7 +423,10 @@ const Messages = () => {
               filteredConversations.map((conversation) => (
                 <button
                   key={conversation.user_id}
-                  onClick={() => setSelectedConversation(conversation.user_id)}
+                  onClick={() => {
+                    setSelectedConversation(conversation.user_id);
+                    setSearchParams({ userId: conversation.user_id }, { replace: true });
+                  }}
                   className={`w-full p-3 rounded-lg text-left transition-colors hover:bg-accent ${
                     selectedConversation === conversation.user_id ? 'bg-accent' : ''
                   }`}
@@ -463,7 +466,10 @@ const Messages = () => {
           <>
             <div className="p-4 border-b">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelectedConversation(null)}>
+                <Button variant="ghost" size="icon" className="md:hidden" onClick={() => {
+                  setSelectedConversation(null);
+                  setSearchParams({}, { replace: true });
+                }}>
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <Avatar>
