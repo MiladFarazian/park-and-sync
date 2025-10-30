@@ -42,7 +42,9 @@ export function sendMessage({
   });
 
   // 1) Broadcast immediately for instant cross-client echo
-  const channel = supabase.channel(`messages:${recipientId}:${senderId}`);
+  const channel = supabase.channel(`messages:${recipientId}:${senderId}`, {
+    config: { broadcast: { ack: false } }
+  });
   channel.send({
     type: 'broadcast',
     event: 'pending_message',
@@ -56,6 +58,10 @@ export function sendMessage({
       created_at: optimisticMessage.created_at,
     }
   });
+  // Prevent channel leaks: remove after next tick so the message can flush
+  setTimeout(() => {
+    try { supabase.removeChannel(channel); } catch {}
+  }, 0);
 
   // 2) Fire-and-forget insert (non-blocking)
   console.time('[PERF] send:insert-request');

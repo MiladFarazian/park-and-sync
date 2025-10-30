@@ -431,7 +431,6 @@ const Messages = () => {
                 <button
                   key={conversation.user_id}
                   onClick={() => {
-                    setSelectedConversation(conversation.user_id);
                     setSearchParams({ userId: conversation.user_id }, { replace: true });
                   }}
                   className={`w-full p-3 rounded-lg text-left transition-colors hover:bg-accent ${
@@ -474,7 +473,6 @@ const Messages = () => {
             <div className="p-4 border-b">
               <div className="flex items-center gap-3">
                 <Button variant="ghost" size="icon" className="md:hidden" onClick={() => {
-                  setSelectedConversation(null);
                   setSearchParams({}, { replace: true });
                 }}>
                   <ArrowLeft className="h-5 w-5" />
