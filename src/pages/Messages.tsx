@@ -148,12 +148,19 @@ const Messages = () => {
 
   // Load initial messages when conversation is selected
   useEffect(() => {
-    if (!selectedConversation || !user) return;
+    if (!selectedConversation || !user) {
+      setMessages([]);
+      return;
+    }
+
+    // CRITICAL: Clear messages immediately to prevent glitching between conversations
+    setMessages([]);
+    setShowNewMessageButton(false);
+    initialLoadRef.current = true;
+    loadingOlderRef.current = false;
+    atBottomRef.current = true;
 
     const loadInitialMessages = async () => {
-      initialLoadRef.current = true;
-      loadingOlderRef.current = false;
-      
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -163,8 +170,6 @@ const Messages = () => {
       if (!error && data) {
         setMessages(data as Message[]);
         await markAsRead(selectedConversation);
-        atBottomRef.current = true;
-        setShowNewMessageButton(false);
         
         // Scroll to bottom on initial load only
         setTimeout(() => {
@@ -458,6 +463,7 @@ const Messages = () => {
               ) : (
                 <>
                   <Virtuoso
+                    key={selectedConversation}
                     ref={virtuosoRef}
                     data={sortedMessages}
                     computeItemKey={(index, item) => item.id}
