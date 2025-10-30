@@ -101,14 +101,20 @@ const Messages = () => {
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
-  const [atBottom, setAtBottom] = useState(true);
   const [showNewMessageButton, setShowNewMessageButton] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const virtuosoRef = useRef<any>(null);
+  const atBottomRef = useRef(true); // Use ref to avoid re-renders on scroll
   const isMobile = useIsMobile();
   const initialLoadRef = useRef(true);
+  const loadingOlderRef = useRef(false);
 
-  // Auto-select conversation from URL parameter
+  // Sort messages once per render (no in-place mutation)
+  const sortedMessages = [...messages].sort((a, b) => {
+    const ta = new Date(a.created_at).getTime();
+    const tb = new Date(b.created_at).getTime();
+    return ta === tb ? String(a.id).localeCompare(String(b.id)) : ta - tb;
+  });
   useEffect(() => {
     const userIdFromUrl = searchParams.get('userId');
     if (userIdFromUrl) {
@@ -146,6 +152,8 @@ const Messages = () => {
 
     const loadInitialMessages = async () => {
       initialLoadRef.current = true;
+      loadingOlderRef.current = false;
+      
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -155,7 +163,7 @@ const Messages = () => {
       if (!error && data) {
         setMessages(data as Message[]);
         await markAsRead(selectedConversation);
-        setAtBottom(true);
+        atBottomRef.current = true;
         setShowNewMessageButton(false);
         
         // Scroll to bottom on initial load only
@@ -166,8 +174,8 @@ const Messages = () => {
               align: 'end',
               behavior: 'auto'
             });
-            initialLoadRef.current = false;
           }
+          initialLoadRef.current = false;
         }, 50);
       }
     };
@@ -177,23 +185,33 @@ const Messages = () => {
 
   // Set up real-time subscription with the dedicated hook
   useRealtimeMessages(selectedConversation, user?.id, setMessages);
-
-  // Mark messages as read and handle new message notifications
-  useEffect(() => {
-    if (!selectedConversation || !user || messages.length === 0) return;
-
-    const latestMsg = messages[messages.length - 1];
+  
+  // Load older messages when scrolling to top
+  const loadOlderMessages = async () => {
+    if (!selectedConversation || !user || loadingOlderRef.current || sortedMessages.length === 0) return;
     
-    // Mark as read if we're at bottom and it's from the other user
-    if (atBottom && latestMsg.sender_id === selectedConversation && !latestMsg.read_at) {
-      markAsRead(selectedConversation);
-    }
+    loadingOlderRef.current = true;
+    const oldestMessage = sortedMessages[0];
     
-    // Show "new messages" button if we're scrolled up and new message arrives
-    if (!atBottom && !initialLoadRef.current && latestMsg.sender_id === selectedConversation) {
-      setShowNewMessageButton(true);
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${user.id},recipient_id.eq.${selectedConversation}),and(sender_id.eq.${selectedConversation},recipient_id.eq.${user.id})`)
+        .lt('created_at', oldestMessage.created_at)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (!error && data && data.length > 0) {
+        // Prepend older messages (Virtuoso handles position preservation)
+        setMessages(prev => [...data.reverse(), ...prev]);
+      }
+    } catch (error) {
+      console.error('Error loading older messages:', error);
+    } finally {
+      loadingOlderRef.current = false;
     }
-  }, [messages, selectedConversation, user, markAsRead, atBottom]);
+  };
   
   const scrollToBottom = () => {
     if (virtuosoRef.current) {
@@ -433,7 +451,7 @@ const Messages = () => {
               </div>
             </div>
             <div className="flex-1 relative">
-              {messages.length === 0 ? (
+              {sortedMessages.length === 0 ? (
                 <div className="absolute inset-0 flex items-center justify-center text-center text-muted-foreground">
                   <p className="text-sm">No messages yet. Start the conversation!</p>
                 </div>
@@ -441,26 +459,36 @@ const Messages = () => {
                 <>
                   <Virtuoso
                     ref={virtuosoRef}
-                    data={messages}
-                    followOutput={(isAtBottom) => {
-                      // Only auto-scroll if user is at bottom (within 100px)
-                      // This allows free scrolling up without interruption
-                      return isAtBottom ? 'smooth' : false;
+                    data={sortedMessages}
+                    computeItemKey={(index, item) => item.id}
+                    followOutput={() => {
+                      // Only auto-scroll if at bottom (ref-based, no re-render)
+                      return atBottomRef.current ? 'auto' : false;
                     }}
                     atBottomStateChange={(isAtBottom) => {
-                      setAtBottom(isAtBottom);
+                      atBottomRef.current = isAtBottom;
+                      
                       if (isAtBottom) {
                         setShowNewMessageButton(false);
-                        // Mark as read when scrolling to bottom
-                        if (selectedConversation && messages.length > 0) {
-                          const latestMsg = messages[messages.length - 1];
+                        // Mark as read when at bottom
+                        if (selectedConversation && sortedMessages.length > 0) {
+                          const latestMsg = sortedMessages[sortedMessages.length - 1];
                           if (latestMsg.sender_id === selectedConversation && !latestMsg.read_at) {
                             markAsRead(selectedConversation);
+                          }
+                        }
+                      } else {
+                        // Show button if new message arrives while scrolled up
+                        if (!initialLoadRef.current && sortedMessages.length > 0) {
+                          const latestMsg = sortedMessages[sortedMessages.length - 1];
+                          if (latestMsg.sender_id === selectedConversation) {
+                            setShowNewMessageButton(true);
                           }
                         }
                       }
                     }}
                     atBottomThreshold={100}
+                    startReached={loadOlderMessages}
                     itemContent={(index, message) => (
                       <div className="px-4 py-2">
                         <MessageItem 
@@ -472,7 +500,7 @@ const Messages = () => {
                     )}
                   />
                   
-                  {/* New messages button when scrolled up */}
+                  {/* New messages pill when scrolled up */}
                   {showNewMessageButton && (
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
                       <Button
