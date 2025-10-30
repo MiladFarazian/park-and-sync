@@ -6,6 +6,8 @@ import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import BookingModal from '@/components/booking/BookingModal';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { formatAvailability } from '@/lib/formatAvailability';
@@ -53,6 +55,9 @@ const SpotDetail = () => {
   const [showDirections, setShowDirections] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [isOwnSpot, setIsOwnSpot] = useState(false);
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+  const [messageText, setMessageText] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   // Determine where to navigate back based on 'from' parameter
   const from = searchParams.get('from');
@@ -159,6 +164,51 @@ const SpotDetail = () => {
       return;
     }
     setBookingOpen(true);
+  };
+
+  const handleMessageHost = () => {
+    if (!user) {
+      toast.error('Please sign in to message the host');
+      return;
+    }
+    if (isOwnSpot) {
+      toast.error("You cannot message yourself");
+      return;
+    }
+    setMessageDialogOpen(true);
+  };
+
+  const handleSendMessage = async () => {
+    if (!messageText.trim()) {
+      toast.error('Please enter a message');
+      return;
+    }
+    if (!user || !spot?.host_id) {
+      return;
+    }
+
+    setSendingMessage(true);
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .insert({
+          sender_id: user.id,
+          recipient_id: spot.host_id,
+          message: messageText.trim(),
+          delivered_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+
+      toast.success('Message sent to host');
+      setMessageText('');
+      setMessageDialogOpen(false);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast.error('Failed to send message');
+    } finally {
+      setSendingMessage(false);
+    }
   };
 
   const fetchSpotDetails = async () => {
@@ -418,6 +468,12 @@ const SpotDetail = () => {
                 <p className="text-sm text-muted-foreground">Host</p>
               </div>
             </div>
+            {!isOwnSpot && (
+              <Button variant="outline" size="sm" onClick={handleMessageHost}>
+                <MessageCircle className="h-4 w-4 mr-2" />
+                Message
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -483,6 +539,46 @@ const SpotDetail = () => {
         onOpenChange={setBookingOpen}
         spot={spot}
       />
+
+      {/* Message Host Dialog */}
+      <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Message {spot?.host.name}</DialogTitle>
+            <DialogDescription>
+              Send a message to the host about this parking spot
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Textarea
+              placeholder="Type your message here..."
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              rows={5}
+              className="resize-none"
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setMessageDialogOpen(false)}
+                disabled={sendingMessage}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSendMessage} disabled={sendingMessage}>
+                {sendingMessage ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  'Send Message'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
