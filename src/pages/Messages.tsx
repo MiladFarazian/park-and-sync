@@ -90,7 +90,6 @@ const Messages = () => {
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [sendingMessage, setSendingMessage] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
@@ -202,11 +201,9 @@ const Messages = () => {
     let mediaUrl: string | null = null;
     let mediaType: string | null = null;
 
-    try {
-      setSendingMessage(true);
-
-      // Upload media if selected
-      if (selectedMedia) {
+    // Upload media if selected (this is the ONLY thing we await)
+    if (selectedMedia) {
+      try {
         setUploadingMedia(true);
         const fileExt = selectedMedia.name.split('.').pop();
         const fileName = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
@@ -223,34 +220,34 @@ const Messages = () => {
 
         mediaUrl = publicUrl;
         mediaType = selectedMedia.type;
+      } catch (error) {
+        toast.error('Failed to upload media');
+        console.error('Error uploading media:', error);
+        setUploadingMedia(false);
+        return;
+      } finally {
         setUploadingMedia(false);
       }
-
-      // Clear input immediately for better UX
-      const textToSend = messageText;
-      setMessageInput('');
-      handleRemoveMedia();
-
-      // Use the bulletproof send function
-      await sendMessageLib({
-        recipientId: selectedConversation,
-        senderId: user.id,
-        messageText: textToSend || '',
-        mediaUrl,
-        mediaType,
-        setMessages,
-        onError: (error) => {
-          toast.error('Failed to send message');
-          console.error('Error sending message:', error);
-        }
-      });
-    } catch (error) {
-      toast.error('Failed to send message');
-      console.error('Error sending message:', error);
-    } finally {
-      setSendingMessage(false);
-      setUploadingMedia(false);
     }
+
+    // CRITICAL: Clear input immediately (no await after this point)
+    const textToSend = messageText;
+    setMessageInput('');
+    handleRemoveMedia();
+
+    // Fire-and-forget: render optimistic bubble + broadcast + insert (non-blocking)
+    sendMessageLib({
+      recipientId: selectedConversation,
+      senderId: user.id,
+      messageText: textToSend || '',
+      mediaUrl,
+      mediaType,
+      setMessages,
+      onError: (error) => {
+        toast.error('Failed to send message');
+        console.error('Error sending message:', error);
+      }
+    });
   };
 
   const filteredConversations = conversations.filter(conv =>
@@ -412,7 +409,7 @@ const Messages = () => {
                   variant="outline"
                   size="icon"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={sendingMessage || uploadingMedia}
+                  disabled={uploadingMedia}
                 >
                   <Paperclip className="h-4 w-4" />
                 </Button>
@@ -420,15 +417,15 @@ const Messages = () => {
                   placeholder="Type a message..."
                   value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !sendingMessage && !uploadingMedia && handleSendMessage()}
-                  disabled={sendingMessage || uploadingMedia}
+                  onKeyDown={(e) => e.key === 'Enter' && !uploadingMedia && handleSendMessage()}
+                  disabled={uploadingMedia}
                 />
                 <Button 
                   onClick={handleSendMessage} 
                   size="icon"
-                  disabled={sendingMessage || uploadingMedia || (!messageInput.trim() && !selectedMedia)}
+                  disabled={uploadingMedia || (!messageInput.trim() && !selectedMedia)}
                 >
-                  {sendingMessage || uploadingMedia ? (
+                  {uploadingMedia ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Send className="h-4 w-4" />
