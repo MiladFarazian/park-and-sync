@@ -101,9 +101,12 @@ const Messages = () => {
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [atBottom, setAtBottom] = useState(true);
+  const [showNewMessageButton, setShowNewMessageButton] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const virtuosoRef = useRef<any>(null);
   const isMobile = useIsMobile();
+  const initialLoadRef = useRef(true);
 
   // Auto-select conversation from URL parameter
   useEffect(() => {
@@ -142,6 +145,7 @@ const Messages = () => {
     if (!selectedConversation || !user) return;
 
     const loadInitialMessages = async () => {
+      initialLoadRef.current = true;
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -151,17 +155,20 @@ const Messages = () => {
       if (!error && data) {
         setMessages(data as Message[]);
         await markAsRead(selectedConversation);
+        setAtBottom(true);
+        setShowNewMessageButton(false);
         
-        // Scroll to bottom after messages load
+        // Scroll to bottom on initial load only
         setTimeout(() => {
           if (virtuosoRef.current && data.length > 0) {
             virtuosoRef.current.scrollToIndex({
-              index: data.length - 1,
+              index: 'LAST',
               align: 'end',
               behavior: 'auto'
             });
+            initialLoadRef.current = false;
           }
-        }, 100);
+        }, 50);
       }
     };
 
@@ -171,15 +178,33 @@ const Messages = () => {
   // Set up real-time subscription with the dedicated hook
   useRealtimeMessages(selectedConversation, user?.id, setMessages);
 
-  // Virtuoso handles auto-scroll via followOutput
+  // Mark messages as read and handle new message notifications
   useEffect(() => {
     if (!selectedConversation || !user || messages.length === 0) return;
 
     const latestMsg = messages[messages.length - 1];
-    if (latestMsg.sender_id === selectedConversation && !latestMsg.read_at) {
+    
+    // Mark as read if we're at bottom and it's from the other user
+    if (atBottom && latestMsg.sender_id === selectedConversation && !latestMsg.read_at) {
       markAsRead(selectedConversation);
     }
-  }, [messages, selectedConversation, user, markAsRead]);
+    
+    // Show "new messages" button if we're scrolled up and new message arrives
+    if (!atBottom && !initialLoadRef.current && latestMsg.sender_id === selectedConversation) {
+      setShowNewMessageButton(true);
+    }
+  }, [messages, selectedConversation, user, markAsRead, atBottom]);
+  
+  const scrollToBottom = () => {
+    if (virtuosoRef.current) {
+      virtuosoRef.current.scrollToIndex({
+        index: 'LAST',
+        align: 'end',
+        behavior: 'smooth'
+      });
+    }
+    setShowNewMessageButton(false);
+  };
 
   const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -413,24 +438,53 @@ const Messages = () => {
                   <p className="text-sm">No messages yet. Start the conversation!</p>
                 </div>
               ) : (
-                <Virtuoso
-                  ref={virtuosoRef}
-                  data={messages}
-                  followOutput={(isAtBottom) => {
-                    // Only auto-scroll if user is already at bottom
-                    // This allows scrolling up to read history without interruption
-                    return isAtBottom ? 'smooth' : false;
-                  }}
-                  itemContent={(index, message) => (
-                    <div className="px-4 py-2">
-                      <MessageItem 
-                        key={message.id} 
-                        message={message} 
-                        isMe={message.sender_id === user?.id} 
-                      />
+                <>
+                  <Virtuoso
+                    ref={virtuosoRef}
+                    data={messages}
+                    followOutput={(isAtBottom) => {
+                      // Only auto-scroll if user is at bottom (within 100px)
+                      // This allows free scrolling up without interruption
+                      return isAtBottom ? 'smooth' : false;
+                    }}
+                    atBottomStateChange={(isAtBottom) => {
+                      setAtBottom(isAtBottom);
+                      if (isAtBottom) {
+                        setShowNewMessageButton(false);
+                        // Mark as read when scrolling to bottom
+                        if (selectedConversation && messages.length > 0) {
+                          const latestMsg = messages[messages.length - 1];
+                          if (latestMsg.sender_id === selectedConversation && !latestMsg.read_at) {
+                            markAsRead(selectedConversation);
+                          }
+                        }
+                      }
+                    }}
+                    atBottomThreshold={100}
+                    itemContent={(index, message) => (
+                      <div className="px-4 py-2">
+                        <MessageItem 
+                          key={message.id} 
+                          message={message} 
+                          isMe={message.sender_id === user?.id} 
+                        />
+                      </div>
+                    )}
+                  />
+                  
+                  {/* New messages button when scrolled up */}
+                  {showNewMessageButton && (
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+                      <Button
+                        size="sm"
+                        onClick={scrollToBottom}
+                        className="shadow-lg"
+                      >
+                        New messages ↓
+                      </Button>
                     </div>
                   )}
-                />
+                </>
               )}
             </div>
             <div className="p-4 border-t">
