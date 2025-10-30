@@ -29,12 +29,35 @@ export function useRealtimeMessages(
         channelRef.current = null;
       }
 
-      // Handler for new messages
+      // Handler for broadcast (instant echo for cross-client)
+      const handleBroadcast = (payload: any) => {
+        if (cancelled) return;
+        const msg = payload.payload as Message & { client_id?: string };
+
+        setMessages(prev => {
+          // Dedupe by client_id
+          if (prev.some(m => m.client_id === msg.client_id || m.id === msg.id)) return prev;
+          
+          const ephemeral = {
+            ...msg,
+            id: `temp-${msg.client_id}`,
+            status: 'sending' as const,
+          };
+          
+          const next = [...prev, ephemeral];
+          next.sort((a, b) => {
+            const ta = new Date(a.created_at).getTime();
+            const tb = new Date(b.created_at).getTime();
+            return ta === tb ? String(a.id).localeCompare(String(b.id)) : ta - tb;
+          });
+          return next;
+        });
+      };
+
+      // Handler for postgres_changes (reconcile with canonical row)
       const handleNewMessage = (payload: any) => {
         if (cancelled) return;
         const msg = payload.new as Message & { client_id?: string };
-
-        console.log('[realtime] Received message:', msg.id);
 
         setMessages(prev => {
           // Dedupe by id OR client_id (handles optimistic reconciliation)
@@ -46,7 +69,6 @@ export function useRealtimeMessages(
 
           if (existingIndex !== -1) {
             // Replace optimistic message with real one
-            console.log('[realtime] Reconciling optimistic message:', msg.id);
             const next = [...prev];
             next[existingIndex] = msg;
             return next;
@@ -69,8 +91,11 @@ export function useRealtimeMessages(
       // Subscribe to messages in this conversation (both directions)
       const channel = supabase
         .channel(`messages:${currentUserId}:${conversationUserId}`, {
-          config: { broadcast: { ack: true } }
+          config: { broadcast: { ack: false } }
         })
+        // Listen for instant broadcast (cross-client echo)
+        .on('broadcast', { event: 'pending_message' }, handleBroadcast)
+        // Listen for postgres inserts (reconcile)
         .on('postgres_changes', {
           event: 'INSERT',
           schema: 'public',

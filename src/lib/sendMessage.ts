@@ -39,7 +39,23 @@ export async function sendMessage({
   // Add optimistic message (no in-place mutation)
   setMessages(prev => [...prev, optimisticMessage]);
 
-  // Fire-and-forget insert (non-blocking)
+  // 1) Broadcast immediately for instant cross-client echo
+  const channel = supabase.channel(`messages:${recipientId}:${senderId}`);
+  channel.send({
+    type: 'broadcast',
+    event: 'pending_message',
+    payload: {
+      client_id: clientId,
+      sender_id: senderId,
+      recipient_id: recipientId,
+      message: messageText,
+      media_url: mediaUrl,
+      media_type: mediaType,
+      created_at: optimisticMessage.created_at,
+    }
+  });
+
+  // 2) Fire-and-forget insert (non-blocking)
   supabase
     .from('messages')
     .insert({

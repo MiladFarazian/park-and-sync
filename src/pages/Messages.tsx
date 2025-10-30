@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,72 @@ import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 import { sendMessage as sendMessageLib } from '@/lib/sendMessage';
+import { Virtuoso } from 'react-virtuoso';
+
+// Memoized message item component for performance
+const MessageItem = memo(({ message, isMe }: { message: Message; isMe: boolean }) => {
+  const isVideo = message.media_type?.startsWith('video/');
+  const isImage = message.media_type?.startsWith('image/');
+  
+  return (
+    <div className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`max-w-[70%] rounded-lg p-3 ${
+          isMe
+            ? 'bg-primary text-primary-foreground'
+            : 'bg-muted'
+        }`}
+      >
+        {message.media_url && (
+          <div className="mb-2">
+            {isImage && (
+              <img 
+                src={message.media_url} 
+                alt="Shared media"
+                className="rounded-md max-w-full h-auto max-h-64 object-cover"
+              />
+            )}
+            {isVideo && (
+              <video 
+                src={message.media_url} 
+                controls
+                className="rounded-md max-w-full h-auto max-h-64"
+              />
+            )}
+          </div>
+        )}
+        
+        {message.message && (
+          <p className="text-sm">{message.message}</p>
+        )}
+        
+        <div className={`flex items-center gap-1 mt-1 ${
+          isMe ? 'text-primary-foreground/70' : 'text-muted-foreground'
+        }`}>
+          <span className="text-xs">
+            {new Date(message.created_at).toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit' 
+            })}
+          </span>
+          {isMe && (
+            <>
+              {message.read_at ? (
+                <CheckCheck className="h-3 w-3" />
+              ) : message.delivered_at ? (
+                <CheckCheck className="h-3 w-3 opacity-50" />
+              ) : (
+                <Check className="h-3 w-3 opacity-50" />
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+MessageItem.displayName = 'MessageItem';
 
 const Messages = () => {
   const { user } = useAuth();
@@ -28,8 +94,8 @@ const Messages = () => {
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const virtuosoRef = useRef<any>(null);
   const isMobile = useIsMobile();
 
   // Auto-select conversation from URL parameter
@@ -87,7 +153,7 @@ const Messages = () => {
   // Set up real-time subscription with the dedicated hook
   useRealtimeMessages(selectedConversation, user?.id, setMessages);
 
-  // Mark messages as read when receiving from other user
+  // Virtuoso handles auto-scroll via followOutput
   useEffect(() => {
     if (!selectedConversation || !user || messages.length === 0) return;
 
@@ -96,11 +162,6 @@ const Messages = () => {
       markAsRead(selectedConversation);
     }
   }, [messages, selectedConversation, user, markAsRead]);
-
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
 
   const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -288,85 +349,28 @@ const Messages = () => {
                 </div>
               </div>
             </div>
-            <ScrollArea className="flex-1 p-4">
-              <div className="space-y-4">
-                {messages.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p className="text-sm">No messages yet. Start the conversation!</p>
-                  </div>
-                ) : (
-                  messages.map((message) => {
-                    const isMe = message.sender_id === user?.id;
-                    const isVideo = message.media_type?.startsWith('video/');
-                    const isImage = message.media_type?.startsWith('image/');
-                    
-                    return (
-                      <div
-                        key={message.id}
-                        className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div
-                          className={`max-w-[70%] rounded-lg p-3 ${
-                            isMe
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted'
-                          }`}
-                        >
-                          {/* Media content */}
-                          {message.media_url && (
-                            <div className="mb-2">
-                              {isImage && (
-                                <img 
-                                  src={message.media_url} 
-                                  alt="Shared media"
-                                  className="rounded-md max-w-full h-auto max-h-64 object-cover"
-                                />
-                              )}
-                              {isVideo && (
-                                <video 
-                                  src={message.media_url} 
-                                  controls
-                                  className="rounded-md max-w-full h-auto max-h-64"
-                                />
-                              )}
-                            </div>
-                          )}
-                          
-                          {/* Text content */}
-                          {message.message && (
-                            <p className="text-sm">{message.message}</p>
-                          )}
-                          
-                          {/* Timestamp and status */}
-                          <div className={`flex items-center gap-1 mt-1 ${
-                            isMe ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                          }`}>
-                            <span className="text-xs">
-                              {new Date(message.created_at).toLocaleTimeString('en-US', { 
-                                hour: 'numeric', 
-                                minute: '2-digit' 
-                              })}
-                            </span>
-                            {isMe && (
-                              <>
-                                {message.read_at ? (
-                                  <CheckCheck className="h-3 w-3" />
-                                ) : message.delivered_at ? (
-                                  <CheckCheck className="h-3 w-3 opacity-50" />
-                                ) : (
-                                  <Check className="h-3 w-3 opacity-50" />
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-            </ScrollArea>
+            <div className="flex-1 relative">
+              {messages.length === 0 ? (
+                <div className="absolute inset-0 flex items-center justify-center text-center text-muted-foreground">
+                  <p className="text-sm">No messages yet. Start the conversation!</p>
+                </div>
+              ) : (
+                <Virtuoso
+                  ref={virtuosoRef}
+                  data={messages}
+                  followOutput="smooth"
+                  itemContent={(index, message) => (
+                    <div className="px-4 py-2">
+                      <MessageItem 
+                        key={message.id} 
+                        message={message} 
+                        isMe={message.sender_id === user?.id} 
+                      />
+                    </div>
+                  )}
+                />
+              )}
+            </div>
             <div className="p-4 border-t">
               {/* Media preview */}
               {mediaPreview && (

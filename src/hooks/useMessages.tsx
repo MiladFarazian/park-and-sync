@@ -22,6 +22,7 @@ export interface Message {
   delivered_at: string | null;
   media_url: string | null;
   media_type: string | null;
+  client_id?: string | null;
 }
 
 export const useMessages = () => {
