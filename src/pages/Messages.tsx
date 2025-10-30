@@ -416,7 +416,11 @@ const Messages = () => {
                 <Virtuoso
                   ref={virtuosoRef}
                   data={messages}
-                  followOutput="smooth"
+                  followOutput={(isAtBottom) => {
+                    // Only auto-scroll if user is already at bottom
+                    // This allows scrolling up to read history without interruption
+                    return isAtBottom ? 'smooth' : false;
+                  }}
                   itemContent={(index, message) => (
                     <div className="px-4 py-2">
                       <MessageItem 
