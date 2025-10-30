@@ -93,62 +93,96 @@ const Messages = () => {
 
     loadMessages();
 
-    // Realtime subscription - listen to all messages involving this user
+    // Realtime subscription - filter at Postgres level for efficiency
     conversationChannelRef.current = supabase
       .channel(`conversation-${selectedConversation}`)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
-          table: 'messages'
+          table: 'messages',
+          filter: `sender_id=eq.${user.id},recipient_id=eq.${selectedConversation}`
         },
         (payload) => {
           if (!mountedRef.current) return;
-          
           const newMsg = payload.new as Message;
-          const oldMsg = payload.old as any;
           
-          // Filter to only messages in this conversation
-          const isRelevant = (msg: Message | any) => {
-            return (msg.sender_id === user.id && msg.recipient_id === selectedConversation) ||
-                   (msg.sender_id === selectedConversation && msg.recipient_id === user.id);
-          };
-          
-          console.log('[realtime]', payload.eventType, newMsg?.id || oldMsg?.id);
+          console.log('[realtime] INSERT from me:', newMsg.id);
           
           setMessages(prev => {
-            if (payload.eventType === 'INSERT') {
-              // Only process if relevant to this conversation
-              if (!isRelevant(newMsg)) return prev;
-              
-              // Avoid duplicates - check if this exact message already exists
-              if (prev.some(m => m.id === newMsg.id)) {
-                console.log('[realtime] duplicate detected, skipping:', newMsg.id);
-                return prev;
-              }
-              
-              console.log('[realtime] adding new message:', newMsg.id);
-              
-              // Mark as read if from other user (async, don't block state update)
-              if (newMsg.sender_id === selectedConversation) {
-                markAsRead(selectedConversation);
-              }
-              
-              return [...prev, newMsg].sort((a, b) => 
-                new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-              );
+            // Check for duplicate (optimistic message already replaced by insert response)
+            if (prev.some(m => m.id === newMsg.id)) {
+              console.log('[realtime] duplicate detected, skipping:', newMsg.id);
+              return prev;
             }
-            if (payload.eventType === 'UPDATE') {
-              if (!isRelevant(newMsg)) return prev;
-              return prev.map(m => m.id === newMsg.id ? { ...m, ...newMsg } : m);
-            }
-            if (payload.eventType === 'DELETE') {
-              if (!isRelevant(oldMsg)) return prev;
-              return prev.filter(m => m.id !== oldMsg.id);
-            }
-            return prev;
+            
+            console.log('[realtime] adding new message:', newMsg.id);
+            return [...prev, newMsg].sort((a, b) => {
+              const timeCompare = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+              return timeCompare !== 0 ? timeCompare : a.id.localeCompare(b.id);
+            });
           });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `sender_id=eq.${selectedConversation},recipient_id=eq.${user.id}`
+        },
+        (payload) => {
+          if (!mountedRef.current) return;
+          const newMsg = payload.new as Message;
+          
+          console.log('[realtime] INSERT from other user:', newMsg.id);
+          
+          setMessages(prev => {
+            // Check for duplicate
+            if (prev.some(m => m.id === newMsg.id)) {
+              console.log('[realtime] duplicate detected, skipping:', newMsg.id);
+              return prev;
+            }
+            
+            console.log('[realtime] adding new message and marking read:', newMsg.id);
+            // Mark as read asynchronously
+            markAsRead(selectedConversation);
+            
+            return [...prev, newMsg].sort((a, b) => {
+              const timeCompare = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+              return timeCompare !== 0 ? timeCompare : a.id.localeCompare(b.id);
+            });
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `sender_id=eq.${user.id},recipient_id=eq.${selectedConversation}`
+        },
+        (payload) => {
+          if (!mountedRef.current) return;
+          const updatedMsg = payload.new as Message;
+          setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `sender_id=eq.${selectedConversation},recipient_id=eq.${user.id}`
+        },
+        (payload) => {
+          if (!mountedRef.current) return;
+          const updatedMsg = payload.new as Message;
+          setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
         }
       )
       .subscribe((status) => {
