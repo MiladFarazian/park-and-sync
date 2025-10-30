@@ -11,11 +11,20 @@ export function useRealtimeMessages(
   const channelRef = useRef<RealtimeChannel | null>(null);
   const pendingUpdatesRef = useRef<Array<() => void>>([]);
   const batchTimeoutRef = useRef<number | null>(null);
+  const setMessagesRef = useRef(setMessages);
+  const activeConversationRef = useRef(conversationUserId);
+
+  // Keep refs in sync
+  useEffect(() => {
+    setMessagesRef.current = setMessages;
+    activeConversationRef.current = conversationUserId;
+  });
 
   useEffect(() => {
     if (!conversationUserId || !currentUserId) return;
     
     let cancelled = false;
+    const thisConversationId = conversationUserId; // Capture for closure
 
     // Batch multiple Realtime events into single state update (60fps = ~16ms batching)
     const batchUpdate = (updateFn: () => void) => {
@@ -51,11 +60,11 @@ export function useRealtimeMessages(
 
       // Handler for broadcast (instant echo for cross-client)
       const handleBroadcast = (payload: any) => {
-        if (cancelled) return;
+        if (cancelled || activeConversationRef.current !== thisConversationId) return;
         const msg = payload.payload as Message & { client_id?: string };
 
         batchUpdate(() => {
-          setMessages(prev => {
+          setMessagesRef.current(prev => {
             // Dedupe by client_id
             if (prev.some(m => m.client_id === msg.client_id || m.id === msg.id)) return prev;
             
@@ -78,13 +87,13 @@ export function useRealtimeMessages(
 
       // Handler for postgres_changes (reconcile with canonical row)
       const handleNewMessage = (payload: any) => {
-        if (cancelled) return;
+        if (cancelled || activeConversationRef.current !== thisConversationId) return;
         const realtimeLatency = performance.now();
         const msg = payload.new as Message & { client_id?: string };
         console.log('[PERF] realtime:postgres-insert-latency-ms', realtimeLatency - new Date(msg.created_at).getTime());
 
         batchUpdate(() => {
-          setMessages(prev => {
+          setMessagesRef.current(prev => {
             // Dedupe by id OR client_id (handles optimistic reconciliation)
             const existingIndex = prev.findIndex(m => 
               m.id === msg.id || 
@@ -140,10 +149,10 @@ export function useRealtimeMessages(
           table: 'messages',
           filter: `sender_id=eq.${currentUserId},recipient_id=eq.${conversationUserId}`
         }, (payload) => {
-          if (cancelled) return;
+          if (cancelled || activeConversationRef.current !== thisConversationId) return;
           const updatedMsg = payload.new as Message;
           batchUpdate(() => {
-            setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
+            setMessagesRef.current(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
           });
         })
         .on('postgres_changes', {
@@ -152,10 +161,10 @@ export function useRealtimeMessages(
           table: 'messages',
           filter: `sender_id=eq.${conversationUserId},recipient_id=eq.${currentUserId}`
         }, (payload) => {
-          if (cancelled) return;
+          if (cancelled || activeConversationRef.current !== thisConversationId) return;
           const updatedMsg = payload.new as Message;
           batchUpdate(() => {
-            setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
+            setMessagesRef.current(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
           });
         })
         .subscribe((status) => {
@@ -169,18 +178,18 @@ export function useRealtimeMessages(
 
     // Safety net: refetch on focus/online (handles network drops/tab sleep)
     const refetchMessages = async () => {
-      if (cancelled) return;
+      if (cancelled || activeConversationRef.current !== thisConversationId) return;
       
       console.log('[realtime] Refetching messages (focus/online event)');
       
       const { data, error } = await supabase
         .from('messages')
         .select('*')
-        .or(`and(sender_id.eq.${currentUserId},recipient_id.eq.${conversationUserId}),and(sender_id.eq.${conversationUserId},recipient_id.eq.${currentUserId})`)
+        .or(`and(sender_id.eq.${currentUserId},recipient_id.eq.${thisConversationId}),and(sender_id.eq.${thisConversationId},recipient_id.eq.${currentUserId})`)
         .order('created_at', { ascending: true });
 
       if (!error && data) {
-        setMessages(prev => {
+        setMessagesRef.current(prev => {
           const seen = new Set(prev.map(m => m.id));
           const merged = [...prev];
           
@@ -218,5 +227,5 @@ export function useRealtimeMessages(
       window.removeEventListener('focus', refetchMessages);
       window.removeEventListener('online', refetchMessages);
     };
-  }, [conversationUserId, currentUserId, setMessages]);
+  }, [conversationUserId, currentUserId]);
 }
