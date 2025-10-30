@@ -108,6 +108,7 @@ const Messages = () => {
   const isMobile = useIsMobile();
   const initialLoadRef = useRef(true);
   const loadingOlderRef = useRef(false);
+  const messagesCacheRef = useRef<Map<string, Message[]>>(new Map());
 
   // Sort messages once per render (no in-place mutation)
   const sortedMessages = [...messages].sort((a, b) => {
@@ -156,23 +157,36 @@ const Messages = () => {
       return;
     }
 
-    // CRITICAL: Clear messages immediately to prevent glitching between conversations
-    setMessages([]);
+    const convId = selectedConversation;
+
+    // Reset refs/state but keep cached messages to avoid flicker when switching
     setShowNewMessageButton(false);
     initialLoadRef.current = true;
     loadingOlderRef.current = false;
     atBottomRef.current = true;
 
+    // Show cached messages immediately (if any)
+    const cached = messagesCacheRef.current.get(convId);
+    if (cached) {
+      setMessages(cached);
+    } else {
+      setMessages([]);
+    }
+
     const loadInitialMessages = async () => {
       const { data, error } = await supabase
         .from('messages')
         .select('*')
-        .or(`and(sender_id.eq.${user.id},recipient_id.eq.${selectedConversation}),and(sender_id.eq.${selectedConversation},recipient_id.eq.${user.id})`)
+        .or(`and(sender_id.eq.${user.id},recipient_id.eq.${convId}),and(sender_id.eq.${convId},recipient_id.eq.${user.id})`)
         .order('created_at', { ascending: true });
 
       if (!error && data) {
+        // Ensure we're still on the same conversation
+        if (convId !== selectedConversation) return;
+
         setMessages(data as Message[]);
-        await markAsRead(selectedConversation);
+        messagesCacheRef.current.set(convId, data as Message[]);
+        await markAsRead(convId);
         
         // Scroll to bottom on initial load only
         setTimeout(() => {
@@ -193,6 +207,12 @@ const Messages = () => {
 
   // Set up real-time subscription with the dedicated hook
   useRealtimeMessages(selectedConversation, user?.id, setMessages);
+
+  // Keep cache in sync for the active conversation
+  useEffect(() => {
+    if (!selectedConversation) return;
+    messagesCacheRef.current.set(selectedConversation, messages);
+  }, [messages, selectedConversation]);
   
   // Load older messages when scrolling to top
   const loadOlderMessages = async () => {
