@@ -119,7 +119,15 @@ const Messages = () => {
   });
   useEffect(() => {
     const userIdFromUrl = searchParams.get('userId');
-    if (!userIdFromUrl) return;
+    
+    // If no userId in URL, clear selection
+    if (!userIdFromUrl) {
+      if (selectedConversation !== null) {
+        setSelectedConversation(null);
+        setNewUserProfile(null);
+      }
+      return;
+    }
 
     // Only react when the URL target actually changes to prevent resets
     if (selectedConversation === userIdFromUrl) return;
