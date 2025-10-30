@@ -129,19 +129,22 @@ const Messages = () => {
       return;
     }
 
-    // Only react when the URL target actually changes to prevent resets
-    if (selectedConversation === userIdFromUrl) return;
-
-    const existingConv = conversations.find(c => c.user_id === userIdFromUrl);
-    if (existingConv) {
-      setSelectedConversation(userIdFromUrl);
-      setNewUserProfile(null);
-    } else {
-      // Start new conversation - fetch user profile once
-      fetchNewUserProfile(userIdFromUrl);
+    // URL is the single source of truth for selection
+    if (selectedConversation !== userIdFromUrl) {
       setSelectedConversation(userIdFromUrl);
     }
-  }, [searchParams, conversations, selectedConversation]);
+  }, [searchParams, selectedConversation]);
+
+  // Fetch profile only when selected user isn't in conversations (new chat)
+  useEffect(() => {
+    if (!selectedConversation) return;
+    const exists = conversations.some(c => c.user_id === selectedConversation);
+    if (!exists) {
+      fetchNewUserProfile(selectedConversation);
+    } else if (newUserProfile) {
+      setNewUserProfile(null);
+    }
+  }, [selectedConversation, conversations]);
 
   const fetchNewUserProfile = async (userId: string) => {
     try {
