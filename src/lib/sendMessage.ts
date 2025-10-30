@@ -20,7 +20,8 @@ export async function sendMessage({
   onSuccess?: () => void;
   onError?: (error: any) => void;
 }) {
-  const tempId = `temp-${crypto.randomUUID()}`;
+  const clientId = crypto.randomUUID();
+  const tempId = `temp-${clientId}`;
 
   // Optimistic update - add message immediately
   const optimisticMessage: Message = {
@@ -38,35 +39,29 @@ export async function sendMessage({
   // Add optimistic message (no in-place mutation)
   setMessages(prev => [...prev, optimisticMessage]);
 
-  try {
-    // Insert into database
-    const { data, error } = await supabase
-      .from('messages')
-      .insert({
-        sender_id: senderId,
-        recipient_id: recipientId,
-        message: messageText,
-        media_url: mediaUrl,
-        media_type: mediaType,
-        delivered_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Reconcile optimistic message with server response
-    setMessages(prev => 
-      prev.map(m => m.id === tempId ? (data as Message) : m)
-    );
-
-    onSuccess?.();
-  } catch (error) {
-    console.error('Error sending message:', error);
-    
-    // Rollback optimistic update on error
-    setMessages(prev => prev.filter(m => m.id !== tempId));
-    
-    onError?.(error);
-  }
+  // Fire-and-forget insert (non-blocking)
+  supabase
+    .from('messages')
+    .insert({
+      sender_id: senderId,
+      recipient_id: recipientId,
+      message: messageText,
+      media_url: mediaUrl,
+      media_type: mediaType,
+      delivered_at: new Date().toISOString(),
+      client_id: clientId,
+    })
+    .then(({ error }) => {
+      if (error) {
+        console.error('Error sending message:', error);
+        // Mark message as error (keep in UI to allow retry)
+        setMessages(prev => 
+          prev.map(m => m.id === tempId ? { ...m, id: `error-${clientId}` } : m)
+        );
+        onError?.(error);
+      } else {
+        // Success - Realtime will reconcile the optimistic message
+        onSuccess?.();
+      }
+    });
 }

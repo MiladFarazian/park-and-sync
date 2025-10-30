@@ -32,18 +32,27 @@ export function useRealtimeMessages(
       // Handler for new messages
       const handleNewMessage = (payload: any) => {
         if (cancelled) return;
-        const msg = payload.new as Message;
+        const msg = payload.new as Message & { client_id?: string };
 
         console.log('[realtime] Received message:', msg.id);
 
         setMessages(prev => {
-          // Dedupe by id - handles optimistic reconciliation
-          if (prev.some(m => m.id === msg.id)) {
-            console.log('[realtime] Duplicate detected, skipping:', msg.id);
-            return prev;
+          // Dedupe by id OR client_id (handles optimistic reconciliation)
+          const existingIndex = prev.findIndex(m => 
+            m.id === msg.id || 
+            (msg.client_id && m.id === `temp-${msg.client_id}`) ||
+            (msg.client_id && m.id === `error-${msg.client_id}`)
+          );
+
+          if (existingIndex !== -1) {
+            // Replace optimistic message with real one
+            console.log('[realtime] Reconciling optimistic message:', msg.id);
+            const next = [...prev];
+            next[existingIndex] = msg;
+            return next;
           }
 
-          // Create new array (no in-place mutation)
+          // New message - add and sort
           const next = [...prev, msg];
           
           // Sort by created_at, then by id for timestamp collisions
