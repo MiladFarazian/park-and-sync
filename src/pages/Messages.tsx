@@ -89,34 +89,342 @@ const MessageItem = memo(({ message, isMe }: { message: Message; isMe: boolean }
 
 MessageItem.displayName = 'MessageItem';
 
+// Chat pane remounts per conversation to isolate effects and prevent leaks
+function ChatPane({
+  conversationId,
+  userId,
+  onBack,
+  displayName,
+  displayAvatar,
+  messagesCacheRef,
+  markAsRead,
+}: {
+  conversationId: string;
+  userId: string;
+  onBack: () => void;
+  displayName: string;
+  displayAvatar?: string;
+  messagesCacheRef: React.MutableRefObject<Map<string, Message[]>>;
+  markAsRead: (otherUserId: string) => Promise<void> | void;
+}) {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [messageInput, setMessageInput] = useState('');
+  const [showNewMessageButton, setShowNewMessageButton] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const virtuosoRef = useRef<any>(null);
+  const atBottomRef = useRef(true);
+  const initialLoadRef = useRef(true);
+  const loadingOlderRef = useRef(false);
+
+  // Sorted view (stable)
+  const sortedMessages = [...messages].sort((a, b) => {
+    const ta = new Date(a.created_at).getTime();
+    const tb = new Date(b.created_at).getTime();
+    return ta === tb ? String(a.id).localeCompare(String(b.id)) : ta - tb;
+  });
+
+  // Initial load with cancellation & guard
+  useEffect(() => {
+    const convId = conversationId;
+    let alive = true;
+
+    // Reset state flags but keep cache if present
+    setShowNewMessageButton(false);
+    initialLoadRef.current = true;
+    loadingOlderRef.current = false;
+    atBottomRef.current = true;
+
+    const cached = messagesCacheRef.current.get(convId);
+    if (cached && cached.length > 0) {
+      setMessages(cached);
+      setLoadingMessages(false);
+    } else {
+      setLoadingMessages(true);
+    }
+
+    (async () => {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${userId},recipient_id.eq.${convId}),and(sender_id.eq.${convId},recipient_id.eq.${userId})`)
+        .order('created_at', { ascending: true });
+
+      if (!alive) return;
+      if (error) {
+        setLoadingMessages(false);
+        return;
+      }
+      // Drop late results
+      if (convId !== conversationId) return;
+
+      setMessages((data || []) as Message[]);
+      messagesCacheRef.current.set(convId, (data || []) as Message[]);
+      await markAsRead(convId);
+      setLoadingMessages(false);
+
+      // Scroll to bottom on initial load only
+      setTimeout(() => {
+        if (!alive) return;
+        if (virtuosoRef.current && (data?.length || 0) > 0) {
+          virtuosoRef.current.scrollToIndex({
+            index: 'LAST',
+            align: 'end',
+            behavior: 'auto',
+          });
+        }
+        initialLoadRef.current = false;
+      }, 50);
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [conversationId, userId, messagesCacheRef, markAsRead]);
+
+  // Realtime for this chat only
+  useRealtimeMessages(conversationId, userId, setMessages);
+
+  // Keep cache in sync
+  useEffect(() => {
+    if (!conversationId) return;
+    messagesCacheRef.current.set(conversationId, messages);
+  }, [messages, conversationId, messagesCacheRef]);
+
+  // Pagination: load older
+  const loadOlderMessages = async () => {
+    if (!conversationId || loadingOlderRef.current || sortedMessages.length === 0) return;
+    loadingOlderRef.current = true;
+    const oldest = sortedMessages[0];
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${userId},recipient_id.eq.${conversationId}),and(sender_id.eq.${conversationId},recipient_id.eq.${userId})`)
+        .lt('created_at', oldest.created_at)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (!error && data && data.length > 0) {
+        setMessages(prev => [...data.reverse(), ...prev]);
+      }
+    } finally {
+      loadingOlderRef.current = false;
+    }
+  };
+
+  const scrollToBottom = () => {
+    if (virtuosoRef.current) {
+      virtuosoRef.current.scrollToIndex({ index: 'LAST', align: 'end', behavior: 'smooth' });
+    }
+    setShowNewMessageButton(false);
+  };
+
+  const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const validTypes = ['image/jpeg','image/png','image/gif','image/webp','video/mp4','video/quicktime','video/webm'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Invalid file type. Please select an image or video.');
+      return;
+    }
+    if (file.size > 52428800) {
+      toast.error('File size too large. Maximum size is 50MB.');
+      return;
+    }
+    setSelectedMedia(file);
+    setMediaPreview(URL.createObjectURL(file));
+  };
+
+  const handleRemoveMedia = () => {
+    if (mediaPreview) URL.revokeObjectURL(mediaPreview);
+    setSelectedMedia(null);
+    setMediaPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleSendMessage = () => {
+    if ((!messageInput.trim() && !selectedMedia) || !conversationId || !userId) return;
+    const messageText = messageInput.trim();
+    const mediaToUpload = selectedMedia;
+
+    setMessageInput('');
+    handleRemoveMedia();
+
+    const clientId = sendMessageLib({
+      recipientId: conversationId,
+      senderId: userId,
+      messageText: messageText || '',
+      setMessages,
+      onError: (error) => {
+        toast.error('Failed to send message');
+        console.error('Error sending message:', error);
+      },
+    });
+
+    if (mediaToUpload) {
+      setUploadingMedia(true);
+      (async () => {
+        try {
+          const compressedFile = await compressImage(mediaToUpload);
+          const fileExt = compressedFile.name.split('.').pop();
+          const fileName = `${userId}/${crypto.randomUUID()}.${fileExt}`;
+          const { error: uploadError } = await supabase.storage
+            .from('message-media')
+            .upload(fileName, compressedFile, { cacheControl: '3600', upsert: false, contentType: compressedFile.type });
+          if (uploadError) throw uploadError;
+          const { data: { publicUrl } } = supabase.storage.from('message-media').getPublicUrl(fileName);
+          // resolve DB row by client_id and update media
+          let row: { id: string } | null = null;
+          for (let i = 0; i < 3; i++) {
+            const { data } = await supabase.from('messages').select('id').eq('client_id', clientId).maybeSingle();
+            if (data) { row = data; break; }
+            await new Promise(r => setTimeout(r, 100 * Math.pow(2, i)));
+          }
+          if (row?.id) {
+            await supabase.from('messages').update({ media_url: publicUrl, media_type: compressedFile.type }).eq('id', row.id);
+          } else {
+            throw new Error('Message not found after upload');
+          }
+        } catch (error) {
+          toast.error('Failed to upload media');
+          setMessages(prev => prev.map(m => m.client_id === clientId ? { ...m, id: `error-${clientId}` } : m));
+        } finally {
+          setUploadingMedia(false);
+        }
+      })();
+    }
+  };
+
+  return (
+    <>
+      <div className="p-4 border-b">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="md:hidden" onClick={onBack}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <Avatar>
+            <AvatarImage src={displayAvatar} />
+            <AvatarFallback>{displayName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+          </Avatar>
+          <div>
+            <p className="font-semibold">{displayName}</p>
+            <p className="text-sm text-muted-foreground">Active</p>
+          </div>
+        </div>
+      </div>
+      <div className="flex-1 relative">
+        {(loadingMessages && !(messagesCacheRef.current.get(conversationId)?.length)) ? (
+          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        ) : (
+          sortedMessages.length === 0 ? (
+            <div className="absolute inset-0 flex items-center justify-center text-center text-muted-foreground">
+              <p className="text-sm">No messages yet. Start the conversation!</p>
+            </div>
+          ) : (
+            <>
+              <Virtuoso
+                key={conversationId}
+                ref={virtuosoRef}
+                data={sortedMessages}
+                computeItemKey={(index, item) => item.id}
+                increaseViewportBy={{ top: 400, bottom: 600 }}
+                followOutput={() => atBottomRef.current ? 'auto' : false}
+                atBottomStateChange={(isAtBottom) => {
+                  atBottomRef.current = isAtBottom;
+                  if (isAtBottom) {
+                    setShowNewMessageButton(false);
+                    if (sortedMessages.length > 0) {
+                      const latestMsg = sortedMessages[sortedMessages.length - 1];
+                      if (latestMsg.sender_id === conversationId && !latestMsg.read_at) {
+                        markAsRead(conversationId);
+                      }
+                    }
+                  } else {
+                    if (!initialLoadRef.current && sortedMessages.length > 0) {
+                      const latestMsg = sortedMessages[sortedMessages.length - 1];
+                      if (latestMsg.sender_id === conversationId) {
+                        setShowNewMessageButton(true);
+                      }
+                    }
+                  }
+                }}
+                atBottomThreshold={100}
+                startReached={loadOlderMessages}
+                itemContent={(index, message) => (
+                  <div className="px-4 py-2">
+                    <MessageItem key={message.id} message={message} isMe={message.sender_id === userId} />
+                  </div>
+                )}
+              />
+              {showNewMessageButton && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+                  <Button size="sm" onClick={scrollToBottom} className="shadow-lg">
+                    New messages ↓
+                  </Button>
+                </div>
+              )}
+            </>
+          )
+        )}
+      </div>
+      <div className="p-4 border-t">
+        {mediaPreview && (
+          <div className="mb-2 relative inline-block">
+            <div className="relative">
+              {selectedMedia?.type.startsWith('image/') ? (
+                <img src={mediaPreview} alt="Preview" className="h-20 w-20 object-cover rounded-md" />
+              ) : (
+                <video src={mediaPreview} className="h-20 w-20 object-cover rounded-md" />
+              )}
+              <Button variant="destructive" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={handleRemoveMedia}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+        <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,video/webm"
+            onChange={handleMediaSelect}
+            className="hidden"
+          />
+          <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} disabled={uploadingMedia}>
+            <Paperclip className="h-4 w-4" />
+          </Button>
+          <Input
+            placeholder="Type a message..."
+            value={messageInput}
+            onChange={(e) => setMessageInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+          />
+          <Button onClick={handleSendMessage} size="icon" disabled={uploadingMedia || (!messageInput.trim() && !selectedMedia)}>
+            {uploadingMedia ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 const Messages = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const { conversations, loading, markAsRead } = useMessages();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [newUserProfile, setNewUserProfile] = useState<any>(null);
-  const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loadingMessages, setLoadingMessages] = useState(false);
-  const [uploadingMedia, setUploadingMedia] = useState(false);
-  const [selectedMedia, setSelectedMedia] = useState<File | null>(null);
-  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
-  const [showNewMessageButton, setShowNewMessageButton] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const virtuosoRef = useRef<any>(null);
-  const atBottomRef = useRef(true); // Use ref to avoid re-renders on scroll
   const isMobile = useIsMobile();
-  const initialLoadRef = useRef(true);
-  const loadingOlderRef = useRef(false);
   const messagesCacheRef = useRef<Map<string, Message[]>>(new Map());
 
-  // Sort messages once per render (no in-place mutation)
-  const sortedMessages = [...messages].sort((a, b) => {
-    const ta = new Date(a.created_at).getTime();
-    const tb = new Date(b.created_at).getTime();
-    return ta === tb ? String(a.id).localeCompare(String(b.id)) : ta - tb;
-  });
+  // Parent holds no message state; chat-specific logic lives in ChatPane
   useEffect(() => {
     const userIdFromUrl = searchParams.get('userId');
     
@@ -162,242 +470,21 @@ const Messages = () => {
     }
   };
 
-  // Load initial messages when conversation is selected
-  useEffect(() => {
-    if (!selectedConversation || !user) {
-      setMessages([]);
-      setLoadingMessages(false);
-      return;
-    }
+  // Moved chat data loading into ChatPane for clean remount per conversation
 
-    const convId = selectedConversation;
+  // Realtime subscription handled inside ChatPane
 
-    // Reset refs/state but keep cached messages to avoid flicker when switching
-    setShowNewMessageButton(false);
-    initialLoadRef.current = true;
-    loadingOlderRef.current = false;
-    atBottomRef.current = true;
-
-    // Check cache; avoid blanking UI when switching
-    const cached = messagesCacheRef.current.get(convId);
-    if (cached && cached.length > 0) {
-      setMessages(cached);
-      setLoadingMessages(false);
-    } else {
-      setLoadingMessages(true);
-    }
-
-    const loadInitialMessages = async () => {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`and(sender_id.eq.${user.id},recipient_id.eq.${convId}),and(sender_id.eq.${convId},recipient_id.eq.${user.id})`)
-        .order('created_at', { ascending: true });
-
-      if (!error && data) {
-        // Ensure we're still on the same conversation
-        if (convId !== selectedConversation) return;
-
-        setMessages(data as Message[]);
-        messagesCacheRef.current.set(convId, data as Message[]);
-        await markAsRead(convId);
-        setLoadingMessages(false);
-        
-        // Scroll to bottom on initial load only
-        setTimeout(() => {
-          if (virtuosoRef.current && data.length > 0) {
-            virtuosoRef.current.scrollToIndex({
-              index: 'LAST',
-              align: 'end',
-              behavior: 'auto'
-            });
-          }
-          initialLoadRef.current = false;
-        }, 50);
-      } else {
-        setLoadingMessages(false);
-      }
-    };
-
-    loadInitialMessages();
-  }, [selectedConversation, user, markAsRead]);
-
-  // Set up real-time subscription with the dedicated hook
-  useRealtimeMessages(selectedConversation, user?.id, setMessages);
-
-  // Keep cache in sync for the active conversation
-  useEffect(() => {
-    if (!selectedConversation) return;
-    messagesCacheRef.current.set(selectedConversation, messages);
-  }, [messages, selectedConversation]);
+  // Cache synchronization handled inside ChatPane
   
-  // Load older messages when scrolling to top
-  const loadOlderMessages = async () => {
-    if (!selectedConversation || !user || loadingOlderRef.current || sortedMessages.length === 0) return;
-    
-    loadingOlderRef.current = true;
-    const oldestMessage = sortedMessages[0];
-    
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`and(sender_id.eq.${user.id},recipient_id.eq.${selectedConversation}),and(sender_id.eq.${selectedConversation},recipient_id.eq.${user.id})`)
-        .lt('created_at', oldestMessage.created_at)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (!error && data && data.length > 0) {
-        // Prepend older messages (Virtuoso handles position preservation)
-        setMessages(prev => [...data.reverse(), ...prev]);
-      }
-    } catch (error) {
-      console.error('Error loading older messages:', error);
-    } finally {
-      loadingOlderRef.current = false;
-    }
-  };
+  // Pagination handled inside ChatPane
   
-  const scrollToBottom = () => {
-    if (virtuosoRef.current) {
-      virtuosoRef.current.scrollToIndex({
-        index: 'LAST',
-        align: 'end',
-        behavior: 'smooth'
-      });
-    }
-    setShowNewMessageButton(false);
-  };
+  // Scroll handling moved to ChatPane
 
-  const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Media selection handled inside ChatPane
 
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/webm'];
-    if (!validTypes.includes(file.type)) {
-      toast.error('Invalid file type. Please select an image or video.');
-      return;
-    }
+  // Media removal handled inside ChatPane
 
-    // Validate file size (50MB)
-    if (file.size > 52428800) {
-      toast.error('File size too large. Maximum size is 50MB.');
-      return;
-    }
-
-    setSelectedMedia(file);
-    setMediaPreview(URL.createObjectURL(file));
-  };
-
-  const handleRemoveMedia = () => {
-    if (mediaPreview) {
-      URL.revokeObjectURL(mediaPreview);
-    }
-    setSelectedMedia(null);
-    setMediaPreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const handleSendMessage = () => {
-    if ((!messageInput.trim() && !selectedMedia) || !selectedConversation || !user) return;
-
-    const messageText = messageInput.trim();
-    const mediaToUpload = selectedMedia;
-
-    console.time('[PERF] send:total');
-    
-    // CRITICAL: Clear input immediately (send without media first)
-    setMessageInput('');
-    handleRemoveMedia();
-
-    // Fire-and-forget: render optimistic bubble + broadcast + insert (non-blocking, <10ms)
-    const clientId = sendMessageLib({
-      recipientId: selectedConversation,
-      senderId: user.id,
-      messageText: messageText || '',
-      setMessages,
-      onError: (error) => {
-        toast.error('Failed to send message');
-        console.error('Error sending message:', error);
-      }
-    });
-    
-    console.timeEnd('[PERF] send:total');
-
-    // Background upload (if media selected) - doesn't block send
-    if (mediaToUpload) {
-      setUploadingMedia(true);
-      
-      (async () => {
-        try {
-          console.time('[PERF] media:compression');
-          const compressedFile = await compressImage(mediaToUpload);
-          console.timeEnd('[PERF] media:compression');
-          
-          console.time('[PERF] media:upload');
-          const fileExt = compressedFile.name.split('.').pop();
-          const fileName = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
-          
-          const { error: uploadError } = await supabase.storage
-            .from('message-media')
-            .upload(fileName, compressedFile, {
-              cacheControl: '3600',
-              upsert: false,
-              contentType: compressedFile.type
-            });
-
-          if (uploadError) throw uploadError;
-          console.timeEnd('[PERF] media:upload');
-
-          const { data: { publicUrl } } = supabase.storage
-            .from('message-media')
-            .getPublicUrl(fileName);
-
-          // Get the real DB id by client_id (retry up to 3 times with backoff)
-          let row = null;
-          for (let i = 0; i < 3; i++) {
-            const { data } = await supabase
-              .from('messages')
-              .select('id')
-              .eq('client_id', clientId)
-              .maybeSingle();
-            
-            if (data) {
-              row = data;
-              break;
-            }
-            
-            // Wait before retry (exponential backoff: 100ms, 200ms, 400ms)
-            await new Promise(r => setTimeout(r, 100 * Math.pow(2, i)));
-          }
-
-          if (row?.id) {
-            // Update the message with media (Realtime UPDATE will show it)
-            await supabase.from('messages')
-              .update({ media_url: publicUrl, media_type: compressedFile.type })
-              .eq('id', row.id);
-          } else {
-            throw new Error('Message not found after upload');
-          }
-        } catch (error) {
-          toast.error('Failed to upload media');
-          console.error('Error uploading media:', error);
-          
-          // Mark message as error
-          setMessages(prev => prev.map(m =>
-            m.client_id === clientId
-              ? { ...m, id: `error-${clientId}` }
-              : m
-          ));
-        } finally {
-          setUploadingMedia(false);
-        }
-      })();
-    }
-  };
+  // Sending handled inside ChatPane
 
   const filteredConversations = conversations.filter(conv =>
     conv.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -480,165 +567,16 @@ const Messages = () => {
       {/* Messages Area */}
       <Card className={`${selectedConversation && isMobile ? 'flex' : 'hidden'} md:flex flex-1 flex-col`}>
         {selectedConversation ? (
-          <>
-            <div className="p-4 border-b">
-              <div className="flex items-center gap-3">
-                <Button variant="ghost" size="icon" className="md:hidden" onClick={() => {
-                  setSearchParams({}, { replace: true });
-                }}>
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-                <Avatar>
-                  <AvatarImage src={displayAvatar} />
-                  <AvatarFallback>
-                    {displayName.split(' ').map(n => n[0]).join('')}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-semibold">{displayName}</p>
-                  <p className="text-sm text-muted-foreground">Active</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex-1 relative">
-                { (loadingMessages && !hasCache) ? (
-                  <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                  </div>
-                ) : (
-                  sortedMessages.length === 0 ? (
-                    <div className="absolute inset-0 flex items-center justify-center text-center text-muted-foreground">
-                      <p className="text-sm">No messages yet. Start the conversation!</p>
-                    </div>
-                  ) : (
-                    <>
-                      <Virtuoso
-                        key={selectedConversation}
-                        ref={virtuosoRef}
-                        data={sortedMessages}
-                        computeItemKey={(index, item) => item.id}
-                        increaseViewportBy={{ top: 400, bottom: 600 }}
-                        followOutput={() => {
-                          // Only auto-scroll if at bottom (ref-based, no re-render)
-                          return atBottomRef.current ? 'auto' : false;
-                        }}
-                        atBottomStateChange={(isAtBottom) => {
-                          atBottomRef.current = isAtBottom;
-                          
-                          if (isAtBottom) {
-                            setShowNewMessageButton(false);
-                            // Mark as read when at bottom
-                            if (selectedConversation && sortedMessages.length > 0) {
-                              const latestMsg = sortedMessages[sortedMessages.length - 1];
-                              if (latestMsg.sender_id === selectedConversation && !latestMsg.read_at) {
-                                markAsRead(selectedConversation);
-                              }
-                            }
-                          } else {
-                            // Show button if new message arrives while scrolled up
-                            if (!initialLoadRef.current && sortedMessages.length > 0) {
-                              const latestMsg = sortedMessages[sortedMessages.length - 1];
-                              if (latestMsg.sender_id === selectedConversation) {
-                                setShowNewMessageButton(true);
-                              }
-                            }
-                          }
-                        }}
-                        atBottomThreshold={100}
-                        startReached={loadOlderMessages}
-                        itemContent={(index, message) => (
-                          <div className="px-4 py-2">
-                            <MessageItem 
-                              key={message.id} 
-                              message={message} 
-                              isMe={message.sender_id === user?.id} 
-                            />
-                          </div>
-                        )}
-                      />
-                      
-                      {/* New messages pill when scrolled up */}
-                      {showNewMessageButton && (
-                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
-                          <Button
-                            size="sm"
-                            onClick={scrollToBottom}
-                            className="shadow-lg"
-                          >
-                            New messages ↓
-                          </Button>
-                        </div>
-                      )}
-                    </>
-                  )
-                )}
-
-            </div>
-            <div className="p-4 border-t">
-              {/* Media preview */}
-              {mediaPreview && (
-                <div className="mb-2 relative inline-block">
-                  <div className="relative">
-                    {selectedMedia?.type.startsWith('image/') ? (
-                      <img 
-                        src={mediaPreview} 
-                        alt="Preview"
-                        className="h-20 w-20 object-cover rounded-md"
-                      />
-                    ) : (
-                      <video 
-                        src={mediaPreview}
-                        className="h-20 w-20 object-cover rounded-md"
-                      />
-                    )}
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="absolute -top-2 -right-2 h-6 w-6"
-                      onClick={handleRemoveMedia}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-              
-              <div className="flex gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,video/webm"
-                  onChange={handleMediaSelect}
-                  className="hidden"
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingMedia}
-                >
-                  <Paperclip className="h-4 w-4" />
-                </Button>
-                <Input
-                  placeholder="Type a message..."
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                />
-                <Button 
-                  onClick={handleSendMessage} 
-                  size="icon"
-                  disabled={uploadingMedia || (!messageInput.trim() && !selectedMedia)}
-                >
-                  {uploadingMedia ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            </div>
-          </>
+          <ChatPane
+            key={selectedConversation}
+            conversationId={selectedConversation}
+            userId={(user?.id as string) ?? ''}
+            onBack={() => setSearchParams({}, { replace: true })}
+            displayName={displayName}
+            displayAvatar={displayAvatar}
+            messagesCacheRef={messagesCacheRef}
+            markAsRead={markAsRead}
+          />
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center">
