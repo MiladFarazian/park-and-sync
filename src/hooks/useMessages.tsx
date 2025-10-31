@@ -47,6 +47,8 @@ export const useMessages = () => {
       if (error) throw error;
       if (!mountedRef.current) return;
 
+      console.log('[useMessages] Processing', allMessages?.length || 0, 'messages');
+      
       const conversationMap = new Map<string, any>();
       
       for (const msg of allMessages || []) {
@@ -60,6 +62,15 @@ export const useMessages = () => {
             unread_count: 0,
             messages: []
           });
+        } else {
+          // Update last_message if this message is newer
+          const conv = conversationMap.get(partnerId);
+          const existingTime = new Date(conv.last_message_at).getTime();
+          const msgTime = new Date(msg.created_at).getTime();
+          if (msgTime > existingTime) {
+            conv.last_message = msg.message;
+            conv.last_message_at = msg.created_at;
+          }
         }
         
         const conv = conversationMap.get(partnerId);
@@ -80,6 +91,7 @@ export const useMessages = () => {
         const convs: Conversation[] = [];
         for (const [partnerId, conv] of conversationMap) {
           const profile = profiles?.find(p => p.user_id === partnerId);
+          // Create completely new object to force React re-render
           convs.push({
             id: partnerId,
             user_id: partnerId,
@@ -92,6 +104,7 @@ export const useMessages = () => {
         }
 
         convs.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
+        console.log('[useMessages] Setting', convs.length, 'conversations, newest:', convs[0]?.last_message);
         if (mountedRef.current) {
           setConversations(convs);
         }
@@ -153,11 +166,15 @@ export const useMessages = () => {
           const msg = payload.new as Message;
           const oldMsg = payload.old as any;
           
+          console.log('[useMessages] Realtime event:', payload.eventType, msg);
+          
           // Only reload if this message involves the current user
           if (payload.eventType === 'INSERT' && (msg.sender_id === user.id || msg.recipient_id === user.id)) {
+            console.log('[useMessages] Reloading conversations after INSERT');
             loadConversations();
           } else if (payload.eventType === 'UPDATE' && oldMsg && 
                      (oldMsg.sender_id === user.id || oldMsg.recipient_id === user.id)) {
+            console.log('[useMessages] Reloading conversations after UPDATE');
             loadConversations();
           }
         }

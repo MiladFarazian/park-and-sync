@@ -424,6 +424,15 @@ const Messages = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const isMobile = useIsMobile();
   const messagesCacheRef = useRef<Map<string, Message[]>>(new Map());
+  const [tick, setTick] = useState(0);
+  
+  // Force re-render every 60 seconds to update relative timestamps
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTick(t => t + 1);
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Parent holds no message state; chat-specific logic lives in ChatPane
   useEffect(() => {
@@ -528,7 +537,7 @@ const Messages = () => {
             ) : (
               filteredConversations.map((conversation) => (
                 <button
-                  key={conversation.user_id}
+                  key={`${conversation.user_id}-${conversation.last_message_at}-${tick}`}
                   onClick={() => {
                     setSearchParams({ userId: conversation.user_id }, { replace: true });
                   }}
