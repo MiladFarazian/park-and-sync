@@ -34,7 +34,7 @@ const ModeSwitcher = () => {
         <Button
           variant="outline"
           className={cn(
-            "flex items-center gap-2 h-9 px-3",
+            "flex items-center gap-2 h-9 px-3 bg-sidebar text-sidebar-foreground border-sidebar hover:bg-sidebar/90",
             isLoading && "opacity-50 cursor-not-allowed"
           )}
           disabled={isLoading}
