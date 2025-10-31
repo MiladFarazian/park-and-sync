@@ -333,6 +333,7 @@ function ChatPane({
                 ref={virtuosoRef}
                 data={sortedMessages}
                 computeItemKey={(index, item) => item.id}
+                initialTopMostItemIndex={sortedMessages.length > 0 ? sortedMessages.length - 1 : 0}
                 increaseViewportBy={{ top: 400, bottom: 600 }}
                 followOutput={() => atBottomRef.current ? 'auto' : false}
                 atBottomStateChange={(isAtBottom) => {
