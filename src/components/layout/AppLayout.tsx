@@ -3,11 +3,12 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import BottomNavigation from './BottomNavigation';
 import { AppSidebar } from './AppSidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { Bell, MessageSquare } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import parkwayLogo from '@/assets/parkway-logo.png';
 import ModeSwitcher from './ModeSwitcher';
 import ModeLoadingOverlay from './ModeLoadingOverlay';
+import { NotificationBell } from './NotificationBell';
 interface AppLayoutProps {
   children: React.ReactNode;
 }
@@ -33,9 +34,7 @@ const AppLayout = ({
                     <ModeSwitcher />
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="icon">
-                      <Bell className="h-5 w-5" />
-                    </Button>
+                    <NotificationBell />
                     <Button variant="ghost" size="icon" onClick={() => navigate('/messages')}>
                       <MessageSquare className="h-5 w-5" />
                     </Button>
@@ -57,9 +56,7 @@ const AppLayout = ({
               <ModeSwitcher />
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon">
-                <Bell className="h-5 w-5" />
-              </Button>
+              <NotificationBell />
             </div>
           </header>}
         <div className="min-h-screen bg-background pb-24">

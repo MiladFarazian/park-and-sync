@@ -158,6 +158,61 @@ serve(async (req) => {
         .eq('id', hold_id);
     }
 
+    // Get host and renter profiles for notifications and emails
+    const { data: hostProfile } = await supabase
+      .from('profiles')
+      .select('email, first_name')
+      .eq('user_id', spot.host_id)
+      .single();
+
+    const { data: renterProfile } = await supabase
+      .from('profiles')
+      .select('email, first_name')
+      .eq('user_id', userData.user.id)
+      .single();
+
+    // Create notifications for host and renter
+    if (hostProfile && renterProfile) {
+      const hostNotification = {
+        user_id: spot.host_id,
+        type: 'booking',
+        title: 'New Booking Received',
+        message: `${renterProfile.first_name || 'A driver'} booked your spot at ${spot.address}`,
+        related_id: booking.id,
+      };
+
+      const renterNotification = {
+        user_id: userData.user.id,
+        type: 'booking',
+        title: 'Booking Confirmed',
+        message: `Your booking at ${spot.address} is confirmed`,
+        related_id: booking.id,
+      };
+
+      await supabase.from('notifications').insert([hostNotification, renterNotification]);
+
+      // Send confirmation emails
+      try {
+        await supabase.functions.invoke('send-booking-confirmation', {
+          body: {
+            hostEmail: hostProfile.email,
+            hostName: hostProfile.first_name || 'Host',
+            driverEmail: renterProfile.email,
+            driverName: renterProfile.first_name || 'Driver',
+            spotTitle: spot.title,
+            spotAddress: spot.address,
+            startAt: start_at,
+            endAt: end_at,
+            totalAmount: totalAmount,
+            bookingId: booking.id,
+          },
+        });
+      } catch (emailError) {
+        console.error('Failed to send confirmation emails:', emailError);
+        // Don't fail the booking if email fails
+      }
+    }
+
     console.log('Booking created:', booking.id);
 
     return new Response(JSON.stringify({
