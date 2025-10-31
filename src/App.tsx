@@ -20,6 +20,7 @@ import Booking from "./pages/Booking";
 import BookingConfirmation from "./pages/BookingConfirmation";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
+import EmailConfirmation from "./pages/EmailConfirmation";
 import NotFound from "./pages/NotFound";
 import PersonalInformation from "./pages/PersonalInformation";
 import MyVehicles from "./pages/MyVehicles";
@@ -67,6 +68,7 @@ const App = () => {
           <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/email-confirmation" element={<EmailConfirmation />} />
             <Route path="/search-results" element={<SearchResults />} />
             <Route path="/spot/:id" element={<SpotDetail />} />
             <Route path="/book/:spotId" element={<Booking />} />
