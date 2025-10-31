@@ -48,6 +48,7 @@ const BookingConfirmation = () => {
               spot_photos(url, is_primary),
               profiles!spots_host_id_fkey(
                 id,
+                user_id,
                 first_name,
                 last_name,
                 avatar_url,
@@ -151,6 +152,7 @@ const BookingConfirmation = () => {
             spot_photos(url, is_primary),
             profiles!spots_host_id_fkey(
               id,
+              user_id,
               first_name,
               last_name,
               avatar_url,
