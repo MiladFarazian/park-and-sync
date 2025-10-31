@@ -11,36 +11,53 @@ const EmailConfirmation = () => {
   const [message, setMessage] = useState('Confirming your email...');
 
   useEffect(() => {
-    const confirmEmail = async () => {
-      try {
-        // Check if there's a session (email confirmation creates a session)
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          setStatus('error');
-          setMessage('Failed to confirm email. Please try again.');
-          return;
-        }
+    const hasHashFragment = window.location.hash.length > 0;
+    let timeoutId: NodeJS.Timeout;
 
+    // Set up auth state listener to detect when confirmation completes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        setStatus('success');
+        setMessage('Your email has been confirmed successfully!');
+        
+        // Redirect to home after 2 seconds
+        setTimeout(() => {
+          navigate('/');
+        }, 2000);
+      }
+    });
+
+    // If we have hash fragments, Supabase is processing the auth callback
+    // Give it time to complete before showing an error
+    if (hasHashFragment) {
+      // If auth doesn't complete within 5 seconds, show error
+      timeoutId = setTimeout(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (!session) {
+            setStatus('error');
+            setMessage('Failed to confirm email. Please try again.');
+          }
+        });
+      }, 5000);
+    } else {
+      // No hash fragments means this isn't an auth callback
+      // Check if there's already an active session
+      supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) {
           setStatus('success');
           setMessage('Your email has been confirmed successfully!');
-          
-          // Redirect to home after 2 seconds
-          setTimeout(() => {
-            navigate('/');
-          }, 2000);
+          setTimeout(() => navigate('/'), 2000);
         } else {
           setStatus('error');
-          setMessage('No confirmation session found. Please check your email link.');
+          setMessage('No confirmation link detected. Please check your email.');
         }
-      } catch (err) {
-        setStatus('error');
-        setMessage('An unexpected error occurred. Please try again.');
-      }
-    };
+      });
+    }
 
-    confirmEmail();
+    return () => {
+      subscription.unsubscribe();
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [navigate]);
 
   return (
