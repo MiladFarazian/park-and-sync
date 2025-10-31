@@ -30,6 +30,9 @@ export const useMessages = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const mountedRef = useRef(true);
+  const profileCacheRef = useRef<Map<string, { name: string; avatar_url?: string }>>(new Map());
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
 
   // Load conversations
   const loadConversations = async () => {
@@ -122,6 +125,73 @@ export const useMessages = () => {
     }
   };
 
+  // Helpers for realtime incremental updates
+  const ensureProfileLoaded = async (partnerId: string) => {
+    if (profileCacheRef.current.has(partnerId)) return;
+    try {
+      profileCacheRef.current.set(partnerId, { name: 'Unknown User' });
+      const { data } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name, avatar_url')
+        .eq('user_id', partnerId)
+        .maybeSingle();
+      if (data) {
+        const name = `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'Unknown User';
+        profileCacheRef.current.set(partnerId, { name, avatar_url: data.avatar_url || undefined });
+        if (mountedRef.current) {
+          setConversations(prev => prev.map(c => c.user_id === partnerId ? { ...c, name, avatar_url: data.avatar_url || undefined } : c));
+        }
+      }
+    } catch (e) {
+      console.error('[useMessages] ensureProfileLoaded error:', e);
+    }
+  };
+
+  const scheduleSoftReload = () => {
+    try {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(() => {
+        if (mountedRef.current) {
+          loadConversations();
+        }
+      }, 3000);
+    } catch (e) {
+      console.error('[useMessages] scheduleSoftReload error:', e);
+    }
+  };
+
+  const upsertConversationFromMessage = (msg: Message) => {
+    if (!user) return;
+    const partnerId = msg.sender_id === user.id ? msg.recipient_id : msg.sender_id;
+
+    setConversations(prev => {
+      const existing = prev.find(c => c.user_id === partnerId);
+      const isNewer = !existing || new Date(msg.created_at).getTime() >= new Date(existing.last_message_at).getTime();
+
+      let unread = existing?.unread_count || 0;
+      if (msg.recipient_id === user.id && !msg.read_at) {
+        unread = (existing ? existing.unread_count : 0) + 1;
+      }
+
+      const updated: Conversation = {
+        id: partnerId,
+        user_id: partnerId,
+        name: existing?.name || 'Unknown User',
+        avatar_url: existing?.avatar_url,
+        last_message: isNewer ? msg.message : (existing?.last_message || msg.message),
+        last_message_at: isNewer ? msg.created_at : (existing ? existing.last_message_at : msg.created_at),
+        unread_count: unread,
+      };
+
+      const others = prev.filter(c => c.user_id !== partnerId);
+      const next = [updated, ...others];
+      next.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
+      return next;
+    });
+
+    ensureProfileLoaded(partnerId);
+  };
+
   // Mark messages as read
   const markAsRead = async (senderId: string) => {
     if (!user) return;
@@ -153,36 +223,52 @@ export const useMessages = () => {
 
     loadConversations();
 
-    const channel = supabase
-      .channel('conversations-updates')
+    // Ensure Realtime has the latest auth token
+    supabase.auth.getSession().then(({ data }) => {
+      const access = data.session?.access_token;
+      try {
+        (supabase as any).realtime?.setAuth?.(access);
+      } catch (e) {
+        // no-op if setAuth not available
+      }
+    });
+
+    const channel = supabase.channel('conversations-updates');
+
+    channel
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'messages'
-        },
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `recipient_id=eq.${user.id}` },
         (payload) => {
           const msg = payload.new as Message;
-          const oldMsg = payload.old as any;
-          
-          console.log('[useMessages] Realtime event:', payload.eventType, msg);
-          
-          // Only reload if this message involves the current user
-          if (payload.eventType === 'INSERT' && (msg.sender_id === user.id || msg.recipient_id === user.id)) {
-            console.log('[useMessages] Reloading conversations after INSERT');
-            loadConversations();
-          } else if (payload.eventType === 'UPDATE' && oldMsg && 
-                     (oldMsg.sender_id === user.id || oldMsg.recipient_id === user.id)) {
-            console.log('[useMessages] Reloading conversations after UPDATE');
-            loadConversations();
-          }
+          console.log('[useMessages] INSERT incoming', msg);
+          upsertConversationFromMessage(msg);
+          scheduleSoftReload();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${user.id}` },
+        (payload) => {
+          const msg = payload.new as Message;
+          console.log('[useMessages] INSERT outgoing', msg);
+          upsertConversationFromMessage(msg);
+          scheduleSoftReload();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'messages', filter: `recipient_id=eq.${user.id}` },
+        () => {
+          // Soft reconcile in case of missed events (e.g., read receipts)
+          scheduleSoftReload();
         }
       )
       .subscribe();
 
     return () => {
       mountedRef.current = false;
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       supabase.removeChannel(channel);
     };
   }, [user]);
