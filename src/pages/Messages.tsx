@@ -73,7 +73,7 @@ const MessageItem = memo(({ message, isMe }: { message: Message; isMe: boolean }
           {isMe && (
             <>
               {message.read_at ? (
-                <CheckCheck className="h-3 w-3 text-blue-500" />
+                <CheckCheck className="h-3 w-3 text-green-500" />
               ) : message.delivered_at ? (
                 <CheckCheck className="h-3 w-3 text-white/60" />
               ) : (
