@@ -8,9 +8,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Trash2 } from 'lucide-react';
+import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Trash2, Upload, X, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { compressImage } from '@/lib/compressImage';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +38,13 @@ const amenitiesList = [
   { id: 'ev', label: 'EV Charging', icon: Zap, dbField: 'has_ev_charging' },
 ];
 
+interface SpotPhoto {
+  id: string;
+  url: string;
+  is_primary: boolean;
+  sort_order: number;
+}
+
 const EditSpot = () => {
   const navigate = useNavigate();
   const { spotId } = useParams<{ spotId: string }>();
@@ -45,6 +53,9 @@ const EditSpot = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [existingPhotos, setExistingPhotos] = useState<SpotPhoto[]>([]);
+  const [newPhotos, setNewPhotos] = useState<File[]>([]);
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
 
   const {
     register,
@@ -88,6 +99,17 @@ const EditSpot = () => {
         if (spotData.is_secure) amenities.push('security');
         if (spotData.has_ev_charging) amenities.push('ev');
         setSelectedAmenities(amenities);
+
+        // Fetch existing photos
+        const { data: photosData, error: photosError } = await supabase
+          .from('spot_photos')
+          .select('*')
+          .eq('spot_id', spotId)
+          .order('sort_order', { ascending: true });
+
+        if (!photosError && photosData) {
+          setExistingPhotos(photosData);
+        }
       } catch (error) {
         console.error('Error fetching spot:', error);
         toast.error('Failed to load spot details');
@@ -106,6 +128,134 @@ const EditSpot = () => {
         ? prev.filter((id) => id !== amenityId)
         : [...prev, amenityId]
     );
+  };
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      setNewPhotos([...newPhotos, ...files]);
+    }
+  };
+
+  const removeNewPhoto = (index: number) => {
+    setNewPhotos(newPhotos.filter((_, i) => i !== index));
+  };
+
+  const deleteExistingPhoto = async (photoId: string, photoUrl: string) => {
+    try {
+      // Extract file path from URL
+      const urlParts = photoUrl.split('/');
+      const filePath = urlParts.slice(urlParts.indexOf('spot-photos') + 1).join('/');
+
+      // Delete from storage
+      const { error: storageError } = await supabase.storage
+        .from('spot-photos')
+        .remove([filePath]);
+
+      if (storageError) {
+        console.error('Error deleting from storage:', storageError);
+      }
+
+      // Delete from database
+      const { error: dbError } = await supabase
+        .from('spot_photos')
+        .delete()
+        .eq('id', photoId);
+
+      if (dbError) throw dbError;
+
+      setExistingPhotos(existingPhotos.filter(p => p.id !== photoId));
+      toast.success('Photo deleted');
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      toast.error('Failed to delete photo');
+    }
+  };
+
+  const setPrimaryPhoto = async (photoId: string) => {
+    try {
+      // First, set all photos to non-primary
+      await supabase
+        .from('spot_photos')
+        .update({ is_primary: false })
+        .eq('spot_id', spotId);
+
+      // Then set the selected photo as primary
+      const { error } = await supabase
+        .from('spot_photos')
+        .update({ is_primary: true })
+        .eq('id', photoId);
+
+      if (error) throw error;
+
+      setExistingPhotos(existingPhotos.map(p => ({
+        ...p,
+        is_primary: p.id === photoId
+      })));
+      toast.success('Primary photo updated');
+    } catch (error) {
+      console.error('Error setting primary photo:', error);
+      toast.error('Failed to set primary photo');
+    }
+  };
+
+  const uploadNewPhotos = async () => {
+    if (newPhotos.length === 0 || !spotId) return;
+
+    try {
+      setIsUploadingPhotos(true);
+
+      for (let i = 0; i < newPhotos.length; i++) {
+        const file = newPhotos[i];
+        const compressedFile = await compressImage(file);
+        
+        const fileExt = compressedFile.name.split('.').pop();
+        const fileName = `${spotId}/${Date.now()}-${i}.${fileExt}`;
+
+        // Upload to storage
+        const { error: uploadError, data } = await supabase.storage
+          .from('spot-photos')
+          .upload(fileName, compressedFile);
+
+        if (uploadError) throw uploadError;
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('spot-photos')
+          .getPublicUrl(fileName);
+
+        // Save to database
+        const { error: dbError } = await supabase
+          .from('spot_photos')
+          .insert({
+            spot_id: spotId,
+            url: publicUrl,
+            is_primary: existingPhotos.length === 0 && i === 0,
+            sort_order: existingPhotos.length + i,
+          });
+
+        if (dbError) throw dbError;
+      }
+
+      // Refresh photos
+      const { data: photosData } = await supabase
+        .from('spot_photos')
+        .select('*')
+        .eq('spot_id', spotId)
+        .order('sort_order', { ascending: true });
+
+      if (photosData) {
+        setExistingPhotos(photosData);
+      }
+
+      setNewPhotos([]);
+      toast.success('Photos uploaded successfully');
+    } catch (error) {
+      console.error('Error uploading photos:', error);
+      toast.error('Failed to upload photos');
+    } finally {
+      setIsUploadingPhotos(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -320,6 +470,123 @@ const EditSpot = () => {
                       );
                     })}
                   </div>
+                </div>
+
+                {/* Photos Section */}
+                <div>
+                  <Label className="mb-3 block">Photos</Label>
+                  
+                  {/* Existing Photos */}
+                  {existingPhotos.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-sm text-muted-foreground mb-3">Current photos</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {existingPhotos.map((photo) => (
+                          <div key={photo.id} className="relative group">
+                            <div className={`relative aspect-video rounded-lg overflow-hidden border-2 ${
+                              photo.is_primary ? 'border-primary' : 'border-border'
+                            }`}>
+                              <img
+                                src={photo.url}
+                                alt="Spot"
+                                className="w-full h-full object-cover"
+                              />
+                              {photo.is_primary && (
+                                <div className="absolute top-2 left-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
+                                  <Star className="h-3 w-3 fill-current" />
+                                  Primary
+                                </div>
+                              )}
+                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                {!photo.is_primary && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => setPrimaryPhoto(photo.id)}
+                                  >
+                                    <Star className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => deleteExistingPhoto(photo.id, photo.url)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* New Photos Preview */}
+                  {newPhotos.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-sm text-muted-foreground mb-3">New photos to upload</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {newPhotos.map((photo, index) => (
+                          <div key={index} className="relative group">
+                            <div className="relative aspect-video rounded-lg overflow-hidden border-2 border-border">
+                              <img
+                                src={URL.createObjectURL(photo)}
+                                alt="New"
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => removeNewPhoto(index)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Upload Button */}
+                  <div className="flex gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => document.getElementById('photo-upload')?.click()}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Add Photos
+                    </Button>
+                    {newPhotos.length > 0 && (
+                      <Button
+                        type="button"
+                        onClick={uploadNewPhotos}
+                        disabled={isUploadingPhotos}
+                        className="flex-1"
+                      >
+                        {isUploadingPhotos ? 'Uploading...' : `Upload ${newPhotos.length} Photo${newPhotos.length > 1 ? 's' : ''}`}
+                      </Button>
+                    )}
+                  </div>
+                  <input
+                    id="photo-upload"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handlePhotoSelect}
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Click the star icon to set a primary photo. This will be shown as the main image.
+                  </p>
                 </div>
               </div>
 
