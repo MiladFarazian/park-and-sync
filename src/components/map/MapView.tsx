@@ -75,7 +75,6 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<mapboxgl.Marker[]>([]);
-  const searchMarker = useRef<mapboxgl.Marker | null>(null);
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -126,6 +125,9 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     // Mark map as ready when loaded
     map.current.on('load', () => {
       setMapReady(true);
+      
+      // Defensive cleanup: remove any orphaned HTML markers
+      mapContainer.current?.querySelectorAll('.mapboxgl-marker').forEach(marker => marker.remove());
       
       // Customize water color to deep blue
       if (map.current?.getLayer('water')) {
@@ -185,9 +187,49 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           }
         });
       }
+
+      // Add search center source and layers
+      if (map.current && !map.current.getSource('search-center')) {
+        map.current.addSource('search-center', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: []
+          }
+        });
+
+        // Outer ring
+        map.current.addLayer({
+          id: 'search-center-outer',
+          type: 'circle',
+          source: 'search-center',
+          paint: {
+            'circle-radius': 12,
+            'circle-color': 'hsl(250, 100%, 65%)',
+            'circle-opacity': 0.3,
+            'circle-stroke-width': 3,
+            'circle-stroke-color': 'white',
+            'circle-stroke-opacity': 0.9
+          }
+        });
+
+        // Inner dot
+        map.current.addLayer({
+          id: 'search-center-inner',
+          type: 'circle',
+          source: 'search-center',
+          paint: {
+            'circle-radius': 4,
+            'circle-color': 'hsl(250, 100%, 65%)',
+            'circle-opacity': 1,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': 'white'
+          }
+        });
+      }
     });
 
-    // Also add user location layers on style.load (in case style changes)
+    // Also add layers on style.load (in case style changes)
     map.current.on('style.load', () => {
       if (map.current && !map.current.getSource('user-location')) {
         map.current.addSource('user-location', {
@@ -239,6 +281,43 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           }
         });
       }
+
+      if (map.current && !map.current.getSource('search-center')) {
+        map.current.addSource('search-center', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: []
+          }
+        });
+
+        map.current.addLayer({
+          id: 'search-center-outer',
+          type: 'circle',
+          source: 'search-center',
+          paint: {
+            'circle-radius': 12,
+            'circle-color': 'hsl(250, 100%, 65%)',
+            'circle-opacity': 0.3,
+            'circle-stroke-width': 3,
+            'circle-stroke-color': 'white',
+            'circle-stroke-opacity': 0.9
+          }
+        });
+
+        map.current.addLayer({
+          id: 'search-center-inner',
+          type: 'circle',
+          source: 'search-center',
+          paint: {
+            'circle-radius': 4,
+            'circle-color': 'hsl(250, 100%, 65%)',
+            'circle-opacity': 1,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': 'white'
+          }
+        });
+      }
     });
 
     // Update visible spots count and notify parent when map moves
@@ -280,87 +359,57 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     map.current.on('idle', () => {
       updateVisibleSpots();
     });
+
+    // Cleanup function
+    return () => {
+      // Remove any orphaned HTML markers on cleanup
+      mapContainer.current?.querySelectorAll('.mapboxgl-marker').forEach(marker => marker.remove());
+    };
   }, [mapboxToken]);
 
-  // Move map when search center changes
+  // Update search center marker when searchCenter changes
   useEffect(() => {
     if (!map.current || !mapReady || !searchCenter) return;
-    
-    // Remove existing search marker if any
-    if (searchMarker.current) {
-      searchMarker.current.remove();
+
+    // Validate coordinates
+    const { lat, lng } = searchCenter;
+    if (
+      typeof lat !== 'number' || typeof lng !== 'number' ||
+      !isFinite(lat) || !isFinite(lng) ||
+      lat < -90 || lat > 90 ||
+      lng < -180 || lng > 180
+    ) {
+      console.warn('Invalid search center coordinates:', lat, lng);
+      return;
     }
 
-    // Create a custom element for the search marker
-    const el = document.createElement('div');
-    el.className = 'search-location-marker';
-    el.style.width = '40px';
-    el.style.height = '40px';
-    
-    // Create the marker HTML
-    el.innerHTML = `
-      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
-        <circle cx="20" cy="20" r="18" fill="hsl(250, 100%, 65%)" stroke="white" stroke-width="3" opacity="0.9"/>
-        <circle cx="20" cy="20" r="8" fill="white"/>
-        <circle cx="20" cy="20" r="4" fill="hsl(250, 100%, 65%)"/>
-      </svg>
-    `;
-
-    // Add pulsing animation
-    const style = document.createElement('style');
-    if (!document.getElementById('marker-pulse-style')) {
-      style.id = 'marker-pulse-style';
-      style.textContent = `
-        @keyframes marker-pulse {
-          0%, 100% { 
-            opacity: 1; 
-            transform: scale(1); 
+    // Update the search-center source with the new coordinates
+    const source = map.current.getSource('search-center');
+    if (source && 'setData' in source) {
+      (source as mapboxgl.GeoJSONSource).setData({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: [lng, lat]
+            },
+            properties: {}
           }
-          50% { 
-            opacity: 0.8; 
-            transform: scale(1.15); 
-          }
-        }
-        .search-location-marker {
-          animation: marker-pulse 2s ease-in-out infinite;
-        }
-      `;
-      document.head.appendChild(style);
+        ]
+      });
     }
 
-    // Fly to the new search center location first
+    // Fly to the new search center location
     map.current.flyTo({
-      center: [searchCenter.lng, searchCenter.lat],
+      center: [lng, lat],
       zoom: 14,
       essential: true,
       duration: 1500
     });
 
-    // Add marker after map finishes moving (more reliable than timeout)
-    const addMarkerAfterMove = () => {
-      if (map.current && searchCenter) {
-        searchMarker.current = new mapboxgl.Marker({
-          element: el,
-          anchor: 'center'
-        })
-          .setLngLat([searchCenter.lng, searchCenter.lat])
-          .addTo(map.current);
-        
-        console.log('Search marker added at:', searchCenter.lat, searchCenter.lng);
-      }
-      // Remove listener after adding marker
-      map.current?.off('moveend', addMarkerAfterMove);
-    };
-    
-    map.current.once('moveend', addMarkerAfterMove);
-
-    // Cleanup function
-    return () => {
-      if (searchMarker.current) {
-        searchMarker.current.remove();
-        searchMarker.current = null;
-      }
-    };
+    console.log('Search center updated at:', lat, lng);
   }, [searchCenter, mapReady]);
 
   // Update current location GeoJSON source when currentLocation changes
