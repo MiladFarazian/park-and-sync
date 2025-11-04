@@ -219,28 +219,32 @@ const EditSpot = () => {
       for (let i = 0; i < newPhotos.length; i++) {
         try {
           const file = newPhotos[i];
-          const fileExt = file.name.split('.').pop();
-          const fileName = `${spotId}/${crypto.randomUUID()}.${fileExt}`;
+          // Use compressed file's extension when available; fall back to MIME type mapping
+          const compressedFile = await compressImage(file);
+          const extFromName = (compressedFile as File).name?.split('.').pop();
+          const extFromType = (compressedFile as File).type?.split('/').pop();
+          const safeExt = (extFromName || extFromType || 'jpg').toLowerCase().replace('jpeg', 'jpg');
+
+          // Generate a safe unique filename, with fallback if crypto.randomUUID is not available
+          const uid = (globalThis as any)?.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+          const filePath = `${spotId}/${uid}.${safeExt}`;
 
           console.log('[PERF] Compressing image before upload:', file.name);
-          const compressedFile = await compressImage(file);
 
-          console.log('[UPLOAD] Starting upload:', fileName);
+          console.log('[UPLOAD] Starting upload:', filePath);
           const { error: uploadError } = await supabase.storage
             .from('spot-photos')
-            .upload(fileName, compressedFile, {
-              cacheControl: '3600',
-              upsert: false,
-            });
+            .upload(filePath, compressedFile);
 
           if (uploadError) {
             console.error('[UPLOAD] Storage upload error for photo', i + 1, ':', uploadError);
             throw uploadError;
           }
 
+
           const { data: { publicUrl } } = supabase.storage
             .from('spot-photos')
-            .getPublicUrl(fileName);
+            .getPublicUrl(filePath);
 
           console.log('[UPLOAD] Got public URL:', publicUrl);
 
