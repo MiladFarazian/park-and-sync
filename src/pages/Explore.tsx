@@ -463,13 +463,20 @@ const Explore = () => {
         )}
       </button>
 
-      <MapView spots={parkingSpots} searchCenter={userLocation} onVisibleSpotsChange={() => {}} onMapMove={handleMapMove} exploreParams={{
-      lat: userLocation?.lat.toString(),
-      lng: userLocation?.lng.toString(),
-      start: startTime?.toISOString(),
-      end: endTime?.toISOString(),
-      q: searchQuery
-    }} />
+      <MapView 
+        spots={parkingSpots} 
+        searchCenter={userLocation} 
+        currentLocation={userLocation}
+        onVisibleSpotsChange={() => {}} 
+        onMapMove={handleMapMove} 
+        exploreParams={{
+          lat: userLocation?.lat.toString(),
+          lng: userLocation?.lng.toString(),
+          start: startTime?.toISOString(),
+          end: endTime?.toISOString(),
+          q: searchQuery
+        }} 
+      />
     </div>;
 };
 export default Explore;

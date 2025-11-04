@@ -23,6 +23,7 @@ interface Spot {
 interface MapViewProps {
   spots: Spot[];
   searchCenter?: { lat: number; lng: number };
+  currentLocation?: { lat: number; lng: number };
   onVisibleSpotsChange?: (count: number) => void;
   onMapMove?: (center: { lat: number; lng: number }, radiusMeters: number) => void;
   exploreParams?: {
@@ -52,7 +53,7 @@ const calculateWalkTime = (distanceMiles: number): number => {
   return Math.round((distanceMiles / 3) * 60);
 };
 
-const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, exploreParams }: MapViewProps) => {
+const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, onMapMove, exploreParams }: MapViewProps) => {
   const navigate = useNavigate();
   
   const buildSpotUrl = (spotId: string) => {
@@ -75,6 +76,7 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, explore
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<mapboxgl.Marker[]>([]);
   const searchMarker = useRef<mapboxgl.Marker | null>(null);
+  const currentLocationMarker = useRef<mapboxgl.Marker | null>(null);
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -249,6 +251,71 @@ const MapView = ({ spots, searchCenter, onVisibleSpotsChange, onMapMove, explore
       }
     };
   }, [searchCenter, mapReady]);
+
+  // Add/update current location marker
+  useEffect(() => {
+    if (!map.current || !mapReady || !currentLocation) return;
+
+    // Remove existing current location marker if any
+    if (currentLocationMarker.current) {
+      currentLocationMarker.current.remove();
+    }
+
+    // Create a custom element for the current location marker
+    const el = document.createElement('div');
+    el.className = 'current-location-marker';
+    el.style.width = '24px';
+    el.style.height = '24px';
+    
+    // Create the marker HTML - blue dot with white ring
+    el.innerHTML = `
+      <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));">
+        <circle cx="12" cy="12" r="10" fill="white" opacity="1"/>
+        <circle cx="12" cy="12" r="7" fill="hsl(217, 91%, 60%)" opacity="1"/>
+        <circle cx="12" cy="12" r="3" fill="white" opacity="1"/>
+      </svg>
+    `;
+
+    // Add pulsing animation for current location
+    const style = document.createElement('style');
+    if (!document.getElementById('current-location-pulse-style')) {
+      style.id = 'current-location-pulse-style';
+      style.textContent = `
+        @keyframes current-location-pulse {
+          0%, 100% { 
+            opacity: 1; 
+            transform: scale(1); 
+          }
+          50% { 
+            opacity: 0.7; 
+            transform: scale(1.2); 
+          }
+        }
+        .current-location-marker {
+          animation: current-location-pulse 2s ease-in-out infinite;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    // Create and add the marker
+    currentLocationMarker.current = new mapboxgl.Marker({
+      element: el,
+      anchor: 'center'
+    })
+      .setLngLat([currentLocation.lng, currentLocation.lat])
+      .addTo(map.current);
+
+    console.log('Current location marker added at:', currentLocation.lat, currentLocation.lng);
+
+    // Cleanup function
+    return () => {
+      if (currentLocationMarker.current) {
+        currentLocationMarker.current.remove();
+        currentLocationMarker.current = null;
+      }
+    };
+  }, [currentLocation, mapReady]);
 
   // Add markers for spots
   useEffect(() => {
