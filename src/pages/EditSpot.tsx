@@ -210,62 +210,82 @@ const EditSpot = () => {
   const uploadNewPhotos = async () => {
     if (newPhotos.length === 0 || !spotId) return;
 
+    setIsUploadingPhotos(true);
+    setUploadProgress(0);
+    let successCount = 0;
+    let failCount = 0;
+
     try {
-      setIsUploadingPhotos(true);
-      setUploadProgress(0);
-
-      const uploadedIds: string[] = [];
-
       for (let i = 0; i < newPhotos.length; i++) {
-        const file = newPhotos[i];
-        const compressedFile = await compressImage(file);
-        
-        const fileExt = compressedFile.name.split('.').pop();
-        const fileName = `${spotId}/${Date.now()}-${i}.${fileExt}`;
+        try {
+          const file = newPhotos[i];
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${spotId}/${crypto.randomUUID()}.${fileExt}`;
 
-        // Upload to storage
-        const { error: uploadError, data } = await supabase.storage
-          .from('spot-photos')
-          .upload(fileName, compressedFile);
+          console.log('[PERF] Compressing image before upload:', file.name);
+          const compressedFile = await compressImage(file);
 
-        if (uploadError) throw uploadError;
+          console.log('[UPLOAD] Starting upload:', fileName);
+          const { error: uploadError } = await supabase.storage
+            .from('spot-photos')
+            .upload(fileName, compressedFile, {
+              cacheControl: '3600',
+              upsert: false,
+            });
 
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('spot-photos')
-          .getPublicUrl(fileName);
+          if (uploadError) {
+            console.error('[UPLOAD] Storage upload error for photo', i + 1, ':', uploadError);
+            throw uploadError;
+          }
 
-        // Save to database
-        const { error: dbError, data: insertedData } = await supabase
-          .from('spot_photos')
-          .insert({
-            spot_id: spotId,
-            url: publicUrl,
-            is_primary: existingPhotos.length === 0 && i === 0,
-            sort_order: existingPhotos.length + i,
-          })
-          .select()
-          .single();
+          const { data: { publicUrl } } = supabase.storage
+            .from('spot-photos')
+            .getPublicUrl(fileName);
 
-        if (dbError) throw dbError;
-        if (insertedData) {
-          uploadedIds.push(insertedData.id);
+          console.log('[UPLOAD] Got public URL:', publicUrl);
+
+          // Save to database - removed .select().single() which was causing the error
+          const { error: dbError } = await supabase
+            .from('spot_photos')
+            .insert({
+              spot_id: spotId,
+              url: publicUrl,
+              is_primary: existingPhotos.length === 0 && i === 0,
+              sort_order: existingPhotos.length + i,
+            });
+
+          if (dbError) {
+            console.error('[UPLOAD] Database insert error for photo', i + 1, ':', dbError);
+            throw dbError;
+          }
+
+          console.log('[UPLOAD] Successfully saved photo', i + 1, 'to database');
+          successCount++;
+
+          // Update progress
+          setUploadProgress(((i + 1) / newPhotos.length) * 100);
+        } catch (error) {
+          console.error(`[UPLOAD] Failed to upload photo ${i + 1} of ${newPhotos.length}:`, error);
+          failCount++;
+          // Continue with next photo instead of stopping
         }
-
-        // Update progress
-        setUploadProgress(((i + 1) / newPhotos.length) * 100);
       }
 
       // Refresh photos
-      const { data: photosData } = await supabase
+      const { data: photosData, error: fetchError } = await supabase
         .from('spot_photos')
         .select('*')
         .eq('spot_id', spotId)
         .order('sort_order', { ascending: true });
 
-      if (photosData) {
+      if (fetchError) {
+        console.error('[UPLOAD] Error fetching updated photos:', fetchError);
+      } else if (photosData) {
         setExistingPhotos(photosData);
-        setRecentlyUploaded(uploadedIds);
+        
+        // Mark recently uploaded photos for animation
+        const recentIds = photosData.slice(-successCount).map(p => p.id);
+        setRecentlyUploaded(recentIds);
         
         // Clear recently uploaded indicator after 3 seconds
         setTimeout(() => {
@@ -282,10 +302,17 @@ const EditSpot = () => {
       }
 
       setNewPhotos([]);
-      toast.success('Photos uploaded successfully');
+      
+      if (successCount > 0 && failCount === 0) {
+        toast.success(`Successfully uploaded ${successCount} photo(s)`);
+      } else if (successCount > 0 && failCount > 0) {
+        toast.success(`Uploaded ${successCount} photo(s), ${failCount} failed`);
+      } else {
+        toast.error('All photo uploads failed. Please try again.');
+      }
     } catch (error) {
-      console.error('Error uploading photos:', error);
-      toast.error('Failed to upload photos');
+      console.error('[UPLOAD] Upload process failed:', error);
+      toast.error('Failed to upload photos. Please try again.');
     } finally {
       setIsUploadingPhotos(false);
       setUploadProgress(0);
