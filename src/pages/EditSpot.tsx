@@ -139,10 +139,21 @@ const EditSpot = () => {
   };
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      setNewPhotos([...newPhotos, ...files]);
+    const selected = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith('image/'));
+    if (selected.length === 0) {
+      e.target.value = '';
+      return;
     }
+    setNewPhotos((prev) => {
+      const existingKeys = new Set(prev.map((f) => `${f.name}-${f.size}`));
+      const deduped = selected.filter((f) => !existingKeys.has(`${f.name}-${f.size}`));
+      if (deduped.length > 0) {
+        toast.success(`${deduped.length} photo${deduped.length > 1 ? 's' : ''} added`);
+      }
+      return [...prev, ...deduped];
+    });
+    // Reset so selecting the same files again will trigger onChange
+    e.target.value = '';
   };
 
   const removeNewPhoto = (index: number) => {
@@ -337,14 +348,19 @@ const EditSpot = () => {
     e.preventDefault();
     setIsDragging(false);
     
-    const files = Array.from(e.dataTransfer.files).filter(file => 
+    const dropped = Array.from(e.dataTransfer.files).filter((file) =>
       file.type.startsWith('image/')
     );
-    
-    if (files.length > 0) {
-      setNewPhotos([...newPhotos, ...files]);
-      toast.success(`${files.length} photo${files.length > 1 ? 's' : ''} added`);
-    }
+    if (dropped.length === 0) return;
+
+    setNewPhotos((prev) => {
+      const existingKeys = new Set(prev.map((f) => `${f.name}-${f.size}`));
+      const deduped = dropped.filter((f) => !existingKeys.has(`${f.name}-${f.size}`));
+      if (deduped.length > 0) {
+        toast.success(`${deduped.length} photo${deduped.length > 1 ? 's' : ''} added`);
+      }
+      return [...prev, ...deduped];
+    });
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -832,7 +848,7 @@ const EditSpot = () => {
                     }`}
                   >
                     <div className="p-6">
-                      <div className="flex flex-col items-center text-center mb-4">
+                      <div className="flex flex-col items-center text-center mb-4 cursor-pointer" onClick={() => document.getElementById('edit-photo-upload')?.click()}>
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-colors ${
                           isDragging ? 'bg-primary/10' : 'bg-muted'
                         }`}>
@@ -851,7 +867,7 @@ const EditSpot = () => {
                           type="button"
                           variant="outline"
                           className="flex-1"
-                          onClick={() => document.getElementById('photo-upload')?.click()}
+                          onClick={() => document.getElementById('edit-photo-upload')?.click()}
                         >
                           <Upload className="h-4 w-4 mr-2" />
                           Browse Files
@@ -872,7 +888,7 @@ const EditSpot = () => {
                   </div>
                   
                   <input
-                    id="photo-upload"
+                    id="edit-photo-upload"
                     type="file"
                     accept="image/*"
                     multiple
