@@ -76,7 +76,6 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<mapboxgl.Marker[]>([]);
   const searchMarker = useRef<mapboxgl.Marker | null>(null);
-  const currentLocationMarker = useRef<mapboxgl.Marker | null>(null);
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -131,6 +130,86 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       // Customize water color to deep blue
       if (map.current?.getLayer('water')) {
         map.current.setPaintProperty('water', 'fill-color', '#004e89');
+      }
+
+      // Add user location source and layers
+      if (map.current && !map.current.getSource('user-location')) {
+        map.current.addSource('user-location', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: []
+          }
+        });
+
+        // Outer pulsing ring
+        map.current.addLayer({
+          id: 'user-location-outer',
+          type: 'circle',
+          source: 'user-location',
+          paint: {
+            'circle-radius': 16,
+            'circle-color': 'hsl(217, 91%, 60%)',
+            'circle-opacity': 0.3,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': 'white',
+            'circle-stroke-opacity': 0.8
+          }
+        });
+
+        // Inner solid dot
+        map.current.addLayer({
+          id: 'user-location-inner',
+          type: 'circle',
+          source: 'user-location',
+          paint: {
+            'circle-radius': 8,
+            'circle-color': 'hsl(217, 91%, 60%)',
+            'circle-opacity': 1,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': 'white'
+          }
+        });
+      }
+    });
+
+    // Also add user location layers on style.load (in case style changes)
+    map.current.on('style.load', () => {
+      if (map.current && !map.current.getSource('user-location')) {
+        map.current.addSource('user-location', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: []
+          }
+        });
+
+        map.current.addLayer({
+          id: 'user-location-outer',
+          type: 'circle',
+          source: 'user-location',
+          paint: {
+            'circle-radius': 16,
+            'circle-color': 'hsl(217, 91%, 60%)',
+            'circle-opacity': 0.3,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': 'white',
+            'circle-stroke-opacity': 0.8
+          }
+        });
+
+        map.current.addLayer({
+          id: 'user-location-inner',
+          type: 'circle',
+          source: 'user-location',
+          paint: {
+            'circle-radius': 8,
+            'circle-color': 'hsl(217, 91%, 60%)',
+            'circle-opacity': 1,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': 'white'
+          }
+        });
       }
     });
 
@@ -229,8 +308,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       duration: 1500
     });
 
-    // Add marker after a short delay to ensure map has moved
-    setTimeout(() => {
+    // Add marker after map finishes moving (more reliable than timeout)
+    const addMarkerAfterMove = () => {
       if (map.current && searchCenter) {
         searchMarker.current = new mapboxgl.Marker({
           element: el,
@@ -241,7 +320,11 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         
         console.log('Search marker added at:', searchCenter.lat, searchCenter.lng);
       }
-    }, 100);
+      // Remove listener after adding marker
+      map.current?.off('moveend', addMarkerAfterMove);
+    };
+    
+    map.current.once('moveend', addMarkerAfterMove);
 
     // Cleanup function
     return () => {
@@ -252,69 +335,40 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     };
   }, [searchCenter, mapReady]);
 
-  // Add/update current location marker
+  // Update current location GeoJSON source when currentLocation changes
   useEffect(() => {
     if (!map.current || !mapReady || !currentLocation) return;
 
-    // Remove existing current location marker if any
-    if (currentLocationMarker.current) {
-      currentLocationMarker.current.remove();
+    // Validate coordinates
+    const { lat, lng } = currentLocation;
+    if (
+      typeof lat !== 'number' || typeof lng !== 'number' ||
+      !isFinite(lat) || !isFinite(lng) ||
+      lat < -90 || lat > 90 ||
+      lng < -180 || lng > 180
+    ) {
+      console.warn('Invalid current location coordinates:', lat, lng);
+      return;
     }
 
-    // Create a custom element for the current location marker
-    const el = document.createElement('div');
-    el.className = 'current-location-marker';
-    el.style.width = '24px';
-    el.style.height = '24px';
-    
-    // Create the marker HTML - blue dot with white ring
-    el.innerHTML = `
-      <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));">
-        <circle cx="12" cy="12" r="10" fill="white" opacity="1"/>
-        <circle cx="12" cy="12" r="7" fill="hsl(217, 91%, 60%)" opacity="1"/>
-        <circle cx="12" cy="12" r="3" fill="white" opacity="1"/>
-      </svg>
-    `;
-
-    // Add pulsing animation for current location
-    const style = document.createElement('style');
-    if (!document.getElementById('current-location-pulse-style')) {
-      style.id = 'current-location-pulse-style';
-      style.textContent = `
-        @keyframes current-location-pulse {
-          0%, 100% { 
-            opacity: 1; 
-            transform: scale(1); 
+    // Update the user-location source with the new coordinates
+    const source = map.current.getSource('user-location');
+    if (source && 'setData' in source) {
+      (source as mapboxgl.GeoJSONSource).setData({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: [lng, lat]
+            },
+            properties: {}
           }
-          50% { 
-            opacity: 0.7; 
-            transform: scale(1.2); 
-          }
-        }
-        .current-location-marker {
-          animation: current-location-pulse 2s ease-in-out infinite;
-        }
-      `;
-      document.head.appendChild(style);
+        ]
+      });
+      console.log('Current location updated at:', lat, lng);
     }
-
-    // Create and add the marker
-    currentLocationMarker.current = new mapboxgl.Marker({
-      element: el,
-      anchor: 'center'
-    })
-      .setLngLat([currentLocation.lng, currentLocation.lat])
-      .addTo(map.current);
-
-    console.log('Current location marker added at:', currentLocation.lat, currentLocation.lng);
-
-    // Cleanup function
-    return () => {
-      if (currentLocationMarker.current) {
-        currentLocationMarker.current.remove();
-        currentLocationMarker.current = null;
-      }
-    };
   }, [currentLocation, mapReady]);
 
   // Add markers for spots
