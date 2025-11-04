@@ -57,6 +57,32 @@ const SpotDetail = () => {
   const [messageText, setMessageText] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
 
+  const handleShare = async () => {
+    const shareUrl = window.location.href;
+    const shareData = {
+      title: spot?.title || 'Parking Spot',
+      text: `Check out this parking spot: ${spot?.title} - $${spot?.hourlyRate}/hour`,
+      url: shareUrl,
+    };
+
+    try {
+      // Check if Web Share API is available (mobile devices)
+      if (navigator.share && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+        toast.success('Shared successfully');
+      } else {
+        // Fallback: Copy to clipboard
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success('Link copied to clipboard');
+      }
+    } catch (error: any) {
+      // User cancelled share or clipboard failed
+      if (error.name !== 'AbortError') {
+        toast.error('Failed to share');
+      }
+    }
+  };
+
   // Determine where to navigate back based on 'from' parameter
   const from = searchParams.get('from');
   const getBackUrl = () => {
@@ -337,7 +363,7 @@ const SpotDetail = () => {
             <Button variant="secondary" size="sm">
               <Heart className="h-4 w-4" />
             </Button>
-            <Button variant="secondary" size="sm">
+            <Button variant="secondary" size="sm" onClick={handleShare}>
               <Share className="h-4 w-4" />
             </Button>
           </div>
