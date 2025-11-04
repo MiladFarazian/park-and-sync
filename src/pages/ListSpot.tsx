@@ -8,10 +8,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Star, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { AvailabilityManager, AvailabilityRule } from '@/components/availability/AvailabilityManager';
+import { compressImage } from '@/lib/compressImage';
 
 const formSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
@@ -40,6 +43,7 @@ const ListSpot = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [photos, setPhotos] = useState<File[]>([]);
+  const [primaryIndex, setPrimaryIndex] = useState<number>(0);
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availabilityRules, setAvailabilityRules] = useState<any[]>([]);
@@ -87,7 +91,46 @@ const ListSpot = () => {
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setPhotos([...photos, ...Array.from(e.target.files)]);
+      const newFiles = Array.from(e.target.files);
+      setPhotos([...photos, ...newFiles]);
+      // Set first photo as primary if no photos exist yet
+      if (photos.length === 0 && newFiles.length > 0) {
+        setPrimaryIndex(0);
+      }
+    }
+  };
+
+  const setPrimary = (index: number) => {
+    setPrimaryIndex(index);
+  };
+
+  const movePhoto = (index: number, direction: 'left' | 'right') => {
+    const newPhotos = [...photos];
+    const newIndex = direction === 'left' ? index - 1 : index + 1;
+    
+    if (newIndex < 0 || newIndex >= photos.length) return;
+    
+    [newPhotos[index], newPhotos[newIndex]] = [newPhotos[newIndex], newPhotos[index]];
+    
+    // Update primary index if needed
+    if (primaryIndex === index) {
+      setPrimaryIndex(newIndex);
+    } else if (primaryIndex === newIndex) {
+      setPrimaryIndex(index);
+    }
+    
+    setPhotos(newPhotos);
+  };
+
+  const removePhoto = (index: number) => {
+    const newPhotos = photos.filter((_, i) => i !== index);
+    setPhotos(newPhotos);
+    
+    // Adjust primary index
+    if (primaryIndex === index) {
+      setPrimaryIndex(0);
+    } else if (primaryIndex > index) {
+      setPrimaryIndex(primaryIndex - 1);
     }
   };
 
@@ -182,8 +225,52 @@ const ListSpot = () => {
         }
       }
 
-      // TODO: Handle photo uploads to storage
-      // For now, just show success
+      // Upload photos to storage and database
+      if (photos.length > 0 && spotData) {
+        toast.info('Uploading photos...');
+        
+        let uploadFailed = false;
+        for (let i = 0; i < photos.length; i++) {
+          const file = photos[i];
+          
+          try {
+            const compressedFile = await compressImage(file);
+            const fileExt = compressedFile.name.split('.').pop();
+            const filePath = `${spotData.id}/${crypto.randomUUID()}.${fileExt}`;
+
+            // Upload to storage
+            const { error: uploadError } = await supabase.storage
+              .from('spot-photos')
+              .upload(filePath, compressedFile);
+
+            if (uploadError) throw uploadError;
+
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+              .from('spot-photos')
+              .getPublicUrl(filePath);
+
+            // Save to database
+            const { error: dbError } = await supabase
+              .from('spot_photos')
+              .insert({
+                spot_id: spotData.id,
+                url: publicUrl,
+                is_primary: i === primaryIndex,
+                sort_order: i,
+              });
+
+            if (dbError) throw dbError;
+          } catch (photoError) {
+            console.error('Error uploading photo:', photoError);
+            uploadFailed = true;
+          }
+        }
+
+        if (uploadFailed) {
+          toast.warning('Spot created but some photos failed to upload');
+        }
+      }
       
       toast.success('Parking spot submitted for review!');
       navigate('/add-spot');
@@ -480,16 +567,116 @@ const ListSpot = () => {
                 </div>
 
                 {photos.length > 0 && (
-                  <div className="grid grid-cols-3 gap-3">
-                    {photos.map((photo, index) => (
-                      <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-muted">
-                        <img
-                          src={URL.createObjectURL(photo)}
-                          alt={`Upload ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ))}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground">
+                        {photos.length} photo{photos.length > 1 ? 's' : ''} • Will be uploaded on submit
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {photos.map((photo, index) => (
+                        <TooltipProvider key={index}>
+                          <div className="relative aspect-square rounded-lg overflow-hidden bg-muted group">
+                            <img
+                              src={URL.createObjectURL(photo)}
+                              alt={`Upload ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            
+                            {/* Order number badge */}
+                            <Badge 
+                              variant="secondary" 
+                              className="absolute top-2 left-2 text-xs font-semibold"
+                            >
+                              #{index + 1}
+                            </Badge>
+                            
+                            {/* Primary star badge */}
+                            {primaryIndex === index && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge 
+                                    className="absolute top-2 right-2 bg-primary text-primary-foreground"
+                                  >
+                                    <Star className="h-3 w-3 fill-current" />
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>Primary Photo</TooltipContent>
+                              </Tooltip>
+                            )}
+                            
+                            {/* Controls overlay */}
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
+                              <div className="flex gap-2">
+                                {primaryIndex !== index && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="secondary"
+                                        onClick={() => setPrimary(index)}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Star className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Set as Primary</TooltipContent>
+                                  </Tooltip>
+                                )}
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => removePhoto(index)}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Remove</TooltipContent>
+                                </Tooltip>
+                              </div>
+                              
+                              <div className="flex gap-2">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="secondary"
+                                      onClick={() => movePhoto(index, 'left')}
+                                      disabled={index === 0}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <ChevronLeft className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Move Left</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="secondary"
+                                      onClick={() => movePhoto(index, 'right')}
+                                      disabled={index === photos.length - 1}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Move Right</TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </div>
+                          </div>
+                        </TooltipProvider>
+                      ))}
+                    </div>
                   </div>
                 )}
 

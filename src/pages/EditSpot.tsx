@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Trash2, Upload, X, Star, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Trash2, Upload, X, Star, CheckCircle2, ChevronLeft, ChevronRight, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { compressImage } from '@/lib/compressImage';
@@ -62,6 +62,8 @@ const EditSpot = () => {
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [recentlyUploaded, setRecentlyUploaded] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
+  const [hasOrderChanged, setHasOrderChanged] = useState(false);
 
   const {
     register,
@@ -320,6 +322,43 @@ const EditSpot = () => {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
+  const moveExistingPhoto = (index: number, direction: 'left' | 'right') => {
+    const newPhotos = [...existingPhotos];
+    const newIndex = direction === 'left' ? index - 1 : index + 1;
+    
+    if (newIndex < 0 || newIndex >= existingPhotos.length) return;
+    
+    [newPhotos[index], newPhotos[newIndex]] = [newPhotos[newIndex], newPhotos[index]];
+    
+    setExistingPhotos(newPhotos);
+    setHasOrderChanged(true);
+  };
+
+  const savePhotoOrder = async () => {
+    if (!spotId || isSavingOrder) return;
+
+    try {
+      setIsSavingOrder(true);
+
+      // Update sort_order for each photo
+      for (let i = 0; i < existingPhotos.length; i++) {
+        const photo = existingPhotos[i];
+        await supabase
+          .from('spot_photos')
+          .update({ sort_order: i })
+          .eq('id', photo.id);
+      }
+
+      setHasOrderChanged(false);
+      toast.success('Photo order saved');
+    } catch (error) {
+      console.error('Error saving photo order:', error);
+      toast.error('Failed to save photo order');
+    } finally {
+      setIsSavingOrder(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!spotId || isDeleting) return;
 
@@ -549,6 +588,18 @@ const EditSpot = () => {
                           {newPhotos.length} Pending
                         </Badge>
                       )}
+                      {hasOrderChanged && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={savePhotoOrder}
+                          disabled={isSavingOrder}
+                          className="h-7"
+                        >
+                          <Save className="h-3.5 w-3.5 mr-1.5" />
+                          Save Order
+                        </Button>
+                      )}
                     </div>
                   </div>
                   
@@ -560,7 +611,7 @@ const EditSpot = () => {
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <TooltipProvider>
-                          {existingPhotos.map((photo) => {
+                          {existingPhotos.map((photo, index) => {
                             const isRecent = recentlyUploaded.includes(photo.id);
                             return (
                               <div key={photo.id} className="relative group">
@@ -577,17 +628,25 @@ const EditSpot = () => {
                                     className="w-full h-full object-cover"
                                   />
                                   
+                                  {/* Order Badge */}
+                                  <Badge 
+                                    variant="secondary" 
+                                    className="absolute top-2 left-2 text-xs font-semibold z-10"
+                                  >
+                                    #{index + 1}
+                                  </Badge>
+                                  
                                   {/* Primary Badge */}
                                   {photo.is_primary && (
-                                    <div className="absolute top-2 left-2 bg-primary text-primary-foreground px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-lg">
+                                    <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-lg z-10">
                                       <Star className="h-3.5 w-3.5 fill-current" />
-                                      Primary Photo
+                                      Primary
                                     </div>
                                   )}
                                   
                                   {/* Recently Uploaded Badge */}
                                   {isRecent && (
-                                    <div className="absolute top-2 right-2 bg-green-500 text-white px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-lg animate-scale-in">
+                                    <div className="absolute top-10 right-2 bg-green-500 text-white px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-lg animate-scale-in z-10">
                                       <CheckCircle2 className="h-3.5 w-3.5" />
                                       Uploaded
                                     </div>
@@ -606,14 +665,48 @@ const EditSpot = () => {
                                             className="shadow-lg"
                                           >
                                             <Star className="h-4 w-4 mr-1.5" />
-                                            Set as Primary
+                                            Set Primary
                                           </Button>
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                          <p>This photo will appear first in your listing</p>
+                                          <p>This photo will appear first</p>
                                         </TooltipContent>
                                       </Tooltip>
                                     )}
+                                    
+                                    <div className="flex gap-2">
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="secondary"
+                                            onClick={() => moveExistingPhoto(index, 'left')}
+                                            disabled={index === 0}
+                                            className="shadow-lg h-8 w-8 p-0"
+                                          >
+                                            <ChevronLeft className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Move Left</TooltipContent>
+                                      </Tooltip>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="secondary"
+                                            onClick={() => moveExistingPhoto(index, 'right')}
+                                            disabled={index === existingPhotos.length - 1}
+                                            className="shadow-lg h-8 w-8 p-0"
+                                          >
+                                            <ChevronRight className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Move Right</TooltipContent>
+                                      </Tooltip>
+                                    </div>
+                                    
                                     <Button
                                       type="button"
                                       size="sm"
