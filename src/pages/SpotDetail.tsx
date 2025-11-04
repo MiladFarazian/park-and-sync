@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import BookingModal from '@/components/booking/BookingModal';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -53,7 +52,6 @@ const SpotDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showDirections, setShowDirections] = useState(false);
-  const [bookingOpen, setBookingOpen] = useState(false);
   const [isOwnSpot, setIsOwnSpot] = useState(false);
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const [messageText, setMessageText] = useState('');
@@ -163,7 +161,15 @@ const SpotDetail = () => {
       toast.error("You cannot book your own spot");
       return;
     }
-    setBookingOpen(true);
+    
+    // Get start/end times from URL params if they exist
+    const start = searchParams.get('start');
+    const end = searchParams.get('end');
+    const params = new URLSearchParams();
+    if (start) params.set('start', start);
+    if (end) params.set('end', end);
+    
+    navigate(`/book/${spot.id}${params.toString() ? `?${params.toString()}` : ''}`);
   };
 
   const handleMessageHost = () => {
@@ -532,13 +538,6 @@ const SpotDetail = () => {
           </div>
         </SheetContent>
       </Sheet>
-
-      {/* Booking Modal */}
-      <BookingModal
-        open={bookingOpen}
-        onOpenChange={setBookingOpen}
-        spot={spot}
-      />
 
       {/* Message Host Dialog */}
       <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
