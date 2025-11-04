@@ -12,8 +12,11 @@ interface ModeContextType {
 const ModeContext = createContext<ModeContextType | undefined>(undefined);
 
 export const ModeProvider = ({ children }: { children: ReactNode }) => {
-  // Always start in driver mode
-  const [mode, setModeState] = useState<Mode>('driver');
+  // Initialize from localStorage or default to driver mode
+  const [mode, setModeState] = useState<Mode>(() => {
+    const savedMode = localStorage.getItem('parkway-mode');
+    return (savedMode === 'host' || savedMode === 'driver') ? savedMode : 'driver';
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [targetMode, setTargetMode] = useState<Mode | null>(null);
 
