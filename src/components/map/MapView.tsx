@@ -148,9 +148,23 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           type: 'circle',
           source: 'user-location',
           paint: {
-            'circle-radius': 16,
-            'circle-color': 'hsl(217, 91%, 60%)',
-            'circle-opacity': 0.3,
+            'circle-radius': [
+              'interpolate',
+              ['linear'],
+              ['%', ['/', ['get', 'timestamp'], 1000], 2],
+              0, 16,
+              1, 24,
+              2, 16
+            ],
+            'circle-color': 'hsl(250, 100%, 65%)',
+            'circle-opacity': [
+              'interpolate',
+              ['linear'],
+              ['%', ['/', ['get', 'timestamp'], 1000], 2],
+              0, 0.6,
+              1, 0.2,
+              2, 0.6
+            ],
             'circle-stroke-width': 2,
             'circle-stroke-color': 'white',
             'circle-stroke-opacity': 0.8
@@ -164,7 +178,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           source: 'user-location',
           paint: {
             'circle-radius': 8,
-            'circle-color': 'hsl(217, 91%, 60%)',
+            'circle-color': 'hsl(250, 100%, 65%)',
             'circle-opacity': 1,
             'circle-stroke-width': 2,
             'circle-stroke-color': 'white'
@@ -189,9 +203,23 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           type: 'circle',
           source: 'user-location',
           paint: {
-            'circle-radius': 16,
-            'circle-color': 'hsl(217, 91%, 60%)',
-            'circle-opacity': 0.3,
+            'circle-radius': [
+              'interpolate',
+              ['linear'],
+              ['%', ['/', ['get', 'timestamp'], 1000], 2],
+              0, 16,
+              1, 24,
+              2, 16
+            ],
+            'circle-color': 'hsl(250, 100%, 65%)',
+            'circle-opacity': [
+              'interpolate',
+              ['linear'],
+              ['%', ['/', ['get', 'timestamp'], 1000], 2],
+              0, 0.6,
+              1, 0.2,
+              2, 0.6
+            ],
             'circle-stroke-width': 2,
             'circle-stroke-color': 'white',
             'circle-stroke-opacity': 0.8
@@ -204,7 +232,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           source: 'user-location',
           paint: {
             'circle-radius': 8,
-            'circle-color': 'hsl(217, 91%, 60%)',
+            'circle-color': 'hsl(250, 100%, 65%)',
             'circle-opacity': 1,
             'circle-stroke-width': 2,
             'circle-stroke-color': 'white'
@@ -351,24 +379,32 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       return;
     }
 
-    // Update the user-location source with the new coordinates
-    const source = map.current.getSource('user-location');
-    if (source && 'setData' in source) {
-      (source as mapboxgl.GeoJSONSource).setData({
-        type: 'FeatureCollection',
-        features: [
-          {
-            type: 'Feature',
-            geometry: {
-              type: 'Point',
-              coordinates: [lng, lat]
-            },
-            properties: {}
-          }
-        ]
-      });
-      console.log('Current location updated at:', lat, lng);
-    }
+    const updateLocation = () => {
+      const source = map.current?.getSource('user-location');
+      if (source && 'setData' in source) {
+        (source as mapboxgl.GeoJSONSource).setData({
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'Point',
+                coordinates: [lng, lat]
+              },
+              properties: { timestamp: Date.now() }
+            }
+          ]
+        });
+      }
+    };
+
+    // Initial update
+    updateLocation();
+    
+    // Update every 100ms to trigger animation
+    const animationInterval = setInterval(updateLocation, 100);
+
+    return () => clearInterval(animationInterval);
   }, [currentLocation, mapReady]);
 
   // Add markers for spots
