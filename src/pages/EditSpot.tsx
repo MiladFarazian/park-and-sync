@@ -8,7 +8,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Trash2, Upload, X, Star } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Trash2, Upload, X, Star, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { compressImage } from '@/lib/compressImage';
@@ -56,6 +59,9 @@ const EditSpot = () => {
   const [existingPhotos, setExistingPhotos] = useState<SpotPhoto[]>([]);
   const [newPhotos, setNewPhotos] = useState<File[]>([]);
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [recentlyUploaded, setRecentlyUploaded] = useState<string[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
 
   const {
     register,
@@ -204,6 +210,9 @@ const EditSpot = () => {
 
     try {
       setIsUploadingPhotos(true);
+      setUploadProgress(0);
+
+      const uploadedIds: string[] = [];
 
       for (let i = 0; i < newPhotos.length; i++) {
         const file = newPhotos[i];
@@ -225,16 +234,24 @@ const EditSpot = () => {
           .getPublicUrl(fileName);
 
         // Save to database
-        const { error: dbError } = await supabase
+        const { error: dbError, data: insertedData } = await supabase
           .from('spot_photos')
           .insert({
             spot_id: spotId,
             url: publicUrl,
             is_primary: existingPhotos.length === 0 && i === 0,
             sort_order: existingPhotos.length + i,
-          });
+          })
+          .select()
+          .single();
 
         if (dbError) throw dbError;
+        if (insertedData) {
+          uploadedIds.push(insertedData.id);
+        }
+
+        // Update progress
+        setUploadProgress(((i + 1) / newPhotos.length) * 100);
       }
 
       // Refresh photos
@@ -246,6 +263,20 @@ const EditSpot = () => {
 
       if (photosData) {
         setExistingPhotos(photosData);
+        setRecentlyUploaded(uploadedIds);
+        
+        // Clear recently uploaded indicator after 3 seconds
+        setTimeout(() => {
+          setRecentlyUploaded([]);
+        }, 3000);
+
+        // Scroll to photos section
+        setTimeout(() => {
+          document.getElementById('photos-section')?.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'nearest' 
+          });
+        }, 100);
       }
 
       setNewPhotos([]);
@@ -255,7 +286,38 @@ const EditSpot = () => {
       toast.error('Failed to upload photos');
     } finally {
       setIsUploadingPhotos(false);
+      setUploadProgress(0);
     }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const files = Array.from(e.dataTransfer.files).filter(file => 
+      file.type.startsWith('image/')
+    );
+    
+    if (files.length > 0) {
+      setNewPhotos([...newPhotos, ...files]);
+      toast.success(`${files.length} photo${files.length > 1 ? 's' : ''} added`);
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
   const handleDelete = async () => {
@@ -473,78 +535,147 @@ const EditSpot = () => {
                 </div>
 
                 {/* Photos Section */}
-                <div>
-                  <Label className="mb-3 block">Photos</Label>
+                <div id="photos-section">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label>Photos</Label>
+                    <div className="flex gap-2">
+                      {existingPhotos.length > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          {existingPhotos.length} Uploaded
+                        </Badge>
+                      )}
+                      {newPhotos.length > 0 && (
+                        <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400">
+                          {newPhotos.length} Pending
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
                   
                   {/* Existing Photos */}
                   {existingPhotos.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-sm text-muted-foreground mb-3">Current photos</p>
+                    <div className="mb-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <p className="text-sm font-medium">Current Photos</p>
+                      </div>
                       <div className="grid grid-cols-2 gap-3">
-                        {existingPhotos.map((photo) => (
-                          <div key={photo.id} className="relative group">
-                            <div className={`relative aspect-video rounded-lg overflow-hidden border-2 ${
-                              photo.is_primary ? 'border-primary' : 'border-border'
-                            }`}>
-                              <img
-                                src={photo.url}
-                                alt="Spot"
-                                className="w-full h-full object-cover"
-                              />
-                              {photo.is_primary && (
-                                <div className="absolute top-2 left-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
-                                  <Star className="h-3 w-3 fill-current" />
-                                  Primary
+                        <TooltipProvider>
+                          {existingPhotos.map((photo) => {
+                            const isRecent = recentlyUploaded.includes(photo.id);
+                            return (
+                              <div key={photo.id} className="relative group">
+                                <div className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all ${
+                                  photo.is_primary 
+                                    ? 'border-primary ring-2 ring-primary/20' 
+                                    : isRecent
+                                    ? 'border-green-500 ring-2 ring-green-500/20 animate-fade-in'
+                                    : 'border-border'
+                                }`}>
+                                  <img
+                                    src={photo.url}
+                                    alt="Spot"
+                                    className="w-full h-full object-cover"
+                                  />
+                                  
+                                  {/* Primary Badge */}
+                                  {photo.is_primary && (
+                                    <div className="absolute top-2 left-2 bg-primary text-primary-foreground px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-lg">
+                                      <Star className="h-3.5 w-3.5 fill-current" />
+                                      Primary Photo
+                                    </div>
+                                  )}
+                                  
+                                  {/* Recently Uploaded Badge */}
+                                  {isRecent && (
+                                    <div className="absolute top-2 right-2 bg-green-500 text-white px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-lg animate-scale-in">
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                      Uploaded
+                                    </div>
+                                  )}
+                                  
+                                  {/* Hover Overlay */}
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col items-center justify-center gap-2">
+                                    {!photo.is_primary && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="secondary"
+                                            onClick={() => setPrimaryPhoto(photo.id)}
+                                            className="shadow-lg"
+                                          >
+                                            <Star className="h-4 w-4 mr-1.5" />
+                                            Set as Primary
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>This photo will appear first in your listing</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => deleteExistingPhoto(photo.id, photo.url)}
+                                      className="shadow-lg"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-1.5" />
+                                      Delete
+                                    </Button>
+                                  </div>
                                 </div>
-                              )}
-                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                {!photo.is_primary && (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="secondary"
-                                    onClick={() => setPrimaryPhoto(photo.id)}
-                                  >
-                                    <Star className="h-4 w-4" />
-                                  </Button>
-                                )}
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => deleteExistingPhoto(photo.id, photo.url)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
                               </div>
-                            </div>
-                          </div>
-                        ))}
+                            );
+                          })}
+                        </TooltipProvider>
                       </div>
                     </div>
                   )}
 
                   {/* New Photos Preview */}
                   {newPhotos.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-sm text-muted-foreground mb-3">New photos to upload</p>
+                    <div className="mb-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <p className="text-sm font-medium">Pending Upload</p>
+                        <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400">
+                          Not yet saved
+                        </Badge>
+                      </div>
                       <div className="grid grid-cols-2 gap-3">
                         {newPhotos.map((photo, index) => (
                           <div key={index} className="relative group">
-                            <div className="relative aspect-video rounded-lg overflow-hidden border-2 border-border">
+                            <div className="relative aspect-video rounded-lg overflow-hidden border-2 border-dashed border-amber-500 bg-amber-50/50 dark:bg-amber-950/20">
                               <img
                                 src={URL.createObjectURL(photo)}
-                                alt="New"
+                                alt="Pending upload"
                                 className="w-full h-full object-cover"
                               />
+                              
+                              {/* Pending Badge */}
+                              <div className="absolute top-2 left-2 bg-amber-500 text-white px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-lg">
+                                <Upload className="h-3.5 w-3.5" />
+                                Pending
+                              </div>
+                              
+                              {/* File Info */}
+                              <div className="absolute bottom-2 left-2 right-2 bg-black/70 backdrop-blur-sm px-2 py-1.5 rounded text-xs text-white">
+                                <p className="truncate font-medium">{photo.name}</p>
+                                <p className="text-white/70">{formatFileSize(photo.size)}</p>
+                              </div>
+                              
+                              {/* Hover Overlay */}
                               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                 <Button
                                   type="button"
                                   size="sm"
                                   variant="destructive"
                                   onClick={() => removeNewPhoto(index)}
+                                  className="shadow-lg"
                                 >
-                                  <X className="h-4 w-4" />
+                                  <X className="h-4 w-4 mr-1.5" />
+                                  Remove
                                 </Button>
                               </div>
                             </div>
@@ -554,28 +685,68 @@ const EditSpot = () => {
                     </div>
                   )}
 
-                  {/* Upload Button */}
-                  <div className="flex gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => document.getElementById('photo-upload')?.click()}
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Add Photos
-                    </Button>
-                    {newPhotos.length > 0 && (
-                      <Button
-                        type="button"
-                        onClick={uploadNewPhotos}
-                        disabled={isUploadingPhotos}
-                        className="flex-1"
-                      >
-                        {isUploadingPhotos ? 'Uploading...' : `Upload ${newPhotos.length} Photo${newPhotos.length > 1 ? 's' : ''}`}
-                      </Button>
-                    )}
+                  {/* Upload Progress */}
+                  {isUploadingPhotos && (
+                    <div className="mb-4 p-4 rounded-lg bg-primary/5 border border-primary/20">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-medium">Uploading photos...</p>
+                        <p className="text-sm text-muted-foreground">{Math.round(uploadProgress)}%</p>
+                      </div>
+                      <Progress value={uploadProgress} className="h-2" />
+                    </div>
+                  )}
+
+                  {/* Drag & Drop Zone / Upload Buttons */}
+                  <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`rounded-lg border-2 border-dashed transition-all ${
+                      isDragging
+                        ? 'border-primary bg-primary/5 scale-[1.02]'
+                        : 'border-border bg-background'
+                    }`}
+                  >
+                    <div className="p-6">
+                      <div className="flex flex-col items-center text-center mb-4">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-colors ${
+                          isDragging ? 'bg-primary/10' : 'bg-muted'
+                        }`}>
+                          <Camera className={`h-6 w-6 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
+                        </div>
+                        <p className="text-sm font-medium mb-1">
+                          {isDragging ? 'Drop photos here' : 'Add photos to your listing'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Drag and drop, or click to browse
+                        </p>
+                      </div>
+                      
+                      <div className="flex gap-3">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => document.getElementById('photo-upload')?.click()}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Browse Files
+                        </Button>
+                        {newPhotos.length > 0 && (
+                          <Button
+                            type="button"
+                            onClick={uploadNewPhotos}
+                            disabled={isUploadingPhotos}
+                            className="flex-1"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            {isUploadingPhotos ? 'Uploading...' : `Upload ${newPhotos.length} Photo${newPhotos.length > 1 ? 's' : ''}`}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                  
                   <input
                     id="photo-upload"
                     type="file"
@@ -584,8 +755,10 @@ const EditSpot = () => {
                     className="hidden"
                     onChange={handlePhotoSelect}
                   />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Click the star icon to set a primary photo. This will be shown as the main image.
+                  
+                  <p className="text-xs text-muted-foreground mt-3">
+                    <Star className="h-3 w-3 inline mr-1" />
+                    Tip: Set a primary photo to make it appear first in your listing. Images are automatically compressed for optimal loading.
                   </p>
                 </div>
               </div>
