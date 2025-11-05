@@ -301,7 +301,7 @@ const Home = () => {
   ];
 
   return (
-    <div className="bg-background pb-20">
+    <div className="bg-background">
       <div className="p-4 space-y-6">
         {/* Search Card */}
         <Card className="p-6 space-y-4">

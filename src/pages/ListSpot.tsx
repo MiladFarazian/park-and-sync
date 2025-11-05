@@ -297,7 +297,7 @@ const ListSpot = () => {
   };
 
   return (
-    <div className="bg-background pb-20">
+    <div className="bg-background">
       <div className="p-4 space-y-6 max-w-2xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3">
