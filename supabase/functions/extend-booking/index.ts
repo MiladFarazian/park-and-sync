@@ -193,11 +193,39 @@ serve(async (req) => {
         throw new Error('Invalid payment method');
       }
     } else {
-      const response = await stripe.paymentMethods.list({ customer: customerId!, type: 'card' });
-      if (!response.data || response.data.length === 0) {
-        throw new Error('No payment method on file. Please add a payment method in your profile.');
+      // Try to reuse the original booking's payment method first
+      let pmFromBooking: string | undefined;
+      try {
+        if (booking.stripe_payment_intent_id) {
+          const originalPi = await stripe.paymentIntents.retrieve(booking.stripe_payment_intent_id);
+          const pmId = typeof originalPi.payment_method === 'string'
+            ? originalPi.payment_method
+            : originalPi.payment_method?.id;
+          if (pmId) {
+            try {
+              const pmObj = await stripe.paymentMethods.retrieve(pmId);
+              if (!pmObj.customer) {
+                await stripe.paymentMethods.attach(pmId, { customer: customerId! });
+              }
+              pmFromBooking = pmId;
+            } catch (err) {
+              console.error('Failed to reuse payment method from original booking', err);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error retrieving original booking payment method', err);
       }
-      resolvedPaymentMethodId = response.data[0].id;
+
+      if (pmFromBooking) {
+        resolvedPaymentMethodId = pmFromBooking;
+      } else {
+        const response = await stripe.paymentMethods.list({ customer: customerId!, type: 'card' });
+        if (!response.data || response.data.length === 0) {
+          throw new Error('No payment method on file. Please add a payment method in your profile.');
+        }
+        resolvedPaymentMethodId = response.data[0].id;
+      }
     }
 
     // Create and confirm PaymentIntent (on-session)
