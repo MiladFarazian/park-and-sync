@@ -71,14 +71,14 @@ const AddSpot = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
+      <div className="bg-background pb-20 flex items-center justify-center">
         <p>Loading your listings...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="bg-background pb-20">
       <div className="p-4 space-y-6">
         <div className="flex justify-between items-start">
           <div>

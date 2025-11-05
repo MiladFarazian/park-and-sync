@@ -24,7 +24,7 @@ const AppLayout = ({
       {/* Desktop Layout with Sidebar */}
       <div className="hidden md:block">
         <SidebarProvider>
-          <div className="flex min-h-screen w-full">
+          <div className="flex w-full">
             <AppSidebar />
             <main className="flex-1">
               {!isProfilePage && <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
@@ -59,7 +59,7 @@ const AppLayout = ({
               <NotificationBell />
             </div>
           </header>}
-        <div className="min-h-screen bg-background pb-24">
+        <div className="bg-background pb-24">
           <div className="max-w-md mx-auto">
             {children}
           </div>

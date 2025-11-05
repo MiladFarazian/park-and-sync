@@ -495,7 +495,7 @@ const EditSpot = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background pb-20">
+      <div className="bg-background pb-20">
         <div className="p-4 space-y-6 max-w-2xl mx-auto">
           <p className="text-center text-muted-foreground">Loading...</p>
         </div>
@@ -504,7 +504,7 @@ const EditSpot = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="bg-background pb-20">
       <div className="p-4 space-y-6 max-w-2xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3">

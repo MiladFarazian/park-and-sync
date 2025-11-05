@@ -197,7 +197,7 @@ const SearchResults = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       {/* Header */}
       <div className="p-4 border-b bg-background sticky top-0 z-10">
         <div className="flex items-center justify-between">
