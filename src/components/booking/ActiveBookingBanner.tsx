@@ -231,17 +231,17 @@ export const ActiveBookingBanner = () => {
                   )}
                 </div>
                 
-                <div className="flex items-center gap-3 text-xs text-muted-foreground overflow-hidden whitespace-nowrap">
-                  <div className="flex items-center gap-1 whitespace-nowrap flex-shrink-0">
-                    <Clock className="h-3 w-3 flex-shrink-0" />
-                    <span className="font-medium">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Clock className="h-3 w-3" />
+                    <span className="font-medium whitespace-nowrap">
                       {isOverstayed ? `Ended at ${endTime}` : `Ends at ${endTime}`}
                     </span>
                   </div>
                   {isHost && (
                     <>
-                      <span className="opacity-60">•</span>
-                      <span className="truncate">Driver: {activeBooking.profiles.first_name} {activeBooking.profiles.last_name}</span>
+                      <span className="opacity-60 flex-shrink-0">•</span>
+                      <span className="truncate min-w-0">Driver: {activeBooking.profiles.first_name} {activeBooking.profiles.last_name}</span>
                     </>
                   )}
                 </div>
