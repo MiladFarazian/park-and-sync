@@ -6,9 +6,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, addHours, format } from "date-fns";
 
 interface ActiveBooking {
   id: string;
@@ -40,6 +42,8 @@ export const ActiveBookingBanner = () => {
   const navigate = useNavigate();
   const [activeBooking, setActiveBooking] = useState<ActiveBooking | null>(null);
   const [showOverstayDialog, setShowOverstayDialog] = useState(false);
+  const [showExtendDialog, setShowExtendDialog] = useState(false);
+  const [extensionHours, setExtensionHours] = useState(1);
   const [loading, setLoading] = useState(false);
   const isHost = activeBooking && profile?.user_id === activeBooking.spots.host_id;
 
@@ -167,19 +171,34 @@ export const ActiveBookingBanner = () => {
     
     try {
       const { data, error } = await supabase.functions.invoke('extend-booking', {
-        body: { bookingId: activeBooking.id, extensionHours: 1 }
+        body: { 
+          bookingId: activeBooking.id, 
+          extensionHours 
+        }
       });
 
       if (error) throw error;
 
-      toast.success('Booking extended by 1 hour');
+      toast.success(`Booking extended by ${extensionHours} hour${extensionHours > 1 ? 's' : ''}`);
+      setShowExtendDialog(false);
+      setExtensionHours(1);
       loadActiveBooking();
     } catch (error) {
       console.error('Error extending booking:', error);
-      toast.error('Failed to extend booking');
+      toast.error(error instanceof Error ? error.message : 'Failed to extend booking');
     }
     
     setLoading(false);
+  };
+
+  const getNewEndTime = () => {
+    if (!activeBooking) return '';
+    return format(addHours(new Date(activeBooking.end_at), extensionHours), 'MMM d, h:mm a');
+  };
+
+  const getExtensionCost = () => {
+    if (!activeBooking) return 0;
+    return activeBooking.spots.hourly_rate * extensionHours;
   };
 
   if (!activeBooking) return null;
@@ -190,82 +209,114 @@ export const ActiveBookingBanner = () => {
 
   return (
     <>
-      <Card className="mb-6 border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
-        <div className="p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <CarFront className="h-5 w-5 text-primary" />
-                <h3 className="font-semibold text-lg">
-                  {isHost ? 'Active Booking' : 'Currently Parked'}
-                </h3>
+      <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 via-background to-primary/5 shadow-lg">
+        <div className="p-6">
+          <div className="flex items-start justify-between gap-6">
+            <div className="flex-1 space-y-4">
+              {/* Header */}
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <CarFront className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-xl">
+                    {isHost ? 'Active Booking' : 'Currently Parked'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {isHost ? 'Spot is in use' : 'Your parking session'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Status Badges */}
+              <div className="flex flex-wrap gap-2">
                 {isOverstayed && !activeBooking.overstay_action && (
-                  <Badge variant="destructive" className="ml-2">
+                  <Badge variant="destructive" className="px-3 py-1">
                     <AlertTriangle className="h-3 w-3 mr-1" />
                     Overstayed
                   </Badge>
                 )}
                 {activeBooking.overstay_action === 'charging' && (
-                  <Badge variant="destructive" className="ml-2">
+                  <Badge variant="destructive" className="px-3 py-1">
                     <DollarSign className="h-3 w-3 mr-1" />
                     Overstay Charges Active
                   </Badge>
                 )}
                 {activeBooking.overstay_action === 'towing' && (
-                  <Badge variant="destructive" className="ml-2">
+                  <Badge variant="destructive" className="px-3 py-1">
                     Towing Requested
                   </Badge>
                 )}
               </div>
               
-              <p className="text-sm text-muted-foreground mb-1">
-                {activeBooking.spots.title}
-              </p>
-              <p className="text-sm text-muted-foreground mb-3">
-                {activeBooking.spots.address}
-              </p>
-
-              {isHost && (
-                <p className="text-sm font-medium mb-2">
-                  Driver: {activeBooking.profiles.first_name} {activeBooking.profiles.last_name}
+              {/* Location Info */}
+              <div className="space-y-2 p-4 bg-muted/50 rounded-lg">
+                <p className="font-semibold text-lg">
+                  {activeBooking.spots.title}
                 </p>
-              )}
-
-              <div className="flex items-center gap-2 text-sm">
-                <Clock className="h-4 w-4" />
-                <span>
-                  {isOverstayed 
-                    ? `Ended ${timeRemaining}` 
-                    : `Ends ${timeRemaining}`}
-                </span>
+                <p className="text-sm text-muted-foreground">
+                  {activeBooking.spots.address}
+                </p>
+                
+                {isHost && (
+                  <p className="text-sm font-medium pt-2 border-t">
+                    Driver: {activeBooking.profiles.first_name} {activeBooking.profiles.last_name}
+                  </p>
+                )}
               </div>
 
+              {/* Time Info */}
+              <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
+                <Clock className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Time Remaining</p>
+                  <p className="font-semibold">
+                    {isOverstayed 
+                      ? `Ended ${timeRemaining}` 
+                      : `Ends ${timeRemaining}`}
+                  </p>
+                </div>
+              </div>
+
+              {/* Overstay Charges */}
               {hasOverstayCharges && (
-                <div className="mt-2 p-2 bg-destructive/10 rounded-md">
-                  <p className="text-sm font-semibold text-destructive">
-                    Overstay Charges: ${activeBooking.overstay_charge_amount.toFixed(2)}
+                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <DollarSign className="h-5 w-5 text-destructive" />
+                    <p className="font-semibold text-destructive">
+                      Overstay Charges
+                    </p>
+                  </div>
+                  <p className="text-2xl font-bold text-destructive">
+                    ${activeBooking.overstay_charge_amount.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    $25/hour premium rate applied
                   </p>
                 </div>
               )}
             </div>
 
-            <div className="flex flex-col gap-2">
+            {/* Actions */}
+            <div className="flex flex-col gap-3 min-w-[160px]">
               <Button
                 variant="outline"
-                size="sm"
+                size="lg"
                 onClick={handleMessage}
+                className="w-full"
               >
-                <MessageCircle className="h-4 w-4 mr-1" />
+                <MessageCircle className="h-4 w-4 mr-2" />
                 Message {isHost ? 'Driver' : 'Host'}
               </Button>
 
               {isHost && !activeBooking.overstay_action && isOverstayed && (
                 <Button
                   variant="destructive"
-                  size="sm"
+                  size="lg"
                   onClick={handleMarkOverstay}
+                  className="w-full"
                 >
-                  <AlertTriangle className="h-4 w-4 mr-1" />
+                  <AlertTriangle className="h-4 w-4 mr-2" />
                   Mark Overstay
                 </Button>
               )}
@@ -273,18 +324,80 @@ export const ActiveBookingBanner = () => {
               {!isHost && !isOverstayed && (
                 <Button
                   variant="default"
-                  size="sm"
-                  onClick={handleExtendBooking}
+                  size="lg"
+                  onClick={() => setShowExtendDialog(true)}
                   disabled={loading}
+                  className="w-full"
                 >
-                  <Clock className="h-4 w-4 mr-1" />
-                  Extend 1 Hour
+                  <Plus className="h-4 w-4 mr-2" />
+                  Extend Time
                 </Button>
               )}
             </div>
           </div>
         </div>
       </Card>
+
+      {/* Extend Booking Dialog */}
+      <Dialog open={showExtendDialog} onOpenChange={setShowExtendDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Extend Your Parking</DialogTitle>
+            <DialogDescription>
+              How much additional time do you need?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            <div className="space-y-3">
+              <Label>Extension Duration</Label>
+              <div className="grid grid-cols-4 gap-2">
+                {[1, 2, 3, 4].map((hours) => (
+                  <Button
+                    key={hours}
+                    variant={extensionHours === hours ? "default" : "outline"}
+                    onClick={() => setExtensionHours(hours)}
+                    className="h-16 flex flex-col gap-1"
+                  >
+                    <span className="text-2xl font-bold">{hours}</span>
+                    <span className="text-xs">hour{hours > 1 ? 's' : ''}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2 p-4 bg-muted rounded-lg">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Current End Time</span>
+                <span className="font-medium">
+                  {format(new Date(activeBooking?.end_at || ''), 'MMM d, h:mm a')}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">New End Time</span>
+                <span className="font-semibold text-primary">
+                  {getNewEndTime()}
+                </span>
+              </div>
+              <div className="pt-2 mt-2 border-t flex justify-between">
+                <span className="font-semibold">Extension Cost</span>
+                <span className="text-xl font-bold text-primary">
+                  ${getExtensionCost().toFixed(2)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowExtendDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleExtendBooking} disabled={loading}>
+              {loading ? 'Processing...' : `Extend ${extensionHours} Hour${extensionHours > 1 ? 's' : ''}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={showOverstayDialog} onOpenChange={setShowOverstayDialog}>
         <AlertDialogContent>
