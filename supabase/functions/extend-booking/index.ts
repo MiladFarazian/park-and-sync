@@ -115,7 +115,7 @@ serve(async (req) => {
     }
     const stripe = new Stripe(stripeSecret, {});
 
-    // Get customer ID
+    // Get customer ID and default payment method
     const { data: profile } = await supabase
       .from('profiles')
       .select('stripe_customer_id')
@@ -123,24 +123,36 @@ serve(async (req) => {
       .single();
 
     if (!profile?.stripe_customer_id) {
-      throw new Error('Payment method not found');
+      throw new Error('Payment method not found. Please add a payment method first.');
     }
 
-    // Create payment intent for extension
+    // Get customer's default payment method from Stripe
+    const customer = await stripe.customers.retrieve(profile.stripe_customer_id);
+    
+    if (!customer || customer.deleted) {
+      throw new Error('Customer not found');
+    }
+
+    const defaultPaymentMethodId = customer.invoice_settings?.default_payment_method;
+    
+    if (!defaultPaymentMethodId) {
+      throw new Error('No payment method on file. Please add a payment method in your profile.');
+    }
+
+    // Create payment intent for extension with saved payment method
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(extensionCost * 100),
       currency: 'usd',
       customer: profile.stripe_customer_id,
+      payment_method: defaultPaymentMethodId as string,
+      off_session: true,
       confirm: true,
-      automatic_payment_methods: {
-        enabled: true,
-        allow_redirects: 'never'
-      },
       metadata: {
         booking_id: bookingId,
         extension_hours: extensionHours.toString(),
         host_id: booking.spots.host_id,
-        renter_id: userData.user.id
+        renter_id: userData.user.id,
+        type: 'extension'
       }
     });
 
