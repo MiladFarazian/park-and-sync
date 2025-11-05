@@ -235,6 +235,7 @@ serve(async (req) => {
       customer: customerId!,
       payment_method: resolvedPaymentMethodId,
       confirm: true,
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
       description: `Parking Extension - ${booking.spots.title}`,
       metadata: {
         booking_id: bookingId,
