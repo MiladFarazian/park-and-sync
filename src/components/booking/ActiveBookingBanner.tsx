@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus } from "lucide-react";
+import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus, Navigation } from "lucide-react";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { toast } from "sonner";
@@ -147,6 +147,13 @@ export const ActiveBookingBanner = () => {
     
     const recipientId = isHost ? activeBooking.renter_id : activeBooking.spots.host_id;
     navigate(`/messages?userId=${recipientId}`);
+  };
+
+  const handleGetDirections = () => {
+    if (!activeBooking) return;
+    
+    const address = encodeURIComponent(activeBooking.spots.address);
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${address}`, '_blank');
   };
 
   const handleMarkOverstay = () => {
@@ -352,24 +359,9 @@ export const ActiveBookingBanner = () => {
                       <span className="opacity-60 flex-shrink-0">•</span>
                       <span className="truncate min-w-0">Driver: {activeBooking.profiles.first_name} {activeBooking.profiles.last_name}</span>
                     </>
-                  )}
+                   )}
             </div>
-
-            <div className="flex items-center justify-between">
-              <Button variant="ghost" size="sm" onClick={startNewCardFlow} className="px-0">
-                Change payment method
-              </Button>
-              {newPaymentMethodId && (
-                <Badge variant="secondary" className="text-xs">New card saved</Badge>
-              )}
-            </div>
-
-            {useNewCard && stripePromise && setupClientSecret && (
-              <Elements stripe={stripePromise} options={{ clientSecret: setupClientSecret }}>
-                <AddCardInline />
-              </Elements>
-            )}
-          </div>
+              </div>
             </div>
 
             {/* Right: Actions */}
@@ -382,34 +374,58 @@ export const ActiveBookingBanner = () => {
                 </div>
               )}
               
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleMessage}
-              >
-                <MessageCircle className="h-4 w-4" />
-              </Button>
+              {!isHost && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleMessage}
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                  </Button>
 
-              {isHost && !activeBooking.overstay_action && isOverstayed && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleMarkOverstay}
-                >
-                  <AlertTriangle className="h-4 w-4 mr-1" />
-                  Mark Overstay
-                </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGetDirections}
+                  >
+                    <Navigation className="h-4 w-4" />
+                  </Button>
+
+                  {!isOverstayed && (
+                    <Button
+                      size="sm"
+                      onClick={() => setShowExtendDialog(true)}
+                      disabled={loading}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Extend
+                    </Button>
+                  )}
+                </>
               )}
 
-              {!isHost && !isOverstayed && (
-                <Button
-                  size="sm"
-                  onClick={() => setShowExtendDialog(true)}
-                  disabled={loading}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Extend
-                </Button>
+              {isHost && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleMessage}
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                  </Button>
+
+                  {!activeBooking.overstay_action && isOverstayed && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleMarkOverstay}
+                    >
+                      <AlertTriangle className="h-4 w-4 mr-1" />
+                      Mark Overstay
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -461,10 +477,42 @@ export const ActiveBookingBanner = () => {
                 </span>
               </div>
             </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Payment method</Label>
+                {!useNewCard && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={startNewCardFlow}
+                    className="h-auto py-1 px-2 text-xs"
+                  >
+                    Change card
+                  </Button>
+                )}
+              </div>
+              
+              {!useNewCard && (
+                <div className="p-3 bg-muted/50 rounded-md border">
+                  <p className="text-sm text-muted-foreground">Using same card from booking</p>
+                </div>
+              )}
+
+              {useNewCard && stripePromise && setupClientSecret && (
+                <Elements stripe={stripePromise} options={{ clientSecret: setupClientSecret }}>
+                  <AddCardInline />
+                </Elements>
+              )}
+            </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowExtendDialog(false)}>
+            <Button variant="outline" onClick={() => {
+              setShowExtendDialog(false);
+              setUseNewCard(false);
+              setNewPaymentMethodId(null);
+            }}>
               Cancel
             </Button>
             <Button onClick={handleExtendBooking} disabled={loading}>
