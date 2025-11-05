@@ -193,11 +193,11 @@ serve(async (req) => {
         throw new Error('Invalid payment method');
       }
     } else {
-      const { data: methods } = await stripe.paymentMethods.list({ customer: customerId!, type: 'card' });
-      if (!methods || methods.data.length === 0) {
+      const response = await stripe.paymentMethods.list({ customer: customerId!, type: 'card' });
+      if (!response.data || response.data.length === 0) {
         throw new Error('No payment method on file. Please add a payment method in your profile.');
       }
-      resolvedPaymentMethodId = methods.data[0].id;
+      resolvedPaymentMethodId = response.data[0].id;
     }
 
     // Create and confirm PaymentIntent (on-session)
