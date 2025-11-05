@@ -4,7 +4,7 @@ import CTASection from '@/components/ui/cta-section';
 
 const Index = () => {
   return (
-    <div className="min-h-screen">
+    <div className="bg-background">
       <HeroSection />
       <FeaturesSection />
       <CTASection />

@@ -324,7 +324,7 @@ const SpotDetail = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="bg-background flex items-center justify-center py-24">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin mx-auto" />
           <p className="text-muted-foreground">Loading parking spot...</p>
@@ -335,7 +335,7 @@ const SpotDetail = () => {
 
   if (error || !spot) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="bg-background flex items-center justify-center py-24">
         <div className="text-center space-y-4">
           <p className="text-red-500">{error || 'Spot not found'}</p>
           <Button onClick={() => navigate('/')}>Back to Search</Button>

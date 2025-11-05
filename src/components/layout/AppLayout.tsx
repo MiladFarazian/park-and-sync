@@ -59,7 +59,7 @@ const AppLayout = ({
               <NotificationBell />
             </div>
           </header>}
-        <div className="bg-background pb-24">
+        <div className="bg-background">
           <div className="max-w-md mx-auto">
             {children}
           </div>
