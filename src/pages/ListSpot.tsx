@@ -23,7 +23,7 @@ const formSchema = z.object({
     message: 'Hourly rate must be a positive number',
   }),
   description: z.string().min(20, 'Description must be at least 20 characters'),
-  parkingInstructions: z.string().optional(),
+  parkingInstructions: z.string().min(10, 'Parking instructions must be at least 10 characters'),
   amenities: z.array(z.string()),
   photos: z.array(z.any()).optional(),
 });
@@ -193,7 +193,7 @@ const ListSpot = () => {
           address: data.address,
           hourly_rate: parseFloat(data.hourlyRate),
           description: data.description,
-          access_notes: data.parkingInstructions || null,
+          access_notes: data.parkingInstructions,
           latitude: coordinates.lat,
           longitude: coordinates.lng,
           location: `POINT(${coordinates.lng} ${coordinates.lat})`,
@@ -290,7 +290,8 @@ const ListSpot = () => {
       return formData.title && formData.address && formData.hourlyRate && !errors.title && !errors.address && !errors.hourlyRate;
     }
     if (currentStep === 2) {
-      return formData.description && formData.description.length >= 20;
+      return formData.description && formData.description.length >= 20 && 
+             formData.parkingInstructions && formData.parkingInstructions.length >= 10;
     }
     return true;
   };
@@ -432,8 +433,11 @@ const ListSpot = () => {
                       {...register('parkingInstructions')}
                       className="mt-1.5 resize-none"
                     />
+                    {errors.parkingInstructions && (
+                      <p className="text-sm text-destructive mt-1">{errors.parkingInstructions.message}</p>
+                    )}
                     <p className="text-xs text-muted-foreground mt-1">
-                      Optional - Help renters find and access your spot easily
+                      {formData.parkingInstructions?.length || 0} / 10 minimum characters
                     </p>
                   </div>
                 </div>
@@ -753,12 +757,10 @@ const ListSpot = () => {
                     <p className="text-sm text-muted-foreground">{formData.description}</p>
                   </div>
 
-                  {formData.parkingInstructions && (
-                    <div className="p-4 rounded-lg bg-muted/50">
-                      <h3 className="font-semibold text-sm mb-3">Parking Instructions</h3>
-                      <p className="text-sm text-muted-foreground">{formData.parkingInstructions}</p>
-                    </div>
-                  )}
+                  <div className="p-4 rounded-lg bg-muted/50">
+                    <h3 className="font-semibold text-sm mb-3">Parking Instructions</h3>
+                    <p className="text-sm text-muted-foreground">{formData.parkingInstructions}</p>
+                  </div>
 
                   <div className="p-4 rounded-lg bg-muted/50">
                     <h3 className="font-semibold text-sm mb-3">Amenities</h3>
