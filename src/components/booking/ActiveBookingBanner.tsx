@@ -179,14 +179,13 @@ export const ActiveBookingBanner = () => {
 
       if (error) throw error;
 
-      // Redirect to Stripe Checkout
-      if (data.checkoutUrl) {
-        window.open(data.checkoutUrl, '_blank');
-        toast.success('Opening payment page...');
+      if (data.success) {
+        toast.success(data.message || 'Booking extended successfully!');
         setShowExtendDialog(false);
         setExtensionHours(1);
+        loadActiveBooking(); // Reload to show updated end time
       } else {
-        throw new Error('No checkout URL received');
+        throw new Error(data.error || 'Failed to extend booking');
       }
     } catch (error) {
       console.error('Error extending booking:', error);

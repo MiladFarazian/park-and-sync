@@ -117,7 +117,7 @@ serve(async (req) => {
       apiVersion: '2025-08-27.basil',
     });
 
-    // Get customer ID
+    // Get customer ID and payment methods
     const { data: profile } = await supabase
       .from('profiles')
       .select('stripe_customer_id')
@@ -142,27 +142,28 @@ serve(async (req) => {
         .eq('user_id', userData.user.id);
     }
 
-    // Create a Checkout session for the extension payment
-    const origin = req.headers.get('origin') || 'https://bcd0f814-3e2f-427f-8e4e-b211f7011a0e.lovableproject.com';
-    
-    const session = await stripe.checkout.sessions.create({
+    // Get payment methods
+    const paymentMethods = await stripe.paymentMethods.list({
       customer: customerId,
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `Parking Extension - ${booking.spots.title}`,
-              description: `${extensionHours} hour${extensionHours > 1 ? 's' : ''} extension`,
-            },
-            unit_amount: Math.round(extensionCost * 100),
-          },
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      success_url: `${origin}/activity?extension_success=true`,
-      cancel_url: `${origin}/activity?extension_canceled=true`,
+      type: 'card',
+    });
+
+    if (paymentMethods.data.length === 0) {
+      throw new Error('No payment method on file. Please add a payment method in your profile.');
+    }
+
+    // Use the default payment method (first one)
+    const paymentMethodId = paymentMethods.data[0].id;
+
+    // Create a PaymentIntent
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(extensionCost * 100),
+      currency: 'usd',
+      customer: customerId,
+      payment_method: paymentMethodId,
+      off_session: true,
+      confirm: true,
+      description: `Parking Extension - ${booking.spots.title}`,
       metadata: {
         booking_id: bookingId,
         extension_hours: extensionHours.toString(),
@@ -175,19 +176,55 @@ serve(async (req) => {
       }
     });
 
-    console.log('Checkout session created for extension:', {
-      sessionId: session.id,
+    if (paymentIntent.status !== 'succeeded') {
+      throw new Error('Payment failed. Please try again or update your payment method.');
+    }
+
+    console.log('Payment successful for extension:', {
+      paymentIntentId: paymentIntent.id,
       bookingId,
       extensionHours,
       extensionCost
     });
 
+    // Update the booking with new end time
+    const { error: updateError } = await supabase
+      .from('bookings')
+      .update({
+        end_at: newEndTime.toISOString(),
+        total_amount: booking.total_amount + extensionCost,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', bookingId);
+
+    if (updateError) {
+      console.error('Error updating booking:', updateError);
+      throw new Error('Payment succeeded but failed to update booking. Please contact support.');
+    }
+
+    // Credit the host's balance
+    const { error: balanceError } = await supabase.rpc('increment_balance', {
+      user_id: booking.spots.host_id,
+      amount: hostEarnings
+    });
+
+    if (balanceError) {
+      console.error('Error updating host balance:', balanceError);
+    }
+
+    console.log('Booking extended successfully:', {
+      bookingId,
+      newEndTime: newEndTime.toISOString(),
+      extensionCost,
+      hostEarnings
+    });
+
     return new Response(JSON.stringify({
       success: true,
-      checkoutUrl: session.url,
-      sessionId: session.id,
+      message: `Booking extended by ${extensionHours} hour${extensionHours > 1 ? 's' : ''}`,
+      newEndTime: newEndTime.toISOString(),
       extensionCost,
-      message: `Extension checkout ready for ${extensionHours} hour${extensionHours > 1 ? 's' : ''}`
+      paymentIntentId: paymentIntent.id
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
