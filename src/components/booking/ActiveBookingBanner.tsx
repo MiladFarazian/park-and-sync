@@ -6,7 +6,6 @@ import { useMode } from "@/contexts/ModeContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus, Navigation } from "lucide-react";
@@ -45,7 +44,6 @@ export const ActiveBookingBanner = () => {
   const { mode } = useMode();
   const navigate = useNavigate();
   const [activeBooking, setActiveBooking] = useState<ActiveBooking | null>(null);
-  const [showOverstayDialog, setShowOverstayDialog] = useState(false);
   const [showExtendDialog, setShowExtendDialog] = useState(false);
   const [extensionHours, setExtensionHours] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -158,10 +156,6 @@ export const ActiveBookingBanner = () => {
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${address}`, '_blank');
   };
 
-  const handleMarkOverstay = () => {
-    setShowOverstayDialog(true);
-  };
-
   const handleOverstayAction = async (action: 'charging' | 'towing') => {
     if (!activeBooking) return;
     
@@ -188,7 +182,6 @@ export const ActiveBookingBanner = () => {
           ? 'Overstay charging activated. $25/hour will apply after 10-minute grace period.' 
           : 'Towing process initiated. Driver will be notified.'
       );
-      setShowOverstayDialog(false);
       loadActiveBooking();
     }
     
@@ -375,7 +368,7 @@ export const ActiveBookingBanner = () => {
             </div>
 
             {/* Bottom: Action Buttons */}
-            <div className="flex items-center gap-2 justify-end">
+            <div className="flex items-center gap-2 justify-end flex-wrap">
               {!isHost && (
                 <>
                   <Button
@@ -383,7 +376,8 @@ export const ActiveBookingBanner = () => {
                     size="sm"
                     onClick={handleMessage}
                   >
-                    <MessageCircle className="h-4 w-4" />
+                    <MessageCircle className="h-4 w-4 mr-1.5" />
+                    <span className="hidden sm:inline">Message</span>
                   </Button>
 
                   <Button
@@ -391,7 +385,8 @@ export const ActiveBookingBanner = () => {
                     size="sm"
                     onClick={handleGetDirections}
                   >
-                    <Navigation className="h-4 w-4" />
+                    <Navigation className="h-4 w-4 mr-1.5" />
+                    <span className="hidden sm:inline">Directions</span>
                   </Button>
 
                   {!isOverstayed && (
@@ -414,18 +409,47 @@ export const ActiveBookingBanner = () => {
                     size="sm"
                     onClick={handleMessage}
                   >
-                    <MessageCircle className="h-4 w-4" />
+                    <MessageCircle className="h-4 w-4 mr-1.5" />
+                    <span className="hidden sm:inline">Message</span>
                   </Button>
 
-                  {!activeBooking.overstay_action && isOverstayed && (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={handleMarkOverstay}
-                    >
-                      <AlertTriangle className="h-4 w-4 mr-1" />
-                      Mark Overstay
-                    </Button>
+                  {!activeBooking.overstay_action && (
+                    <>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleOverstayAction('charging')}
+                        disabled={loading}
+                      >
+                        <DollarSign className="h-4 w-4 mr-1" />
+                        Charge $25/hr
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOverstayAction('towing')}
+                        disabled={loading}
+                        className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                      >
+                        <AlertTriangle className="h-4 w-4 mr-1" />
+                        Request Tow
+                      </Button>
+                    </>
+                  )}
+
+                  {activeBooking.overstay_action === 'charging' && (
+                    <Badge variant="destructive" className="px-3 py-1.5">
+                      <DollarSign className="h-3 w-3 mr-1" />
+                      Charging Active
+                    </Badge>
+                  )}
+
+                  {activeBooking.overstay_action === 'towing' && (
+                    <Badge variant="destructive" className="px-3 py-1.5">
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      Tow Requested
+                    </Badge>
                   )}
                 </>
               )}
@@ -523,53 +547,6 @@ export const ActiveBookingBanner = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={showOverstayDialog} onOpenChange={setShowOverstayDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Driver Overstayed Booking</AlertDialogTitle>
-            <AlertDialogDescription>
-              The driver has exceeded their booking time. Choose how you'd like to proceed:
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          
-          <div className="space-y-4 my-4">
-            <div className="p-4 border rounded-lg">
-              <h4 className="font-semibold mb-2">Charge Premium Rate</h4>
-              <p className="text-sm text-muted-foreground">
-                Charge $25/hour for overstay time after a 10-minute grace period. 
-                The driver will be automatically charged.
-              </p>
-            </div>
-            
-            <div className="p-4 border rounded-lg">
-              <h4 className="font-semibold mb-2">Request Towing</h4>
-              <p className="text-sm text-muted-foreground">
-                Initiate towing process. The driver will be notified and 
-                premium charging will not apply.
-              </p>
-            </div>
-          </div>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button
-              variant="default"
-              onClick={() => handleOverstayAction('charging')}
-              disabled={loading}
-            >
-              Charge Premium
-            </Button>
-            <AlertDialogAction
-              onClick={() => handleOverstayAction('towing')}
-              disabled={loading}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Request Towing
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 };
