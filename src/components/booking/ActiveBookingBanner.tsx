@@ -108,19 +108,17 @@ export const ActiveBookingBanner = () => {
       `)
       .in('status', ['active', 'paid'])
       .lte('start_at', now)
-      .gte('end_at', now)
-      .or(`renter_id.eq.${user.id},spots.host_id.eq.${user.id}`)
-      .order('start_at', { ascending: false })
-      .limit(1);
+      .gte('end_at', now);
 
-    const { data, error } = await query.maybeSingle();
-
-    if (error) {
-      console.error('Error loading active booking:', error);
+    // Check both renter and host bookings
+    const { data: renterData } = await query.eq('renter_id', user.id).maybeSingle();
+    if (renterData) {
+      setActiveBooking(renterData as ActiveBooking);
       return;
     }
 
-    setActiveBooking(data as ActiveBooking);
+    const { data: hostData } = await query.eq('spots.host_id', user.id).maybeSingle();
+    setActiveBooking(hostData as ActiveBooking);
   };
 
   const getStripeKey = async (): Promise<string> => {
