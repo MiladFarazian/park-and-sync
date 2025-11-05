@@ -37,16 +37,31 @@ const HostHome = () => {
 
       const spotIds = spotsData?.map(s => s.id) || [];
 
+      // If no spots, set stats to zero
+      if (spotIds.length === 0) {
+        setStats({
+          totalEarnings: 0,
+          totalBookings: 0,
+          activeListings: 0,
+        });
+        setLoading(false);
+        return;
+      }
+
       // Fetch completed bookings for earnings
       const { data: completedBookings, error: bookingsError } = await supabase
         .from('bookings')
-        .select('total_amount')
+        .select('host_earnings, total_amount, status')
         .in('spot_id', spotIds)
         .eq('status', 'completed');
 
       if (bookingsError) throw bookingsError;
 
-      const totalEarnings = completedBookings?.reduce((sum, b) => sum + Number(b.total_amount), 0) || 0;
+      // Calculate total earnings using host_earnings field if available, otherwise use total_amount
+      const totalEarnings = completedBookings?.reduce((sum, b) => {
+        const earnings = b.host_earnings ? Number(b.host_earnings) : Number(b.total_amount);
+        return sum + earnings;
+      }, 0) || 0;
 
       setStats({
         totalEarnings,
