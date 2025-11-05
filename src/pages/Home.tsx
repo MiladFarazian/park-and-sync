@@ -290,7 +290,7 @@ const Home = () => {
       label: 'List Your Spot',
       onClick: () => {
         setMode('host');
-        navigate('/add-spot');
+        navigate('/dashboard');
       }
     },
     { 

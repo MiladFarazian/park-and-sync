@@ -276,7 +276,7 @@ const ListSpot = () => {
       }
       
       toast.success('Parking spot submitted for review!');
-      navigate('/add-spot');
+      navigate('/dashboard');
     } catch (error) {
       console.error('Error submitting spot:', error);
       toast.error('Failed to submit listing');
@@ -306,7 +306,7 @@ const ListSpot = () => {
             size="icon"
             onClick={() => {
               if (currentStep === 1) {
-                navigate('/add-spot');
+                navigate('/dashboard');
               } else {
                 setCurrentStep(currentStep - 1);
               }

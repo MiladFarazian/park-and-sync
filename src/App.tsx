@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import AppLayout from "./components/layout/AppLayout";
 import Home from "./pages/Home";
 import Explore from "./pages/Explore";
-import AddSpot from "./pages/AddSpot";
+
 import ListSpot from "./pages/ListSpot";
 import Activity from "./pages/Activity";
 import Dashboard from "./pages/Dashboard";
@@ -84,7 +84,6 @@ const App = () => {
                 <Routes>
                   <Route path="/" element={<Home />} />
                   <Route path="/explore" element={<Explore />} />
-                  <Route path="/add-spot" element={<AddSpot />} />
                   <Route path="/list-spot" element={<ListSpot />} />
               <Route path="/edit-availability/:spotId" element={<EditSpotAvailability />} />
               <Route path="/edit-spot/:spotId" element={<EditSpot />} />

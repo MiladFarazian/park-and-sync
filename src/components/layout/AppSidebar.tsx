@@ -15,7 +15,7 @@ import {
 const menuItems = [
   { title: 'Home', url: '/', icon: Home },
   { title: 'Explore', url: '/explore', icon: Compass },
-  { title: 'Add Spot', url: '/add-spot', icon: Plus },
+  { title: 'My Listings', url: '/dashboard', icon: Plus },
   { title: 'Activity', url: '/activity', icon: Activity },
   { title: 'Profile', url: '/profile', icon: User },
 ];
