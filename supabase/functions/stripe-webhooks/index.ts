@@ -66,7 +66,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   // Get the booking details
   const { data: booking, error: bookingError } = await supabase
     .from('bookings')
-    .select('host_earnings, spot_id, spots!inner(host_id)')
+    .select('id, host_earnings, renter_id, spot_id, spots!inner(host_id, title, address)')
     .eq('stripe_payment_intent_id', paymentIntent.id)
     .single();
 
@@ -88,6 +88,17 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     console.error('Failed to update booking status:', updateError);
     return;
   }
+
+  // Send confirmation notification to renter
+  const renterNotification = {
+    user_id: booking.renter_id,
+    type: 'booking',
+    title: 'Payment Successful',
+    message: `Your booking at ${(booking.spots as any).address} is now confirmed!`,
+    related_id: booking.id,
+  };
+
+  await supabase.from('notifications').insert(renterNotification);
 
   // Credit host's balance
   const hostId = (booking.spots as any).host_id;

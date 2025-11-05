@@ -176,16 +176,16 @@ serve(async (req) => {
       const hostNotification = {
         user_id: spot.host_id,
         type: 'booking',
-        title: 'New Booking Received',
-        message: `${renterProfile.first_name || 'A driver'} booked your spot at ${spot.address}`,
+        title: 'New Booking Confirmed',
+        message: `${renterProfile.first_name || 'A driver'} has booked your spot at ${spot.address}`,
         related_id: booking.id,
       };
 
       const renterNotification = {
         user_id: userData.user.id,
         type: 'booking',
-        title: 'Booking Confirmed',
-        message: `Your booking at ${spot.address} is confirmed`,
+        title: 'Booking Created',
+        message: `Your booking at ${spot.address} will be confirmed once payment is complete`,
         related_id: booking.id,
       };
 
