@@ -327,9 +327,9 @@ export const ActiveBookingBanner = () => {
     <>
       <Card className="border-l-4 border-l-primary shadow-md bg-card animate-fade-in">
         <div className="p-3">
-          <div className="flex items-center justify-between gap-4">
-            {/* Left: Info */}
-            <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex flex-col gap-3">
+            {/* Top: Info Section */}
+            <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <CarFront className="h-5 w-5 text-primary" />
               </div>
@@ -359,21 +359,21 @@ export const ActiveBookingBanner = () => {
                       <span className="opacity-60 flex-shrink-0">•</span>
                       <span className="truncate min-w-0">Driver: {activeBooking.profiles.first_name} {activeBooking.profiles.last_name}</span>
                     </>
-                   )}
-            </div>
+                  )}
+                </div>
               </div>
-            </div>
-
-            {/* Right: Actions */}
-            <div className="flex items-center gap-2 flex-shrink-0">
+              
               {hasOverstayCharges && (
-                <div className="px-3 py-1 bg-destructive/10 rounded-md">
+                <div className="px-3 py-1 bg-destructive/10 rounded-md flex-shrink-0">
                   <p className="text-sm font-semibold text-destructive">
                     +${activeBooking.overstay_charge_amount.toFixed(2)}
                   </p>
                 </div>
               )}
-              
+            </div>
+
+            {/* Bottom: Action Buttons */}
+            <div className="flex items-center gap-2 justify-end">
               {!isHost && (
                 <>
                   <Button
