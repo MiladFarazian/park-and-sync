@@ -23,6 +23,7 @@ const formSchema = z.object({
     message: 'Hourly rate must be a positive number',
   }),
   description: z.string().min(20, 'Description must be at least 20 characters'),
+  parkingInstructions: z.string().optional(),
   amenities: z.array(z.string()),
   photos: z.array(z.any()).optional(),
 });
@@ -75,6 +76,7 @@ const ListSpot = () => {
       address: '',
       hourlyRate: '',
       description: '',
+      parkingInstructions: '',
       amenities: [],
     },
   });
@@ -191,6 +193,7 @@ const ListSpot = () => {
           address: data.address,
           hourly_rate: parseFloat(data.hourlyRate),
           description: data.description,
+          access_notes: data.parkingInstructions || null,
           latitude: coordinates.lat,
           longitude: coordinates.lng,
           location: `POINT(${coordinates.lng} ${coordinates.lat})`,
@@ -407,7 +410,7 @@ const ListSpot = () => {
                     <Label htmlFor="description">Spot Description</Label>
                     <Textarea
                       id="description"
-                      placeholder="Describe your parking spot, access instructions, and any important details..."
+                      placeholder="Describe your parking spot, nearby landmarks, and any important details..."
                       rows={6}
                       {...register('description')}
                       className="mt-1.5 resize-none"
@@ -417,6 +420,20 @@ const ListSpot = () => {
                     )}
                     <p className="text-xs text-muted-foreground mt-1">
                       {formData.description?.length || 0} / 20 minimum characters
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="parkingInstructions">Parking Instructions</Label>
+                    <Textarea
+                      id="parkingInstructions"
+                      placeholder="How should renters access your spot? Include gate codes, entry instructions, or any special directions..."
+                      rows={5}
+                      {...register('parkingInstructions')}
+                      className="mt-1.5 resize-none"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Optional - Help renters find and access your spot easily
                     </p>
                   </div>
                 </div>
@@ -735,6 +752,13 @@ const ListSpot = () => {
                     <h3 className="font-semibold text-sm mb-3">Description</h3>
                     <p className="text-sm text-muted-foreground">{formData.description}</p>
                   </div>
+
+                  {formData.parkingInstructions && (
+                    <div className="p-4 rounded-lg bg-muted/50">
+                      <h3 className="font-semibold text-sm mb-3">Parking Instructions</h3>
+                      <p className="text-sm text-muted-foreground">{formData.parkingInstructions}</p>
+                    </div>
+                  )}
 
                   <div className="p-4 rounded-lg bg-muted/50">
                     <h3 className="font-semibold text-sm mb-3">Amenities</h3>
