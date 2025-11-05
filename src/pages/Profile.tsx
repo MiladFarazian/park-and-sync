@@ -310,6 +310,15 @@ const Profile = () => {
           onClick: () => navigate('/personal-information')
         },
         { 
+          icon: Building2, 
+          label: 'List Your Spot', 
+          subtitle: 'Earn money by hosting',
+          onClick: () => {
+            setMode('host');
+            navigate('/list-spot');
+          }
+        },
+        { 
           icon: Car, 
           label: 'My Vehicles', 
           subtitle: 'Manage your cars',
