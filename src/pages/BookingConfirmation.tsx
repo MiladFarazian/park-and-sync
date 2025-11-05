@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Clock, MapPin, Star, MessageCircle, Car, Calendar, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, MapPin, Star, MessageCircle, Car, Calendar, XCircle, Navigation } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -32,6 +32,7 @@ const BookingConfirmation = () => {
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [directionsDialogOpen, setDirectionsDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchBookingDetails = async () => {
@@ -104,6 +105,43 @@ const BookingConfirmation = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleDirections = () => {
+    setDirectionsDialogOpen(true);
+  };
+
+  const openMapApp = (app: 'google' | 'apple' | 'waze') => {
+    if (!spot?.address) return;
+
+    const encodedAddress = encodeURIComponent(spot.address);
+    const coords = spot.latitude && spot.longitude ? `${spot.latitude},${spot.longitude}` : '';
+    
+    let url = '';
+    
+    switch (app) {
+      case 'google':
+        // Google Maps works on all platforms
+        url = coords 
+          ? `https://www.google.com/maps/dir/?api=1&destination=${coords}`
+          : `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+        break;
+      case 'apple':
+        // Apple Maps
+        url = coords
+          ? `http://maps.apple.com/?daddr=${coords}`
+          : `http://maps.apple.com/?q=${encodedAddress}`;
+        break;
+      case 'waze':
+        // Waze
+        url = coords
+          ? `https://waze.com/ul?ll=${coords}&navigate=yes`
+          : `https://waze.com/ul?q=${encodedAddress}&navigate=yes`;
+        break;
+    }
+    
+    window.open(url, '_blank');
+    setDirectionsDialogOpen(false);
   };
 
   const getCancellationPolicy = () => {
@@ -276,7 +314,80 @@ const BookingConfirmation = () => {
               </div>
             </div>
           </div>
+          <Button 
+            variant="outline" 
+            className="w-full mt-4"
+            onClick={handleDirections}
+          >
+            <Navigation className="h-4 w-4 mr-2" />
+            Get Directions
+          </Button>
         </Card>
+
+        {/* Directions Dialog */}
+        <AlertDialog open={directionsDialogOpen} onOpenChange={setDirectionsDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Choose Your Map App</AlertDialogTitle>
+              <AlertDialogDescription>
+                Select which map application you'd like to use for directions to:
+                <div className="mt-2 p-2 bg-muted rounded text-foreground font-medium">
+                  {spot?.address}
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-2 py-4">
+              <Button
+                variant="outline"
+                className="w-full justify-start h-auto py-3"
+                onClick={() => openMapApp('google')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded bg-blue-500 flex items-center justify-center text-white text-xl">
+                    🗺️
+                  </div>
+                  <div className="text-left">
+                    <div className="font-semibold">Google Maps</div>
+                    <div className="text-xs text-muted-foreground">Navigate with Google Maps</div>
+                  </div>
+                </div>
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start h-auto py-3"
+                onClick={() => openMapApp('apple')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xl">
+                    🍎
+                  </div>
+                  <div className="text-left">
+                    <div className="font-semibold">Apple Maps</div>
+                    <div className="text-xs text-muted-foreground">Navigate with Apple Maps</div>
+                  </div>
+                </div>
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start h-auto py-3"
+                onClick={() => openMapApp('waze')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded bg-sky-400 flex items-center justify-center text-white text-xl">
+                    🚗
+                  </div>
+                  <div className="text-left">
+                    <div className="font-semibold">Waze</div>
+                    <div className="text-xs text-muted-foreground">Navigate with Waze</div>
+                  </div>
+                </div>
+              </Button>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Vehicle Info Card */}
         {vehicle && (
