@@ -77,7 +77,7 @@ export const ActiveBookingBanner = () => {
 
     const now = new Date().toISOString();
     
-    // Check for active bookings (currently happening)
+    // Check for active bookings (currently happening) - look for active or paid status
     const query = supabase
       .from('bookings')
       .select(`
@@ -95,7 +95,7 @@ export const ActiveBookingBanner = () => {
         spots!inner(title, address, host_id, hourly_rate),
         profiles!bookings_renter_id_fkey(first_name, last_name, avatar_url)
       `)
-      .eq('status', 'paid')
+      .in('status', ['active', 'paid'])
       .lte('start_at', now)
       .gte('end_at', now);
 

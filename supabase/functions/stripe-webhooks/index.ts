@@ -75,11 +75,11 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     return;
   }
 
-  // Update booking status
+  // Update booking status to active (paid and ready to use)
   const { error: updateError } = await supabase
     .from('bookings')
     .update({ 
-      status: 'paid',
+      status: 'active',
       stripe_charge_id: paymentIntent.latest_charge as string
     })
     .eq('stripe_payment_intent_id', paymentIntent.id);
