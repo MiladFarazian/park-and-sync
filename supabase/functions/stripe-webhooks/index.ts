@@ -39,6 +39,10 @@ serve(async (req) => {
         await handlePaymentFailed(event.data.object as Stripe.PaymentIntent);
         break;
         
+      case 'checkout.session.completed':
+        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+        break;
+        
       case 'account.updated':
         await handleAccountUpdated(event.data.object as Stripe.Account);
         break;
@@ -137,6 +141,101 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
 
   if (error) {
     console.error('Failed to update booking status:', error);
+  }
+}
+
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  console.log('Checkout session completed:', session.id);
+  
+  // Check if this is an extension payment
+  if (session.metadata?.type === 'extension') {
+    const bookingId = session.metadata.booking_id;
+    const extensionHours = parseInt(session.metadata.extension_hours || '0');
+    const newEndTime = session.metadata.new_end_time;
+    const hostEarnings = parseFloat(session.metadata.host_earnings || '0');
+    const platformFee = parseFloat(session.metadata.platform_fee || '0');
+    const hostId = session.metadata.host_id;
+    const renterId = session.metadata.renter_id;
+
+    if (!bookingId || !newEndTime) {
+      console.error('Missing required metadata for extension');
+      return;
+    }
+
+    // Get current booking to calculate new totals
+    const { data: currentBooking } = await supabase
+      .from('bookings')
+      .select('total_hours, subtotal, platform_fee, total_amount, host_earnings, spots!inner(title, address)')
+      .eq('id', bookingId)
+      .single();
+
+    if (!currentBooking) {
+      console.error('Booking not found:', bookingId);
+      return;
+    }
+
+    const extensionCost = hostEarnings + platformFee;
+
+    // Update booking with extended time and costs
+    const { error: updateError } = await supabase
+      .from('bookings')
+      .update({
+        end_at: newEndTime,
+        total_hours: currentBooking.total_hours + extensionHours,
+        subtotal: currentBooking.subtotal + extensionCost,
+        platform_fee: currentBooking.platform_fee + platformFee,
+        total_amount: currentBooking.total_amount + extensionCost,
+        host_earnings: (currentBooking.host_earnings || 0) + hostEarnings,
+      })
+      .eq('id', bookingId);
+
+    if (updateError) {
+      console.error('Failed to update booking:', updateError);
+      return;
+    }
+
+    // Credit host's balance
+    const { error: balanceError } = await supabase
+      .from('profiles')
+      .update({ 
+        balance: supabase.sql`balance + ${hostEarnings}`
+      })
+      .eq('user_id', hostId);
+
+    if (balanceError) {
+      console.error('Failed to update host balance:', balanceError);
+    }
+
+    // Get profiles for notifications
+    const { data: renterProfile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name')
+      .eq('user_id', renterId)
+      .single();
+
+    // Notify host
+    const hostNotification = {
+      user_id: hostId,
+      type: 'booking',
+      title: 'Booking Extended',
+      message: `${renterProfile?.first_name || 'A driver'} extended their booking at ${(currentBooking.spots as any).title} by ${extensionHours} hour${extensionHours > 1 ? 's' : ''}`,
+      related_id: bookingId,
+    };
+
+    await supabase.from('notifications').insert(hostNotification);
+
+    // Notify renter
+    const renterNotification = {
+      user_id: renterId,
+      type: 'booking',
+      title: 'Extension Confirmed',
+      message: `Your parking at ${(currentBooking.spots as any).title} has been extended until ${new Date(newEndTime).toLocaleString()}`,
+      related_id: bookingId,
+    };
+
+    await supabase.from('notifications').insert(renterNotification);
+
+    console.log(`Booking ${bookingId} extended by ${extensionHours} hours`);
   }
 }
 

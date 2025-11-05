@@ -113,132 +113,81 @@ serve(async (req) => {
     if (!stripeSecret) {
       throw new Error('Stripe secret key not configured');
     }
-    const stripe = new Stripe(stripeSecret, {});
+    const stripe = new Stripe(stripeSecret, {
+      apiVersion: '2025-08-27.basil',
+    });
 
-    // Get customer ID and default payment method
+    // Get customer ID
     const { data: profile } = await supabase
       .from('profiles')
       .select('stripe_customer_id')
       .eq('user_id', userData.user.id)
       .single();
 
-    if (!profile?.stripe_customer_id) {
-      throw new Error('Payment method not found. Please add a payment method first.');
+    let customerId = profile?.stripe_customer_id;
+
+    // Create or get customer
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: userData.user.email!,
+        metadata: {
+          supabase_user_id: userData.user.id
+        }
+      });
+      customerId = customer.id;
+
+      await supabase
+        .from('profiles')
+        .update({ stripe_customer_id: customerId })
+        .eq('user_id', userData.user.id);
     }
 
-    // Get customer's default payment method from Stripe
-    const customer = await stripe.customers.retrieve(profile.stripe_customer_id);
+    // Create a Checkout session for the extension payment
+    const origin = req.headers.get('origin') || 'https://bcd0f814-3e2f-427f-8e4e-b211f7011a0e.lovableproject.com';
     
-    if (!customer || customer.deleted) {
-      throw new Error('Customer not found');
-    }
-
-    const defaultPaymentMethodId = customer.invoice_settings?.default_payment_method;
-    
-    if (!defaultPaymentMethodId) {
-      throw new Error('No payment method on file. Please add a payment method in your profile.');
-    }
-
-    // Create payment intent for extension with saved payment method
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(extensionCost * 100),
-      currency: 'usd',
-      customer: profile.stripe_customer_id,
-      payment_method: defaultPaymentMethodId as string,
-      off_session: true,
-      confirm: true,
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `Parking Extension - ${booking.spots.title}`,
+              description: `${extensionHours} hour${extensionHours > 1 ? 's' : ''} extension`,
+            },
+            unit_amount: Math.round(extensionCost * 100),
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${origin}/activity?extension_success=true`,
+      cancel_url: `${origin}/activity?extension_canceled=true`,
       metadata: {
         booking_id: bookingId,
         extension_hours: extensionHours.toString(),
         host_id: booking.spots.host_id,
         renter_id: userData.user.id,
-        type: 'extension'
+        type: 'extension',
+        new_end_time: newEndTime.toISOString(),
+        host_earnings: hostEarnings.toString(),
+        platform_fee: platformFee.toString(),
       }
     });
 
-    if (paymentIntent.status !== 'succeeded') {
-      throw new Error('Payment failed. Please check your payment method.');
-    }
-
-    // Update booking with new end time and charges
-    const { error: updateError } = await supabase
-      .from('bookings')
-      .update({
-        end_at: newEndTime.toISOString(),
-        total_hours: booking.total_hours + extensionHours,
-        subtotal: booking.subtotal + extensionCost,
-        platform_fee: booking.platform_fee + platformFee,
-        total_amount: booking.total_amount + extensionCost,
-        host_earnings: (booking.host_earnings || 0) + hostEarnings,
-      })
-      .eq('id', bookingId);
-
-    if (updateError) {
-      console.error('Failed to update booking:', updateError);
-      // Refund the payment if booking update fails
-      await stripe.refunds.create({ payment_intent: paymentIntent.id });
-      throw new Error('Failed to extend booking');
-    }
-
-    // Credit host's balance
-    const { error: balanceError } = await supabase
-      .from('profiles')
-      .update({ 
-        balance: supabase.sql`balance + ${hostEarnings}`
-      })
-      .eq('user_id', booking.spots.host_id);
-
-    if (balanceError) {
-      console.error('Failed to update host balance:', balanceError);
-    }
-
-    // Get renter and host profiles for notification
-    const { data: renterProfile } = await supabase
-      .from('profiles')
-      .select('first_name, last_name')
-      .eq('user_id', userData.user.id)
-      .single();
-
-    const { data: hostProfile } = await supabase
-      .from('profiles')
-      .select('first_name, last_name')
-      .eq('user_id', booking.spots.host_id)
-      .single();
-
-    // Send notification to host
-    const hostNotification = {
-      user_id: booking.spots.host_id,
-      type: 'booking',
-      title: 'Booking Extended',
-      message: `${renterProfile?.first_name || 'A driver'} extended their booking at ${booking.spots.title} by ${extensionHours} hour${extensionHours > 1 ? 's' : ''}`,
-      related_id: bookingId,
-    };
-
-    await supabase.from('notifications').insert(hostNotification);
-
-    // Send notification to renter
-    const renterNotification = {
-      user_id: userData.user.id,
-      type: 'booking',
-      title: 'Extension Confirmed',
-      message: `Your parking at ${booking.spots.title} has been extended until ${newEndTime.toLocaleString()}`,
-      related_id: bookingId,
-    };
-
-    await supabase.from('notifications').insert(renterNotification);
-
-    console.log('Booking extended successfully:', {
+    console.log('Checkout session created for extension:', {
+      sessionId: session.id,
       bookingId,
-      newEndTime,
-      extensionCost,
-      hostEarnings
+      extensionHours,
+      extensionCost
     });
 
     return new Response(JSON.stringify({
       success: true,
-      newEndTime: newEndTime.toISOString(),
+      checkoutUrl: session.url,
+      sessionId: session.id,
       extensionCost,
-      message: `Booking extended by ${extensionHours} hour${extensionHours > 1 ? 's' : ''}`
+      message: `Extension checkout ready for ${extensionHours} hour${extensionHours > 1 ? 's' : ''}`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

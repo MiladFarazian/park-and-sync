@@ -179,10 +179,15 @@ export const ActiveBookingBanner = () => {
 
       if (error) throw error;
 
-      toast.success(`Booking extended by ${extensionHours} hour${extensionHours > 1 ? 's' : ''}`);
-      setShowExtendDialog(false);
-      setExtensionHours(1);
-      loadActiveBooking();
+      // Redirect to Stripe Checkout
+      if (data.checkoutUrl) {
+        window.open(data.checkoutUrl, '_blank');
+        toast.success('Opening payment page...');
+        setShowExtendDialog(false);
+        setExtensionHours(1);
+      } else {
+        throw new Error('No checkout URL received');
+      }
     } catch (error) {
       console.error('Error extending booking:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to extend booking');
