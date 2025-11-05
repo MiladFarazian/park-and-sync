@@ -203,7 +203,7 @@ export const ActiveBookingBanner = () => {
 
   if (!activeBooking) return null;
 
-  const timeRemaining = formatDistanceToNow(new Date(activeBooking.end_at));
+  const endTime = format(new Date(activeBooking.end_at), 'h:mm a');
   const isOverstayed = new Date() > new Date(activeBooking.end_at);
   const hasOverstayCharges = activeBooking.overstay_charge_amount > 0;
 
@@ -235,7 +235,7 @@ export const ActiveBookingBanner = () => {
                   <div className="flex items-center gap-1 whitespace-nowrap flex-shrink-0">
                     <Clock className="h-3 w-3 flex-shrink-0" />
                     <span className="font-medium">
-                      {isOverstayed ? `Ended ${timeRemaining}` : `Ends ${timeRemaining}`}
+                      {isOverstayed ? `Ended at ${endTime}` : `Ends at ${endTime}`}
                     </span>
                   </div>
                   {isHost && (
