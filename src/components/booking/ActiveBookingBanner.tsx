@@ -209,128 +209,79 @@ export const ActiveBookingBanner = () => {
 
   return (
     <>
-      <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 via-background to-primary/5 shadow-lg">
-        <div className="p-6">
-          <div className="flex items-start justify-between gap-6">
-            <div className="flex-1 space-y-4">
-              {/* Header */}
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <CarFront className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-xl">
-                    {isHost ? 'Active Booking' : 'Currently Parked'}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {isHost ? 'Spot is in use' : 'Your parking session'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Status Badges */}
-              <div className="flex flex-wrap gap-2">
-                {isOverstayed && !activeBooking.overstay_action && (
-                  <Badge variant="destructive" className="px-3 py-1">
-                    <AlertTriangle className="h-3 w-3 mr-1" />
-                    Overstayed
-                  </Badge>
-                )}
-                {activeBooking.overstay_action === 'charging' && (
-                  <Badge variant="destructive" className="px-3 py-1">
-                    <DollarSign className="h-3 w-3 mr-1" />
-                    Overstay Charges Active
-                  </Badge>
-                )}
-                {activeBooking.overstay_action === 'towing' && (
-                  <Badge variant="destructive" className="px-3 py-1">
-                    Towing Requested
-                  </Badge>
-                )}
+      <Card className="border-l-4 border-l-primary shadow-md bg-card">
+        <div className="p-4">
+          <div className="flex items-center justify-between gap-4">
+            {/* Left: Info */}
+            <div className="flex items-center gap-4 flex-1 min-w-0">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <CarFront className="h-5 w-5 text-primary" />
               </div>
               
-              {/* Location Info */}
-              <div className="space-y-2 p-4 bg-muted/50 rounded-lg">
-                <p className="font-semibold text-lg">
-                  {activeBooking.spots.title}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {activeBooking.spots.address}
-                </p>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-semibold text-base truncate">
+                    {activeBooking.spots.title}
+                  </h3>
+                  {isOverstayed && !activeBooking.overstay_action && (
+                    <Badge variant="destructive" className="text-xs">Overstayed</Badge>
+                  )}
+                  {activeBooking.overstay_action === 'charging' && (
+                    <Badge variant="destructive" className="text-xs">Charging</Badge>
+                  )}
+                </div>
                 
-                {isHost && (
-                  <p className="text-sm font-medium pt-2 border-t">
-                    Driver: {activeBooking.profiles.first_name} {activeBooking.profiles.last_name}
-                  </p>
-                )}
-              </div>
-
-              {/* Time Info */}
-              <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
-                <Clock className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Time Remaining</p>
-                  <p className="font-semibold">
-                    {isOverstayed 
-                      ? `Ended ${timeRemaining}` 
-                      : `Ends ${timeRemaining}`}
-                  </p>
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    <span className="font-medium">
+                      {isOverstayed ? `Ended ${timeRemaining}` : `Ends ${timeRemaining}`}
+                    </span>
+                  </div>
+                  {isHost && (
+                    <span>Driver: {activeBooking.profiles.first_name} {activeBooking.profiles.last_name}</span>
+                  )}
                 </div>
               </div>
+            </div>
 
-              {/* Overstay Charges */}
+            {/* Right: Actions */}
+            <div className="flex items-center gap-2 flex-shrink-0">
               {hasOverstayCharges && (
-                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                  <div className="flex items-center gap-2 mb-1">
-                    <DollarSign className="h-5 w-5 text-destructive" />
-                    <p className="font-semibold text-destructive">
-                      Overstay Charges
-                    </p>
-                  </div>
-                  <p className="text-2xl font-bold text-destructive">
-                    ${activeBooking.overstay_charge_amount.toFixed(2)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    $25/hour premium rate applied
+                <div className="px-3 py-1 bg-destructive/10 rounded-md">
+                  <p className="text-sm font-semibold text-destructive">
+                    +${activeBooking.overstay_charge_amount.toFixed(2)}
                   </p>
                 </div>
               )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-col gap-3 min-w-[160px]">
+              
               <Button
                 variant="outline"
-                size="lg"
+                size="sm"
                 onClick={handleMessage}
-                className="w-full"
               >
-                <MessageCircle className="h-4 w-4 mr-2" />
-                Message {isHost ? 'Driver' : 'Host'}
+                <MessageCircle className="h-4 w-4" />
               </Button>
 
               {isHost && !activeBooking.overstay_action && isOverstayed && (
                 <Button
                   variant="destructive"
-                  size="lg"
+                  size="sm"
                   onClick={handleMarkOverstay}
-                  className="w-full"
                 >
-                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  <AlertTriangle className="h-4 w-4 mr-1" />
                   Mark Overstay
                 </Button>
               )}
 
               {!isHost && !isOverstayed && (
                 <Button
-                  variant="default"
-                  size="lg"
+                  size="sm"
                   onClick={() => setShowExtendDialog(true)}
                   disabled={loading}
-                  className="w-full"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Extend Time
+                  <Plus className="h-4 w-4 mr-1" />
+                  Extend
                 </Button>
               )}
             </div>
@@ -344,44 +295,41 @@ export const ActiveBookingBanner = () => {
           <DialogHeader>
             <DialogTitle>Extend Your Parking</DialogTitle>
             <DialogDescription>
-              How much additional time do you need?
+              Choose how much time to add to your booking
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-6 py-4">
-            <div className="space-y-3">
-              <Label>Extension Duration</Label>
-              <div className="grid grid-cols-4 gap-2">
-                {[1, 2, 3, 4].map((hours) => (
-                  <Button
-                    key={hours}
-                    variant={extensionHours === hours ? "default" : "outline"}
-                    onClick={() => setExtensionHours(hours)}
-                    className="h-16 flex flex-col gap-1"
-                  >
-                    <span className="text-2xl font-bold">{hours}</span>
-                    <span className="text-xs">hour{hours > 1 ? 's' : ''}</span>
-                  </Button>
-                ))}
-              </div>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-4 gap-2">
+              {[1, 2, 3, 4].map((hours) => (
+                <Button
+                  key={hours}
+                  variant={extensionHours === hours ? "default" : "outline"}
+                  onClick={() => setExtensionHours(hours)}
+                  className="h-20 flex flex-col gap-1"
+                >
+                  <span className="text-3xl font-bold">{hours}</span>
+                  <span className="text-xs opacity-80">hr{hours > 1 ? 's' : ''}</span>
+                </Button>
+              ))}
             </div>
 
-            <div className="space-y-2 p-4 bg-muted rounded-lg">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Current End Time</span>
-                <span className="font-medium">
-                  {format(new Date(activeBooking?.end_at || ''), 'MMM d, h:mm a')}
+            <div className="space-y-2 p-4 bg-muted/50 rounded-lg border">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Current end</span>
+                <span className="text-sm font-medium">
+                  {format(new Date(activeBooking?.end_at || ''), 'h:mm a')}
                 </span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">New End Time</span>
-                <span className="font-semibold text-primary">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">New end</span>
+                <span className="text-sm font-semibold text-primary">
                   {getNewEndTime()}
                 </span>
               </div>
-              <div className="pt-2 mt-2 border-t flex justify-between">
-                <span className="font-semibold">Extension Cost</span>
-                <span className="text-xl font-bold text-primary">
+              <div className="pt-2 mt-2 border-t flex justify-between items-center">
+                <span className="font-semibold">Total cost</span>
+                <span className="text-2xl font-bold text-primary">
                   ${getExtensionCost().toFixed(2)}
                 </span>
               </div>
@@ -393,7 +341,7 @@ export const ActiveBookingBanner = () => {
               Cancel
             </Button>
             <Button onClick={handleExtendBooking} disabled={loading}>
-              {loading ? 'Processing...' : `Extend ${extensionHours} Hour${extensionHours > 1 ? 's' : ''}`}
+              {loading ? 'Processing...' : 'Confirm Extension'}
             </Button>
           </DialogFooter>
         </DialogContent>
