@@ -213,33 +213,33 @@ export const ActiveBookingBanner = () => {
         <div className="p-4">
           <div className="flex items-center justify-between gap-4">
             {/* Left: Info */}
-            <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
               <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <CarFront className="h-5 w-5 text-primary" />
               </div>
               
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="font-semibold text-base truncate">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <h3 className="font-semibold text-sm truncate">
                     {activeBooking.spots.title}
                   </h3>
                   {isOverstayed && !activeBooking.overstay_action && (
-                    <Badge variant="destructive" className="text-xs">Overstayed</Badge>
+                    <Badge variant="destructive" className="text-xs flex-shrink-0">Overstayed</Badge>
                   )}
                   {activeBooking.overstay_action === 'charging' && (
-                    <Badge variant="destructive" className="text-xs">Charging</Badge>
+                    <Badge variant="destructive" className="text-xs flex-shrink-0">Charging</Badge>
                   )}
                 </div>
                 
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3.5 w-3.5" />
+                <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                  <div className="flex items-center gap-1 whitespace-nowrap">
+                    <Clock className="h-3 w-3 flex-shrink-0" />
                     <span className="font-medium">
                       {isOverstayed ? `Ended ${timeRemaining}` : `Ends ${timeRemaining}`}
                     </span>
                   </div>
                   {isHost && (
-                    <span>Driver: {activeBooking.profiles.first_name} {activeBooking.profiles.last_name}</span>
+                    <span className="truncate">Driver: {activeBooking.profiles.first_name} {activeBooking.profiles.last_name}</span>
                   )}
                 </div>
               </div>
