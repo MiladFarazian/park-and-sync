@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMode } from "@/contexts/ModeContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,7 @@ interface ActiveBooking {
 
 export const ActiveBookingBanner = () => {
   const { user, profile } = useAuth();
+  const { mode } = useMode();
   const navigate = useNavigate();
   const [activeBooking, setActiveBooking] = useState<ActiveBooking | null>(null);
   const [showOverstayDialog, setShowOverstayDialog] = useState(false);
@@ -68,9 +70,6 @@ export const ActiveBookingBanner = () => {
           event: '*',
           schema: 'public',
           table: 'bookings',
-          filter: isHost 
-            ? `spots.host_id=eq.${user.id}`
-            : `renter_id=eq.${user.id}`
         },
         () => {
           loadActiveBooking();
@@ -81,14 +80,13 @@ export const ActiveBookingBanner = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, isHost]);
+  }, [user, mode]);
 
   const loadActiveBooking = async () => {
     if (!user) return;
 
     const now = new Date().toISOString();
     
-    // Check for active bookings (currently happening) - look for active or paid status
     const query = supabase
       .from('bookings')
       .select(`
@@ -110,15 +108,19 @@ export const ActiveBookingBanner = () => {
       .lte('start_at', now)
       .gte('end_at', now);
 
-    // Check both renter and host bookings
-    const { data: renterData } = await query.eq('renter_id', user.id).maybeSingle();
-    if (renterData) {
+    // Show booking based on current mode
+    if (mode === 'driver') {
+      // Only show bookings where user is the renter
+      const { data: renterData } = await query.eq('renter_id', user.id).maybeSingle();
       setActiveBooking(renterData as ActiveBooking);
-      return;
+    } else if (mode === 'host') {
+      // Only show bookings where user's spot is being rented by someone else
+      const { data: hostData } = await query
+        .eq('spots.host_id', user.id)
+        .neq('renter_id', user.id)
+        .maybeSingle();
+      setActiveBooking(hostData as ActiveBooking);
     }
-
-    const { data: hostData } = await query.eq('spots.host_id', user.id).maybeSingle();
-    setActiveBooking(hostData as ActiveBooking);
   };
 
   const getStripeKey = async (): Promise<string> => {
