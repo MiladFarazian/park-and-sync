@@ -209,8 +209,8 @@ export const ActiveBookingBanner = () => {
 
   return (
     <>
-      <Card className="border-l-4 border-l-primary shadow-md bg-card">
-        <div className="p-4">
+      <Card className="border-l-4 border-l-primary shadow-md bg-card animate-fade-in">
+        <div className="p-3">
           <div className="flex items-center justify-between gap-4">
             {/* Left: Info */}
             <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -231,15 +231,18 @@ export const ActiveBookingBanner = () => {
                   )}
                 </div>
                 
-                <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                  <div className="flex items-center gap-1 whitespace-nowrap">
+                <div className="flex items-center gap-3 text-xs text-muted-foreground overflow-hidden whitespace-nowrap">
+                  <div className="flex items-center gap-1 whitespace-nowrap flex-shrink-0">
                     <Clock className="h-3 w-3 flex-shrink-0" />
                     <span className="font-medium">
                       {isOverstayed ? `Ended ${timeRemaining}` : `Ends ${timeRemaining}`}
                     </span>
                   </div>
                   {isHost && (
-                    <span className="truncate">Driver: {activeBooking.profiles.first_name} {activeBooking.profiles.last_name}</span>
+                    <>
+                      <span className="opacity-60">•</span>
+                      <span className="truncate">Driver: {activeBooking.profiles.first_name} {activeBooking.profiles.last_name}</span>
+                    </>
                   )}
                 </div>
               </div>
