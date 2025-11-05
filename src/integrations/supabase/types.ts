@@ -111,6 +111,10 @@ export type Database = {
           hourly_rate: number
           id: string
           idempotency_key: string | null
+          overstay_action: string | null
+          overstay_charge_amount: number | null
+          overstay_detected_at: string | null
+          overstay_grace_end: string | null
           platform_fee: number
           refund_amount: number | null
           renter_id: string
@@ -136,6 +140,10 @@ export type Database = {
           hourly_rate: number
           id?: string
           idempotency_key?: string | null
+          overstay_action?: string | null
+          overstay_charge_amount?: number | null
+          overstay_detected_at?: string | null
+          overstay_grace_end?: string | null
           platform_fee: number
           refund_amount?: number | null
           renter_id: string
@@ -161,6 +169,10 @@ export type Database = {
           hourly_rate?: number
           id?: string
           idempotency_key?: string | null
+          overstay_action?: string | null
+          overstay_charge_amount?: number | null
+          overstay_detected_at?: string | null
+          overstay_grace_end?: string | null
           platform_fee?: number
           refund_amount?: number | null
           renter_id?: string

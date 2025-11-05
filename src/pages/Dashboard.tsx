@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { formatAvailability } from '@/lib/formatAvailability';
+import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('listings');
@@ -188,6 +189,8 @@ const Dashboard = () => {
 
   return (
     <div className="p-4 space-y-6">
+      <ActiveBookingBanner />
+      
       {/* Header with Add Button */}
       <div className="pt-4 flex justify-between items-center">
         <div>

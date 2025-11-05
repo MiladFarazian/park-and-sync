@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
 
 const HostHome = () => {
   const navigate = useNavigate();
@@ -94,6 +95,8 @@ const HostHome = () => {
         <h1 className="text-2xl font-bold">Host Dashboard</h1>
         <p className="text-muted-foreground">Your hosting overview</p>
       </div>
+
+      <ActiveBookingBanner />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-4">
