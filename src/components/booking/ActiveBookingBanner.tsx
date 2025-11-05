@@ -101,14 +101,10 @@ export const ActiveBookingBanner = () => {
       `)
       .in('status', ['active', 'paid'])
       .lte('start_at', now)
-      .gte('end_at', now);
-
-    // Filter by role
-    if (profile?.role === 'host') {
-      query.eq('spots.host_id', user.id);
-    } else {
-      query.eq('renter_id', user.id);
-    }
+      .gte('end_at', now)
+      .or(`renter_id.eq.${user.id},spots.host_id.eq.${user.id}`)
+      .order('start_at', { ascending: false })
+      .limit(1);
 
     const { data, error } = await query.maybeSingle();
 
