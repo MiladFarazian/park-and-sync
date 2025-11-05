@@ -203,7 +203,7 @@ export const ActiveBookingBanner = () => {
 
   if (!activeBooking) return null;
 
-  const timeRemaining = formatDistanceToNow(new Date(activeBooking.end_at), { addSuffix: true });
+  const timeRemaining = formatDistanceToNow(new Date(activeBooking.end_at));
   const isOverstayed = new Date() > new Date(activeBooking.end_at);
   const hasOverstayCharges = activeBooking.overstay_charge_amount > 0;
 
