@@ -10,6 +10,9 @@ const corsHeaders = {
 interface ExtendBookingRequest {
   bookingId: string;
   extensionHours: number;
+  paymentMethodId?: string;
+  finalize?: boolean;
+  paymentIntentId?: string;
 }
 
 serve(async (req) => {
@@ -45,7 +48,7 @@ serve(async (req) => {
       throw new Error('User not authenticated');
     }
 
-    const { bookingId, extensionHours }: ExtendBookingRequest = await req.json();
+    const { bookingId, extensionHours, paymentMethodId, finalize, paymentIntentId }: ExtendBookingRequest = await req.json();
 
     console.log('Extending booking:', { bookingId, extensionHours, userId: userData.user.id });
 
@@ -117,51 +120,92 @@ serve(async (req) => {
       apiVersion: '2025-08-27.basil',
     });
 
-    // Get customer ID and payment methods
+    // Get customer ID
     const { data: profile } = await supabase
       .from('profiles')
       .select('stripe_customer_id')
       .eq('user_id', userData.user.id)
       .single();
 
-    let customerId = profile?.stripe_customer_id;
+    let customerId = profile?.stripe_customer_id as string | undefined;
 
     // Create or get customer
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: userData.user.email!,
-        metadata: {
-          supabase_user_id: userData.user.id
-        }
+        metadata: { supabase_user_id: userData.user.id },
       });
       customerId = customer.id;
-
       await supabase
         .from('profiles')
         .update({ stripe_customer_id: customerId })
         .eq('user_id', userData.user.id);
     }
 
-    // Get payment methods
-    const paymentMethods = await stripe.paymentMethods.list({
-      customer: customerId,
-      type: 'card',
-    });
+    // Finalize path: called after client handles 3DS
+    if (finalize && paymentIntentId) {
+      const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+      if (pi.status !== 'succeeded') {
+        throw new Error('Payment not completed');
+      }
 
-    if (paymentMethods.data.length === 0) {
-      throw new Error('No payment method on file. Please add a payment method in your profile.');
+      // Update the booking with new end time
+      const { error: updateError } = await supabase
+        .from('bookings')
+        .update({
+          end_at: newEndTime.toISOString(),
+          total_amount: booking.total_amount + extensionCost,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', bookingId);
+      if (updateError) {
+        console.error('Error updating booking:', updateError);
+        throw new Error('Payment succeeded but failed to update booking. Please contact support.');
+      }
+
+      // Credit the host
+      const { error: balanceError } = await supabase.rpc('increment_balance', {
+        user_id: booking.spots.host_id,
+        amount: hostEarnings,
+      });
+      if (balanceError) console.error('Error updating host balance:', balanceError);
+
+      return new Response(JSON.stringify({
+        success: true,
+        message: `Booking extended by ${extensionHours} hour${extensionHours > 1 ? 's' : ''}`,
+        newEndTime: newEndTime.toISOString(),
+        extensionCost,
+        paymentIntentId,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Use the default payment method (first one)
-    const paymentMethodId = paymentMethods.data[0].id;
+    // Resolve payment method
+    let resolvedPaymentMethodId = paymentMethodId as string | undefined;
 
-    // Create a PaymentIntent
+    if (resolvedPaymentMethodId) {
+      try {
+        const pm = await stripe.paymentMethods.retrieve(resolvedPaymentMethodId);
+        if (!pm.customer) {
+          await stripe.paymentMethods.attach(resolvedPaymentMethodId, { customer: customerId! });
+        }
+      } catch (e) {
+        console.error('Provided payment method invalid or cannot be attached', e);
+        throw new Error('Invalid payment method');
+      }
+    } else {
+      const { data: methods } = await stripe.paymentMethods.list({ customer: customerId!, type: 'card' });
+      if (!methods || methods.data.length === 0) {
+        throw new Error('No payment method on file. Please add a payment method in your profile.');
+      }
+      resolvedPaymentMethodId = methods.data[0].id;
+    }
+
+    // Create and confirm PaymentIntent (on-session)
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(extensionCost * 100),
       currency: 'usd',
-      customer: customerId,
-      payment_method: paymentMethodId,
-      off_session: true,
+      customer: customerId!,
+      payment_method: resolvedPaymentMethodId,
       confirm: true,
       description: `Parking Extension - ${booking.spots.title}`,
       metadata: {
@@ -173,21 +217,23 @@ serve(async (req) => {
         new_end_time: newEndTime.toISOString(),
         host_earnings: hostEarnings.toString(),
         platform_fee: platformFee.toString(),
-      }
+      },
     });
+
+    if (paymentIntent.status === 'requires_action') {
+      return new Response(JSON.stringify({
+        requiresAction: true,
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        message: 'Additional authentication required',
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     if (paymentIntent.status !== 'succeeded') {
       throw new Error('Payment failed. Please try again or update your payment method.');
     }
 
-    console.log('Payment successful for extension:', {
-      paymentIntentId: paymentIntent.id,
-      bookingId,
-      extensionHours,
-      extensionCost
-    });
-
-    // Update the booking with new end time
+    // Update booking on success
     const { error: updateError } = await supabase
       .from('bookings')
       .update({
@@ -202,32 +248,19 @@ serve(async (req) => {
       throw new Error('Payment succeeded but failed to update booking. Please contact support.');
     }
 
-    // Credit the host's balance
     const { error: balanceError } = await supabase.rpc('increment_balance', {
       user_id: booking.spots.host_id,
-      amount: hostEarnings
+      amount: hostEarnings,
     });
-
-    if (balanceError) {
-      console.error('Error updating host balance:', balanceError);
-    }
-
-    console.log('Booking extended successfully:', {
-      bookingId,
-      newEndTime: newEndTime.toISOString(),
-      extensionCost,
-      hostEarnings
-    });
+    if (balanceError) console.error('Error updating host balance:', balanceError);
 
     return new Response(JSON.stringify({
       success: true,
       message: `Booking extended by ${extensionHours} hour${extensionHours > 1 ? 's' : ''}`,
       newEndTime: newEndTime.toISOString(),
       extensionCost,
-      paymentIntentId: paymentIntent.id
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+      paymentIntentId: paymentIntent.id,
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
     console.error('Extension error:', error);

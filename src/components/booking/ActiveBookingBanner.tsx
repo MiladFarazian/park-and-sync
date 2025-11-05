@@ -9,6 +9,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus } from "lucide-react";
+import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
 import { toast } from "sonner";
 import { formatDistanceToNow, addHours, format } from "date-fns";
 
@@ -45,6 +47,11 @@ export const ActiveBookingBanner = () => {
   const [showExtendDialog, setShowExtendDialog] = useState(false);
   const [extensionHours, setExtensionHours] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [useNewCard, setUseNewCard] = useState(false);
+  const [newPaymentMethodId, setNewPaymentMethodId] = useState<string | null>(null);
+  const [setupClientSecret, setSetupClientSecret] = useState<string | null>(null);
+  const [stripePublishableKey, setStripePublishableKey] = useState<string | null>(null);
+  const [stripePromise, setStripePromise] = useState<Promise<any> | null>(null);
   const isHost = activeBooking && profile?.user_id === activeBooking.spots.host_id;
 
   useEffect(() => {
@@ -116,6 +123,27 @@ export const ActiveBookingBanner = () => {
     setActiveBooking(data as ActiveBooking);
   };
 
+  const getStripeKey = async (): Promise<string> => {
+    if (stripePublishableKey) return stripePublishableKey;
+    const { data, error } = await supabase.functions.invoke('get-stripe-publishable-key');
+    if (error) throw error;
+    setStripePublishableKey(data.publishableKey);
+    return data.publishableKey as string;
+  };
+
+  const startNewCardFlow = async () => {
+    try {
+      setUseNewCard(true);
+      const key = await getStripeKey();
+      setStripePromise(loadStripe(key));
+      const { data, error } = await supabase.functions.invoke('setup-payment-method');
+      if (error) throw error;
+      setSetupClientSecret(data.clientSecret);
+    } catch (e) {
+      console.error('Failed to start card setup flow', e);
+      toast.error('Unable to start card setup. Please try again.');
+    }
+  };
   const handleMessage = () => {
     if (!activeBooking) return;
     
@@ -162,32 +190,80 @@ export const ActiveBookingBanner = () => {
 
   const handleExtendBooking = async () => {
     if (!activeBooking) return;
-    
     setLoading(true);
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('extend-booking', {
-        body: { 
-          bookingId: activeBooking.id, 
-          extensionHours 
-        }
-      });
 
+    try {
+      // If user chose to add a new card, ensure it's saved first
+      if (useNewCard) {
+        if (!setupClientSecret) {
+          await startNewCardFlow();
+          setLoading(false);
+          return;
+        }
+        if (!newPaymentMethodId) {
+          toast.error('Please save your new card first.');
+          setLoading(false);
+          return;
+        }
+      }
+
+      const body: any = {
+        bookingId: activeBooking.id,
+        extensionHours,
+      };
+      if (newPaymentMethodId) body.paymentMethodId = newPaymentMethodId;
+
+      const { data, error } = await supabase.functions.invoke('extend-booking', { body });
       if (error) throw error;
+
+      if (data.requiresAction && data.clientSecret && data.paymentIntentId) {
+        const key = await getStripeKey();
+        const stripe = await loadStripe(key);
+        const result = await stripe!.confirmCardPayment(data.clientSecret);
+        if (result.error) {
+          throw new Error(result.error.message || 'Payment authentication failed');
+        }
+        // Finalize the booking update after successful authentication
+        const finalize = await supabase.functions.invoke('extend-booking', {
+          body: {
+            bookingId: activeBooking.id,
+            extensionHours,
+            paymentIntentId: data.paymentIntentId,
+            finalize: true,
+          },
+        });
+        if (finalize.error) throw finalize.error;
+        toast.success(finalize.data.message || 'Booking extended successfully!');
+        setShowExtendDialog(false);
+        setExtensionHours(1);
+        setUseNewCard(false);
+        setNewPaymentMethodId(null);
+        loadActiveBooking();
+        setLoading(false);
+        return;
+      }
 
       if (data.success) {
         toast.success(data.message || 'Booking extended successfully!');
         setShowExtendDialog(false);
         setExtensionHours(1);
-        loadActiveBooking(); // Reload to show updated end time
+        setUseNewCard(false);
+        setNewPaymentMethodId(null);
+        loadActiveBooking();
       } else {
         throw new Error(data.error || 'Failed to extend booking');
       }
-    } catch (error) {
-      console.error('Error extending booking:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to extend booking');
+    } catch (error: any) {
+      const msg = error?.message || String(error);
+      if (msg.includes('No payment method on file')) {
+        await startNewCardFlow();
+        toast.message('Add a card to continue', { description: 'Enter your card details below and press Save.' });
+      } else {
+        console.error('Error extending booking:', error);
+        toast.error(msg || 'Failed to extend booking');
+      }
     }
-    
+
     setLoading(false);
   };
 
@@ -195,12 +271,47 @@ export const ActiveBookingBanner = () => {
     if (!activeBooking) return '';
     return format(addHours(new Date(activeBooking.end_at), extensionHours), 'MMM d, h:mm a');
   };
-
   const getExtensionCost = () => {
     if (!activeBooking) return 0;
     return activeBooking.spots.hourly_rate * extensionHours;
   };
 
+  const AddCardInline = () => {
+    const stripe = useStripe();
+    const elements = useElements();
+
+    const onSave = async () => {
+      if (!stripe || !elements || !setupClientSecret) return;
+      const card = elements.getElement(CardElement);
+      if (!card) return;
+      const { error, setupIntent } = await stripe.confirmCardSetup(setupClientSecret, {
+        payment_method: { card },
+      });
+      if (error) {
+        toast.error(error.message || 'Failed to save card');
+        return;
+      }
+      const pmId = setupIntent?.payment_method as string | undefined;
+      if (pmId) {
+        setNewPaymentMethodId(pmId);
+        toast.success('Card saved. You can now confirm the extension.');
+      }
+    };
+
+    return (
+      <div className="space-y-3 border rounded-lg p-3">
+        <Label>New card</Label>
+        <div className="rounded-md border p-3 bg-background">
+          <CardElement options={{ hidePostalCode: true }} />
+        </div>
+        <div className="flex justify-end">
+          <Button size="sm" onClick={onSave} disabled={loading || !setupClientSecret}>
+            {loading ? 'Saving...' : 'Save Card'}
+          </Button>
+        </div>
+      </div>
+    );
+  };
   if (!activeBooking) return null;
 
   const endTime = format(new Date(activeBooking.end_at), 'h:mm a');
@@ -244,8 +355,23 @@ export const ActiveBookingBanner = () => {
                       <span className="truncate min-w-0">Driver: {activeBooking.profiles.first_name} {activeBooking.profiles.last_name}</span>
                     </>
                   )}
-                </div>
-              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" size="sm" onClick={startNewCardFlow} className="px-0">
+                Change payment method
+              </Button>
+              {newPaymentMethodId && (
+                <Badge variant="secondary" className="text-xs">New card saved</Badge>
+              )}
+            </div>
+
+            {useNewCard && stripePromise && setupClientSecret && (
+              <Elements stripe={stripePromise} options={{ clientSecret: setupClientSecret }}>
+                <AddCardInline />
+              </Elements>
+            )}
+          </div>
             </div>
 
             {/* Right: Actions */}
