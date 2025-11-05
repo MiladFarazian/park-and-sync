@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMode } from '@/contexts/ModeContext';
+import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -246,6 +247,9 @@ const Activity = () => {
             {mode === 'host' ? 'Manage reservations at your spots' : 'View your parking reservations'}
           </p>
         </div>
+
+        {/* Active booking banner for quick management */}
+        <ActiveBookingBanner />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
