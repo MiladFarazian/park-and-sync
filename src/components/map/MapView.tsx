@@ -341,7 +341,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       color: white;
       white-space: nowrap;
       max-width: 250px;
-      overflow: visible;
+      overflow: hidden;
       text-overflow: ellipsis;
       border: 2px solid hsla(250, 100%, 80%, 0.3);
     `;
@@ -369,8 +369,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     // Create and add the marker (positioned higher to avoid overlapping user location)
     searchMarkerRef.current = new mapboxgl.Marker({
       element: el,
-      anchor: 'center',
-      offset: [0, -50] // Position higher above the user location marker
+      anchor: 'bottom',
+      offset: [0, 0]
     })
       .setLngLat([lng, lat])
       .addTo(map.current);
