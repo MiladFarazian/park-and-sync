@@ -167,13 +167,16 @@ serve(async (req) => {
     // Get host and renter profiles for notifications and emails
     const { data: hostProfile } = await supabase
       .from('profiles')
-      .select('email, first_name')
+      .select('first_name')
       .eq('user_id', spot.host_id)
       .single();
 
+    // Get host's auth email
+    const { data: { user: hostUser } } = await supabase.auth.admin.getUserById(spot.host_id);
+
     const { data: renterProfile } = await supabase
       .from('profiles')
-      .select('email, first_name')
+      .select('first_name')
       .eq('user_id', userData.user.id)
       .single();
 
@@ -201,10 +204,10 @@ serve(async (req) => {
       try {
         await supabase.functions.invoke('send-booking-confirmation', {
           body: {
-            hostEmail: hostProfile.email,
-            hostName: hostProfile.first_name || 'Host',
-            driverEmail: renterProfile.email,
-            driverName: renterProfile.first_name || 'Driver',
+            hostEmail: hostUser?.email || '',
+            hostName: hostProfile?.first_name || 'Host',
+            driverEmail: userData.user.email || '',
+            driverName: renterProfile?.first_name || 'Driver',
             spotTitle: spot.title,
             spotAddress: spot.address,
             startAt: start_at,
