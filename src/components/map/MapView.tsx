@@ -329,8 +329,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     bubble.style.cssText = `
       position: relative;
       background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-      padding: 12px 20px;
-      border-radius: 20px;
+      padding: 14px 28px;
+      border-radius: 50px;
       box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
       font-size: 14px;
       font-weight: 600;
@@ -347,25 +347,25 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     const pointer = document.createElement('div');
     pointer.style.cssText = `
       position: absolute;
-      bottom: -14px;
+      bottom: -18px;
       left: 50%;
       transform: translateX(-50%);
       width: 0;
       height: 0;
-      border-left: 16px solid transparent;
-      border-right: 16px solid transparent;
-      border-top: 16px solid #7c3aed;
+      border-left: 20px solid transparent;
+      border-right: 20px solid transparent;
+      border-top: 20px solid #7c3aed;
       filter: drop-shadow(0 4px 6px rgba(139, 92, 246, 0.3));
     `;
     
     bubble.appendChild(pointer);
     el.appendChild(bubble);
 
-    // Create and add the marker (positioned closer to user location)
+    // Create and add the marker (positioned higher to avoid overlapping user location)
     searchMarkerRef.current = new mapboxgl.Marker({
       element: el,
       anchor: 'bottom',
-      offset: [0, 10] // Offset to position closer to user location marker
+      offset: [0, -40] // Position higher above the user location marker
     })
       .setLngLat([lng, lat])
       .addTo(map.current);
