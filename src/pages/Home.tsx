@@ -153,26 +153,33 @@ const Home = () => {
       // Fixed Southern California proximity (Downtown LA)
       const socal_center = { lat: 34.0522, lng: -118.2437 };
       
-      const response = await fetch(
-        `https://api.mapbox.com/search/searchbox/v1/suggest?` +
+      const url = `https://api.mapbox.com/search/searchbox/v1/suggest?` +
         `q=${encodeURIComponent(query)}` +
         `&access_token=${mapboxToken}` +
         `&limit=8` +
         `&types=poi,address,place` +
         `&proximity=${socal_center.lng},${socal_center.lat}` +
         `&country=US` +
-        `&bbox=-119.5,32.5,-117.0,34.8` // Southern California bounding box
-      );
+        `&bbox=-119.5,32.5,-117.0,34.8`;
+      
+      console.log('[Search Box API] Calling:', url.replace(mapboxToken, 'TOKEN'));
+      
+      const response = await fetch(url);
       const data = await response.json();
+      
+      console.log('[Search Box API] Response:', data);
+      
       if (data.suggestions && data.suggestions.length > 0) {
+        console.log('[Search Box API] Found', data.suggestions.length, 'suggestions');
         setSuggestions(data.suggestions);
         setShowSuggestions(true);
       } else {
+        console.log('[Search Box API] No suggestions found');
         setSuggestions([]);
         setShowSuggestions(false);
       }
     } catch (error) {
-      console.error('Error searching location:', error);
+      console.error('[Search Box API] Error:', error);
       setSuggestions([]);
       setShowSuggestions(false);
     }
