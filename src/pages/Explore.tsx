@@ -23,6 +23,7 @@ const Explore = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [mapboxToken, setMapboxToken] = useState('');
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const sessionTokenRef = useRef<string>(crypto.randomUUID());
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [endTime, setEndTime] = useState<Date | null>(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
@@ -164,6 +165,7 @@ const Explore = () => {
       const url = `https://api.mapbox.com/search/searchbox/v1/suggest?` +
         `q=${encodeURIComponent(query)}` +
         `&access_token=${mapboxToken}` +
+        `&session_token=${sessionTokenRef.current}` +
         `&limit=8` +
         `&types=poi,address,place` +
         `&proximity=${socal_center.lng},${socal_center.lat}` +
@@ -203,21 +205,39 @@ const Explore = () => {
       searchLocation(value);
     }, 300);
   };
-  const handleSelectLocation = (location: any) => {
-    // Search Box API returns coordinates in a different format
-    const { longitude, latitude } = location.coordinates || {};
-    if (!longitude || !latitude) return;
+  const handleSelectLocation = async (location: any) => {
+    if (!mapboxToken || !location.mapbox_id) return;
     
-    const newLocation = {
-      lat: latitude,
-      lng: longitude
-    };
-    setUserLocation(newLocation);
-    setSearchQuery(location.name || location.place_formatted || location.full_address);
-    setShowSuggestions(false);
-    setSuggestions([]);
-    // Fetch spots for the new search location
-    fetchNearbySpots(newLocation, 15000, false);
+    try {
+      const retrieveUrl = `https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(location.mapbox_id)}?access_token=${mapboxToken}&session_token=${sessionTokenRef.current}`;
+      
+      console.log('[Search Box API] Retrieving:', retrieveUrl.replace(mapboxToken, 'TOKEN'));
+      
+      const response = await fetch(retrieveUrl);
+      const data = await response.json();
+      
+      console.log('[Search Box API] Retrieve response:', data);
+      
+      if (data?.features?.[0]?.geometry?.coordinates) {
+        const [lng, lat] = data.features[0].geometry.coordinates;
+        const placeName = location.name || location.place_formatted || location.full_address;
+        
+        const newLocation = { lat, lng };
+        setUserLocation(newLocation);
+        setSearchQuery(placeName);
+        setShowSuggestions(false);
+        setSuggestions([]);
+        
+        // Fetch spots for the new search location
+        fetchNearbySpots(newLocation, 15000, false);
+        
+        // Regenerate session token for next search session
+        sessionTokenRef.current = crypto.randomUUID();
+        console.log('[Search Box API] Session token regenerated');
+      }
+    } catch (error) {
+      console.error('[Search Box API] Retrieve error:', error);
+    }
   };
 
   const handleSearchSubmit = async () => {

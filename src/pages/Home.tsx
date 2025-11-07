@@ -26,6 +26,7 @@ const Home = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [mapboxToken, setMapboxToken] = useState('');
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const sessionTokenRef = useRef<string>(crypto.randomUUID());
   const [startTime, setStartTime] = useState(new Date());
   const [endTime, setEndTime] = useState(new Date(Date.now() + 2 * 60 * 60 * 1000)); // 2 hours later
 
@@ -156,6 +157,7 @@ const Home = () => {
       const url = `https://api.mapbox.com/search/searchbox/v1/suggest?` +
         `q=${encodeURIComponent(query)}` +
         `&access_token=${mapboxToken}` +
+        `&session_token=${sessionTokenRef.current}` +
         `&limit=8` +
         `&types=poi,address,place` +
         `&proximity=${socal_center.lng},${socal_center.lat}` +
@@ -195,16 +197,33 @@ const Home = () => {
     }, 300);
   };
 
-  const handleSelectSuggestion = (suggestion: any) => {
-    // Search Box API returns suggestions with 'name' and 'place_formatted'
-    const placeName = suggestion.name || suggestion.place_formatted || suggestion.full_address;
-    setSearchQuery(placeName);
-    setShowSuggestions(false);
+  const handleSelectSuggestion = async (suggestion: any) => {
+    if (!mapboxToken || !suggestion.mapbox_id) return;
     
-    // Extract coordinates from Search Box API suggestion
-    if (suggestion.coordinates) {
-      const { longitude, latitude } = suggestion.coordinates;
-      setUserLocation({ lat: latitude, lng: longitude });
+    try {
+      const retrieveUrl = `https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(suggestion.mapbox_id)}?access_token=${mapboxToken}&session_token=${sessionTokenRef.current}`;
+      
+      console.log('[Search Box API] Retrieving:', retrieveUrl.replace(mapboxToken, 'TOKEN'));
+      
+      const response = await fetch(retrieveUrl);
+      const data = await response.json();
+      
+      console.log('[Search Box API] Retrieve response:', data);
+      
+      if (data?.features?.[0]?.geometry?.coordinates) {
+        const [lng, lat] = data.features[0].geometry.coordinates;
+        const placeName = suggestion.name || suggestion.place_formatted || suggestion.full_address;
+        
+        setSearchQuery(placeName);
+        setUserLocation({ lat, lng });
+        setShowSuggestions(false);
+        
+        // Regenerate session token for next search session
+        sessionTokenRef.current = crypto.randomUUID();
+        console.log('[Search Box API] Session token regenerated');
+      }
+    } catch (error) {
+      console.error('[Search Box API] Retrieve error:', error);
     }
   };
 
