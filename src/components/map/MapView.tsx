@@ -369,8 +369,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     // Create and add the marker (positioned higher to avoid overlapping user location)
     searchMarkerRef.current = new mapboxgl.Marker({
       element: el,
-      anchor: 'bottom',
-      offset: [0, 0]
+      anchor: 'center',
+      offset: [0, -70]
     })
       .setLngLat([lng, lat])
       .addTo(map.current);
