@@ -376,25 +376,29 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     bubble.appendChild(pointer);
     el.appendChild(bubble);
 
+    // Determine target position: prefer currentLocation when available
+    const targetLng = currentLocation?.lng ?? lng;
+    const targetLat = currentLocation?.lat ?? lat;
+
     // Create and add the marker (positioned higher to avoid overlapping user location)
     searchMarkerRef.current = new mapboxgl.Marker({
       element: el,
       anchor: 'bottom',
       offset: [0, -18]
     })
-      .setLngLat([lng, lat])
+      .setLngLat([targetLng, targetLat])
       .addTo(map.current);
 
-    // Fly to the new search center location
+    // Fly to the target location
     map.current.flyTo({
-      center: [lng, lat],
+      center: [targetLng, targetLat],
       zoom: 14,
       essential: true,
       duration: 1500
     });
 
     console.log('Search center updated at:', lat, lng);
-  }, [searchCenter, mapReady, searchQuery]);
+  }, [searchCenter, mapReady, searchQuery, currentLocation]);
 
   // Update current location GeoJSON source when currentLocation changes
   useEffect(() => {
