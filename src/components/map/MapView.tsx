@@ -320,54 +320,52 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       searchMarkerRef.current.remove();
     }
 
-    // Create custom HTML marker element
+    // Create custom HTML marker element - speech bubble style
     const el = document.createElement('div');
-    el.style.cssText = 'display: flex; flex-direction: column; align-items: center; cursor: pointer;';
+    el.style.cssText = 'cursor: pointer;';
     
-    // Create label card above the pin
-    const label = document.createElement('div');
-    label.style.cssText = `
-      background: white;
-      padding: 8px 12px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-      font-size: 13px;
+    // Create speech bubble with triangle pointer
+    const bubble = document.createElement('div');
+    bubble.style.cssText = `
+      position: relative;
+      background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+      padding: 12px 20px;
+      border-radius: 20px;
+      box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
+      font-size: 14px;
       font-weight: 600;
-      color: #1a1a1a;
+      color: white;
       white-space: nowrap;
-      margin-bottom: 8px;
-      max-width: 200px;
+      max-width: 280px;
       overflow: hidden;
       text-overflow: ellipsis;
-      border: 2px solid #ff5722;
+      border: 3px solid #a78bfa;
     `;
-    label.textContent = searchQuery || 'Search Location';
+    bubble.textContent = searchQuery || 'Search Location';
     
-    // Create pin icon
-    const pin = document.createElement('div');
-    pin.innerHTML = `
-      <svg width="40" height="50" viewBox="0 0 40 50" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <filter id="search-shadow" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.4)" />
-          </filter>
-        </defs>
-        <g filter="url(#search-shadow)">
-          <path d="M 20 2 C 12 2 6 8 6 16 C 6 24 20 48 20 48 C 20 48 34 24 34 16 C 34 8 28 2 20 2 Z" 
-                fill="#ff5722" stroke="white" stroke-width="2.5"/>
-          <circle cx="20" cy="16" r="8" fill="white"/>
-          <path d="M 20 12 L 20 20 M 16 16 L 24 16" stroke="#ff5722" stroke-width="2" stroke-linecap="round"/>
-        </g>
-      </svg>
+    // Create downward triangle pointer
+    const pointer = document.createElement('div');
+    pointer.style.cssText = `
+      position: absolute;
+      bottom: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 16px solid transparent;
+      border-right: 16px solid transparent;
+      border-top: 16px solid #7c3aed;
+      filter: drop-shadow(0 4px 6px rgba(139, 92, 246, 0.3));
     `;
     
-    el.appendChild(label);
-    el.appendChild(pin);
+    bubble.appendChild(pointer);
+    el.appendChild(bubble);
 
-    // Create and add the marker
+    // Create and add the marker (positioned closer to user location)
     searchMarkerRef.current = new mapboxgl.Marker({
       element: el,
-      anchor: 'bottom'
+      anchor: 'bottom',
+      offset: [0, 10] // Offset to position closer to user location marker
     })
       .setLngLat([lng, lat])
       .addTo(map.current);
