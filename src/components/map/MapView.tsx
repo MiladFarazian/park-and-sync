@@ -384,7 +384,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     searchMarkerRef.current = new mapboxgl.Marker({
       element: el,
       anchor: 'bottom',
-      offset: [0, -18]
+      offset: [0, -20]
     })
       .setLngLat([targetLng, targetLat])
       .addTo(map.current);
