@@ -341,11 +341,21 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       color: white;
       white-space: nowrap;
       max-width: 250px;
-      overflow: hidden;
+      overflow: visible;
       text-overflow: ellipsis;
       border: 2px solid hsla(250, 100%, 80%, 0.3);
     `;
-    bubble.textContent = searchQuery || 'Search Location';
+    const label = document.createElement('div');
+    label.style.cssText = `
+      display: inline-block;
+      max-width: 250px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      vertical-align: top;
+    `;
+    label.textContent = searchQuery || 'Search Location';
+    bubble.appendChild(label);
     
     // Create downward triangle pointer
     const pointer = document.createElement('div');
@@ -360,7 +370,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       border-right: 18px solid transparent;
       border-top: 18px solid hsl(250 80% 75%);
       filter: drop-shadow(0 4px 6px hsla(250, 100%, 65%, 0.3));
-      z-index: -1;
+      z-index: 0;
     `;
     
     bubble.appendChild(pointer);
@@ -369,8 +379,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     // Create and add the marker (positioned higher to avoid overlapping user location)
     searchMarkerRef.current = new mapboxgl.Marker({
       element: el,
-      anchor: 'center',
-      offset: [0, -70]
+      anchor: 'bottom',
+      offset: [0, -18]
     })
       .setLngLat([lng, lat])
       .addTo(map.current);
