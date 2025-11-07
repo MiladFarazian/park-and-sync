@@ -65,6 +65,12 @@ serve(async (req) => {
       throw new Error('Spot not found');
     }
 
+    // Check if user is trying to book their own spot
+    if (userData.user.id === spot.host_id) {
+      console.error('Self-booking attempt:', { user_id: userData.user.id, host_id: spot.host_id });
+      throw new Error('You cannot book your own parking spot');
+    }
+
     // Calculate pricing
     const startDate = new Date(start_at);
     const endDate = new Date(end_at);

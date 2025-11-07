@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check } from 'lucide-react';
+import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { differenceInHours, addHours, format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface PaymentMethod {
   id: string;
@@ -35,6 +36,7 @@ const Booking = () => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [isOwnSpot, setIsOwnSpot] = useState(false);
   
   // Get times from URL params or use defaults (1 hour from now + 2 hours duration)
   const getInitialTimes = () => {
@@ -112,6 +114,10 @@ const Booking = () => {
         // Fetch user's vehicles and payment methods
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
+          // Check if user is the host of this spot
+          if (spotData.host_id === user.id) {
+            setIsOwnSpot(true);
+          }
           const { data: vehiclesData } = await supabase
             .from('vehicles')
             .select('*')
@@ -211,6 +217,16 @@ const Booking = () => {
           variant: "destructive",
         });
         navigate('/auth');
+        return;
+      }
+
+      // Check for self-booking
+      if (isOwnSpot || spot.host_id === user.id) {
+        toast({
+          title: "Cannot book own spot",
+          description: "You're the host of this spot and cannot book it",
+          variant: "destructive",
+        });
         return;
       }
 
@@ -345,6 +361,16 @@ const Booking = () => {
             </div>
           </div>
         </Card>
+
+        {/* Self-booking Warning */}
+        {isOwnSpot && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              You're the host of this spot. You cannot book your own listing.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Parking Time Card */}
         <Card className="p-4">
@@ -687,7 +713,7 @@ const Booking = () => {
             className="w-full h-14 text-lg"
             size="lg"
             onClick={handleBooking}
-            disabled={!startDateTime || !endDateTime || !pricing || !selectedVehicle || !selectedPaymentMethod || bookingLoading}
+            disabled={!startDateTime || !endDateTime || !pricing || !selectedVehicle || !selectedPaymentMethod || bookingLoading || isOwnSpot}
           >
             {bookingLoading ? 'Processing...' : `Book Now • $${pricing?.total || '0.00'}`}
           </Button>
