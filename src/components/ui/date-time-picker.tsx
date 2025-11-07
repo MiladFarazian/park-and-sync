@@ -1,5 +1,5 @@
 import * as React from "react";
-import { format } from "date-fns";
+import { format, isToday } from "date-fns";
 import { CalendarIcon, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -63,7 +63,7 @@ export function DateTimePicker({
             <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
             {date ? (
               <span className="flex items-center gap-1 md:gap-2 text-sm md:text-base truncate">
-                <span className="truncate">{format(date, "MMM d, yyyy")}</span>
+                <span className="truncate">{isToday(date) ? "Today" : format(date, "MMM d, yyyy")}</span>
                 <span className="text-muted-foreground flex-shrink-0">·</span>
                 <Clock className="h-3 w-3 flex-shrink-0" />
                 <span className="flex-shrink-0">{format(date, "h:mm a")}</span>
