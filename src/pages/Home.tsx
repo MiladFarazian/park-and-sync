@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { TimePicker } from '@/components/ui/time-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format } from 'date-fns';
+import { format, isToday } from 'date-fns';
 import { CalendarIcon, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Star, MapPin, Loader2, Search, Plus, Activity, Zap } from 'lucide-react';
@@ -356,7 +356,7 @@ const Home = () => {
                       >
                         <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
                         <span className="truncate">
-                          {startTime ? format(startTime, "MMM d, yyyy") : "Pick date"}
+                          {startTime ? (isToday(startTime) ? "Today" : format(startTime, "MMM d, yyyy")) : "Pick date"}
                         </span>
                       </Button>
                     </PopoverTrigger>
@@ -408,7 +408,7 @@ const Home = () => {
                       >
                         <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
                         <span className="truncate">
-                          {endTime ? format(endTime, "MMM d, yyyy") : "Pick date"}
+                          {endTime ? (isToday(endTime) ? "Today" : format(endTime, "MMM d, yyyy")) : "Pick date"}
                         </span>
                       </Button>
                     </PopoverTrigger>
