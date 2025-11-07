@@ -26,6 +26,7 @@ interface MapViewProps {
   currentLocation?: { lat: number; lng: number };
   onVisibleSpotsChange?: (count: number) => void;
   onMapMove?: (center: { lat: number; lng: number }, radiusMeters: number) => void;
+  searchQuery?: string;
   exploreParams?: {
     lat?: string;
     lng?: string;
@@ -53,7 +54,7 @@ const calculateWalkTime = (distanceMiles: number): number => {
   return Math.round((distanceMiles / 3) * 60);
 };
 
-const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, onMapMove, exploreParams }: MapViewProps) => {
+const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, onMapMove, searchQuery, exploreParams }: MapViewProps) => {
   const navigate = useNavigate();
   
   const buildSpotUrl = (spotId: string) => {
@@ -75,6 +76,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<mapboxgl.Marker[]>([]);
+  const searchMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -187,46 +189,6 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           }
         });
       }
-
-      // Add search center source and layers
-      if (map.current && !map.current.getSource('search-center')) {
-        map.current.addSource('search-center', {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: []
-          }
-        });
-
-        // Outer ring
-        map.current.addLayer({
-          id: 'search-center-outer',
-          type: 'circle',
-          source: 'search-center',
-          paint: {
-            'circle-radius': 12,
-            'circle-color': 'hsl(250, 100%, 65%)',
-            'circle-opacity': 0.3,
-            'circle-stroke-width': 3,
-            'circle-stroke-color': 'white',
-            'circle-stroke-opacity': 0.9
-          }
-        });
-
-        // Inner dot
-        map.current.addLayer({
-          id: 'search-center-inner',
-          type: 'circle',
-          source: 'search-center',
-          paint: {
-            'circle-radius': 4,
-            'circle-color': 'hsl(250, 100%, 65%)',
-            'circle-opacity': 1,
-            'circle-stroke-width': 2,
-            'circle-stroke-color': 'white'
-          }
-        });
-      }
     });
 
     // Also add layers on style.load (in case style changes)
@@ -274,43 +236,6 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           source: 'user-location',
           paint: {
             'circle-radius': 8,
-            'circle-color': 'hsl(250, 100%, 65%)',
-            'circle-opacity': 1,
-            'circle-stroke-width': 2,
-            'circle-stroke-color': 'white'
-          }
-        });
-      }
-
-      if (map.current && !map.current.getSource('search-center')) {
-        map.current.addSource('search-center', {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: []
-          }
-        });
-
-        map.current.addLayer({
-          id: 'search-center-outer',
-          type: 'circle',
-          source: 'search-center',
-          paint: {
-            'circle-radius': 12,
-            'circle-color': 'hsl(250, 100%, 65%)',
-            'circle-opacity': 0.3,
-            'circle-stroke-width': 3,
-            'circle-stroke-color': 'white',
-            'circle-stroke-opacity': 0.9
-          }
-        });
-
-        map.current.addLayer({
-          id: 'search-center-inner',
-          type: 'circle',
-          source: 'search-center',
-          paint: {
-            'circle-radius': 4,
             'circle-color': 'hsl(250, 100%, 65%)',
             'circle-opacity': 1,
             'circle-stroke-width': 2,
@@ -369,7 +294,14 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
 
   // Update search center marker when searchCenter changes
   useEffect(() => {
-    if (!map.current || !mapReady || !searchCenter) return;
+    if (!map.current || !mapReady || !searchCenter) {
+      // Remove marker if no search center
+      if (searchMarkerRef.current) {
+        searchMarkerRef.current.remove();
+        searchMarkerRef.current = null;
+      }
+      return;
+    }
 
     // Validate coordinates
     const { lat, lng } = searchCenter;
@@ -383,23 +315,62 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       return;
     }
 
-    // Update the search-center source with the new coordinates
-    const source = map.current.getSource('search-center');
-    if (source && 'setData' in source) {
-      (source as mapboxgl.GeoJSONSource).setData({
-        type: 'FeatureCollection',
-        features: [
-          {
-            type: 'Feature',
-            geometry: {
-              type: 'Point',
-              coordinates: [lng, lat]
-            },
-            properties: {}
-          }
-        ]
-      });
+    // Remove existing marker
+    if (searchMarkerRef.current) {
+      searchMarkerRef.current.remove();
     }
+
+    // Create custom HTML marker element
+    const el = document.createElement('div');
+    el.style.cssText = 'display: flex; flex-direction: column; align-items: center; cursor: pointer;';
+    
+    // Create label card above the pin
+    const label = document.createElement('div');
+    label.style.cssText = `
+      background: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      font-size: 13px;
+      font-weight: 600;
+      color: #1a1a1a;
+      white-space: nowrap;
+      margin-bottom: 8px;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      border: 2px solid #ff5722;
+    `;
+    label.textContent = searchQuery || 'Search Location';
+    
+    // Create pin icon
+    const pin = document.createElement('div');
+    pin.innerHTML = `
+      <svg width="40" height="50" viewBox="0 0 40 50" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="search-shadow" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.4)" />
+          </filter>
+        </defs>
+        <g filter="url(#search-shadow)">
+          <path d="M 20 2 C 12 2 6 8 6 16 C 6 24 20 48 20 48 C 20 48 34 24 34 16 C 34 8 28 2 20 2 Z" 
+                fill="#ff5722" stroke="white" stroke-width="2.5"/>
+          <circle cx="20" cy="16" r="8" fill="white"/>
+          <path d="M 20 12 L 20 20 M 16 16 L 24 16" stroke="#ff5722" stroke-width="2" stroke-linecap="round"/>
+        </g>
+      </svg>
+    `;
+    
+    el.appendChild(label);
+    el.appendChild(pin);
+
+    // Create and add the marker
+    searchMarkerRef.current = new mapboxgl.Marker({
+      element: el,
+      anchor: 'bottom'
+    })
+      .setLngLat([lng, lat])
+      .addTo(map.current);
 
     // Fly to the new search center location
     map.current.flyTo({
@@ -410,7 +381,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     });
 
     console.log('Search center updated at:', lat, lng);
-  }, [searchCenter, mapReady]);
+  }, [searchCenter, mapReady, searchQuery]);
 
   // Update current location GeoJSON source when currentLocation changes
   useEffect(() => {

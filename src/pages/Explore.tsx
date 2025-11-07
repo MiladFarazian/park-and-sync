@@ -521,7 +521,8 @@ const Explore = () => {
         searchCenter={userLocation} 
         currentLocation={userLocation}
         onVisibleSpotsChange={() => {}} 
-        onMapMove={handleMapMove} 
+        onMapMove={handleMapMove}
+        searchQuery={searchQuery}
         exploreParams={{
           lat: userLocation?.lat.toString(),
           lng: userLocation?.lng.toString(),
