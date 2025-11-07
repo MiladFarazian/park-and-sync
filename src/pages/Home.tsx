@@ -150,17 +150,22 @@ const Home = () => {
       return;
     }
     try {
-      // Build proximity parameter if user location is available
-      const proximityParam = userLocation 
-        ? `&proximity=${userLocation.lng},${userLocation.lat}` 
-        : '';
+      // Fixed Southern California proximity (Downtown LA)
+      const socal_center = { lat: 34.0522, lng: -118.2437 };
       
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&limit=8&types=poi,address,place,locality,neighborhood&country=US${proximityParam}`
+        `https://api.mapbox.com/search/searchbox/v1/suggest?` +
+        `q=${encodeURIComponent(query)}` +
+        `&access_token=${mapboxToken}` +
+        `&limit=8` +
+        `&types=poi,address,place` +
+        `&proximity=${socal_center.lng},${socal_center.lat}` +
+        `&country=US` +
+        `&bbox=-119.5,32.5,-117.0,34.8` // Southern California bounding box
       );
       const data = await response.json();
-      if (data.features && data.features.length > 0) {
-        setSuggestions(data.features);
+      if (data.suggestions && data.suggestions.length > 0) {
+        setSuggestions(data.suggestions);
         setShowSuggestions(true);
       } else {
         setSuggestions([]);
@@ -183,14 +188,17 @@ const Home = () => {
     }, 300);
   };
 
-  const handleSelectSuggestion = (feature: any) => {
-    const placeName = feature.place_name || feature.text;
+  const handleSelectSuggestion = (suggestion: any) => {
+    // Search Box API returns suggestions with 'name' and 'place_formatted'
+    const placeName = suggestion.name || suggestion.place_formatted || suggestion.full_address;
     setSearchQuery(placeName);
     setShowSuggestions(false);
     
-    // Extract coordinates from Mapbox feature
-    const [lng, lat] = feature.center;
-    setUserLocation({ lat, lng });
+    // Extract coordinates from Search Box API suggestion
+    if (suggestion.coordinates) {
+      const { longitude, latitude } = suggestion.coordinates;
+      setUserLocation({ lat: latitude, lng: longitude });
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -332,8 +340,8 @@ const Home = () => {
                     <div className="flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       <div className="flex flex-col">
-                        <span className="text-sm font-medium">{s.text}</span>
-                        <span className="text-xs text-muted-foreground">{s.place_name}</span>
+                        <span className="text-sm font-medium">{s.name}</span>
+                        <span className="text-xs text-muted-foreground">{s.place_formatted || s.full_address}</span>
                       </div>
                     </div>
                   </button>

@@ -158,10 +158,22 @@ const Explore = () => {
       return;
     }
     try {
-      const response = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&limit=5&types=place,locality,neighborhood,address,poi`);
+      // Fixed Southern California proximity (Downtown LA)
+      const socal_center = { lat: 34.0522, lng: -118.2437 };
+      
+      const response = await fetch(
+        `https://api.mapbox.com/search/searchbox/v1/suggest?` +
+        `q=${encodeURIComponent(query)}` +
+        `&access_token=${mapboxToken}` +
+        `&limit=8` +
+        `&types=poi,address,place` +
+        `&proximity=${socal_center.lng},${socal_center.lat}` +
+        `&country=US` +
+        `&bbox=-119.5,32.5,-117.0,34.8`
+      );
       const data = await response.json();
-      if (data.features && data.features.length > 0) {
-        setSuggestions(data.features);
+      if (data.suggestions && data.suggestions.length > 0) {
+        setSuggestions(data.suggestions);
         setShowSuggestions(true);
       } else {
         setSuggestions([]);
@@ -185,13 +197,16 @@ const Explore = () => {
     }, 300);
   };
   const handleSelectLocation = (location: any) => {
-    const [lng, lat] = location.center;
+    // Search Box API returns coordinates in a different format
+    const { longitude, latitude } = location.coordinates || {};
+    if (!longitude || !latitude) return;
+    
     const newLocation = {
-      lat,
-      lng
+      lat: latitude,
+      lng: longitude
     };
     setUserLocation(newLocation);
-    setSearchQuery(location.place_name);
+    setSearchQuery(location.name || location.place_formatted || location.full_address);
     setShowSuggestions(false);
     setSuggestions([]);
     // Fetch spots for the new search location
@@ -201,13 +216,24 @@ const Explore = () => {
   const handleSearchSubmit = async () => {
     if (!searchQuery.trim() || !mapboxToken) return;
     
-    // Search for the location
+    // Search for the location using Search Box API
     try {
-      const response = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?access_token=${mapboxToken}&limit=1&types=place,locality,neighborhood,address,poi`);
+      const socal_center = { lat: 34.0522, lng: -118.2437 };
+      
+      const response = await fetch(
+        `https://api.mapbox.com/search/searchbox/v1/suggest?` +
+        `q=${encodeURIComponent(searchQuery)}` +
+        `&access_token=${mapboxToken}` +
+        `&limit=1` +
+        `&types=poi,address,place` +
+        `&proximity=${socal_center.lng},${socal_center.lat}` +
+        `&country=US` +
+        `&bbox=-119.5,32.5,-117.0,34.8`
+      );
       const data = await response.json();
       
-      if (data.features && data.features.length > 0) {
-        handleSelectLocation(data.features[0]);
+      if (data.suggestions && data.suggestions.length > 0) {
+        handleSelectLocation(data.suggestions[0]);
       }
     } catch (error) {
       console.error('Error searching location:', error);
@@ -368,9 +394,9 @@ const Explore = () => {
               e.preventDefault();
               handleSelectLocation(suggestion);
             }} className="w-full text-left p-3 hover:bg-accent transition-colors border-b border-border last:border-0">
-                    <div className="font-medium text-sm">{suggestion.text}</div>
+                    <div className="font-medium text-sm">{suggestion.name}</div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      {suggestion.place_name}
+                      {suggestion.place_formatted || suggestion.full_address}
                     </div>
                   </button>)}
               </Card>}
