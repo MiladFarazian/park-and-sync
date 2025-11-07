@@ -150,8 +150,13 @@ const Home = () => {
       return;
     }
     try {
+      // Build proximity parameter if user location is available
+      const proximityParam = userLocation 
+        ? `&proximity=${userLocation.lng},${userLocation.lat}` 
+        : '';
+      
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&limit=5&types=place,locality,neighborhood,address,poi`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&limit=8&types=poi,address,place,locality,neighborhood&country=US${proximityParam}`
       );
       const data = await response.json();
       if (data.features && data.features.length > 0) {
