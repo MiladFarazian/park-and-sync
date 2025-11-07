@@ -322,24 +322,28 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
 
     // Create custom HTML marker element - speech bubble style
     const el = document.createElement('div');
-    el.style.cssText = 'cursor: pointer;';
+    el.style.cssText = `
+      cursor: pointer;
+      overflow: visible;
+      position: relative;
+    `;
     
     // Create speech bubble with triangle pointer
     const bubble = document.createElement('div');
     bubble.style.cssText = `
       position: relative;
-      background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+      background: linear-gradient(135deg, hsl(250 100% 65%), hsl(250 100% 55%));
       padding: 14px 28px;
       border-radius: 50px;
-      box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
+      box-shadow: 0 6px 20px hsla(250, 100%, 65%, 0.5);
       font-size: 14px;
       font-weight: 600;
       color: white;
       white-space: nowrap;
       max-width: 280px;
-      overflow: hidden;
+      overflow: visible;
       text-overflow: ellipsis;
-      border: 3px solid #a78bfa;
+      border: 3px solid hsl(250 100% 75%);
     `;
     bubble.textContent = searchQuery || 'Search Location';
     
@@ -347,15 +351,16 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     const pointer = document.createElement('div');
     pointer.style.cssText = `
       position: absolute;
-      bottom: -18px;
+      bottom: -20px;
       left: 50%;
       transform: translateX(-50%);
       width: 0;
       height: 0;
       border-left: 20px solid transparent;
       border-right: 20px solid transparent;
-      border-top: 20px solid #7c3aed;
-      filter: drop-shadow(0 4px 6px rgba(139, 92, 246, 0.3));
+      border-top: 20px solid hsl(250 100% 55%);
+      filter: drop-shadow(0 4px 6px hsla(250, 100%, 65%, 0.3));
+      z-index: -1;
     `;
     
     bubble.appendChild(pointer);
@@ -364,8 +369,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     // Create and add the marker (positioned higher to avoid overlapping user location)
     searchMarkerRef.current = new mapboxgl.Marker({
       element: el,
-      anchor: 'bottom',
-      offset: [0, -40] // Position higher above the user location marker
+      anchor: 'center',
+      offset: [0, -50] // Position higher above the user location marker
     })
       .setLngLat([lng, lat])
       .addTo(map.current);
