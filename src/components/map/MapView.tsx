@@ -332,18 +332,18 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     const bubble = document.createElement('div');
     bubble.style.cssText = `
       position: relative;
-      background: linear-gradient(135deg, hsl(250 100% 65%), hsl(250 100% 55%));
-      padding: 14px 28px;
-      border-radius: 50px;
-      box-shadow: 0 6px 20px hsla(250, 100%, 65%, 0.5);
+      background: linear-gradient(to bottom, hsl(250 100% 65%), hsl(250 80% 75%));
+      padding: 12px 24px;
+      border-radius: 16px;
+      box-shadow: 0 6px 20px hsla(250, 100%, 65%, 0.4);
       font-size: 14px;
       font-weight: 600;
       color: white;
       white-space: nowrap;
-      max-width: 280px;
+      max-width: 250px;
       overflow: visible;
       text-overflow: ellipsis;
-      border: 3px solid hsl(250 100% 75%);
+      border: 2px solid hsla(250, 100%, 80%, 0.3);
     `;
     bubble.textContent = searchQuery || 'Search Location';
     
@@ -351,14 +351,14 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     const pointer = document.createElement('div');
     pointer.style.cssText = `
       position: absolute;
-      bottom: -20px;
+      bottom: -18px;
       left: 50%;
       transform: translateX(-50%);
       width: 0;
       height: 0;
-      border-left: 20px solid transparent;
-      border-right: 20px solid transparent;
-      border-top: 20px solid hsl(250 100% 55%);
+      border-left: 18px solid transparent;
+      border-right: 18px solid transparent;
+      border-top: 18px solid hsl(250 80% 75%);
       filter: drop-shadow(0 4px 6px hsla(250, 100%, 65%, 0.3));
       z-index: -1;
     `;
