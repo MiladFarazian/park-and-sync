@@ -326,24 +326,25 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       cursor: pointer;
       overflow: visible;
       position: relative;
+      display: flex;
+      justify-content: center;
     `;
     
     // Create speech bubble with triangle pointer
     const bubble = document.createElement('div');
     bubble.style.cssText = `
       position: relative;
-      background: linear-gradient(to bottom, hsl(250 100% 65%), hsl(250 80% 75%));
+      background: linear-gradient(to bottom, #6A5CFF, #C5B9FF);
       padding: 12px 24px;
-      border-radius: 16px;
-      box-shadow: 0 6px 20px hsla(250, 100%, 65%, 0.4);
+      border-radius: 16px 16px 0 0;
+      box-shadow: 0 6px 20px rgba(106, 92, 255, 0.4);
       font-size: 14px;
       font-weight: 600;
       color: white;
       white-space: nowrap;
       max-width: 250px;
-      overflow: visible;
+      overflow: hidden;
       text-overflow: ellipsis;
-      border: 2px solid hsla(250, 100%, 80%, 0.3);
     `;
     const label = document.createElement('div');
     label.style.cssText = `
@@ -368,8 +369,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       height: 0;
       border-left: 18px solid transparent;
       border-right: 18px solid transparent;
-      border-top: 18px solid hsl(250 80% 75%);
-      filter: drop-shadow(0 4px 6px hsla(250, 100%, 65%, 0.3));
+      border-top: 18px solid #C5B9FF;
+      filter: drop-shadow(0 4px 6px rgba(106, 92, 255, 0.3));
       z-index: 0;
     `;
     
