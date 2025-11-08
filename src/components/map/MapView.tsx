@@ -335,7 +335,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     bubble.style.cssText = `
       position: relative;
       background: linear-gradient(to bottom, #6A5CFF, #C5B9FF);
-      padding: 12px 24px;
+      padding: 12px 32px;
       border-radius: 16px 16px 0 0;
       box-shadow: 0 6px 20px rgba(106, 92, 255, 0.4);
       font-size: 14px;
@@ -349,7 +349,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     const label = document.createElement('div');
     label.style.cssText = `
       display: inline-block;
-      max-width: 250px;
+      max-width: 240px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -362,7 +362,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     const pointer = document.createElement('div');
     pointer.style.cssText = `
       position: absolute;
-      bottom: -18px;
+      bottom: -36px;
       left: 50%;
       transform: translateX(-50%);
       width: 0;
@@ -374,8 +374,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       z-index: 0;
     `;
     
-    bubble.appendChild(pointer);
     el.appendChild(bubble);
+    el.appendChild(pointer);
 
     // Determine target position: prefer currentLocation when available
     const targetLng = currentLocation?.lng ?? lng;
