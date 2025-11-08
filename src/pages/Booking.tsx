@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle } from 'lucide-react';
+import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle, Loader2 } from 'lucide-react';
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -39,6 +40,9 @@ const Booking = () => {
   const [isOwnSpot, setIsOwnSpot] = useState(false);
   const [availabilityRules, setAvailabilityRules] = useState<any[]>([]);
   const [availabilityDisplay, setAvailabilityDisplay] = useState<string>('');
+  const [serverAvailable, setServerAvailable] = useState<{ ok: boolean; reason?: string }>({ ok: true });
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const channelRef = useRef<RealtimeChannel | null>(null);
   
   // Get times from URL params or use defaults (1 hour from now + 2 hours duration)
   const getInitialTimes = () => {
@@ -192,6 +196,146 @@ const Booking = () => {
     fetchData();
   }, [spotId, navigate, toast]);
 
+  // Real-time availability polling
+  useEffect(() => {
+    let cancelled = false;
+    let intervalId: number | null = null;
+
+    async function checkAvailability() {
+      if (!spotId || !startDateTime || !endDateTime) {
+        setServerAvailable({ ok: true });
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      setCheckingAvailability(true);
+      console.log('Checking spot availability...', { spotId, start: startDateTime.toISOString(), end: endDateTime.toISOString() });
+
+      try {
+        const { data, error } = await supabase.rpc('check_spot_availability', {
+          p_spot_id: spotId,
+          p_start_at: startDateTime.toISOString(),
+          p_end_at: endDateTime.toISOString(),
+          p_exclude_user_id: user.id
+        });
+
+        if (cancelled) return;
+
+        if (error) {
+          console.warn('Availability check error:', error);
+          setServerAvailable({ ok: false, reason: 'Unable to verify availability right now' });
+        } else {
+          const isAvailable = !!data;
+          console.log('Availability check result:', isAvailable);
+          setServerAvailable({ 
+            ok: isAvailable, 
+            reason: isAvailable ? undefined : 'Another booking or hold conflicts with your selected time'
+          });
+        }
+      } catch (err) {
+        console.error('Availability check exception:', err);
+        if (!cancelled) {
+          setServerAvailable({ ok: false, reason: 'Error checking availability' });
+        }
+      } finally {
+        if (!cancelled) {
+          setCheckingAvailability(false);
+        }
+      }
+    }
+
+    // Initial check
+    checkAvailability();
+
+    // Poll every 2.5 seconds
+    intervalId = window.setInterval(checkAvailability, 2500);
+
+    // Check when tab becomes visible
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        checkAvailability();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [spotId, startDateTime, endDateTime]);
+
+  // Broadcast channel for instant conflict detection
+  useEffect(() => {
+    if (!spotId || !startDateTime || !endDateTime) return;
+
+    const setupChannel = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      console.log('Setting up broadcast channel for spot:', spotId);
+      const channel = supabase
+        .channel(`spot:${spotId}`, { 
+          config: { broadcast: { ack: false } } 
+        })
+        .on('broadcast', { event: 'hold_created' }, (payload) => {
+          console.log('Received hold_created broadcast:', payload);
+          const { userId, start_at, end_at } = payload.payload;
+          
+          // Ignore our own broadcasts
+          if (userId === user.id) return;
+
+          // Check if the broadcast overlaps with our selection
+          const broadcastStart = new Date(start_at);
+          const broadcastEnd = new Date(end_at);
+          const hasOverlap = startDateTime < broadcastEnd && endDateTime > broadcastStart;
+
+          if (hasOverlap) {
+            console.log('Detected overlapping hold from another user');
+            setServerAvailable({ 
+              ok: false, 
+              reason: 'Another user just reserved this time slot'
+            });
+          }
+        })
+        .on('broadcast', { event: 'booking_created' }, (payload) => {
+          console.log('Received booking_created broadcast:', payload);
+          const { userId, start_at, end_at } = payload.payload;
+          
+          // Ignore our own broadcasts
+          if (userId === user.id) return;
+
+          // Check if the broadcast overlaps with our selection
+          const broadcastStart = new Date(start_at);
+          const broadcastEnd = new Date(end_at);
+          const hasOverlap = startDateTime < broadcastEnd && endDateTime > broadcastStart;
+
+          if (hasOverlap) {
+            console.log('Detected overlapping booking from another user');
+            setServerAvailable({ 
+              ok: false, 
+              reason: 'Another user just booked this time slot'
+            });
+          }
+        })
+        .subscribe();
+
+      channelRef.current = channel;
+    };
+
+    setupChannel();
+
+    return () => {
+      console.log('Cleaning up broadcast channel');
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [spotId, startDateTime, endDateTime]);
+
   const calculateTotal = () => {
     if (!startDateTime || !endDateTime || !spot) {
       console.log('Missing dates:', { startDateTime, endDateTime, spot });
@@ -340,6 +484,21 @@ const Booking = () => {
 
       if (holdError) throw holdError;
 
+      // Broadcast hold creation for instant feedback to other users
+      if (holdData?.hold_id && channelRef.current) {
+        console.log('Broadcasting hold_created event');
+        channelRef.current.send({
+          type: 'broadcast',
+          event: 'hold_created',
+          payload: {
+            spotId,
+            userId: user.id,
+            start_at: startAt.toISOString(),
+            end_at: endAt.toISOString()
+          }
+        });
+      }
+
       // Create the booking
       const { data: bookingData, error: bookingError } = await supabase.functions.invoke('create-booking', {
         body: {
@@ -351,6 +510,21 @@ const Booking = () => {
       });
 
       if (bookingError) throw bookingError;
+
+      // Broadcast booking creation for instant feedback to other users
+      if (channelRef.current) {
+        console.log('Broadcasting booking_created event');
+        channelRef.current.send({
+          type: 'broadcast',
+          event: 'booking_created',
+          payload: {
+            spotId,
+            userId: user.id,
+            start_at: startAt.toISOString(),
+            end_at: endAt.toISOString()
+          }
+        });
+      }
 
       toast({
         title: "Booking created!",
@@ -825,17 +999,43 @@ const Booking = () => {
 
         {/* Book Now Button */}
         <div className="space-y-2 pb-6">
+          {!serverAvailable.ok && startDateTime && endDateTime && (
+            <div className="mb-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+              <p className="text-sm text-destructive font-medium">
+                {serverAvailable.reason || 'This time slot is no longer available'}
+              </p>
+            </div>
+          )}
+          
           <Button
             className="w-full h-14 text-lg"
             size="lg"
             onClick={handleBooking}
-            disabled={!startDateTime || !endDateTime || !pricing || !selectedVehicle || !selectedPaymentMethod || bookingLoading || isOwnSpot || !isTimeValid}
+            disabled={!startDateTime || !endDateTime || !pricing || !selectedVehicle || !selectedPaymentMethod || bookingLoading || isOwnSpot || !isTimeValid || !serverAvailable.ok || checkingAvailability}
           >
-            {bookingLoading ? 'Processing...' : `Book Now • $${pricing?.total || '0.00'}`}
+            {bookingLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : checkingAvailability ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Checking availability...
+              </>
+            ) : (
+              `Book Now • $${pricing?.total || '0.00'}`
+            )}
           </Button>
+          
           {!isTimeValid && startDateTime && endDateTime && availabilityRules.length > 0 && (
             <p className="text-center text-xs text-destructive">
               Selected times are outside available hours
+            </p>
+          )}
+          {!serverAvailable.ok && startDateTime && endDateTime && (
+            <p className="text-center text-xs text-destructive">
+              {serverAvailable.reason}
             </p>
           )}
           {(!selectedVehicle || !selectedPaymentMethod) && (
