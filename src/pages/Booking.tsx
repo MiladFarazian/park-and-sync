@@ -123,7 +123,14 @@ const Booking = () => {
 
         if (rulesData) {
           setAvailabilityRules(rulesData);
-          // Format availability display
+          // Format availability display with AM/PM
+          const formatTimeToAMPM = (time: string) => {
+            const [hours, minutes] = time.split(':').map(Number);
+            const period = hours >= 12 ? 'PM' : 'AM';
+            const displayHours = hours % 12 || 12;
+            return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+          };
+
           if (rulesData.length === 0) {
             setAvailabilityDisplay('No schedule set');
           } else if (rulesData.length === 7) {
@@ -131,8 +138,10 @@ const Booking = () => {
             if (is247) {
               setAvailabilityDisplay('Available 24/7');
             } else {
-              // Show time range
-              const times = [...new Set(rulesData.map(r => `${r.start_time.slice(0, 5)} - ${r.end_time.slice(0, 5)}`))];
+              // Show time range in AM/PM format
+              const times = [...new Set(rulesData.map(r => 
+                `${formatTimeToAMPM(r.start_time)} - ${formatTimeToAMPM(r.end_time)}`
+              ))];
               setAvailabilityDisplay(times.length === 1 ? times[0] : 'Varied hours');
             }
           } else {
@@ -463,23 +472,6 @@ const Booking = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-lg">Parking Time</h3>
-          </div>
-          
-          {/* Availability Hours Display */}
-          {availabilityDisplay && (
-            <div className="mb-4 p-3 bg-muted rounded-lg">
-              <div className="flex items-center gap-2 text-sm">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">Available hours:</span>
-                <span className="text-muted-foreground">{availabilityDisplay}</span>
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between mb-3">
-            <div className="invisible">
-              <h3 className="font-bold text-lg">Parking Time</h3>
-            </div>
             <Dialog open={editTimeOpen} onOpenChange={setEditTimeOpen}>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="icon">
@@ -609,6 +601,18 @@ const Booking = () => {
               </DialogContent>
             </Dialog>
           </div>
+          
+          {/* Availability Hours Display */}
+          {availabilityDisplay && (
+            <div className="mb-4 p-3 bg-muted rounded-lg">
+              <div className="flex items-center gap-2 text-sm">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">Available hours:</span>
+                <span className="text-muted-foreground">{availabilityDisplay}</span>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <div className="flex items-start gap-2 text-sm">
               <CalendarIcon className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
