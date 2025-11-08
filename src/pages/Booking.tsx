@@ -37,6 +37,8 @@ const Booking = () => {
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [isOwnSpot, setIsOwnSpot] = useState(false);
+  const [availabilityRules, setAvailabilityRules] = useState<any[]>([]);
+  const [availabilityDisplay, setAvailabilityDisplay] = useState<string>('');
   
   // Get times from URL params or use defaults (1 hour from now + 2 hours duration)
   const getInitialTimes = () => {
@@ -110,6 +112,35 @@ const Booking = () => {
 
         setSpot(spotData);
         setHost(spotData.profiles);
+
+        // Fetch availability rules for the spot
+        const { data: rulesData } = await supabase
+          .from('availability_rules')
+          .select('*')
+          .eq('spot_id', spotId)
+          .eq('is_available', true)
+          .order('day_of_week');
+
+        if (rulesData) {
+          setAvailabilityRules(rulesData);
+          // Format availability display
+          if (rulesData.length === 0) {
+            setAvailabilityDisplay('No schedule set');
+          } else if (rulesData.length === 7) {
+            const is247 = rulesData.every(r => r.start_time === '00:00:00' && r.end_time === '23:59:00');
+            if (is247) {
+              setAvailabilityDisplay('Available 24/7');
+            } else {
+              // Show time range
+              const times = [...new Set(rulesData.map(r => `${r.start_time.slice(0, 5)} - ${r.end_time.slice(0, 5)}`))];
+              setAvailabilityDisplay(times.length === 1 ? times[0] : 'Varied hours');
+            }
+          } else {
+            const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const availableDays = [...new Set(rulesData.map(r => r.day_of_week))].sort((a, b) => a - b);
+            setAvailabilityDisplay(availableDays.map(d => DAYS[d]).join(', '));
+          }
+        }
 
         // Fetch user's vehicles and payment methods
         const { data: { user } } = await supabase.auth.getUser();
@@ -185,6 +216,51 @@ const Booking = () => {
     };
   };
 
+  const validateAvailability = (start: Date, end: Date): { valid: boolean; message?: string } => {
+    if (availabilityRules.length === 0) {
+      return { valid: false, message: "This spot has no availability schedule set" };
+    }
+
+    // Check each hour of the booking
+    const current = new Date(start);
+    while (current < end) {
+      const dayOfWeek = current.getDay();
+      const timeStr = current.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+      
+      // Find rules for this day
+      const dayRules = availabilityRules.filter(r => r.day_of_week === dayOfWeek);
+      
+      if (dayRules.length === 0) {
+        const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        return { 
+          valid: false, 
+          message: `This spot is not available on ${DAYS[dayOfWeek]}s` 
+        };
+      }
+
+      // Check if time falls within any available window
+      const isWithinWindow = dayRules.some(rule => {
+        return timeStr >= rule.start_time.slice(0, 5) && timeStr <= rule.end_time.slice(0, 5);
+      });
+
+      if (!isWithinWindow) {
+        const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const availableWindows = dayRules.map(r => 
+          `${r.start_time.slice(0, 5)} - ${r.end_time.slice(0, 5)}`
+        ).join(', ');
+        return { 
+          valid: false, 
+          message: `Selected time on ${DAYS[dayOfWeek]} (${timeStr}) is outside available hours: ${availableWindows}` 
+        };
+      }
+
+      // Move to next hour
+      current.setHours(current.getHours() + 1);
+    }
+
+    return { valid: true };
+  };
+
   const handleBooking = async () => {
     if (!startDateTime || !endDateTime) {
       toast({
@@ -200,6 +276,17 @@ const Booking = () => {
       toast({
         title: "Invalid time range",
         description: "End time must be after start time",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate availability
+    const availabilityCheck = validateAvailability(startDateTime, endDateTime);
+    if (!availabilityCheck.valid) {
+      toast({
+        title: "Time not available",
+        description: availabilityCheck.message,
         variant: "destructive",
       });
       return;
@@ -376,6 +463,23 @@ const Booking = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-lg">Parking Time</h3>
+          </div>
+          
+          {/* Availability Hours Display */}
+          {availabilityDisplay && (
+            <div className="mb-4 p-3 bg-muted rounded-lg">
+              <div className="flex items-center gap-2 text-sm">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">Available hours:</span>
+                <span className="text-muted-foreground">{availabilityDisplay}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between mb-3">
+            <div className="invisible">
+              <h3 className="font-bold text-lg">Parking Time</h3>
+            </div>
             <Dialog open={editTimeOpen} onOpenChange={setEditTimeOpen}>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="icon">
