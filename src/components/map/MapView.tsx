@@ -320,72 +320,75 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       searchMarkerRef.current.remove();
     }
 
-    // Create custom HTML marker element - speech bubble style
+    // Create custom HTML marker element - centered wrapper
     const el = document.createElement('div');
     el.style.cssText = `
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
       cursor: pointer;
-      overflow: visible;
-      position: relative;
-      display: flex;
-      justify-content: center;
     `;
     
-    // Create speech bubble with triangle pointer
+    // Create wrapper for bubble + pointer (properly positioned above marker)
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = `
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    `;
+    
+    // Create speech bubble with rounded corners
     const bubble = document.createElement('div');
     bubble.style.cssText = `
       position: relative;
       background: linear-gradient(to bottom, #6A5CFF, #C5B9FF);
-      padding: 12px 32px;
-      border-radius: 16px 16px 0 0;
+      padding: 10px 28px;
+      border-radius: 16px;
       box-shadow: 0 6px 20px rgba(106, 92, 255, 0.4);
       font-size: 14px;
-      font-weight: 600;
+      font-weight: 700;
       color: white;
       white-space: nowrap;
-      max-width: 250px;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      text-align: center;
+      overflow: visible;
     `;
+    
     const label = document.createElement('div');
     label.style.cssText = `
-      display: inline-block;
-      max-width: 240px;
+      max-width: 220px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      vertical-align: top;
     `;
     label.textContent = searchQuery || 'Search Location';
     bubble.appendChild(label);
     
-    // Create downward triangle pointer
+    // Create downward triangle pointer (sibling of bubble)
     const pointer = document.createElement('div');
     pointer.style.cssText = `
-      position: absolute;
-      bottom: -36px;
-      left: 50%;
-      transform: translateX(-50%);
       width: 0;
       height: 0;
-      border-left: 18px solid transparent;
-      border-right: 18px solid transparent;
-      border-top: 18px solid #C5B9FF;
-      filter: drop-shadow(0 4px 6px rgba(106, 92, 255, 0.3));
-      z-index: 0;
+      border-left: 12px solid transparent;
+      border-right: 12px solid transparent;
+      border-top: 12px solid #C5B9FF;
+      margin-top: -1px;
+      filter: drop-shadow(0 2px 4px rgba(106, 92, 255, 0.3));
     `;
     
-    el.appendChild(bubble);
-    el.appendChild(pointer);
+    wrapper.appendChild(bubble);
+    wrapper.appendChild(pointer);
+    el.appendChild(wrapper);
 
     // Determine target position: prefer currentLocation when available
     const targetLng = currentLocation?.lng ?? lng;
     const targetLat = currentLocation?.lat ?? lat;
 
-    // Create and add the marker (positioned higher to avoid overlapping user location)
+    // Create and add the marker (positioned so triangle tip touches top of current location circle)
     searchMarkerRef.current = new mapboxgl.Marker({
       element: el,
       anchor: 'bottom',
-      offset: [0, -20]
+      offset: [0, -15]
     })
       .setLngLat([targetLng, targetLat])
       .addTo(map.current);
