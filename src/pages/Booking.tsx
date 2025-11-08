@@ -371,6 +371,15 @@ const Booking = () => {
     }
   };
 
+  // Check if selected times are within available hours - must be before early returns
+  const isTimeValid = useMemo(() => {
+    if (!startDateTime || !endDateTime || availabilityRules.length === 0) {
+      return false;
+    }
+    const check = validateAvailability(startDateTime, endDateTime);
+    return check.valid;
+  }, [startDateTime, endDateTime, availabilityRules]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -384,16 +393,6 @@ const Booking = () => {
   }
 
   const pricing = calculateTotal();
-
-  // Check if selected times are within available hours
-  const isTimeValid = useMemo(() => {
-    if (!startDateTime || !endDateTime || availabilityRules.length === 0) {
-      return false;
-    }
-    const check = validateAvailability(startDateTime, endDateTime);
-    return check.valid;
-  }, [startDateTime, endDateTime, availabilityRules]);
-
   const primaryPhoto = spot?.spot_photos?.find((p: any) => p.is_primary)?.url || spot?.spot_photos?.[0]?.url;
   const hostName = host ? `${host.first_name || ''} ${host.last_name || ''}`.trim() : 'Host';
   const hostInitial = hostName.charAt(0).toUpperCase();
