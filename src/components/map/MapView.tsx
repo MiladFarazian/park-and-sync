@@ -323,16 +323,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     // Create custom HTML marker element - centered wrapper
     const el = document.createElement('div');
     el.style.cssText = `
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
       cursor: pointer;
-    `;
-    
-    // Create wrapper for bubble + pointer (properly positioned above marker)
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = `
-      position: relative;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -376,9 +367,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       filter: drop-shadow(0 2px 4px rgba(106, 92, 255, 0.3));
     `;
     
-    wrapper.appendChild(bubble);
-    wrapper.appendChild(pointer);
-    el.appendChild(wrapper);
+    el.appendChild(bubble);
+    el.appendChild(pointer);
 
     // Determine target position: prefer currentLocation when available
     const targetLng = currentLocation?.lng ?? lng;
