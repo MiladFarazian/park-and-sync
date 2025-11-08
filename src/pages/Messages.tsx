@@ -311,8 +311,22 @@ function ChatPane({
             <AvatarFallback>{displayName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
           </Avatar>
           <div>
-            <p className="font-semibold">{displayName}</p>
-            <p className="text-sm text-muted-foreground">Active</p>
+            <p className="font-semibold flex items-center gap-2">
+              {displayName}
+              {conversationId === '00000000-0000-0000-0000-000000000001' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  Support
+                </span>
+              )}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {conversationId === '00000000-0000-0000-0000-000000000001' 
+                ? "We'll respond within 24 hours" 
+                : "Active"}
+            </p>
           </div>
         </div>
       </div>
@@ -466,6 +480,17 @@ const Messages = () => {
 
   const fetchNewUserProfile = async (userId: string) => {
     try {
+      // Special handling for support user
+      if (userId === '00000000-0000-0000-0000-000000000001') {
+        setNewUserProfile({
+          user_id: userId,
+          first_name: 'Parkway',
+          last_name: 'Support',
+          avatar_url: '/parkway-logo.png',
+        });
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('user_id, first_name, last_name, avatar_url')
@@ -514,6 +539,19 @@ const Messages = () => {
       <Card className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col`}>
         <div className="p-4 border-b">
           <h1 className="text-2xl font-bold mb-4">Messages</h1>
+          
+          {/* Contact Support Button */}
+          <Button 
+            onClick={() => setSearchParams({ userId: '00000000-0000-0000-0000-000000000001' }, { replace: true })}
+            variant="outline"
+            className="w-full mb-4 justify-start gap-2 border-primary/20 hover:bg-primary/5"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            Contact Support
+          </Button>
+          
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input

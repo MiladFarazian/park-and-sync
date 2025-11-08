@@ -29,3 +29,6 @@ verify_jwt = true
 
 [functions.extend-booking]
 verify_jwt = true
+
+[functions.forward-support-messages]
+verify_jwt = false
