@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -384,6 +384,15 @@ const Booking = () => {
   }
 
   const pricing = calculateTotal();
+
+  // Check if selected times are within available hours
+  const isTimeValid = useMemo(() => {
+    if (!startDateTime || !endDateTime || availabilityRules.length === 0) {
+      return false;
+    }
+    const check = validateAvailability(startDateTime, endDateTime);
+    return check.valid;
+  }, [startDateTime, endDateTime, availabilityRules]);
 
   const primaryPhoto = spot?.spot_photos?.find((p: any) => p.is_primary)?.url || spot?.spot_photos?.[0]?.url;
   const hostName = host ? `${host.first_name || ''} ${host.last_name || ''}`.trim() : 'Host';
@@ -821,13 +830,25 @@ const Booking = () => {
             className="w-full h-14 text-lg"
             size="lg"
             onClick={handleBooking}
-            disabled={!startDateTime || !endDateTime || !pricing || !selectedVehicle || !selectedPaymentMethod || bookingLoading || isOwnSpot}
+            disabled={!startDateTime || !endDateTime || !pricing || !selectedVehicle || !selectedPaymentMethod || bookingLoading || isOwnSpot || !isTimeValid}
           >
             {bookingLoading ? 'Processing...' : `Book Now • $${pricing?.total || '0.00'}`}
           </Button>
-          <p className="text-center text-xs text-muted-foreground">
-            You won't be charged until your booking is confirmed
-          </p>
+          {!isTimeValid && startDateTime && endDateTime && availabilityRules.length > 0 && (
+            <p className="text-center text-xs text-destructive">
+              Selected times are outside available hours
+            </p>
+          )}
+          {(!selectedVehicle || !selectedPaymentMethod) && (
+            <p className="text-center text-xs text-muted-foreground">
+              Please add a vehicle and payment method to continue
+            </p>
+          )}
+          {!(!isTimeValid && startDateTime && endDateTime && availabilityRules.length > 0) && (!selectedVehicle || !selectedPaymentMethod) === false && (
+            <p className="text-center text-xs text-muted-foreground">
+              You won't be charged until your booking is confirmed
+            </p>
+          )}
         </div>
       </div>
     </div>
