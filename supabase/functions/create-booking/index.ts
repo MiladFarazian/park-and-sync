@@ -167,16 +167,16 @@ serve(async (req) => {
     // Get host and renter profiles for notifications and emails
     const { data: hostProfile } = await supabase
       .from('profiles')
-      .select('first_name')
+      .select('first_name, email')
       .eq('user_id', spot.host_id)
       .single();
 
-    // Get host's auth email
-    const { data: { user: hostUser } } = await supabase.auth.admin.getUserById(spot.host_id);
+    // Get host's auth email using service role client
+    const { data: { user: hostUser } } = await supabaseAdmin.auth.admin.getUserById(spot.host_id);
 
     const { data: renterProfile } = await supabase
       .from('profiles')
-      .select('first_name')
+      .select('first_name, email')
       .eq('user_id', userData.user.id)
       .single();
 
@@ -202,11 +202,16 @@ serve(async (req) => {
 
       // Send confirmation emails
       try {
+        const hostEmail = hostUser?.email || hostProfile?.email || '';
+        const driverEmail = userData.user.email || renterProfile?.email || '';
+        
+        console.log('Sending confirmation emails to:', { hostEmail, driverEmail });
+        
         await supabase.functions.invoke('send-booking-confirmation', {
           body: {
-            hostEmail: hostUser?.email || '',
+            hostEmail,
             hostName: hostProfile?.first_name || 'Host',
-            driverEmail: userData.user.email || '',
+            driverEmail,
             driverName: renterProfile?.first_name || 'Driver',
             spotTitle: spot.title,
             spotAddress: spot.address,

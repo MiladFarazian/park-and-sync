@@ -9,9 +9,9 @@ const corsHeaders = {
 };
 
 interface BookingConfirmationRequest {
-  hostEmail: string;
+  hostEmail?: string;
   hostName: string;
-  driverEmail: string;
+  driverEmail?: string;
   driverName: string;
   spotTitle: string;
   spotAddress: string;
@@ -47,10 +47,15 @@ const handler = async (req: Request): Promise<Response> => {
     const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
     const bookingUrl = `https://mqbupmusmciijsjmzbcu.supabase.co/activity`;
 
-    // Send email to host
-    const hostEmailResponse = await resend.emails.send({
-      from: "Parkway <onboarding@resend.dev>",
-      to: [hostEmail],
+    const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'Parkway <onboarding@resend.dev>';
+    let hostEmailId: string | undefined;
+    let driverEmailId: string | undefined;
+
+    // Send email to host only if valid email exists
+    if (hostEmail && hostEmail.includes('@')) {
+      const hostEmailResponse = await resend.emails.send({
+        from: fromEmail,
+        to: [hostEmail],
       subject: "🎉 New Booking Received!",
       html: `
         <!DOCTYPE html>
@@ -159,14 +164,19 @@ const handler = async (req: Request): Promise<Response> => {
           </body>
         </html>
       `,
-    });
+      });
 
-    console.log("Host email sent:", hostEmailResponse);
+      hostEmailId = hostEmailResponse.data?.id;
+      console.log("Host email sent:", hostEmailResponse);
+    } else {
+      console.log("Skipping host email: no valid recipient. Email provided:", hostEmail);
+    }
 
-    // Send email to driver
-    const driverEmailResponse = await resend.emails.send({
-      from: "Parkway <onboarding@resend.dev>",
-      to: [driverEmail],
+    // Send email to driver only if valid email exists
+    if (driverEmail && driverEmail.includes('@')) {
+      const driverEmailResponse = await resend.emails.send({
+        from: fromEmail,
+        to: [driverEmail],
       subject: "✅ Booking Confirmed!",
       html: `
         <!DOCTYPE html>
@@ -289,15 +299,23 @@ const handler = async (req: Request): Promise<Response> => {
           </body>
         </html>
       `,
-    });
+      });
 
-    console.log("Driver email sent:", driverEmailResponse);
+      driverEmailId = driverEmailResponse.data?.id;
+      console.log("Driver email sent:", driverEmailResponse);
+    } else {
+      console.log("Skipping driver email: no valid recipient. Email provided:", driverEmail);
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        hostEmailId: hostEmailResponse.data?.id,
-        driverEmailId: driverEmailResponse.data?.id,
+        hostEmailId,
+        driverEmailId,
+        emailsSent: {
+          host: !!hostEmailId,
+          driver: !!driverEmailId
+        }
       }),
       {
         status: 200,
