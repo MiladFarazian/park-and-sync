@@ -47,12 +47,13 @@ serve(async (req) => {
     // Clean up expired holds first
     await supabase.rpc('cleanup_expired_holds');
 
-    // Check if spot is available
+    // Check if spot is available (exclude own holds for retry resilience)
     const { data: isAvailable, error: availabilityError } = await supabase
       .rpc('check_spot_availability', {
         p_spot_id: spot_id,
         p_start_at: start_at,
-        p_end_at: end_at
+        p_end_at: end_at,
+        p_exclude_user_id: userData.user.id
       });
 
     if (availabilityError) throw availabilityError;

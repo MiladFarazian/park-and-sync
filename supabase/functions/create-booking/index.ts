@@ -60,6 +60,59 @@ serve(async (req) => {
 
     console.log('Creating booking:', { spot_id, start_at, end_at, user_id: userData.user.id });
 
+    // Re-check availability before proceeding
+    console.log('Re-checking spot availability...');
+    const { data: isAvailable, error: availabilityError } = await supabase.rpc('check_spot_availability', {
+      p_spot_id: spot_id,
+      p_start_at: start_at,
+      p_end_at: end_at,
+      p_exclude_user_id: userData.user.id
+    });
+
+    if (availabilityError) {
+      console.error('Availability check error:', availabilityError);
+      throw availabilityError;
+    }
+
+    if (!isAvailable) {
+      console.error('Spot is not available:', { spot_id, start_at, end_at });
+      return new Response(JSON.stringify({ 
+        error: 'Spot is not available for the requested time' 
+      }), {
+        status: 409,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Require a valid non-expired hold from this user for exact time window
+    console.log('Verifying booking hold...');
+    const { data: hold, error: holdError } = await supabase
+      .from('booking_holds')
+      .select('id, start_at, end_at, expires_at')
+      .eq('spot_id', spot_id)
+      .eq('user_id', userData.user.id)
+      .eq('start_at', start_at)
+      .eq('end_at', end_at)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle();
+
+    if (holdError) {
+      console.error('Hold verification error:', holdError);
+      throw holdError;
+    }
+
+    if (!hold) {
+      console.error('Missing or expired booking hold:', { spot_id, user_id: userData.user.id, start_at, end_at });
+      return new Response(JSON.stringify({ 
+        error: 'Missing or expired booking hold for this time window. Please try booking again.' 
+      }), {
+        status: 409,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('Valid hold found:', hold.id);
+
     // Get spot details for pricing
     const { data: spot, error: spotError } = await supabase
       .from('spots')
