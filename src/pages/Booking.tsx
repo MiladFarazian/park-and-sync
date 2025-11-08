@@ -196,10 +196,9 @@ const Booking = () => {
     fetchData();
   }, [spotId, navigate, toast]);
 
-  // Real-time availability polling
+  // Check availability only when dates change
   useEffect(() => {
     let cancelled = false;
-    let intervalId: number | null = null;
 
     async function checkAvailability() {
       if (!spotId || !startDateTime || !endDateTime) {
@@ -246,24 +245,11 @@ const Booking = () => {
       }
     }
 
-    // Initial check
+    // Check only when dates change
     checkAvailability();
-
-    // Poll every 2.5 seconds
-    intervalId = window.setInterval(checkAvailability, 2500);
-
-    // Check when tab becomes visible
-    const onVisibilityChange = () => {
-      if (!document.hidden) {
-        checkAvailability();
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
       cancelled = true;
-      if (intervalId) clearInterval(intervalId);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [spotId, startDateTime, endDateTime]);
 
