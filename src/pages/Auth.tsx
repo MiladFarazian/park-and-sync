@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { ArrowLeft, Car } from 'lucide-react';
+import parkzyLogo from '@/assets/parkzy-logo.png';
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -59,12 +60,7 @@ const Auth = () => {
           <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Car className="h-5 w-5 text-white" />
-            </div>
-            <h1 className="text-xl font-bold text-primary">Parkway</h1>
-          </div>
+          <img src={parkzyLogo} alt="Parkzy" className="h-8" />
         </div>
 
         <Card>
