@@ -5,7 +5,7 @@ import { AppSidebar } from './AppSidebar';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import parkwayLogo from '@/assets/parkway-logo.png';
+import parkzyLogo from '@/assets/parkzy-logo.png';
 import ModeSwitcher from './ModeSwitcher';
 import ModeLoadingOverlay from './ModeLoadingOverlay';
 import { NotificationBell } from './NotificationBell';
@@ -30,7 +30,7 @@ const AppLayout = ({
               {!isProfilePage && <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
                   <div className="flex items-center gap-4">
                     <SidebarTrigger />
-                    <img src={parkwayLogo} alt="Parkway" className="h-8" />
+                    <img src={parkzyLogo} alt="Parkzy" className="h-8" />
                     <ModeSwitcher />
                   </div>
                   <div className="flex items-center gap-2">
@@ -52,7 +52,7 @@ const AppLayout = ({
       <div className="md:hidden">
         {!isProfilePage && <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
             <div className="flex items-center gap-3">
-              <img src={parkwayLogo} alt="Parkway" className="h-8" />
+              <img src={parkzyLogo} alt="Parkzy" className="h-8" />
               <ModeSwitcher />
             </div>
             <div className="flex items-center gap-2">
