@@ -1,4 +1,4 @@
-import { Home, Compass, Plus, Activity, User } from 'lucide-react';
+import { Home, Calendar, MessageCircle, User, List } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import {
   Sidebar,
@@ -11,17 +11,29 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-
-const menuItems = [
-  { title: 'Home', url: '/', icon: Home },
-  { title: 'Explore', url: '/explore', icon: Compass },
-  { title: 'My Listings', url: '/dashboard', icon: Plus },
-  { title: 'Activity', url: '/activity', icon: Activity },
-  { title: 'Profile', url: '/profile', icon: User },
-];
+import { useMode } from '@/contexts/ModeContext';
+import { useMessages } from '@/hooks/useMessages';
+import { Badge } from '@/components/ui/badge';
 
 export function AppSidebar() {
   const { open } = useSidebar();
+  const { mode } = useMode();
+  const { totalUnreadCount } = useMessages();
+
+  const menuItems = mode === 'host' 
+    ? [
+        { title: 'Home', url: '/host-home', icon: Home },
+        { title: 'Listings', url: '/dashboard', icon: List },
+        { title: 'Reservations', url: '/activity', icon: Calendar },
+        { title: 'Messages', url: '/messages', icon: MessageCircle, showBadge: true },
+        { title: 'Account', url: '/profile', icon: User },
+      ]
+    : [
+        { title: 'Home', url: '/', icon: Home },
+        { title: 'Reservations', url: '/activity', icon: Calendar },
+        { title: 'Messages', url: '/messages', icon: MessageCircle, showBadge: true },
+        { title: 'Account', url: '/profile', icon: User },
+      ];
 
   return (
     <Sidebar collapsible="icon">
@@ -42,7 +54,17 @@ export function AppSidebar() {
                           : 'hover:bg-muted/50'
                       }
                     >
-                      <item.icon className="h-5 w-5" />
+                      <div className="relative">
+                        <item.icon className="h-5 w-5" />
+                        {item.showBadge && totalUnreadCount > 0 && (
+                          <Badge 
+                            variant="destructive" 
+                            className="absolute -top-2 -right-2 h-4 w-4 p-0 flex items-center justify-center text-[10px]"
+                          >
+                            {totalUnreadCount > 9 ? '9+' : totalUnreadCount}
+                          </Badge>
+                        )}
+                      </div>
                       {open && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
