@@ -10,7 +10,7 @@ import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
 
 const HostHome = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [stats, setStats] = useState({
     totalEarnings: 0,
     totalBookings: 0,
@@ -21,8 +21,10 @@ const HostHome = () => {
   useEffect(() => {
     if (user) {
       fetchHostStats();
+    } else if (!authLoading) {
+      setLoading(false);
     }
-  }, [user]);
+  }, [user, authLoading]);
 
   const fetchHostStats = async () => {
     try {
@@ -76,6 +78,36 @@ const HostHome = () => {
       setLoading(false);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="p-4 space-y-6">
+        <div className="pt-4">
+          <h1 className="text-2xl font-bold">Host Dashboard</h1>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="p-4 space-y-6 pb-20">
+        <div className="pt-4">
+          <h1 className="text-2xl font-bold">Host Dashboard</h1>
+          <p className="text-muted-foreground">You need to be logged in to access this page</p>
+        </div>
+        <Card className="p-6">
+          <div className="space-y-4 text-center">
+            <p className="text-muted-foreground">Please sign in to view your host dashboard and manage your listings.</p>
+            <Button onClick={() => navigate('/auth')}>
+              Sign In / Sign Up
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
