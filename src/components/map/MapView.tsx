@@ -333,7 +333,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     const bubble = document.createElement('div');
     bubble.style.cssText = `
       position: relative;
-      background: linear-gradient(to bottom, #6A5CFF, #C5B9FF);
+      background: hsl(250, 100%, 65%);
       padding: 10px 28px;
       border-radius: 16px;
       box-shadow: 0 6px 20px rgba(106, 92, 255, 0.4);
@@ -362,7 +362,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       height: 0;
       border-left: 12px solid transparent;
       border-right: 12px solid transparent;
-      border-top: 12px solid #C5B9FF;
+      border-top: 12px solid hsl(250, 100%, 65%);
       margin-top: -1px;
       filter: drop-shadow(0 2px 4px rgba(106, 92, 255, 0.3));
     `;
