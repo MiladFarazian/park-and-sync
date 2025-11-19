@@ -122,6 +122,17 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       zoom: 14 // Start at neighborhood zoom level
     });
 
+    // Enable smooth transitions for hover effects
+    map.current.once('styledata', () => {
+      if (map.current) {
+        const styleSpec = map.current.getStyle();
+        if (styleSpec && styleSpec.transition) {
+          styleSpec.transition.duration = 300; // 300ms transitions
+          styleSpec.transition.delay = 0;
+        }
+      }
+    });
+
     // Don't add navigation controls to avoid overlap with search bar
 
     // Mark map as ready when loaded
@@ -479,6 +490,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         }
         return {
           type: 'Feature',
+          id: spot.id, // Add id at feature level for feature-state to work
           properties: { id: spot.id, title: spot.title, price: `$${spot.hourlyRate}` },
           geometry: { type: 'Point', coordinates: [lng, lat] as [number, number] },
         } as any;
@@ -501,7 +513,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       data,
       cluster: true,
       clusterMaxZoom: 16, // Max zoom to cluster points on
-      clusterRadius: 50 // Radius of each cluster when clustering points
+      clusterRadius: 50, // Radius of each cluster when clustering points
+      generateId: false // Use the id we provide on each feature
     } as any);
 
     const pinImageId = 'pin-blue';
@@ -561,9 +574,23 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         filter: ['!', ['has', 'point_count']],
         layout: {
           'icon-image': pinImageId,
-          'icon-size': 1.5,
+          'icon-size': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            1.8,  // 20% larger on hover
+            1.5
+          ],
           'icon-allow-overlap': true,
           'icon-anchor': 'bottom'
+        },
+        paint: {
+          'icon-opacity': [
+            'interpolate',
+            ['linear'],
+            ['case', ['boolean', ['feature-state', 'hover'], false], 1, 0],
+            0, 0.85,
+            1, 1
+          ]
         }
       } as any);
 
@@ -575,7 +602,12 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         filter: ['!', ['has', 'point_count']],
         layout: {
           'text-field': ['get', 'price'],
-          'text-size': 11,
+          'text-size': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            12,  // Slightly larger on hover
+            11
+          ],
           'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
           'text-allow-overlap': true,
           'text-offset': [0, -2.8]
@@ -583,9 +615,19 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         paint: {
           'text-color': 'hsl(250, 100%, 65%)',
           'text-halo-color': '#ffffff',
-          'text-halo-width': 0.5
+          'text-halo-width': 0.5,
+          'text-opacity': [
+            'interpolate',
+            ['linear'],
+            ['case', ['boolean', ['feature-state', 'hover'], false], 1, 0],
+            0, 0.9,
+            1, 1
+          ]
         }
       } as any);
+
+      // Track hover state for smooth animations
+      let hoveredSpotId: string | null = null;
 
       // Handle cluster clicks - zoom in
       (map.current as any).on('click', 'clusters', (e: any) => {
@@ -615,18 +657,70 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       (map.current as any).on('click', circleId, onClick);
       (map.current as any).on('click', labelId, onClick);
 
-      // Change cursor on hover
+      // Change cursor on hover for clusters
       (map.current as any).on('mouseenter', 'clusters', () => {
         (map.current as any).getCanvas().style.cursor = 'pointer';
       });
       (map.current as any).on('mouseleave', 'clusters', () => {
         (map.current as any).getCanvas().style.cursor = '';
       });
-      (map.current as any).on('mouseenter', circleId, () => {
+
+      // Smooth hover animations for individual spots
+      (map.current as any).on('mouseenter', circleId, (e: any) => {
         (map.current as any).getCanvas().style.cursor = 'pointer';
+        if (e.features && e.features.length > 0) {
+          const feature = e.features[0];
+          if (hoveredSpotId !== null) {
+            (map.current as any).setFeatureState(
+              { source: sourceId, id: hoveredSpotId },
+              { hover: false }
+            );
+          }
+          hoveredSpotId = feature.properties.id;
+          (map.current as any).setFeatureState(
+            { source: sourceId, id: hoveredSpotId },
+            { hover: true }
+          );
+        }
       });
       (map.current as any).on('mouseleave', circleId, () => {
         (map.current as any).getCanvas().style.cursor = '';
+        if (hoveredSpotId !== null) {
+          (map.current as any).setFeatureState(
+            { source: sourceId, id: hoveredSpotId },
+            { hover: false }
+          );
+          hoveredSpotId = null;
+        }
+      });
+
+      // Also handle hover for price labels
+      (map.current as any).on('mouseenter', labelId, (e: any) => {
+        (map.current as any).getCanvas().style.cursor = 'pointer';
+        if (e.features && e.features.length > 0) {
+          const feature = e.features[0];
+          if (hoveredSpotId !== null) {
+            (map.current as any).setFeatureState(
+              { source: sourceId, id: hoveredSpotId },
+              { hover: false }
+            );
+          }
+          hoveredSpotId = feature.properties.id;
+          (map.current as any).setFeatureState(
+            { source: sourceId, id: hoveredSpotId },
+            { hover: true }
+          );
+        }
+      });
+      (map.current as any).on('mouseleave', labelId, () => {
+        (map.current as any).getCanvas().style.cursor = '';
+        if (hoveredSpotId !== null) {
+          (map.current as any).setFeatureState(
+            { source: sourceId, id: hoveredSpotId },
+            { hover: false }
+          );
+          hoveredSpotId = null;
+        }
       });
 
       // Trigger visible spots count update after rendering
