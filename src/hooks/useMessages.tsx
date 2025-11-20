@@ -26,15 +26,14 @@ export interface Message {
 }
 
 // Helper to format message preview
-const getMessagePreview = (msg: Message, currentUserId: string): string => {
+const getMessagePreview = (msg: Message, currentUserId: string, senderName?: string): string => {
   const isMe = msg.sender_id === currentUserId;
-  const senderName = isMe ? 'You' : '';
   
   if (msg.media_url && msg.media_type) {
     if (msg.media_type.startsWith('image/')) {
-      return isMe ? 'You sent a photo' : 'sent a photo';
+      return isMe ? 'You sent a photo' : `${senderName || 'They'} sent a photo`;
     } else if (msg.media_type.startsWith('video/')) {
-      return isMe ? 'You sent a video' : 'sent a video';
+      return isMe ? 'You sent a video' : `${senderName || 'They'} sent a video`;
     }
   }
   
@@ -110,13 +109,20 @@ export const useMessages = () => {
         const convs: Conversation[] = [];
         for (const [partnerId, conv] of conversationMap) {
           const profile = profiles?.find(p => p.user_id === partnerId);
+          const profileName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown User' : 'Unknown User';
+          
+          // Find the last message for this conversation to get proper preview
+          const lastMsg = conv.messages.sort((a: Message, b: Message) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )[0];
+          
           // Create completely new object to force React re-render
           convs.push({
             id: partnerId,
             user_id: partnerId,
-            name: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown User' : 'Unknown User',
+            name: profileName,
             avatar_url: profile?.avatar_url,
-            last_message: conv.last_message,
+            last_message: getMessagePreview(lastMsg, user.id, profileName),
             last_message_at: conv.last_message_at,
             unread_count: conv.unread_count
           });
@@ -194,7 +200,7 @@ export const useMessages = () => {
         user_id: partnerId,
         name: existing?.name || 'Unknown User',
         avatar_url: existing?.avatar_url,
-        last_message: isNewer ? getMessagePreview(msg, user.id) : (existing?.last_message || getMessagePreview(msg, user.id)),
+        last_message: isNewer ? getMessagePreview(msg, user.id, existing?.name) : (existing?.last_message || getMessagePreview(msg, user.id, existing?.name)),
         last_message_at: isNewer ? msg.created_at : (existing ? existing.last_message_at : msg.created_at),
         unread_count: unread,
       };
