@@ -73,6 +73,7 @@ const ListSpot = () => {
   const [addressCoordinates, setAddressCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [isValidatingAddress, setIsValidatingAddress] = useState(false);
   const [addressValidationError, setAddressValidationError] = useState<string>('');
+  const [addressConfirmedFromSuggestion, setAddressConfirmedFromSuggestion] = useState(false);
   const sessionTokenRef = useRef<string>(crypto.randomUUID());
 
   useEffect(() => {
@@ -213,6 +214,7 @@ const ListSpot = () => {
     setValue('address', value);
     setAddressCoordinates(null);
     setAddressValidationError('');
+    setAddressConfirmedFromSuggestion(false); // Reset confirmation on manual edit
     
     if (value.length >= 3) {
       setShowSuggestions(true);
@@ -243,6 +245,7 @@ const ListSpot = () => {
         setValue('address', fullAddress);
         setAddressCoordinates({ lat, lng });
         setAddressValidationError(''); // Clear any validation errors
+        setAddressConfirmedFromSuggestion(true); // Mark as confirmed from suggestion
         setShowSuggestions(false);
         setAddressSuggestions([]);
         
@@ -259,72 +262,21 @@ const ListSpot = () => {
   };
 
   const validateAddressBeforeSubmit = async (address: string): Promise<{ lat: number; lng: number } | null> => {
-    // If we already have coordinates from suggestion selection, use those
-    if (addressCoordinates) {
-      console.log('[ListSpot] Using previously selected coordinates');
-      return addressCoordinates;
-    }
-
-    if (!mapboxToken) {
-      console.error('[ListSpot] Mapbox token not available');
-      setAddressValidationError('Unable to validate address. Please try again.');
-      return null;
-    }
-
-    // Validate manually entered address using geocoding
     try {
       setIsValidatingAddress(true);
-      const encodedAddress = encodeURIComponent(address.trim());
       
-      // Use the geocoding API with bias towards SoCal and strict LA County bounds
-      const losAngelesCoords = '-118.2437,34.0522';
-      const laCountyBbox = '-118.9448,33.7037,-117.6462,34.3373'; // LA County geographic bounds
-      
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?` +
-        `access_token=${mapboxToken}` +
-        `&proximity=${losAngelesCoords}` +
-        `&bbox=${laCountyBbox}` +
-        `&types=address,poi,place` +
-        `&country=US` +
-        `&limit=1`
-      );
-      
-      if (!response.ok) {
-        setAddressValidationError('Unable to validate address. Please check and try again.');
-        return null;
-      }
-      
-      const data = await response.json();
-      
-      if (data.features && data.features.length > 0) {
-        const feature = data.features[0];
-        const relevance = feature.relevance || 0;
-
-        // Reject low-confidence matches (fuzzy/poor matches)
-        if (relevance < 0.8) {
-          setAddressValidationError(
-            'Could not verify this exact address. Please select from the suggested addresses below or enter a more specific address.'
-          );
-          return null;
-        }
-
-        const [lng, lat] = feature.center;
-        
-        console.log('[ListSpot] Address validated:', { address, lat, lng, relevance });
-        
-        // DO NOT update the form field - keep user's original input
-        // Only set coordinates if validation passes
-        setAddressCoordinates({ lat, lng });
+      // Only accept addresses that were explicitly selected from suggestions
+      if (addressCoordinates && addressConfirmedFromSuggestion) {
+        console.log('[ListSpot] Address confirmed from suggestion:', addressCoordinates);
         setAddressValidationError('');
-        
-        return { lat, lng };
-      } else {
-        setAddressValidationError(
-          'Address not found in the Los Angeles area. Please check the spelling or select from the suggested addresses below.'
-        );
-        return null;
+        return addressCoordinates;
       }
+      
+      // Reject any free-typed addresses that weren't selected from dropdown
+      setAddressValidationError(
+        'Please select a valid address from the suggestions dropdown. Manual entries are not allowed.'
+      );
+      return null;
     } catch (error) {
       console.error('[ListSpot] Error validating address:', error);
       setAddressValidationError('Unable to validate address. Please select from the suggested addresses below.');
@@ -460,10 +412,13 @@ const ListSpot = () => {
       return formData.title && 
              formData.address && 
              formData.hourlyRate && 
+             !!addressCoordinates &&
+             addressConfirmedFromSuggestion &&
              !errors.title && 
              !errors.address && 
              !errors.hourlyRate &&
-             !addressValidationError;
+             !addressValidationError &&
+             !isValidatingAddress;
     }
     if (currentStep === 2) {
       return formData.description && formData.description.length >= 20 && 
@@ -473,25 +428,28 @@ const ListSpot = () => {
   };
 
   const handleStep1Next = async () => {
-    // Validate address before proceeding to step 2
-    if (!formData.address || formData.address.trim().length < 5) {
-      setAddressValidationError('Please enter a valid address');
-      toast.error('Please enter a valid address');
+    const address = formData.address?.trim();
+    if (!address) {
+      setAddressValidationError('Please enter an address');
       return;
     }
 
-    // If we don't have coordinates yet (manually typed address), validate it
-    if (!addressCoordinates) {
-      const coordinates = await validateAddressBeforeSubmit(formData.address);
-      if (!coordinates) {
-        // Error message already set by validateAddressBeforeSubmit
-        toast.error(addressValidationError || 'Please enter a valid address or select from suggestions');
-        return;
-      }
+    if (!addressCoordinates || !addressConfirmedFromSuggestion) {
+      setAddressValidationError('Please select a valid address from the suggestions dropdown.');
+      toast.error('Address Not Confirmed', {
+        description: 'Please select an address from the dropdown suggestions',
+      });
+      return;
     }
 
-    // Address is valid, proceed to step 2
-    setCurrentStep(2);
+    const coords = await validateAddressBeforeSubmit(address);
+    if (coords) {
+      setCurrentStep(2);
+    } else {
+      toast.error('Invalid Address', {
+        description: addressValidationError || 'Please select a valid address from the suggestions',
+      });
+    }
   };
 
   return (
@@ -596,14 +554,18 @@ const ListSpot = () => {
                       </div>
                     )}
                     
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Start typing and select an address from the dropdown. Manual entries without selecting a suggestion are not allowed.
+                    </p>
+                    
                     {errors.address && (
                       <p className="text-sm text-destructive mt-1">{errors.address.message}</p>
                     )}
                     {addressValidationError && (
                       <p className="text-sm text-destructive mt-1">{addressValidationError}</p>
                     )}
-                    {addressCoordinates && !addressValidationError && (
-                      <p className="text-sm text-green-600 dark:text-green-400 mt-1">✓ Address validated</p>
+                    {addressCoordinates && addressConfirmedFromSuggestion && !addressValidationError && (
+                      <p className="text-sm text-green-600 dark:text-green-400 mt-1">✓ Address confirmed</p>
                     )}
                   </div>
 
