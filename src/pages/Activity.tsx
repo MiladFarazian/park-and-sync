@@ -3,82 +3,81 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Calendar, DollarSign, XCircle, MessageCircle } from 'lucide-react';
+import { MapPin, Clock, Calendar, XCircle, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMode } from '@/contexts/ModeContext';
 import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 const Activity = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const { mode } = useMode();
+  const {
+    toast
+  } = useToast();
+  const {
+    mode
+  } = useMode();
   const [activeTab, setActiveTab] = useState('upcoming');
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [cancelling, setCancelling] = useState(false);
-
   useEffect(() => {
     fetchBookings();
   }, [mode]);
-
   const fetchBookings = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: {
+          user
+        }
+      } = await supabase.auth.getUser();
       if (!user) return;
-
       let bookingsData: any[] = [];
-
       if (mode === 'driver') {
         // Driver mode: only show bookings where user is the renter
-        const { data: renterBookings, error: renterError } = await supabase
-          .from('bookings')
-          .select(`
+        const {
+          data: renterBookings,
+          error: renterError
+        } = await supabase.from('bookings').select(`
             *,
             spots (
               title,
               address,
               host_id
             )
-          `)
-          .eq('renter_id', user.id)
-          .order('start_at', { ascending: false });
-
+          `).eq('renter_id', user.id).order('start_at', {
+          ascending: false
+        });
         if (renterError) throw renterError;
-        bookingsData = (renterBookings || []).map(b => ({ ...b, userRole: 'renter' }));
+        bookingsData = (renterBookings || []).map(b => ({
+          ...b,
+          userRole: 'renter'
+        }));
       } else {
         // Host mode: only show bookings for user's spots
-        const { data: hostBookings, error: hostError } = await supabase
-          .from('bookings')
-          .select(`
+        const {
+          data: hostBookings,
+          error: hostError
+        } = await supabase.from('bookings').select(`
             *,
             spots!inner (
               title,
               address,
               host_id
             )
-          `)
-          .eq('spots.host_id', user.id)
-          .order('start_at', { ascending: false });
-
+          `).eq('spots.host_id', user.id).order('start_at', {
+          ascending: false
+        });
         if (hostError) throw hostError;
-        bookingsData = (hostBookings || []).map(b => ({ ...b, userRole: 'host' }));
+        bookingsData = (hostBookings || []).map(b => ({
+          ...b,
+          userRole: 'host'
+        }));
       }
-
       setBookings(bookingsData);
     } catch (error) {
       console.error('Error fetching bookings:', error);
@@ -91,59 +90,63 @@ const Activity = () => {
       setLoading(false);
     }
   };
-
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
+    return new Date(date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
     });
   };
-
   const formatTime = (start: string, end: string) => {
-    const startTime = new Date(start).toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
-      minute: '2-digit' 
+    const startTime = new Date(start).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit'
     });
-    const endTime = new Date(end).toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
-      minute: '2-digit' 
+    const endTime = new Date(end).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit'
     });
     return `${startTime} - ${endTime}`;
   };
-
   const getCancellationPolicy = (booking: any) => {
     const now = new Date();
     const bookingStart = new Date(booking.start_at);
     const bookingCreated = new Date(booking.created_at);
     const gracePeriodEnd = new Date(bookingCreated.getTime() + 10 * 60 * 1000);
     const oneHourBeforeStart = new Date(bookingStart.getTime() - 60 * 60 * 1000);
-
     if (now <= gracePeriodEnd) {
-      return { refundable: true, message: 'Full refund - within 10-minute grace period' };
+      return {
+        refundable: true,
+        message: 'Full refund - within 10-minute grace period'
+      };
     } else if (now <= oneHourBeforeStart) {
-      return { refundable: true, message: 'Full refund - more than 1 hour before start time' };
+      return {
+        refundable: true,
+        message: 'Full refund - more than 1 hour before start time'
+      };
     } else {
-      return { refundable: false, message: 'No refund - less than 1 hour before start time' };
+      return {
+        refundable: false,
+        message: 'No refund - less than 1 hour before start time'
+      };
     }
   };
-
   const handleCancelBooking = async () => {
     if (!selectedBooking) return;
-
     setCancelling(true);
     try {
-      const { data, error } = await supabase.functions.invoke('cancel-booking', {
-        body: { bookingId: selectedBooking.id }
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('cancel-booking', {
+        body: {
+          bookingId: selectedBooking.id
+        }
       });
-
       if (error) throw error;
-
       toast({
         title: "Booking cancelled",
-        description: data.refundAmount > 0 
-          ? `Refund of $${data.refundAmount.toFixed(2)} will be processed within 5-10 business days`
-          : data.refundReason,
+        description: data.refundAmount > 0 ? `Refund of $${data.refundAmount.toFixed(2)} will be processed within 5-10 business days` : data.refundReason
       });
 
       // Refresh bookings
@@ -161,17 +164,19 @@ const Activity = () => {
       setCancelling(false);
     }
   };
-
   const now = new Date();
   const upcomingBookings = bookings.filter(b => new Date(b.end_at) >= now && b.status !== 'canceled');
   const pastBookings = bookings.filter(b => new Date(b.end_at) < now || b.status === 'canceled');
-
-  const BookingCard = ({ booking, isPast = false }: { booking: any; isPast?: boolean }) => {
+  const BookingCard = ({
+    booking,
+    isPast = false
+  }: {
+    booking: any;
+    isPast?: boolean;
+  }) => {
     const isHost = booking.userRole === 'host';
     const otherPartyId = isHost ? booking.renter_id : booking.spots?.host_id;
-
-    return (
-      <Card>
+    return <Card>
         <CardContent className="p-4">
           <div className="flex justify-between items-start mb-3">
             <div>
@@ -185,7 +190,7 @@ const Activity = () => {
               </p>
             </div>
             <Badge variant={isPast ? 'secondary' : 'default'}>
-              {booking.status === 'canceled' ? 'Canceled' : (booking.status === 'paid' ? (isPast ? 'Completed' : 'Confirmed') : booking.status)}
+              {booking.status === 'canceled' ? 'Canceled' : booking.status === 'paid' ? isPast ? 'Completed' : 'Confirmed' : booking.status}
             </Badge>
           </div>
           
@@ -202,44 +207,30 @@ const Activity = () => {
 
           <div className="mt-3 pt-3 border-t flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-muted-foreground" />
+              
               <span className="font-semibold text-lg">${Number(booking.total_amount).toFixed(2)}</span>
             </div>
           </div>
         </CardContent>
         <div className="p-4 pt-0 flex gap-2">
           <Button variant="outline" className="flex-1" onClick={() => navigate(`/booking-confirmation/${booking.id}`)}>View Details</Button>
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={() => {
-              if (otherPartyId) {
-                navigate(`/messages?userId=${otherPartyId}`);
-              }
-            }}
-            disabled={!otherPartyId}
-          >
+          <Button variant="outline" size="icon" onClick={() => {
+          if (otherPartyId) {
+            navigate(`/messages?userId=${otherPartyId}`);
+          }
+        }} disabled={!otherPartyId}>
             <MessageCircle className="h-4 w-4" />
           </Button>
-          {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && (
-            <Button 
-              variant="destructive" 
-              size="icon"
-              onClick={() => {
-                setSelectedBooking(booking);
-                setCancelDialogOpen(true);
-              }}
-            >
+          {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && <Button variant="destructive" size="icon" onClick={() => {
+          setSelectedBooking(booking);
+          setCancelDialogOpen(true);
+        }}>
               <XCircle className="h-4 w-4" />
-            </Button>
-          )}
+            </Button>}
         </div>
-      </Card>
-    );
+      </Card>;
   };
-
-  return (
-    <div className="bg-background">
+  return <div className="bg-background">
       <div className="p-4 space-y-4">
         <div>
           <h1 className="text-2xl font-bold">{mode === 'host' ? 'Reservations' : 'My Bookings'}</h1>
@@ -258,59 +249,40 @@ const Activity = () => {
           </TabsList>
           
           <TabsContent value="upcoming" className="space-y-3 mt-4">
-            {loading ? (
-              <div className="space-y-3">
-                {[1, 2].map((i) => (
-                  <Card key={i}>
+            {loading ? <div className="space-y-3">
+                {[1, 2].map(i => <Card key={i}>
                     <CardContent className="p-4">
                       <Skeleton className="h-20 w-full" />
                     </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : upcomingBookings.length === 0 ? (
-              <Card>
+                  </Card>)}
+              </div> : upcomingBookings.length === 0 ? <Card>
                 <CardContent className="p-8 text-center">
                   <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                   <h3 className="font-semibold mb-2">
                     {mode === 'host' ? 'No upcoming reservations' : 'No upcoming bookings'}
                   </h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    {mode === 'host' 
-                      ? 'Reservations for your spots will appear here' 
-                      : 'Start exploring parking spots near you'}
+                    {mode === 'host' ? 'Reservations for your spots will appear here' : 'Start exploring parking spots near you'}
                   </p>
-                  {mode === 'driver' && (
-                    <Button onClick={() => {
-                      const now = new Date();
-                      const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-                      navigate(`/explore?start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
-                    }}>
+                  {mode === 'driver' && <Button onClick={() => {
+                const now = new Date();
+                const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+                navigate(`/explore?start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
+              }}>
                       Find Parking
-                    </Button>
-                  )}
+                    </Button>}
                 </CardContent>
-              </Card>
-            ) : (
-              upcomingBookings.map((booking) => (
-                <BookingCard key={booking.id} booking={booking} isPast={false} />
-              ))
-            )}
+              </Card> : upcomingBookings.map(booking => <BookingCard key={booking.id} booking={booking} isPast={false} />)}
           </TabsContent>
           
           <TabsContent value="past" className="space-y-3 mt-4">
-            {loading ? (
-              <div className="space-y-3">
-                {[1, 2].map((i) => (
-                  <Card key={i}>
+            {loading ? <div className="space-y-3">
+                {[1, 2].map(i => <Card key={i}>
                     <CardContent className="p-4">
                       <Skeleton className="h-20 w-full" />
                     </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : pastBookings.length === 0 ? (
-              <Card>
+                  </Card>)}
+              </div> : pastBookings.length === 0 ? <Card>
                 <CardContent className="p-8 text-center">
                   <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                   <h3 className="font-semibold mb-2">No past bookings</h3>
@@ -318,12 +290,7 @@ const Activity = () => {
                     Your completed bookings will appear here
                   </p>
                 </CardContent>
-              </Card>
-            ) : (
-              pastBookings.map((booking) => (
-                <BookingCard key={booking.id} booking={booking} isPast={true} />
-              ))
-            )}
+              </Card> : pastBookings.map(booking => <BookingCard key={booking.id} booking={booking} isPast={true} />)}
           </TabsContent>
         </Tabs>
       </div>
@@ -335,8 +302,7 @@ const Activity = () => {
             <AlertDialogTitle>Cancel Booking?</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <p>Are you sure you want to cancel this booking?</p>
-              {selectedBooking && (
-                <div className="mt-4 p-3 bg-muted rounded-lg">
+              {selectedBooking && <div className="mt-4 p-3 bg-muted rounded-lg">
                   <p className="font-semibold text-foreground">{selectedBooking.spots?.title}</p>
                   <p className="text-sm mt-1">{formatDate(selectedBooking.start_at)}</p>
                   <p className="text-sm">{formatTime(selectedBooking.start_at, selectedBooking.end_at)}</p>
@@ -345,24 +311,17 @@ const Activity = () => {
                       {getCancellationPolicy(selectedBooking).message}
                     </p>
                   </div>
-                </div>
-              )}
+                </div>}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={cancelling}>Keep Booking</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleCancelBooking}
-              disabled={cancelling}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
+            <AlertDialogAction onClick={handleCancelBooking} disabled={cancelling} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {cancelling ? 'Cancelling...' : 'Cancel Booking'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
-  );
+    </div>;
 };
-
 export default Activity;
