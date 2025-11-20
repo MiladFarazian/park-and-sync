@@ -8,23 +8,18 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { differenceInHours, format } from 'date-fns';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 const BookingConfirmation = () => {
-  const { bookingId } = useParams<{ bookingId: string }>();
+  const {
+    bookingId
+  } = useParams<{
+    bookingId: string;
+  }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
   const [booking, setBooking] = useState<any>(null);
   const [spot, setSpot] = useState<any>(null);
   const [host, setHost] = useState<any>(null);
@@ -33,16 +28,15 @@ const BookingConfirmation = () => {
   const [cancelling, setCancelling] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [directionsDialogOpen, setDirectionsDialogOpen] = useState(false);
-
   useEffect(() => {
     const fetchBookingDetails = async () => {
       if (!bookingId) return;
-      
       try {
         // Fetch booking with related data
-        const { data: bookingData, error: bookingError } = await supabase
-          .from('bookings')
-          .select(`
+        const {
+          data: bookingData,
+          error: bookingError
+        } = await supabase.from('bookings').select(`
             *,
             spots (
               *,
@@ -59,12 +53,8 @@ const BookingConfirmation = () => {
             vehicles (
               *
             )
-          `)
-          .eq('id', bookingId)
-          .single();
-
+          `).eq('id', bookingId).single();
         if (bookingError) throw bookingError;
-
         setBooking(bookingData);
         setSpot(bookingData.spots);
         setHost(bookingData.spots.profiles);
@@ -74,22 +64,23 @@ const BookingConfirmation = () => {
         toast({
           title: "Error",
           description: "Failed to load booking details",
-          variant: "destructive",
+          variant: "destructive"
         });
         navigate('/');
       } finally {
         setLoading(false);
       }
     };
-
     fetchBookingDetails();
   }, [bookingId, navigate, toast]);
-
   const handleContactHost = async () => {
     if (!host) return;
-
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: {
+          user
+        }
+      } = await supabase.auth.getUser();
       if (!user) {
         navigate('/auth');
         return;
@@ -102,88 +93,84 @@ const BookingConfirmation = () => {
       toast({
         title: "Error",
         description: "Failed to open messages",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const handleDirections = () => {
     setDirectionsDialogOpen(true);
   };
-
   const openMapApp = (app: 'google' | 'apple' | 'waze') => {
     if (!spot?.address) return;
-
     const encodedAddress = encodeURIComponent(spot.address);
     const coords = spot.latitude && spot.longitude ? `${spot.latitude},${spot.longitude}` : '';
-    
     let url = '';
-    
     switch (app) {
       case 'google':
         // Google Maps works on all platforms
-        url = coords 
-          ? `https://www.google.com/maps/dir/?api=1&destination=${coords}`
-          : `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+        url = coords ? `https://www.google.com/maps/dir/?api=1&destination=${coords}` : `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
         break;
       case 'apple':
         // Apple Maps
-        url = coords
-          ? `http://maps.apple.com/?daddr=${coords}`
-          : `http://maps.apple.com/?q=${encodedAddress}`;
+        url = coords ? `http://maps.apple.com/?daddr=${coords}` : `http://maps.apple.com/?q=${encodedAddress}`;
         break;
       case 'waze':
         // Waze
-        url = coords
-          ? `https://waze.com/ul?ll=${coords}&navigate=yes`
-          : `https://waze.com/ul?q=${encodedAddress}&navigate=yes`;
+        url = coords ? `https://waze.com/ul?ll=${coords}&navigate=yes` : `https://waze.com/ul?q=${encodedAddress}&navigate=yes`;
         break;
     }
-    
     window.open(url, '_blank');
     setDirectionsDialogOpen(false);
   };
-
   const getCancellationPolicy = () => {
-    if (!booking) return { refundable: false, message: '' };
-    
+    if (!booking) return {
+      refundable: false,
+      message: ''
+    };
     const now = new Date();
     const bookingStart = new Date(booking.start_at);
     const bookingCreated = new Date(booking.created_at);
     const gracePeriodEnd = new Date(bookingCreated.getTime() + 10 * 60 * 1000);
     const oneHourBeforeStart = new Date(bookingStart.getTime() - 60 * 60 * 1000);
-
     if (now <= gracePeriodEnd) {
-      return { refundable: true, message: 'Full refund - within 10-minute grace period' };
+      return {
+        refundable: true,
+        message: 'Full refund - within 10-minute grace period'
+      };
     } else if (now <= oneHourBeforeStart) {
-      return { refundable: true, message: 'Full refund - more than 1 hour before start time' };
+      return {
+        refundable: true,
+        message: 'Full refund - more than 1 hour before start time'
+      };
     } else {
-      return { refundable: false, message: 'No refund - less than 1 hour before start time' };
+      return {
+        refundable: false,
+        message: 'No refund - less than 1 hour before start time'
+      };
     }
   };
-
   const handleCancelBooking = async () => {
     if (!booking) return;
-
     setCancelling(true);
     try {
-      const { data, error } = await supabase.functions.invoke('cancel-booking', {
-        body: { bookingId: booking.id }
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('cancel-booking', {
+        body: {
+          bookingId: booking.id
+        }
       });
-
       if (error) throw error;
-
       toast({
         title: "Booking cancelled",
-        description: data.refundAmount > 0 
-          ? `Refund of $${data.refundAmount.toFixed(2)} will be processed within 5-10 business days`
-          : data.refundReason,
+        description: data.refundAmount > 0 ? `Refund of $${data.refundAmount.toFixed(2)} will be processed within 5-10 business days` : data.refundReason
       });
 
       // Refresh booking details
-      const { data: updatedBooking } = await supabase
-        .from('bookings')
-        .select(`
+      const {
+        data: updatedBooking
+      } = await supabase.from('bookings').select(`
           *,
           spots (
             *,
@@ -200,14 +187,10 @@ const BookingConfirmation = () => {
           vehicles (
             *
           )
-        `)
-        .eq('id', bookingId)
-        .single();
-
+        `).eq('id', bookingId).single();
       if (updatedBooking) {
         setBooking(updatedBooking);
       }
-
       setCancelDialogOpen(false);
     } catch (error) {
       console.error('Error cancelling booking:', error);
@@ -220,36 +203,25 @@ const BookingConfirmation = () => {
       setCancelling(false);
     }
   };
-
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
+    return <div className="flex items-center justify-center py-20">
         <div className="text-muted-foreground">Loading...</div>
-      </div>
-    );
+      </div>;
   }
-
   if (!booking || !spot) {
     return null;
   }
-
   const duration = differenceInHours(new Date(booking.end_at), new Date(booking.start_at));
   const primaryPhoto = spot?.spot_photos?.find((p: any) => p.is_primary)?.url || spot?.spot_photos?.[0]?.url;
   const hostName = host ? `${host.first_name || ''} ${host.last_name || ''}`.trim() : 'Host';
   const hostInitial = hostName.charAt(0).toUpperCase();
   const bookingNumber = `#PK-${new Date(booking.created_at).getFullYear()}-${booking.id.slice(0, 3).toUpperCase()}`;
-
-  return (
-    <div className="bg-background">
+  return <div className="bg-background">
       {/* Header */}
       <div className="border-b bg-card sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/')}
-            >
+            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-xl font-bold">Booking Confirmed</h1>
@@ -295,13 +267,7 @@ const BookingConfirmation = () => {
         <Card className="p-4">
           <h3 className="font-bold mb-4">Parking Spot</h3>
           <div className="flex gap-4">
-            {primaryPhoto && (
-              <img 
-                src={primaryPhoto} 
-                alt={spot.title}
-                className="w-20 h-20 rounded-lg object-cover"
-              />
-            )}
+            {primaryPhoto && <img src={primaryPhoto} alt={spot.title} className="w-20 h-20 rounded-lg object-cover" />}
             <div className="flex-1">
               <h4 className="font-semibold mb-1">{spot.title}</h4>
               <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
@@ -314,11 +280,7 @@ const BookingConfirmation = () => {
               </div>
             </div>
           </div>
-          <Button 
-            variant="outline" 
-            className="w-full mt-4"
-            onClick={handleDirections}
-          >
+          <Button variant="outline" className="w-full mt-4" onClick={handleDirections}>
             <Navigation className="h-4 w-4 mr-2" />
             Get Directions
           </Button>
@@ -337,11 +299,7 @@ const BookingConfirmation = () => {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="space-y-2 py-4">
-              <Button
-                variant="outline"
-                className="w-full justify-start h-auto py-3"
-                onClick={() => openMapApp('google')}
-              >
+              <Button variant="outline" className="w-full justify-start h-auto py-3" onClick={() => openMapApp('google')}>
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded bg-blue-500 flex items-center justify-center text-white text-xl">
                     🗺️
@@ -352,11 +310,7 @@ const BookingConfirmation = () => {
                   </div>
                 </div>
               </Button>
-              <Button
-                variant="outline"
-                className="w-full justify-start h-auto py-3"
-                onClick={() => openMapApp('apple')}
-              >
+              <Button variant="outline" className="w-full justify-start h-auto py-3" onClick={() => openMapApp('apple')}>
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xl">
                     🍎
@@ -367,11 +321,7 @@ const BookingConfirmation = () => {
                   </div>
                 </div>
               </Button>
-              <Button
-                variant="outline"
-                className="w-full justify-start h-auto py-3"
-                onClick={() => openMapApp('waze')}
-              >
+              <Button variant="outline" className="w-full justify-start h-auto py-3" onClick={() => openMapApp('waze')}>
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded bg-sky-400 flex items-center justify-center text-white text-xl">
                     🚗
@@ -390,8 +340,7 @@ const BookingConfirmation = () => {
         </AlertDialog>
 
         {/* Vehicle Info Card */}
-        {vehicle && (
-          <Card className="p-4">
+        {vehicle && <Card className="p-4">
             <h3 className="font-bold mb-4">Vehicle</h3>
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -402,8 +351,7 @@ const BookingConfirmation = () => {
                 <div className="text-sm text-muted-foreground">{vehicle.license_plate}</div>
               </div>
             </div>
-          </Card>
-        )}
+          </Card>}
 
         {/* Host Info Card */}
         <Card className="p-4">
@@ -430,59 +378,21 @@ const BookingConfirmation = () => {
         </Card>
 
         {/* Ad Placeholder - Future geolocation-based ads */}
-        <Card className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border-amber-200 dark:border-amber-800">
-          <div className="flex items-center gap-4">
-            <div className="h-16 w-16 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center flex-shrink-0">
-              <span className="text-2xl">🍔</span>
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h4 className="font-bold text-foreground">Tony's Burgers</h4>
-                <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded">Sponsored</span>
-              </div>
-              <div className="flex items-center gap-1 text-sm mb-1">
-                <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                <span className="font-semibold">4.6</span>
-                <span className="text-muted-foreground">(324 reviews)</span>
-              </div>
-              <p className="text-sm text-muted-foreground">Gourmet burgers & craft shakes • 2 blocks away</p>
-              <div className="mt-2 inline-block bg-green-500 text-white text-xs font-semibold px-2 py-1 rounded">
-                20% OFF with code PARKWAY
-              </div>
-            </div>
-          </div>
-          <Button variant="outline" className="w-full mt-4 bg-white dark:bg-background hover:bg-amber-50 dark:hover:bg-amber-950/30 border-amber-300 dark:border-amber-700">
-            View Menu & Order
-          </Button>
-        </Card>
+        
 
         {/* Action Buttons */}
         <div className="space-y-3 pt-2">
-          <Button 
-            className="w-full" 
-            size="lg"
-            onClick={() => navigate('/activity')}
-          >
+          <Button className="w-full" size="lg" onClick={() => navigate('/activity')}>
             View My Bookings
           </Button>
-          <Button 
-            variant="outline" 
-            className="w-full" 
-            size="lg"
-            onClick={() => navigate('/')}
-          >
+          <Button variant="outline" className="w-full" size="lg" onClick={() => navigate('/')}>
             Find More Parking
           </Button>
           
           {/* Cancel Booking Button - Only show if not cancelled and not past */}
-          {booking.status !== 'canceled' && new Date(booking.end_at) > new Date() && (
-            <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+          {booking.status !== 'canceled' && new Date(booking.end_at) > new Date() && <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
               <AlertDialogTrigger asChild>
-                <Button 
-                  variant="destructive" 
-                  className="w-full" 
-                  size="lg"
-                >
+                <Button variant="destructive" className="w-full" size="lg">
                   <XCircle className="h-4 w-4 mr-2" />
                   Cancel Booking
                 </Button>
@@ -506,21 +416,14 @@ const BookingConfirmation = () => {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel disabled={cancelling}>Keep Booking</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleCancelBooking}
-                    disabled={cancelling}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
+                  <AlertDialogAction onClick={handleCancelBooking} disabled={cancelling} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                     {cancelling ? 'Cancelling...' : 'Cancel Booking'}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
-            </AlertDialog>
-          )}
+            </AlertDialog>}
         </div>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default BookingConfirmation;
