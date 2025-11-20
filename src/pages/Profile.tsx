@@ -562,25 +562,15 @@ const Profile = () => {
           })}
         </div>
 
-        {/* Danger Zone */}
-        <Card className="p-6 border-destructive/50 bg-destructive/5">
-          <div className="space-y-4">
-            <div>
-              <h3 className="font-semibold text-lg text-destructive mb-1">Danger Zone</h3>
-              <p className="text-sm text-muted-foreground">
-                Permanently delete your account and all associated data
-              </p>
-            </div>
-            <Button
-              variant="destructive"
-              onClick={() => setIsDeleteDialogOpen(true)}
-              className="w-full"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete Account
-            </Button>
-          </div>
-        </Card>
+        {/* Delete Account Button */}
+        <Button
+          variant="destructive"
+          onClick={() => setIsDeleteDialogOpen(true)}
+          className="w-full"
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Delete Account
+        </Button>
       </div>
 
       {/* Delete Account Confirmation Dialog */}
