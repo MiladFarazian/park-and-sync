@@ -535,7 +535,7 @@ const Messages = () => {
   const hasCache = selectedConversation ? messagesCacheRef.current.has(selectedConversation) : false;
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] md:h-[calc(100vh-6rem)] gap-4">
+    <div className="flex h-full gap-4">
       {/* Conversations List */}
       <Card className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col rounded-none md:rounded-lg`}>
         <div className="p-4 border-b">
