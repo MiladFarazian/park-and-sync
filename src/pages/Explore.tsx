@@ -82,6 +82,7 @@ const Explore = () => {
     return null;
   };
 
+  // Initial load effect - runs once when component mounts or when URL params change
   useEffect(() => {
     fetchMapboxToken();
 
@@ -115,50 +116,39 @@ const Explore = () => {
       if (start) setStartTime(startDate);
       if (end) setEndTime(endDate);
       fetchNearbySpots(desired, 15000, true);
-
-      // Also try to get the actual device location (blue dot) in the background
-      if (navigator.geolocation && !currentLocation) {
-        navigator.geolocation.getCurrentPosition((position) => {
-          setCurrentLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        });
-      }
     } else {
-      // No URL lat/lng: start from the user's physical location if available
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(async (position) => {
-          const deviceLoc = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          };
-
-          // Use device location as both current and initial search location
-          setCurrentLocation(deviceLoc);
-          setSearchLocation(deviceLoc);
-          
-          // Get address for current location
-          if (mapboxToken) {
-            const address = await reverseGeocode(deviceLoc.lat, deviceLoc.lng);
-            if (address) setSearchQuery(address);
-          }
-          
-          fetchNearbySpots(deviceLoc, 15000, true);
-        }, error => {
-          console.log('Location access denied, using default search location');
-          fetchNearbySpots(searchLocation, 15000, true);
-          // Set default location name
-          setSearchQuery('University Park, Los Angeles');
-        });
-      } else {
-        fetchNearbySpots(searchLocation, 15000, true);
-        setSearchQuery('University Park, Los Angeles');
-      }
+      // No URL lat/lng: use default search location
+      fetchNearbySpots(searchLocation, 15000, true);
+      setSearchQuery('University Park, Los Angeles');
       if (start) setStartTime(new Date(start));
       if (end) setEndTime(new Date(end));
     }
-  }, [searchParams, mapboxToken, currentLocation, searchLocation]);
+  }, [searchParams, mapboxToken]);
+
+  // Continuously watch and update the user's physical location (blue dot marker)
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        setCurrentLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+      },
+      (error) => {
+        console.error('Error watching location:', error);
+      },
+      {
+        enableHighAccuracy: false, // Reduce battery drain
+        maximumAge: 10000, // Cache for 10 seconds
+        timeout: 5000
+      }
+    );
+
+    // Cleanup: stop watching when component unmounts
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
   const fetchMapboxToken = async () => {
     try {
       const {
