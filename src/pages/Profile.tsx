@@ -566,7 +566,7 @@ const Profile = () => {
         <Button
           variant="destructive"
           onClick={() => setIsDeleteDialogOpen(true)}
-          className="w-full"
+          className="w-full mb-8"
         >
           <Trash2 className="h-4 w-4 mr-2" />
           Delete Account
