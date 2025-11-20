@@ -117,7 +117,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/navigation-guidance-night-v4', 
+      style: 'mapbox://styles/mapbox/streets-v12',
       center: center,
       zoom: 14 // Start at neighborhood zoom level
     });
@@ -142,10 +142,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       // Defensive cleanup: remove any orphaned HTML markers
       mapContainer.current?.querySelectorAll('.mapboxgl-marker').forEach(marker => marker.remove());
       
-      // Customize water color to deep blue
-      if (map.current?.getLayer('water')) {
-        map.current.setPaintProperty('water', 'fill-color', '#004e89');
-      }
+      // Modern map style - no customization needed
 
       // Add user location source and layers
       if (map.current && !map.current.getSource('user-location')) {
@@ -157,45 +154,28 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           }
         });
 
-        // Outer pulsing ring
+        // Static outer ring (Apple Maps style)
         map.current.addLayer({
           id: 'user-location-outer',
           type: 'circle',
           source: 'user-location',
           paint: {
-            'circle-radius': [
-              'interpolate',
-              ['linear'],
-              ['%', ['/', ['get', 'timestamp'], 1000], 2],
-              0, 16,
-              1, 24,
-              2, 16
-            ],
-            'circle-color': 'hsl(250, 100%, 65%)',
-            'circle-opacity': [
-              'interpolate',
-              ['linear'],
-              ['%', ['/', ['get', 'timestamp'], 1000], 2],
-              0, 0.6,
-              1, 0.2,
-              2, 0.6
-            ],
-            'circle-stroke-width': 2,
-            'circle-stroke-color': 'white',
-            'circle-stroke-opacity': 0.8
+            'circle-radius': 20,
+            'circle-color': '#4A90E2',
+            'circle-opacity': 0.2
           }
         });
 
-        // Inner solid dot
+        // Inner solid dot (Apple Maps style)
         map.current.addLayer({
           id: 'user-location-inner',
           type: 'circle',
           source: 'user-location',
           paint: {
             'circle-radius': 8,
-            'circle-color': 'hsl(250, 100%, 65%)',
+            'circle-color': '#4A90E2',
             'circle-opacity': 1,
-            'circle-stroke-width': 2,
+            'circle-stroke-width': 3,
             'circle-stroke-color': 'white'
           }
         });
@@ -218,26 +198,9 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           type: 'circle',
           source: 'user-location',
           paint: {
-            'circle-radius': [
-              'interpolate',
-              ['linear'],
-              ['%', ['/', ['get', 'timestamp'], 1000], 2],
-              0, 16,
-              1, 24,
-              2, 16
-            ],
-            'circle-color': 'hsl(250, 100%, 65%)',
-            'circle-opacity': [
-              'interpolate',
-              ['linear'],
-              ['%', ['/', ['get', 'timestamp'], 1000], 2],
-              0, 0.6,
-              1, 0.2,
-              2, 0.6
-            ],
-            'circle-stroke-width': 2,
-            'circle-stroke-color': 'white',
-            'circle-stroke-opacity': 0.8
+            'circle-radius': 20,
+            'circle-color': '#4A90E2',
+            'circle-opacity': 0.2
           }
         });
 
@@ -247,9 +210,9 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           source: 'user-location',
           paint: {
             'circle-radius': 8,
-            'circle-color': 'hsl(250, 100%, 65%)',
+            'circle-color': '#4A90E2',
             'circle-opacity': 1,
-            'circle-stroke-width': 2,
+            'circle-stroke-width': 3,
             'circle-stroke-color': 'white'
           }
         });
@@ -303,18 +266,10 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     };
   }, [mapboxToken]);
 
-  // Update search center marker when searchCenter changes
+  // Fly to search center when it changes (no label card for cleaner design)
   useEffect(() => {
-    if (!map.current || !mapReady || !searchCenter) {
-      // Remove marker if no search center
-      if (searchMarkerRef.current) {
-        searchMarkerRef.current.remove();
-        searchMarkerRef.current = null;
-      }
-      return;
-    }
+    if (!map.current || !mapReady || !searchCenter) return;
 
-    // Validate coordinates
     const { lat, lng } = searchCenter;
     if (
       typeof lat !== 'number' || typeof lng !== 'number' ||
@@ -326,84 +281,16 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       return;
     }
 
-    // Remove existing marker
-    if (searchMarkerRef.current) {
-      searchMarkerRef.current.remove();
-    }
-
-    // Create custom HTML marker element - centered wrapper
-    const el = document.createElement('div');
-    el.style.cssText = `
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    `;
-    
-    // Create speech bubble with rounded corners
-    const bubble = document.createElement('div');
-    bubble.style.cssText = `
-      position: relative;
-      background: hsl(250, 100%, 65%);
-      padding: 10px 28px;
-      border-radius: 16px;
-      box-shadow: 0 6px 20px rgba(106, 92, 255, 0.4);
-      font-size: 14px;
-      font-weight: 700;
-      color: white;
-      white-space: nowrap;
-      text-align: center;
-      overflow: visible;
-    `;
-    
-    const label = document.createElement('div');
-    label.style.cssText = `
-      max-width: 220px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    `;
-    label.textContent = searchQuery || 'Search Location';
-    bubble.appendChild(label);
-    
-    // Create downward triangle pointer (sibling of bubble)
-    const pointer = document.createElement('div');
-    pointer.style.cssText = `
-      width: 0;
-      height: 0;
-      border-left: 12px solid transparent;
-      border-right: 12px solid transparent;
-      border-top: 12px solid hsl(250, 100%, 65%);
-      margin-top: -1px;
-      filter: drop-shadow(0 2px 4px rgba(106, 92, 255, 0.3));
-    `;
-    
-    el.appendChild(bubble);
-    el.appendChild(pointer);
-
-    // Determine target position: prefer currentLocation when available
     const targetLng = currentLocation?.lng ?? lng;
     const targetLat = currentLocation?.lat ?? lat;
 
-    // Create and add the marker (positioned so triangle tip touches top of current location circle)
-    searchMarkerRef.current = new mapboxgl.Marker({
-      element: el,
-      anchor: 'bottom',
-      offset: [0, -15]
-    })
-      .setLngLat([targetLng, targetLat])
-      .addTo(map.current);
-
-    // Fly to the target location
     map.current.flyTo({
       center: [targetLng, targetLat],
       zoom: 14,
       essential: true,
       duration: 1500
     });
-
-    console.log('Search center updated at:', lat, lng);
-  }, [searchCenter, mapReady, searchQuery, currentLocation]);
+  }, [searchCenter, mapReady, currentLocation]);
 
   // Update current location GeoJSON source when currentLocation changes
   useEffect(() => {
@@ -421,32 +308,22 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       return;
     }
 
-    const updateLocation = () => {
-      const source = map.current?.getSource('user-location');
-      if (source && 'setData' in source) {
-        (source as mapboxgl.GeoJSONSource).setData({
-          type: 'FeatureCollection',
-          features: [
-            {
-              type: 'Feature',
-              geometry: {
-                type: 'Point',
-                coordinates: [lng, lat]
-              },
-              properties: { timestamp: Date.now() }
-            }
-          ]
-        });
-      }
-    };
-
-    // Initial update
-    updateLocation();
-    
-    // Update every 100ms to trigger animation
-    const animationInterval = setInterval(updateLocation, 100);
-
-    return () => clearInterval(animationInterval);
+    const source = map.current.getSource('user-location');
+    if (source && 'setData' in source) {
+      (source as mapboxgl.GeoJSONSource).setData({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: [lng, lat]
+            },
+            properties: {}
+          }
+        ]
+      });
+    }
   }, [currentLocation, mapReady]);
 
   // Add markers for spots
