@@ -300,8 +300,8 @@ function ChatPane({
   };
 
   return (
-    <>
-      <div className="p-4 border-b">
+    <div className="flex flex-col h-full">
+      <div className="p-4 border-b flex-shrink-0">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={onBack}>
             <ArrowLeft className="h-5 w-5" />
@@ -330,7 +330,7 @@ function ChatPane({
           </div>
         </div>
       </div>
-      <div className="flex-1 relative">
+      <div className="flex-1 relative min-h-0">
         {(loadingMessages && !(messagesCacheRef.current.get(conversationId)?.length)) ? (
           <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin" />
@@ -343,6 +343,7 @@ function ChatPane({
           ) : (
             <>
               <Virtuoso
+                style={{ height: '100%' }}
                 key={conversationId}
                 ref={virtuosoRef}
                 data={sortedMessages}
@@ -388,7 +389,7 @@ function ChatPane({
           )
         )}
       </div>
-      <div className="p-4 border-t">
+      <div className="p-4 border-t flex-shrink-0">
         {mediaPreview && (
           <div className="mb-2 relative inline-block">
             <div className="relative">
@@ -425,7 +426,7 @@ function ChatPane({
           </Button>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
