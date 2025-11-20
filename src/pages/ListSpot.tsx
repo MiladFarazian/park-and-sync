@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -43,8 +43,10 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>;
 
 interface AddressSuggestion {
-  place_name: string;
-  center: [number, number];
+  name: string;
+  place_formatted: string;
+  full_address: string;
+  mapbox_id: string;
 }
 
 const amenitiesList = [
@@ -69,6 +71,7 @@ const ListSpot = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [addressCoordinates, setAddressCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const sessionTokenRef = useRef<string>(crypto.randomUUID());
 
   useEffect(() => {
     const fetchMapboxToken = async () => {
@@ -167,32 +170,37 @@ const ListSpot = () => {
 
     try {
       setLoadingSuggestions(true);
-      const encodedQuery = encodeURIComponent(query);
       
-      // Bias towards Los Angeles area and include POIs
-      const losAngelesCoords = '-118.2437,34.0522'; // Downtown LA coordinates
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?` +
-        `access_token=${mapboxToken}` +
-        `&proximity=${losAngelesCoords}` + // Prioritize LA area
-        `&bbox=-118.9448,33.7037,-117.6462,34.3373` + // Limit to LA County bounds
-        `&types=address,poi,place,locality,neighborhood` + // Include addresses, POIs, and neighborhoods
-        `&country=US` + // US only
-        `&limit=8`
-      );
+      // Southern California center (Downtown LA)
+      const socal_center = { lat: 34.0522, lng: -118.2437 };
+      
+      const url = `https://api.mapbox.com/search/searchbox/v1/suggest?` +
+        `q=${encodeURIComponent(query)}` +
+        `&access_token=${mapboxToken}` +
+        `&session_token=${sessionTokenRef.current}` +
+        `&limit=8` +
+        `&types=poi,address,place` +
+        `&proximity=${socal_center.lng},${socal_center.lat}` +
+        `&country=US` +
+        `&bbox=-119.5,32.5,-117.0,34.8`;
+      
+      console.log('[ListSpot Search Box API] Calling suggest');
+      
+      const response = await fetch(url);
       
       if (!response.ok) throw new Error('Address search failed');
       
       const data = await response.json();
       
-      if (data.features) {
-        setAddressSuggestions(data.features.map((feature: any) => ({
-          place_name: feature.place_name,
-          center: feature.center
-        })));
+      console.log('[ListSpot Search Box API] Response:', data);
+      
+      if (data.suggestions && data.suggestions.length > 0) {
+        setAddressSuggestions(data.suggestions);
+      } else {
+        setAddressSuggestions([]);
       }
     } catch (error) {
-      console.error('Error searching addresses:', error);
+      console.error('[ListSpot Search Box API] Error:', error);
       setAddressSuggestions([]);
     } finally {
       setLoadingSuggestions(false);
@@ -212,14 +220,38 @@ const ListSpot = () => {
     }
   };
 
-  const handleSuggestionSelect = (suggestion: AddressSuggestion) => {
-    setValue('address', suggestion.place_name);
-    setAddressCoordinates({
-      lat: suggestion.center[1],
-      lng: suggestion.center[0]
-    });
-    setShowSuggestions(false);
-    setAddressSuggestions([]);
+  const handleSuggestionSelect = async (suggestion: AddressSuggestion) => {
+    if (!mapboxToken || !suggestion.mapbox_id) return;
+    
+    try {
+      const retrieveUrl = `https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(suggestion.mapbox_id)}?access_token=${mapboxToken}&session_token=${sessionTokenRef.current}`;
+      
+      console.log('[ListSpot Search Box API] Retrieving full details');
+      
+      const response = await fetch(retrieveUrl);
+      const data = await response.json();
+      
+      console.log('[ListSpot Search Box API] Retrieve response:', data);
+      
+      if (data?.features?.[0]?.geometry?.coordinates) {
+        const [lng, lat] = data.features[0].geometry.coordinates;
+        const fullAddress = suggestion.full_address || suggestion.name || suggestion.place_formatted;
+        
+        setValue('address', fullAddress);
+        setAddressCoordinates({ lat, lng });
+        setShowSuggestions(false);
+        setAddressSuggestions([]);
+        
+        console.log('[ListSpot] Selected coordinates:', { lat, lng });
+        
+        // Regenerate session token for next search session
+        sessionTokenRef.current = crypto.randomUUID();
+        console.log('[ListSpot Search Box API] Session token regenerated');
+      }
+    } catch (error) {
+      console.error('[ListSpot Search Box API] Retrieve error:', error);
+      toast.error('Failed to select address. Please try again.');
+    }
   };
 
   const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
@@ -479,7 +511,10 @@ const ListSpot = () => {
                           >
                             <div className="flex items-start gap-2">
                               <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                              <span className="text-sm">{suggestion.place_name}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium">{suggestion.name}</div>
+                                <div className="text-xs text-muted-foreground">{suggestion.place_formatted}</div>
+                              </div>
                             </div>
                           </button>
                         ))}
