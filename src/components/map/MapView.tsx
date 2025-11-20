@@ -191,7 +191,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           }
         });
 
-        // Load destination pin image (red pin)
+        // Load destination pin image (purple pin)
         const destPinSvg = `
           <svg width="50" height="60" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg">
             <defs>
@@ -201,7 +201,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
             </defs>
             <g filter="url(#shadow-dest)">
               <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
-                    fill="#EF4444" stroke="white" stroke-width="3"/>
+                    fill="#f0edfe" stroke="#694dff" stroke-width="3"/>
               <circle cx="25" cy="20" r="8" fill="white" opacity="1"/>
             </g>
           </svg>`;
@@ -290,7 +290,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
             </defs>
             <g filter="url(#shadow-dest-alt)">
               <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
-                    fill="#EF4444" stroke="white" stroke-width="3"/>
+                    fill="#f0edfe" stroke="#694dff" stroke-width="3"/>
               <circle cx="25" cy="20" r="8" fill="white" opacity="1"/>
             </g>
           </svg>`;
