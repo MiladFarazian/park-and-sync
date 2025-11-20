@@ -25,6 +25,22 @@ export interface Message {
   client_id?: string | null;
 }
 
+// Helper to format message preview
+const getMessagePreview = (msg: Message, currentUserId: string): string => {
+  const isMe = msg.sender_id === currentUserId;
+  const senderName = isMe ? 'You' : '';
+  
+  if (msg.media_url && msg.media_type) {
+    if (msg.media_type.startsWith('image/')) {
+      return isMe ? 'You sent a photo' : 'sent a photo';
+    } else if (msg.media_type.startsWith('video/')) {
+      return isMe ? 'You sent a video' : 'sent a video';
+    }
+  }
+  
+  return msg.message || '';
+};
+
 export const useMessages = () => {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -60,7 +76,7 @@ export const useMessages = () => {
         if (!conversationMap.has(partnerId)) {
           conversationMap.set(partnerId, {
             user_id: partnerId,
-            last_message: msg.message,
+            last_message: getMessagePreview(msg, user.id),
             last_message_at: msg.created_at,
             unread_count: 0,
             messages: []
@@ -71,7 +87,7 @@ export const useMessages = () => {
           const existingTime = new Date(conv.last_message_at).getTime();
           const msgTime = new Date(msg.created_at).getTime();
           if (msgTime > existingTime) {
-            conv.last_message = msg.message;
+            conv.last_message = getMessagePreview(msg, user.id);
             conv.last_message_at = msg.created_at;
           }
         }
@@ -178,7 +194,7 @@ export const useMessages = () => {
         user_id: partnerId,
         name: existing?.name || 'Unknown User',
         avatar_url: existing?.avatar_url,
-        last_message: isNewer ? msg.message : (existing?.last_message || msg.message),
+        last_message: isNewer ? getMessagePreview(msg, user.id) : (existing?.last_message || getMessagePreview(msg, user.id)),
         last_message_at: isNewer ? msg.created_at : (existing ? existing.last_message_at : msg.created_at),
         unread_count: unread,
       };
