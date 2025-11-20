@@ -10,25 +10,42 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Star, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Star, ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { AvailabilityManager, AvailabilityRule } from '@/components/availability/AvailabilityManager';
 import { compressImage } from '@/lib/compressImage';
 
 const formSchema = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters'),
-  address: z.string().min(5, 'Address is required'),
+  title: z.string()
+    .trim()
+    .min(3, 'Title must be at least 3 characters')
+    .max(100, 'Title must be less than 100 characters'),
+  address: z.string()
+    .trim()
+    .min(5, 'Address is required')
+    .max(500, 'Address must be less than 500 characters'),
   hourlyRate: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
     message: 'Hourly rate must be a positive number',
   }),
-  description: z.string().min(20, 'Description must be at least 20 characters'),
-  parkingInstructions: z.string().min(10, 'Parking instructions must be at least 10 characters'),
+  description: z.string()
+    .trim()
+    .min(20, 'Description must be at least 20 characters')
+    .max(2000, 'Description must be less than 2000 characters'),
+  parkingInstructions: z.string()
+    .trim()
+    .min(10, 'Parking instructions must be at least 10 characters')
+    .max(1000, 'Instructions must be less than 1000 characters'),
   amenities: z.array(z.string()),
   photos: z.array(z.any()).optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
+
+interface AddressSuggestion {
+  place_name: string;
+  center: [number, number];
+}
 
 const amenitiesList = [
   { id: 'covered', label: 'Covered', icon: Shield },
@@ -48,6 +65,11 @@ const ListSpot = () => {
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availabilityRules, setAvailabilityRules] = useState<any[]>([]);
+  const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState<string>('');
+  const [addressCoordinates, setAddressCoordinates] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     const fetchMapboxToken = async () => {
@@ -136,7 +158,65 @@ const ListSpot = () => {
     }
   };
 
+  const searchAddresses = async (query: string) => {
+    if (!mapboxToken || query.length < 3) {
+      setAddressSuggestions([]);
+      return;
+    }
+
+    try {
+      setLoadingSuggestions(true);
+      const encodedQuery = encodeURIComponent(query);
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${mapboxToken}&limit=5&country=US&types=address,poi`
+      );
+      
+      if (!response.ok) throw new Error('Address search failed');
+      
+      const data = await response.json();
+      
+      if (data.features) {
+        setAddressSuggestions(data.features.map((feature: any) => ({
+          place_name: feature.place_name,
+          center: feature.center
+        })));
+      }
+    } catch (error) {
+      console.error('Error searching addresses:', error);
+      setAddressSuggestions([]);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  const handleAddressChange = (value: string) => {
+    setSelectedAddress(value);
+    setAddressCoordinates(null);
+    
+    if (value.length >= 3) {
+      setShowSuggestions(true);
+      searchAddresses(value);
+    } else {
+      setShowSuggestions(false);
+      setAddressSuggestions([]);
+    }
+  };
+
+  const handleSuggestionSelect = (suggestion: AddressSuggestion) => {
+    setSelectedAddress(suggestion.place_name);
+    setAddressCoordinates({
+      lat: suggestion.center[1],
+      lng: suggestion.center[0]
+    });
+    setShowSuggestions(false);
+  };
+
   const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
+    // If we already have coordinates from suggestion selection, use those
+    if (addressCoordinates) {
+      return addressCoordinates;
+    }
+
     if (!mapboxToken) {
       console.error('Mapbox token not available');
       return null;
@@ -351,17 +431,55 @@ const ListSpot = () => {
                   <div>
                     <Label htmlFor="address">Address</Label>
                     <div className="relative mt-1.5">
-                      <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
                       <Input
                         id="address"
-                        placeholder="Enter your address"
-                        {...register('address')}
+                        placeholder="Start typing your address..."
+                        value={selectedAddress}
+                        onChange={(e) => {
+                          handleAddressChange(e.target.value);
+                          register('address').onChange(e);
+                        }}
+                        onFocus={() => {
+                          if (selectedAddress.length >= 3 && addressSuggestions.length > 0) {
+                            setShowSuggestions(true);
+                          }
+                        }}
+                        onBlur={() => {
+                          setTimeout(() => setShowSuggestions(false), 200);
+                        }}
                         className="pl-10"
+                        autoComplete="off"
                       />
+                      {loadingSuggestions && (
+                        <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
                     </div>
+                    
+                    {showSuggestions && addressSuggestions.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-background border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {addressSuggestions.map((suggestion, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() => handleSuggestionSelect(suggestion)}
+                            className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-b-0 focus:outline-none focus:bg-muted/50"
+                          >
+                            <div className="flex items-start gap-2">
+                              <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                              <span className="text-sm">{suggestion.place_name}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
                     {errors.address && (
                       <p className="text-sm text-destructive mt-1">{errors.address.message}</p>
                     )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Type at least 3 characters to see suggestions. You can also enter a custom address.
+                    </p>
                   </div>
 
                   <div>
