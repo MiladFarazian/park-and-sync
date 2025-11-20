@@ -535,9 +535,9 @@ const Messages = () => {
   const hasCache = selectedConversation ? messagesCacheRef.current.has(selectedConversation) : false;
 
   return (
-    <div className="flex h-[calc(100vh-10rem)] md:h-[calc(100vh-6rem)] gap-4">
+    <div className="flex h-[calc(100vh-8rem)] md:h-[calc(100vh-6rem)] gap-4">
       {/* Conversations List */}
-      <Card className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col rounded-none`}>
+      <Card className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col rounded-none md:rounded-lg`}>
         <div className="p-4 border-b">
           <h1 className="text-2xl font-bold mb-4">Messages</h1>
           
@@ -614,7 +614,7 @@ const Messages = () => {
       </Card>
 
       {/* Messages Area */}
-      <Card className={`${selectedConversation && isMobile ? 'flex' : 'hidden'} md:flex flex-1 flex-col rounded-none`}>
+      <Card className={`${selectedConversation && isMobile ? 'flex' : 'hidden'} md:flex flex-1 flex-col rounded-none md:rounded-lg`}>
         {selectedConversation ? (
           <ChatPane
             key={selectedConversation}
