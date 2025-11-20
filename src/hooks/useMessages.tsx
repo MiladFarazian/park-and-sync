@@ -204,6 +204,14 @@ export const useMessages = () => {
         .eq('sender_id', senderId)
         .is('read_at', null);
       
+      // Also mark any message notifications as read
+      await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('user_id', user.id)
+        .eq('type', 'message')
+        .eq('read', false);
+      
       setConversations(prev => 
         prev.map(conv => 
           conv.user_id === senderId 
