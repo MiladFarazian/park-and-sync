@@ -457,6 +457,28 @@ const ListSpot = () => {
     return true;
   };
 
+  const handleStep1Next = async () => {
+    // Validate address before proceeding to step 2
+    if (!formData.address || formData.address.trim().length < 5) {
+      setAddressValidationError('Please enter a valid address');
+      toast.error('Please enter a valid address');
+      return;
+    }
+
+    // If we don't have coordinates yet (manually typed address), validate it
+    if (!addressCoordinates) {
+      const coordinates = await validateAddressBeforeSubmit(formData.address);
+      if (!coordinates) {
+        // Error message already set by validateAddressBeforeSubmit
+        toast.error(addressValidationError || 'Please enter a valid address or select from suggestions');
+        return;
+      }
+    }
+
+    // Address is valid, proceed to step 2
+    setCurrentStep(2);
+  };
+
   return (
     <div className="bg-background">
       <div className="p-4 space-y-6 max-w-2xl mx-auto">
@@ -592,10 +614,10 @@ const ListSpot = () => {
                 <Button
                   type="button"
                   className="w-full"
-                  onClick={() => setCurrentStep(2)}
-                  disabled={!canProceed()}
+                  onClick={handleStep1Next}
+                  disabled={!canProceed() || isValidatingAddress}
                 >
-                  Next
+                  {isValidatingAddress ? 'Validating Address...' : 'Next'}
                 </Button>
               </CardContent>
             </Card>
