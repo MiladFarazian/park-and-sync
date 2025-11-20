@@ -223,7 +223,7 @@ const BookingConfirmation = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex items-center justify-center py-20">
         <div className="text-muted-foreground">Loading...</div>
       </div>
     );
