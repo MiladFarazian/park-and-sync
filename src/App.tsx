@@ -75,7 +75,6 @@ const App = () => {
             <Route path="/book/:spotId" element={<Booking />} />
             <Route path="/booking-confirmation/:bookingId" element={<BookingConfirmation />} />
             <Route path="/personal-information" element={<PersonalInformation />} />
-            <Route path="/manage-account" element={<ManageAccount />} />
             <Route path="/my-vehicles" element={<MyVehicles />} />
             <Route path="/add-vehicle" element={<AddVehicle />} />
             <Route path="/payment-methods" element={<PaymentMethods />} />
@@ -94,6 +93,7 @@ const App = () => {
                   <Route path="/host-home" element={<HostHome />} />
                   <Route path="/messages" element={<Messages />} />
                   <Route path="/profile" element={<Profile />} />
+                  <Route path="/manage-account" element={<ManageAccount />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
