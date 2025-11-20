@@ -10,7 +10,7 @@ const Notifications = () => {
   const navigate = useNavigate();
   const { profile, updateProfile } = useAuth();
 
-  const handleToggle = async (field: 'notification_booking_updates' | 'notification_host_messages', value: boolean) => {
+  const handleToggle = async (field: 'notification_booking_updates', value: boolean) => {
     try {
       const { error } = await updateProfile({
         [field]: value
@@ -49,19 +49,6 @@ const Notifications = () => {
               <Switch 
                 checked={profile?.notification_booking_updates ?? true}
                 onCheckedChange={(checked) => handleToggle('notification_booking_updates', checked)}
-              />
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="font-medium">Host Messages</p>
-                <p className="text-sm text-muted-foreground">Receive messages from hosts</p>
-              </div>
-              <Switch 
-                checked={profile?.notification_host_messages ?? true}
-                onCheckedChange={(checked) => handleToggle('notification_host_messages', checked)}
               />
             </div>
           </Card>
