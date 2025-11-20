@@ -24,10 +24,10 @@ const AppLayout = ({
       {/* Desktop Layout with Sidebar */}
       <div className="hidden md:block">
         <SidebarProvider>
-          <div className="flex min-h-screen w-full">
+          <div className="flex h-screen w-full">
             <AppSidebar />
-            <main className="flex-1">
-              {!isProfilePage && <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
+            <main className="flex-1 flex flex-col overflow-hidden">
+              {!isProfilePage && <header className="flex-shrink-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
                   <div className="flex items-center gap-4">
                     <SidebarTrigger />
                     <img src={parkzyLogo} alt="Parkzy" className="h-8" />
@@ -40,8 +40,10 @@ const AppLayout = ({
                     </Button>
                   </div>
                 </header>}
-              <div className="container mx-auto p-6">
-                {children}
+              <div className="flex-1 overflow-auto">
+                <div className="container mx-auto p-6">
+                  {children}
+                </div>
               </div>
             </main>
           </div>
@@ -49,8 +51,8 @@ const AppLayout = ({
       </div>
 
       {/* Mobile Layout with Bottom Navigation */}
-      <div className="md:hidden">
-        {!isProfilePage && <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
+      <div className="md:hidden flex flex-col h-screen">
+        {!isProfilePage && <header className="flex-shrink-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
             <div className="flex items-center gap-3">
               <img src={parkzyLogo} alt="Parkzy" className="h-8" />
               <ModeSwitcher />
@@ -59,12 +61,12 @@ const AppLayout = ({
               <NotificationBell />
             </div>
           </header>}
-        <div className="min-h-screen bg-background pb-24">
+        <div className="flex-1 overflow-auto bg-background pb-24">
           <div className="max-w-md mx-auto">
             {children}
           </div>
-          <BottomNavigation />
         </div>
+        <BottomNavigation />
       </div>
     </>;
 };
