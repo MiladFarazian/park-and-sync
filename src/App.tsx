@@ -23,6 +23,7 @@ import Auth from "./pages/Auth";
 import EmailConfirmation from "./pages/EmailConfirmation";
 import NotFound from "./pages/NotFound";
 import PersonalInformation from "./pages/PersonalInformation";
+import ManageAccount from "./pages/ManageAccount";
 import MyVehicles from "./pages/MyVehicles";
 import AddVehicle from "./pages/AddVehicle";
 import PaymentMethods from "./pages/PaymentMethods";
@@ -74,6 +75,7 @@ const App = () => {
             <Route path="/book/:spotId" element={<Booking />} />
             <Route path="/booking-confirmation/:bookingId" element={<BookingConfirmation />} />
             <Route path="/personal-information" element={<PersonalInformation />} />
+            <Route path="/manage-account" element={<ManageAccount />} />
             <Route path="/my-vehicles" element={<MyVehicles />} />
             <Route path="/add-vehicle" element={<AddVehicle />} />
             <Route path="/payment-methods" element={<PaymentMethods />} />

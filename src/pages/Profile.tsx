@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, Building2, ArrowRight, ExternalLink, Trash2 } from 'lucide-react';
+import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, Building2, ArrowRight, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -44,9 +44,6 @@ const Profile = () => {
   } | null>(null);
   const [isLoadingStripe, setIsLoadingStripe] = useState(false);
   const [hasListedSpots, setHasListedSpots] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -248,31 +245,6 @@ const Profile = () => {
     navigate('/auth');
   };
 
-  const handleDeleteAccount = async () => {
-    if (deleteConfirmText !== 'DELETE') {
-      toast.error('Please type DELETE to confirm');
-      return;
-    }
-
-    setIsDeleting(true);
-    try {
-      // Call edge function to delete account and all associated data
-      const { error } = await supabase.functions.invoke('delete-account');
-      
-      if (error) throw error;
-
-      toast.success('Account deleted successfully');
-      await signOut();
-      navigate('/');
-    } catch (error: any) {
-      console.error('Error deleting account:', error);
-      toast.error('Failed to delete account: ' + error.message);
-    } finally {
-      setIsDeleting(false);
-      setIsDeleteDialogOpen(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-64px)]">
@@ -313,9 +285,9 @@ const Profile = () => {
     ? [
         { 
           icon: User, 
-          label: 'Personal Information', 
+          label: 'Manage Account', 
           subtitle: 'Update your profile details',
-          onClick: () => navigate('/personal-information')
+          onClick: () => navigate('/manage-account')
         },
         { 
           icon: Bell, 
@@ -333,9 +305,9 @@ const Profile = () => {
     : [
         { 
           icon: User, 
-          label: 'Personal Information', 
+          label: 'Manage Account', 
           subtitle: 'Update your profile details',
-          onClick: () => navigate('/personal-information')
+          onClick: () => navigate('/manage-account')
         },
         { 
           icon: Building2, 
@@ -562,70 +534,16 @@ const Profile = () => {
           })}
         </div>
 
-        {/* Delete Account Button */}
+        {/* Logout Button */}
         <Button
-          variant="destructive"
-          onClick={() => setIsDeleteDialogOpen(true)}
+          variant="outline"
+          onClick={handleSignOut}
           className="w-full mb-8"
         >
-          <Trash2 className="h-4 w-4 mr-2" />
-          Delete Account
+          <LogOut className="h-4 w-4 mr-2" />
+          Logout
         </Button>
       </div>
-
-      {/* Delete Account Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="text-destructive">Delete Account</DialogTitle>
-            <DialogDescription>
-              This action cannot be undone. This will permanently delete your account and remove all your data including bookings, spots, reviews, and messages.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <Alert className="border-destructive bg-destructive/10">
-              <AlertCircle className="h-4 w-4 text-destructive" />
-              <AlertDescription className="text-destructive">
-                All your data will be permanently deleted and cannot be recovered.
-              </AlertDescription>
-            </Alert>
-            <div className="space-y-2">
-              <Label htmlFor="delete-confirm">
-                Type <span className="font-bold">DELETE</span> to confirm
-              </Label>
-              <Input
-                id="delete-confirm"
-                value={deleteConfirmText}
-                onChange={(e) => setDeleteConfirmText(e.target.value)}
-                placeholder="DELETE"
-                className="font-mono"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setIsDeleteDialogOpen(false);
-                setDeleteConfirmText('');
-              }}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={handleDeleteAccount}
-              disabled={isDeleting || deleteConfirmText !== 'DELETE'}
-            >
-              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete Account
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Edit Profile Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
