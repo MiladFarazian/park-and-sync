@@ -168,8 +168,17 @@ const ListSpot = () => {
     try {
       setLoadingSuggestions(true);
       const encodedQuery = encodeURIComponent(query);
+      
+      // Bias towards Los Angeles area and include POIs
+      const losAngelesCoords = '-118.2437,34.0522'; // Downtown LA coordinates
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${mapboxToken}&limit=5&country=US&types=address,poi`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?` +
+        `access_token=${mapboxToken}` +
+        `&proximity=${losAngelesCoords}` + // Prioritize LA area
+        `&bbox=-118.9448,33.7037,-117.6462,34.3373` + // Limit to LA County bounds
+        `&types=address,poi,place,locality,neighborhood` + // Include addresses, POIs, and neighborhoods
+        `&country=US` + // US only
+        `&limit=8`
       );
       
       if (!response.ok) throw new Error('Address search failed');
