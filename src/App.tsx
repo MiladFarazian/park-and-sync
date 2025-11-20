@@ -72,7 +72,6 @@ const App = () => {
             <Route path="/email-confirmation" element={<EmailConfirmation />} />
             <Route path="/search-results" element={<SearchResults />} />
             <Route path="/spot/:id" element={<SpotDetail />} />
-            <Route path="/book/:spotId" element={<Booking />} />
             <Route path="/booking-confirmation/:bookingId" element={<BookingConfirmation />} />
             <Route path="/personal-information" element={<PersonalInformation />} />
             <Route path="/my-vehicles" element={<MyVehicles />} />
@@ -94,6 +93,7 @@ const App = () => {
                   <Route path="/messages" element={<Messages />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/manage-account" element={<ManageAccount />} />
+                  <Route path="/book/:spotId" element={<Booking />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
