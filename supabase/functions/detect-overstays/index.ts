@@ -1,0 +1,179 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const now = new Date();
+    
+    // Find active bookings that have passed their end time
+    const { data: overstayedBookings, error: fetchError } = await supabaseClient
+      .from('bookings')
+      .select(`
+        *,
+        spots (
+          title,
+          address,
+          hourly_rate,
+          host_id
+        ),
+        profiles:renter_id (
+          first_name,
+          last_name,
+          email
+        )
+      `)
+      .in('status', ['active', 'paid'])
+      .lt('end_at', now.toISOString())
+      .is('overstay_detected_at', null);
+
+    if (fetchError) throw fetchError;
+
+    console.log(`Found ${overstayedBookings?.length || 0} overstayed bookings`);
+
+    for (const booking of overstayedBookings || []) {
+      // Set overstay detection time and 10-minute grace period
+      const graceEnd = new Date(now.getTime() + 10 * 60 * 1000);
+      
+      const { error: updateError } = await supabaseClient
+        .from('bookings')
+        .update({
+          overstay_detected_at: now.toISOString(),
+          overstay_grace_end: graceEnd.toISOString(),
+        })
+        .eq('id', booking.id);
+
+      if (updateError) {
+        console.error('Error updating booking:', updateError);
+        continue;
+      }
+
+      // Send notification to renter (warning)
+      await supabaseClient
+        .from('notifications')
+        .insert({
+          user_id: booking.renter_id,
+          type: 'overstay_warning',
+          title: 'Parking Time Expired',
+          message: `Your parking at ${booking.spots.title} has expired. You have a 10-minute grace period to vacate or extend your booking. After that, overtime charges of $25/hour may apply.`,
+          related_id: booking.id,
+        });
+
+      // Send notification to host
+      await supabaseClient
+        .from('notifications')
+        .insert({
+          user_id: booking.spots.host_id,
+          type: 'overstay_detected',
+          title: 'Guest Overstay Detected',
+          message: `Guest at ${booking.spots.title} has exceeded their booking time. 10-minute grace period started.`,
+          related_id: booking.id,
+        });
+    }
+
+    // Check for bookings past grace period that need charging or escalation
+    const { data: postGraceBookings, error: graceError } = await supabaseClient
+      .from('bookings')
+      .select(`
+        *,
+        spots (
+          title,
+          hourly_rate,
+          host_id
+        )
+      `)
+      .in('status', ['active', 'paid'])
+      .not('overstay_detected_at', 'is', null)
+      .lt('overstay_grace_end', now.toISOString())
+      .is('overstay_action', null);
+
+    if (graceError) throw graceError;
+
+    console.log(`Found ${postGraceBookings?.length || 0} bookings past grace period`);
+
+    for (const booking of postGraceBookings || []) {
+      // Notify host that grace period has ended and they can take action
+      await supabaseClient
+        .from('notifications')
+        .insert({
+          user_id: booking.spots.host_id,
+          type: 'overstay_action_needed',
+          title: 'Guest Overstay - Action Needed',
+          message: `Grace period ended for ${booking.spots.title}. You can now charge overtime or request towing.`,
+          related_id: booking.id,
+        });
+
+      // Notify guest that grace period has ended
+      await supabaseClient
+        .from('notifications')
+        .insert({
+          user_id: booking.renter_id,
+          type: 'overstay_grace_ended',
+          title: 'Overtime Charges May Apply',
+          message: `Your grace period has ended. Please vacate ${booking.spots.title} immediately or you may incur overtime charges.`,
+          related_id: booking.id,
+        });
+    }
+
+    // Calculate overtime charges for bookings with charging action
+    const { data: chargingBookings, error: chargingError } = await supabaseClient
+      .from('bookings')
+      .select(`
+        *,
+        spots (
+          hourly_rate,
+          host_id
+        )
+      `)
+      .in('status', ['active', 'paid'])
+      .eq('overstay_action', 'charging')
+      .lt('overstay_grace_end', now.toISOString());
+
+    if (chargingError) throw chargingError;
+
+    for (const booking of chargingBookings || []) {
+      const graceEnd = new Date(booking.overstay_grace_end);
+      const minutesOverstayed = Math.max(0, (now.getTime() - graceEnd.getTime()) / (1000 * 60));
+      const hoursOverstayed = minutesOverstayed / 60;
+      const overtimeRate = 25; // $25/hour
+      const overtimeCharge = Math.ceil(hoursOverstayed) * overtimeRate;
+
+      // Only update if charge amount changed
+      if (overtimeCharge !== booking.overstay_charge_amount) {
+        await supabaseClient
+          .from('bookings')
+          .update({
+            overstay_charge_amount: overtimeCharge,
+          })
+          .eq('id', booking.id);
+      }
+    }
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: `Processed ${overstayedBookings?.length || 0} new overstays and ${postGraceBookings?.length || 0} grace period endings` 
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    );
+  } catch (error) {
+    console.error('Error detecting overstays:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+    );
+  }
+});

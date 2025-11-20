@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus, Navigation, Edit } from "lucide-react";
+import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus, Navigation, Edit, AlertCircle } from "lucide-react";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { toast } from "sonner";
@@ -156,33 +156,75 @@ export const ActiveBookingBanner = () => {
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${address}`, '_blank');
   };
 
+  const handleSendWarning = async () => {
+    if (!activeBooking) return;
+    
+    setLoading(true);
+
+    try {
+      // Send warning notification to the renter
+      const { error: notifError } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: activeBooking.renter_id,
+          type: 'overstay_warning',
+          title: 'Final Warning - Parking Expired',
+          message: `Your parking at ${activeBooking.spots.title} has expired. Please vacate immediately or extend your booking to avoid overtime charges of $25/hour.`,
+          related_id: activeBooking.id,
+        });
+
+      if (notifError) throw notifError;
+
+      toast.success('Warning sent to driver');
+    } catch (error) {
+      console.error('Error sending warning:', error);
+      toast.error('Failed to send warning');
+    }
+
+    setLoading(false);
+  };
+
   const handleOverstayAction = async (action: 'charging' | 'towing') => {
     if (!activeBooking) return;
     
     setLoading(true);
     
-    const now = new Date();
-    const graceEnd = new Date(now.getTime() + 10 * 60 * 1000); // 10 minutes from now
+    try {
+      const now = new Date();
 
-    const { error } = await supabase
-      .from('bookings')
-      .update({
-        overstay_detected_at: now.toISOString(),
-        overstay_action: action,
-        overstay_grace_end: graceEnd.toISOString(),
-      })
-      .eq('id', activeBooking.id);
+      const { error } = await supabase
+        .from('bookings')
+        .update({
+          overstay_action: action,
+          overstay_detected_at: activeBooking.overstay_detected_at || now.toISOString(),
+          overstay_grace_end: activeBooking.overstay_grace_end || new Date(now.getTime() + 10 * 60 * 1000).toISOString(),
+        })
+        .eq('id', activeBooking.id);
 
-    if (error) {
-      console.error('Error updating overstay:', error);
-      toast.error('Failed to update overstay status');
-    } else {
+      if (error) throw error;
+
+      // Send notification to renter
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: activeBooking.renter_id,
+          type: action === 'charging' ? 'overstay_charging' : 'overstay_towing',
+          title: action === 'charging' ? 'Overtime Charges Applied' : 'Towing Requested',
+          message: action === 'charging' 
+            ? `You are being charged $25/hour for overstaying at ${activeBooking.spots.title}. Please vacate immediately.`
+            : `Towing has been requested for ${activeBooking.spots.title}. Please vacate immediately to avoid additional fees.`,
+          related_id: activeBooking.id,
+        });
+
       toast.success(
         action === 'charging' 
-          ? 'Overstay charging activated. $25/hour will apply after 10-minute grace period.' 
-          : 'Towing process initiated. Driver will be notified.'
+          ? 'Overtime charging activated at $25/hour. Driver notified.' 
+          : 'Towing process initiated. Driver notified.'
       );
       loadActiveBooking();
+    } catch (error) {
+      console.error('Error updating overstay:', error);
+      toast.error('Failed to update overstay status');
     }
     
     setLoading(false);
@@ -424,8 +466,20 @@ export const ActiveBookingBanner = () => {
                     <span className="hidden sm:inline">Message</span>
                   </Button>
 
+                  {/* Overstay Actions - Progressive Warning System */}
                   {!activeBooking.overstay_action && (
                     <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSendWarning}
+                        disabled={loading}
+                        className="border-amber-500 text-amber-600 hover:bg-amber-50 dark:border-amber-600 dark:text-amber-500 dark:hover:bg-amber-950"
+                      >
+                        <AlertCircle className="h-4 w-4 mr-1" />
+                        Send Warning
+                      </Button>
+
                       <Button
                         variant="destructive"
                         size="sm"
@@ -447,6 +501,19 @@ export const ActiveBookingBanner = () => {
                         Request Tow
                       </Button>
                     </>
+                  )}
+                  
+                  {activeBooking.overstay_action === 'charging' && activeBooking.overstay_charge_amount > 0 && (
+                    <div className="text-sm font-semibold text-destructive">
+                      Overtime: ${Number(activeBooking.overstay_charge_amount).toFixed(2)}
+                    </div>
+                  )}
+                  
+                  {activeBooking.overstay_action === 'towing' && (
+                    <div className="text-sm font-semibold text-destructive flex items-center gap-1">
+                      <AlertTriangle className="h-4 w-4" />
+                      Towing Requested
+                    </div>
                   )}
 
                   {activeBooking.overstay_action === 'charging' && (
