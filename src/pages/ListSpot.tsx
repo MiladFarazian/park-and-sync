@@ -71,6 +71,8 @@ const ListSpot = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [addressCoordinates, setAddressCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [isValidatingAddress, setIsValidatingAddress] = useState(false);
+  const [addressValidationError, setAddressValidationError] = useState<string>('');
   const sessionTokenRef = useRef<string>(crypto.randomUUID());
 
   useEffect(() => {
@@ -210,6 +212,7 @@ const ListSpot = () => {
   const handleAddressChange = (value: string) => {
     setValue('address', value);
     setAddressCoordinates(null);
+    setAddressValidationError('');
     
     if (value.length >= 3) {
       setShowSuggestions(true);
@@ -239,6 +242,7 @@ const ListSpot = () => {
         
         setValue('address', fullAddress);
         setAddressCoordinates({ lat, lng });
+        setAddressValidationError(''); // Clear any validation errors
         setShowSuggestions(false);
         setAddressSuggestions([]);
         
@@ -254,36 +258,64 @@ const ListSpot = () => {
     }
   };
 
-  const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
+  const validateAddressBeforeSubmit = async (address: string): Promise<{ lat: number; lng: number } | null> => {
     // If we already have coordinates from suggestion selection, use those
     if (addressCoordinates) {
+      console.log('[ListSpot] Using previously selected coordinates');
       return addressCoordinates;
     }
 
     if (!mapboxToken) {
-      console.error('Mapbox token not available');
+      console.error('[ListSpot] Mapbox token not available');
+      setAddressValidationError('Unable to validate address. Please try again.');
       return null;
     }
 
+    // Validate manually entered address using geocoding
     try {
-      const encodedAddress = encodeURIComponent(address);
+      setIsValidatingAddress(true);
+      const encodedAddress = encodeURIComponent(address.trim());
+      
+      // Use the geocoding API with bias towards SoCal
+      const losAngelesCoords = '-118.2437,34.0522';
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${mapboxToken}&limit=1`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?` +
+        `access_token=${mapboxToken}` +
+        `&proximity=${losAngelesCoords}` +
+        `&types=address,poi,place` +
+        `&country=US` +
+        `&limit=1`
       );
       
-      if (!response.ok) throw new Error('Geocoding failed');
+      if (!response.ok) {
+        setAddressValidationError('Unable to validate address. Please check and try again.');
+        return null;
+      }
       
       const data = await response.json();
       
       if (data.features && data.features.length > 0) {
         const [lng, lat] = data.features[0].center;
+        const validatedAddress = data.features[0].place_name;
+        
+        console.log('[ListSpot] Address validated:', { address: validatedAddress, lat, lng });
+        
+        // Update the form with the validated address
+        setValue('address', validatedAddress);
+        setAddressCoordinates({ lat, lng });
+        setAddressValidationError('');
+        
         return { lat, lng };
+      } else {
+        setAddressValidationError('Address not found. Please enter a valid address or select from suggestions.');
+        return null;
       }
-      
-      return null;
     } catch (error) {
-      console.error('Error geocoding address:', error);
+      console.error('[ListSpot] Error validating address:', error);
+      setAddressValidationError('Failed to validate address. Please try again.');
       return null;
+    } finally {
+      setIsValidatingAddress(false);
     }
   };
 
@@ -299,11 +331,11 @@ const ListSpot = () => {
         return;
       }
 
-      // Geocode the address to get coordinates
-      const coordinates = await geocodeAddress(data.address);
+      // Validate and geocode the address to get coordinates
+      const coordinates = await validateAddressBeforeSubmit(data.address);
       
       if (!coordinates) {
-        toast.error('Could not find location for this address. Please check the address and try again.');
+        toast.error(addressValidationError || 'Could not validate address. Please enter a valid address or select from suggestions.');
         return;
       }
 
@@ -410,7 +442,13 @@ const ListSpot = () => {
 
   const canProceed = () => {
     if (currentStep === 1) {
-      return formData.title && formData.address && formData.hourlyRate && !errors.title && !errors.address && !errors.hourlyRate;
+      return formData.title && 
+             formData.address && 
+             formData.hourlyRate && 
+             !errors.title && 
+             !errors.address && 
+             !errors.hourlyRate &&
+             !addressValidationError;
     }
     if (currentStep === 2) {
       return formData.description && formData.description.length >= 20 && 
@@ -495,7 +533,7 @@ const ListSpot = () => {
                         className="pl-10"
                         autoComplete="off"
                       />
-                      {loadingSuggestions && (
+                      {(loadingSuggestions || isValidatingAddress) && (
                         <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground z-10" />
                       )}
                     </div>
@@ -523,6 +561,12 @@ const ListSpot = () => {
                     
                     {errors.address && (
                       <p className="text-sm text-destructive mt-1">{errors.address.message}</p>
+                    )}
+                    {addressValidationError && (
+                      <p className="text-sm text-destructive mt-1">{addressValidationError}</p>
+                    )}
+                    {addressCoordinates && !addressValidationError && (
+                      <p className="text-sm text-green-600 dark:text-green-400 mt-1">✓ Address validated</p>
                     )}
                   </div>
 
