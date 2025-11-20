@@ -191,44 +191,46 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           }
         });
 
-        // Destination pin shadow
-        map.current.addLayer({
-          id: 'destination-shadow',
-          type: 'circle',
-          source: 'destination-location',
-          paint: {
-            'circle-radius': 12,
-            'circle-color': '#000000',
-            'circle-opacity': 0.2,
-            'circle-blur': 0.8,
-            'circle-translate': [0, 2]
+        // Load destination pin image (red pin)
+        const destPinSvg = `
+          <svg width="50" height="60" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="shadow-dest" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.4)" />
+              </filter>
+            </defs>
+            <g filter="url(#shadow-dest)">
+              <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
+                    fill="#EF4444" stroke="white" stroke-width="3"/>
+              <circle cx="25" cy="20" r="8" fill="white" opacity="1"/>
+            </g>
+          </svg>`;
+        const destPinUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(destPinSvg);
+        const destImg = new Image(50, 60);
+        destImg.onload = () => {
+          try {
+            if (!map.current?.hasImage('pin-destination')) {
+              map.current?.addImage('pin-destination', destImg, { pixelRatio: 2 });
+            }
+          } catch (e) {
+            console.warn('Destination pin image error:', e);
           }
-        });
+        };
+        destImg.src = destPinUrl;
 
-        // Destination pin head
+        // Destination pin layer
         map.current.addLayer({
           id: 'destination-pin',
-          type: 'circle',
+          type: 'symbol',
           source: 'destination-location',
+          layout: {
+            'icon-image': 'pin-destination',
+            'icon-size': 1.2,
+            'icon-allow-overlap': true,
+            'icon-anchor': 'bottom'
+          },
           paint: {
-            'circle-radius': 16,
-            'circle-color': '#EF4444',
-            'circle-opacity': 1,
-            'circle-stroke-width': 3,
-            'circle-stroke-color': 'white'
-          }
-        });
-
-        // Destination pin pointer (bottom part)
-        map.current.addLayer({
-          id: 'destination-pointer',
-          type: 'circle',
-          source: 'destination-location',
-          paint: {
-            'circle-radius': 6,
-            'circle-color': '#EF4444',
-            'circle-opacity': 1,
-            'circle-translate': [0, 18]
+            'icon-opacity': 1
           }
         });
       }
@@ -279,41 +281,44 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           }
         });
 
-        map.current.addLayer({
-          id: 'destination-shadow',
-          type: 'circle',
-          source: 'destination-location',
-          paint: {
-            'circle-radius': 12,
-            'circle-color': '#000000',
-            'circle-opacity': 0.2,
-            'circle-blur': 0.8,
-            'circle-translate': [0, 2]
+        const destPinSvg = `
+          <svg width="50" height="60" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="shadow-dest-alt" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.4)" />
+              </filter>
+            </defs>
+            <g filter="url(#shadow-dest-alt)">
+              <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
+                    fill="#EF4444" stroke="white" stroke-width="3"/>
+              <circle cx="25" cy="20" r="8" fill="white" opacity="1"/>
+            </g>
+          </svg>`;
+        const destPinUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(destPinSvg);
+        const destImg = new Image(50, 60);
+        destImg.onload = () => {
+          try {
+            if (!map.current?.hasImage('pin-destination')) {
+              map.current?.addImage('pin-destination', destImg, { pixelRatio: 2 });
+            }
+          } catch (e) {
+            console.warn('Destination pin image error (alt):', e);
           }
-        });
+        };
+        destImg.src = destPinUrl;
 
         map.current.addLayer({
           id: 'destination-pin',
-          type: 'circle',
+          type: 'symbol',
           source: 'destination-location',
+          layout: {
+            'icon-image': 'pin-destination',
+            'icon-size': 1.2,
+            'icon-allow-overlap': true,
+            'icon-anchor': 'bottom'
+          },
           paint: {
-            'circle-radius': 16,
-            'circle-color': '#EF4444',
-            'circle-opacity': 1,
-            'circle-stroke-width': 3,
-            'circle-stroke-color': 'white'
-          }
-        });
-
-        map.current.addLayer({
-          id: 'destination-pointer',
-          type: 'circle',
-          source: 'destination-location',
-          paint: {
-            'circle-radius': 6,
-            'circle-color': '#EF4444',
-            'circle-opacity': 1,
-            'circle-translate': [0, 18]
+            'icon-opacity': 1
           }
         });
       }
@@ -585,23 +590,12 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         filter: ['!', ['has', 'point_count']],
         layout: {
           'icon-image': pinImageId,
-          'icon-size': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            1.8,  // 20% larger on hover
-            1.5
-          ],
+          'icon-size': 1.5,
           'icon-allow-overlap': true,
           'icon-anchor': 'bottom'
         },
         paint: {
-          'icon-opacity': [
-            'interpolate',
-            ['linear'],
-            ['case', ['boolean', ['feature-state', 'hover'], false], 1, 0],
-            0, 0.85,
-            1, 1
-          ]
+          'icon-opacity': 0.85
         }
       } as any);
 
@@ -613,12 +607,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         filter: ['!', ['has', 'point_count']],
         layout: {
           'text-field': ['get', 'price'],
-          'text-size': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            12,  // Slightly larger on hover
-            11
-          ],
+          'text-size': 11,
           'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
           'text-allow-overlap': true,
           'text-offset': [0, -2.8]
@@ -627,13 +616,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           'text-color': 'hsl(250, 100%, 65%)',
           'text-halo-color': '#ffffff',
           'text-halo-width': 0.5,
-          'text-opacity': [
-            'interpolate',
-            ['linear'],
-            ['case', ['boolean', ['feature-state', 'hover'], false], 1, 0],
-            0, 0.9,
-            1, 1
-          ]
+          'text-opacity': 0.9
         }
       } as any);
 
@@ -676,62 +659,19 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         (map.current as any).getCanvas().style.cursor = '';
       });
 
-      // Smooth hover animations for individual spots
-      (map.current as any).on('mouseenter', circleId, (e: any) => {
+      // Change cursor on hover for spots
+      (map.current as any).on('mouseenter', circleId, () => {
         (map.current as any).getCanvas().style.cursor = 'pointer';
-        if (e.features && e.features.length > 0) {
-          const feature = e.features[0];
-          if (hoveredSpotId !== null) {
-            (map.current as any).setFeatureState(
-              { source: sourceId, id: hoveredSpotId },
-              { hover: false }
-            );
-          }
-          hoveredSpotId = feature.properties.id;
-          (map.current as any).setFeatureState(
-            { source: sourceId, id: hoveredSpotId },
-            { hover: true }
-          );
-        }
       });
       (map.current as any).on('mouseleave', circleId, () => {
         (map.current as any).getCanvas().style.cursor = '';
-        if (hoveredSpotId !== null) {
-          (map.current as any).setFeatureState(
-            { source: sourceId, id: hoveredSpotId },
-            { hover: false }
-          );
-          hoveredSpotId = null;
-        }
       });
 
-      // Also handle hover for price labels
-      (map.current as any).on('mouseenter', labelId, (e: any) => {
+      (map.current as any).on('mouseenter', labelId, () => {
         (map.current as any).getCanvas().style.cursor = 'pointer';
-        if (e.features && e.features.length > 0) {
-          const feature = e.features[0];
-          if (hoveredSpotId !== null) {
-            (map.current as any).setFeatureState(
-              { source: sourceId, id: hoveredSpotId },
-              { hover: false }
-            );
-          }
-          hoveredSpotId = feature.properties.id;
-          (map.current as any).setFeatureState(
-            { source: sourceId, id: hoveredSpotId },
-            { hover: true }
-          );
-        }
       });
       (map.current as any).on('mouseleave', labelId, () => {
         (map.current as any).getCanvas().style.cursor = '';
-        if (hoveredSpotId !== null) {
-          (map.current as any).setFeatureState(
-            { source: sourceId, id: hoveredSpotId },
-            { hover: false }
-          );
-          hoveredSpotId = null;
-        }
       });
 
       // Trigger visible spots count update after rendering
