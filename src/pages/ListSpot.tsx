@@ -68,7 +68,6 @@ const ListSpot = () => {
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
-  const [selectedAddress, setSelectedAddress] = useState<string>('');
   const [addressCoordinates, setAddressCoordinates] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
@@ -90,6 +89,7 @@ const ListSpot = () => {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -104,6 +104,7 @@ const ListSpot = () => {
   });
 
   const formData = watch();
+  const addressValue = watch('address');
 
   const toggleAmenity = (amenityId: string) => {
     setSelectedAmenities((prev) =>
@@ -190,7 +191,7 @@ const ListSpot = () => {
   };
 
   const handleAddressChange = (value: string) => {
-    setSelectedAddress(value);
+    setValue('address', value);
     setAddressCoordinates(null);
     
     if (value.length >= 3) {
@@ -203,12 +204,13 @@ const ListSpot = () => {
   };
 
   const handleSuggestionSelect = (suggestion: AddressSuggestion) => {
-    setSelectedAddress(suggestion.place_name);
+    setValue('address', suggestion.place_name);
     setAddressCoordinates({
       lat: suggestion.center[1],
       lng: suggestion.center[0]
     });
     setShowSuggestions(false);
+    setAddressSuggestions([]);
   };
 
   const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
@@ -428,21 +430,22 @@ const ListSpot = () => {
                     )}
                   </div>
 
-                  <div>
+                  <div className="relative">
                     <Label htmlFor="address">Address</Label>
                     <div className="relative mt-1.5">
                       <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
                       <Input
                         id="address"
                         placeholder="Start typing your address..."
-                        value={selectedAddress}
-                        onChange={(e) => {
-                          handleAddressChange(e.target.value);
-                          register('address').onChange(e);
-                        }}
+                        value={addressValue || ''}
+                        onChange={(e) => handleAddressChange(e.target.value)}
                         onFocus={() => {
-                          if (selectedAddress.length >= 3 && addressSuggestions.length > 0) {
-                            setShowSuggestions(true);
+                          if (addressValue && addressValue.length >= 3) {
+                            if (addressSuggestions.length > 0) {
+                              setShowSuggestions(true);
+                            } else {
+                              searchAddresses(addressValue);
+                            }
                           }
                         }}
                         onBlur={() => {
@@ -452,7 +455,7 @@ const ListSpot = () => {
                         autoComplete="off"
                       />
                       {loadingSuggestions && (
-                        <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />
+                        <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground z-10" />
                       )}
                     </div>
                     
@@ -477,9 +480,6 @@ const ListSpot = () => {
                     {errors.address && (
                       <p className="text-sm text-destructive mt-1">{errors.address.message}</p>
                     )}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Type at least 3 characters to see suggestions. You can also enter a custom address.
-                    </p>
                   </div>
 
                   <div>
