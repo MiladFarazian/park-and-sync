@@ -22,11 +22,11 @@ const AppLayout = ({
       <ModeLoadingOverlay />
       
       {/* Desktop Layout with Sidebar */}
-      <div className="hidden md:block">
+      <div className="hidden md:flex h-screen flex-col">
         <SidebarProvider>
-          <div className="flex h-screen w-full">
+          <div className="flex flex-1 w-full overflow-hidden">
             <AppSidebar />
-            <main className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden">
               {!isProfilePage && <header className="flex-shrink-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
                   <div className="flex items-center gap-4">
                     <SidebarTrigger />
@@ -40,12 +40,12 @@ const AppLayout = ({
                     </Button>
                   </div>
                 </header>}
-              <div className="flex-1 overflow-auto">
-                <div className="container mx-auto p-6">
+              <main className="flex-1 overflow-y-auto">
+                <div className="container mx-auto p-6 h-full">
                   {children}
                 </div>
-              </div>
-            </main>
+              </main>
+            </div>
           </div>
         </SidebarProvider>
       </div>
@@ -61,11 +61,11 @@ const AppLayout = ({
               <NotificationBell />
             </div>
           </header>}
-        <div className="flex-1 overflow-auto bg-background pb-24">
-          <div className="max-w-md mx-auto">
+        <main className="flex-1 overflow-y-auto bg-background">
+          <div className="h-full pb-24">
             {children}
           </div>
-        </div>
+        </main>
         <BottomNavigation />
       </div>
     </>;

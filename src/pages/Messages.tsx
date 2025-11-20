@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
 import { Search, Send, Loader2, ArrowLeft, Paperclip, X, Check, CheckCheck } from 'lucide-react';
 import { useMessages, Message } from '@/hooks/useMessages';
@@ -330,14 +329,14 @@ function ChatPane({
           </div>
         </div>
       </div>
-      <div className="flex-1 relative min-h-0">
+      <div className="flex-1 overflow-y-auto">
         {(loadingMessages && !(messagesCacheRef.current.get(conversationId)?.length)) ? (
-          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+          <div className="flex items-center justify-center h-full text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin" />
           </div>
         ) : (
           sortedMessages.length === 0 ? (
-            <div className="absolute inset-0 flex items-center justify-center text-center text-muted-foreground">
+            <div className="flex items-center justify-center h-full text-center text-muted-foreground">
               <p className="text-sm">No messages yet. Start the conversation!</p>
             </div>
           ) : (
@@ -506,22 +505,6 @@ const Messages = () => {
     }
   };
 
-  // Moved chat data loading into ChatPane for clean remount per conversation
-
-  // Realtime subscription handled inside ChatPane
-
-  // Cache synchronization handled inside ChatPane
-  
-  // Pagination handled inside ChatPane
-  
-  // Scroll handling moved to ChatPane
-
-  // Media selection handled inside ChatPane
-
-  // Media removal handled inside ChatPane
-
-  // Sending handled inside ChatPane
-
   const filteredConversations = conversations.filter(conv =>
     conv.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -532,13 +515,12 @@ const Messages = () => {
   const displayName = selectedConvData?.name || 
     (newUserProfile ? `${newUserProfile.first_name || ''} ${newUserProfile.last_name || ''}`.trim() || 'User' : 'User');
   const displayAvatar = selectedConvData?.avatar_url || newUserProfile?.avatar_url;
-  const hasCache = selectedConversation ? messagesCacheRef.current.has(selectedConversation) : false;
 
   return (
-    <div className="flex h-full gap-4">
+    <div className="flex h-full gap-0 md:gap-4">
       {/* Conversations List */}
-      <Card className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col rounded-none md:rounded-lg`}>
-        <div className="p-4 border-b">
+      <Card className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col overflow-hidden rounded-none md:rounded-2xl`}>
+        <div className="p-4 border-b flex-shrink-0">
           <h1 className="text-2xl font-bold mb-4">Messages</h1>
           
           {/* Contact Support Button */}
@@ -563,7 +545,7 @@ const Messages = () => {
             />
           </div>
         </div>
-        <ScrollArea className="flex-1">
+        <div className="flex-1 overflow-y-auto">
           <div className="p-2">
             {loading ? (
               <div className="flex items-center justify-center py-8">
@@ -610,11 +592,11 @@ const Messages = () => {
               ))
             )}
           </div>
-        </ScrollArea>
+        </div>
       </Card>
 
       {/* Messages Area */}
-      <Card className={`${selectedConversation && isMobile ? 'flex' : 'hidden'} md:flex flex-1 flex-col rounded-none md:rounded-lg`}>
+      <Card className={`${selectedConversation && isMobile ? 'flex' : 'hidden'} md:flex flex-1 flex-col overflow-hidden rounded-none md:rounded-2xl`}>
         {selectedConversation ? (
           <ChatPane
             key={selectedConversation}
