@@ -276,12 +276,15 @@ const ListSpot = () => {
       setIsValidatingAddress(true);
       const encodedAddress = encodeURIComponent(address.trim());
       
-      // Use the geocoding API with bias towards SoCal
+      // Use the geocoding API with bias towards SoCal and strict LA County bounds
       const losAngelesCoords = '-118.2437,34.0522';
+      const laCountyBbox = '-118.9448,33.7037,-117.6462,34.3373'; // LA County geographic bounds
+      
       const response = await fetch(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?` +
         `access_token=${mapboxToken}` +
         `&proximity=${losAngelesCoords}` +
+        `&bbox=${laCountyBbox}` +
         `&types=address,poi,place` +
         `&country=US` +
         `&limit=1`
@@ -295,24 +298,36 @@ const ListSpot = () => {
       const data = await response.json();
       
       if (data.features && data.features.length > 0) {
-        const [lng, lat] = data.features[0].center;
-        const validatedAddress = data.features[0].place_name;
+        const feature = data.features[0];
+        const relevance = feature.relevance || 0;
+
+        // Reject low-confidence matches (fuzzy/poor matches)
+        if (relevance < 0.8) {
+          setAddressValidationError(
+            'Could not verify this exact address. Please select from the suggested addresses below or enter a more specific address.'
+          );
+          return null;
+        }
+
+        const [lng, lat] = feature.center;
         
-        console.log('[ListSpot] Address validated:', { address: validatedAddress, lat, lng });
+        console.log('[ListSpot] Address validated:', { address, lat, lng, relevance });
         
-        // Update the form with the validated address
-        setValue('address', validatedAddress);
+        // DO NOT update the form field - keep user's original input
+        // Only set coordinates if validation passes
         setAddressCoordinates({ lat, lng });
         setAddressValidationError('');
         
         return { lat, lng };
       } else {
-        setAddressValidationError('Address not found. Please enter a valid address or select from suggestions.');
+        setAddressValidationError(
+          'Address not found in the Los Angeles area. Please check the spelling or select from the suggested addresses below.'
+        );
         return null;
       }
     } catch (error) {
       console.error('[ListSpot] Error validating address:', error);
-      setAddressValidationError('Failed to validate address. Please try again.');
+      setAddressValidationError('Unable to validate address. Please select from the suggested addresses below.');
       return null;
     } finally {
       setIsValidatingAddress(false);
