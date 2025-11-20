@@ -202,7 +202,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
             <g filter="url(#shadow-dest)">
               <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
                     fill="#f0edfe" stroke="#694dff" stroke-width="3"/>
-              <circle cx="25" cy="20" r="8" fill="white" opacity="1"/>
+              <circle cx="25" cy="20" r="8" fill="#694dff" opacity="1"/>
             </g>
           </svg>`;
         const destPinUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(destPinSvg);
@@ -291,7 +291,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
             <g filter="url(#shadow-dest-alt)">
               <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
                     fill="#f0edfe" stroke="#694dff" stroke-width="3"/>
-              <circle cx="25" cy="20" r="8" fill="white" opacity="1"/>
+              <circle cx="25" cy="20" r="8" fill="#694dff" opacity="1"/>
             </g>
           </svg>`;
         const destPinUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(destPinSvg);
