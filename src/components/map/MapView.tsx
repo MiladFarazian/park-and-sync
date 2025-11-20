@@ -180,6 +180,58 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           }
         });
       }
+
+      // Add destination location source and layers
+      if (map.current && !map.current.getSource('destination-location')) {
+        map.current.addSource('destination-location', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: []
+          }
+        });
+
+        // Destination pin shadow
+        map.current.addLayer({
+          id: 'destination-shadow',
+          type: 'circle',
+          source: 'destination-location',
+          paint: {
+            'circle-radius': 12,
+            'circle-color': '#000000',
+            'circle-opacity': 0.2,
+            'circle-blur': 0.8,
+            'circle-translate': [0, 2]
+          }
+        });
+
+        // Destination pin head
+        map.current.addLayer({
+          id: 'destination-pin',
+          type: 'circle',
+          source: 'destination-location',
+          paint: {
+            'circle-radius': 16,
+            'circle-color': '#EF4444',
+            'circle-opacity': 1,
+            'circle-stroke-width': 3,
+            'circle-stroke-color': 'white'
+          }
+        });
+
+        // Destination pin pointer (bottom part)
+        map.current.addLayer({
+          id: 'destination-pointer',
+          type: 'circle',
+          source: 'destination-location',
+          paint: {
+            'circle-radius': 6,
+            'circle-color': '#EF4444',
+            'circle-opacity': 1,
+            'circle-translate': [0, 18]
+          }
+        });
+      }
     });
 
     // Also add layers on style.load (in case style changes)
@@ -214,6 +266,54 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
             'circle-opacity': 1,
             'circle-stroke-width': 3,
             'circle-stroke-color': 'white'
+          }
+        });
+      }
+
+      if (map.current && !map.current.getSource('destination-location')) {
+        map.current.addSource('destination-location', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: []
+          }
+        });
+
+        map.current.addLayer({
+          id: 'destination-shadow',
+          type: 'circle',
+          source: 'destination-location',
+          paint: {
+            'circle-radius': 12,
+            'circle-color': '#000000',
+            'circle-opacity': 0.2,
+            'circle-blur': 0.8,
+            'circle-translate': [0, 2]
+          }
+        });
+
+        map.current.addLayer({
+          id: 'destination-pin',
+          type: 'circle',
+          source: 'destination-location',
+          paint: {
+            'circle-radius': 16,
+            'circle-color': '#EF4444',
+            'circle-opacity': 1,
+            'circle-stroke-width': 3,
+            'circle-stroke-color': 'white'
+          }
+        });
+
+        map.current.addLayer({
+          id: 'destination-pointer',
+          type: 'circle',
+          source: 'destination-location',
+          paint: {
+            'circle-radius': 6,
+            'circle-color': '#EF4444',
+            'circle-opacity': 1,
+            'circle-translate': [0, 18]
           }
         });
       }
@@ -325,6 +425,40 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       });
     }
   }, [currentLocation, mapReady]);
+
+  // Update destination location GeoJSON source when searchCenter changes
+  useEffect(() => {
+    if (!map.current || !mapReady || !searchCenter) return;
+
+    // Validate coordinates
+    const { lat, lng } = searchCenter;
+    if (
+      typeof lat !== 'number' || typeof lng !== 'number' ||
+      !isFinite(lat) || !isFinite(lng) ||
+      lat < -90 || lat > 90 ||
+      lng < -180 || lng > 180
+    ) {
+      console.warn('Invalid search center coordinates:', lat, lng);
+      return;
+    }
+
+    const source = map.current.getSource('destination-location');
+    if (source && 'setData' in source) {
+      (source as mapboxgl.GeoJSONSource).setData({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: [lng, lat]
+            },
+            properties: {}
+          }
+        ]
+      });
+    }
+  }, [searchCenter, mapReady]);
 
   // Add markers for spots
   useEffect(() => {
