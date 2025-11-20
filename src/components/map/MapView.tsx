@@ -371,7 +371,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     };
   }, [mapboxToken]);
 
-  // Fly to search center when it changes (no label card for cleaner design)
+  // Fly to search center when it changes (destination location)
   useEffect(() => {
     if (!map.current || !mapReady || !searchCenter) return;
 
@@ -386,16 +386,14 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       return;
     }
 
-    const targetLng = currentLocation?.lng ?? lng;
-    const targetLat = currentLocation?.lat ?? lat;
-
+    // Always fly to the destination (searchCenter), not current location
     map.current.flyTo({
-      center: [targetLng, targetLat],
+      center: [lng, lat],
       zoom: 14,
       essential: true,
       duration: 1500
     });
-  }, [searchCenter, mapReady, currentLocation]);
+  }, [searchCenter, mapReady]);
 
   // Update current location GeoJSON source when currentLocation changes
   useEffect(() => {
