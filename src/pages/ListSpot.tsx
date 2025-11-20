@@ -554,10 +554,6 @@ const ListSpot = () => {
                       </div>
                     )}
                     
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Start typing and select an address from the dropdown. Manual entries without selecting a suggestion are not allowed.
-                    </p>
-                    
                     {errors.address && (
                       <p className="text-sm text-destructive mt-1">{errors.address.message}</p>
                     )}
