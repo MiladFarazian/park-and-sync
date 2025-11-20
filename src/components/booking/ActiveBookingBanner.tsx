@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus, Navigation } from "lucide-react";
+import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus, Navigation, Edit } from "lucide-react";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { toast } from "sonner";
@@ -320,11 +320,14 @@ export const ActiveBookingBanner = () => {
 
   return (
     <>
-      <Card className="border-l-4 border-l-primary shadow-md bg-card animate-fade-in">
+      <Card 
+        className="border-l-4 border-l-primary shadow-md bg-card animate-fade-in cursor-pointer hover:shadow-lg transition-shadow"
+        onClick={() => navigate(`/booking/${activeBooking.id}`)}
+      >
         <div className="p-3">
           <div className="flex flex-col gap-3">
             {/* Top: Info Section */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
               <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <CarFront className="h-5 w-5 text-primary" />
               </div>
@@ -368,18 +371,9 @@ export const ActiveBookingBanner = () => {
             </div>
 
             {/* Bottom: Action Buttons */}
-            <div className="flex items-center gap-2 justify-end flex-wrap">
+            <div className="flex items-center gap-2 justify-end flex-wrap" onClick={(e) => e.stopPropagation()}>
               {!isHost && (
                 <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleMessage}
-                  >
-                    <MessageCircle className="h-4 w-4 mr-1.5" />
-                    <span className="hidden sm:inline">Message</span>
-                  </Button>
-
                   <Button
                     variant="outline"
                     size="sm"
@@ -387,6 +381,15 @@ export const ActiveBookingBanner = () => {
                   >
                     <Navigation className="h-4 w-4 mr-1.5" />
                     <span className="hidden sm:inline">Directions</span>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/booking/${activeBooking.id}`)}
+                  >
+                    <Edit className="h-4 w-4 mr-1.5" />
+                    <span className="hidden sm:inline">Modify</span>
                   </Button>
 
                   {!isOverstayed && (
@@ -399,6 +402,14 @@ export const ActiveBookingBanner = () => {
                       Extend
                     </Button>
                   )}
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleMessage}
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                  </Button>
                 </>
               )}
 
