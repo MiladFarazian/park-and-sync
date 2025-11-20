@@ -14,10 +14,16 @@ const Explore = () => {
   const navigate = useNavigate();
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userLocation, setUserLocation] = useState({
+
+  // Physical device location (blue dot)
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Desired search location / map center (red destination pin)
+  const [searchLocation, setSearchLocation] = useState({
     lat: 34.0224,
     lng: -118.2851
-  }); // Default to University Park
+  }); // Default to University Park as initial search area
+
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -85,57 +91,74 @@ const Explore = () => {
     const start = searchParams.get('start');
     const end = searchParams.get('end');
     const query = searchParams.get('q');
+
+    // If URL has a lat/lng, treat that as the desired search location
     if (lat && lng) {
-      const location = {
+      const desired = {
         lat: parseFloat(lat),
         lng: parseFloat(lng)
       };
-      setUserLocation(location);
+      setSearchLocation(desired);
+
       if (query) {
         setSearchQuery(query);
       } else if (mapboxToken) {
-        // Get address for the location
-        reverseGeocode(location.lat, location.lng).then(address => {
+        // Get address label for the desired location
+        reverseGeocode(desired.lat, desired.lng).then(address => {
           if (address) setSearchQuery(address);
         });
       }
-      // Fetch spots for the initial location
+
+      // Fetch spots for the initial desired location
       const startDate = start ? new Date(start) : new Date();
       const endDate = end ? new Date(end) : new Date(Date.now() + 24 * 60 * 60 * 1000);
       if (start) setStartTime(startDate);
       if (end) setEndTime(endDate);
-      fetchNearbySpots(location, 15000, true);
+      fetchNearbySpots(desired, 15000, true);
+
+      // Also try to get the actual device location (blue dot) in the background
+      if (navigator.geolocation && !currentLocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+          setCurrentLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        });
+      }
     } else {
-      // Get user's current location
+      // No URL lat/lng: start from the user's physical location if available
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(async (position) => {
-          const location = {
+          const deviceLoc = {
             lat: position.coords.latitude,
             lng: position.coords.longitude
           };
-          setUserLocation(location);
+
+          // Use device location as both current and initial search location
+          setCurrentLocation(deviceLoc);
+          setSearchLocation(deviceLoc);
           
           // Get address for current location
           if (mapboxToken) {
-            const address = await reverseGeocode(location.lat, location.lng);
+            const address = await reverseGeocode(deviceLoc.lat, deviceLoc.lng);
             if (address) setSearchQuery(address);
           }
           
-          fetchNearbySpots(location, 15000, true);
+          fetchNearbySpots(deviceLoc, 15000, true);
         }, error => {
-          console.log('Location access denied, using default location');
-          fetchNearbySpots(userLocation, 15000, true);
+          console.log('Location access denied, using default search location');
+          fetchNearbySpots(searchLocation, 15000, true);
           // Set default location name
           setSearchQuery('University Park, Los Angeles');
         });
       } else {
-        fetchNearbySpots(userLocation, 15000, true);
+        fetchNearbySpots(searchLocation, 15000, true);
         setSearchQuery('University Park, Los Angeles');
       }
       if (start) setStartTime(new Date(start));
       if (end) setEndTime(new Date(end));
     }
-  }, [searchParams, mapboxToken]);
+  }, [searchParams, mapboxToken, currentLocation, searchLocation]);
   const fetchMapboxToken = async () => {
     try {
       const {
@@ -148,7 +171,7 @@ const Explore = () => {
       console.error('Error fetching Mapbox token:', error);
     }
   };
-  const searchLocation = async (query: string) => {
+  const searchByQuery = async (query: string) => {
     if (!query.trim()) {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -202,7 +225,7 @@ const Explore = () => {
       clearTimeout(searchTimeoutRef.current);
     }
     searchTimeoutRef.current = setTimeout(() => {
-      searchLocation(value);
+      searchByQuery(value);
     }, 300);
   };
   const handleSelectLocation = async (location: any) => {
@@ -222,14 +245,14 @@ const Explore = () => {
         const [lng, lat] = data.features[0].geometry.coordinates;
         const placeName = location.name || location.place_formatted || location.full_address;
         
-        const newLocation = { lat, lng };
-        setUserLocation(newLocation);
+        const desired = { lat, lng };
+        setSearchLocation(desired);
         setSearchQuery(placeName);
         setShowSuggestions(false);
         setSuggestions([]);
         
         // Fetch spots for the new search location
-        fetchNearbySpots(newLocation, 15000, false);
+        fetchNearbySpots(desired, 15000, false);
         
         // Regenerate session token for next search session
         sessionTokenRef.current = crypto.randomUUID();
@@ -277,19 +300,23 @@ const Explore = () => {
     setIsLoadingLocation(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(async (position) => {
-        const location = {
+        const deviceLoc = {
           lat: position.coords.latitude,
           lng: position.coords.longitude
         };
-        setUserLocation(location);
+
+        // Update physical current location
+        setCurrentLocation(deviceLoc);
+        // Also center the search/destination on the current location when user taps this button
+        setSearchLocation(deviceLoc);
         
         // Get address for current location
         if (mapboxToken) {
-          const address = await reverseGeocode(location.lat, location.lng);
+          const address = await reverseGeocode(deviceLoc.lat, deviceLoc.lng);
           if (address) setSearchQuery(address);
         }
         
-        fetchNearbySpots(location, 15000, false);
+        fetchNearbySpots(deviceLoc, 15000, false);
         setIsLoadingLocation(false);
       }, error => {
         console.error('Error getting location:', error);
@@ -302,7 +329,7 @@ const Explore = () => {
     setSuggestions([]);
     setShowSuggestions(false);
   };
-  const fetchNearbySpots = async (center = userLocation, radius = 15000, isInitialLoad = true) => {
+  const fetchNearbySpots = async (center = searchLocation, radius = 15000, isInitialLoad = true) => {
     try {
       if (isInitialLoad) {
         setLoading(true);
@@ -311,10 +338,7 @@ const Explore = () => {
       // Use provided times or default to now + 24 hours
       const start = startTime || new Date();
       const end = endTime || new Date(Date.now() + 24 * 60 * 60 * 1000);
-      const {
-        data,
-        error
-      } = await supabase.functions.invoke('search-spots', {
+      const { data, error } = await supabase.functions.invoke('search-spots', {
         body: {
           latitude: center.lat,
           longitude: center.lng,
@@ -368,17 +392,15 @@ const Explore = () => {
     
     // Update URL params
     const params = new URLSearchParams();
-    params.set('lat', userLocation.lat.toString());
-    params.set('lng', userLocation.lng.toString());
+    params.set('lat', searchLocation.lat.toString());
+    params.set('lng', searchLocation.lng.toString());
     if (effectiveStartTime) params.set('start', effectiveStartTime.toISOString());
     if (effectiveEndTime) params.set('end', effectiveEndTime.toISOString());
     if (searchQuery) params.set('q', searchQuery);
-    navigate(`/explore?${params.toString()}`, {
-      replace: true
-    });
+    navigate(`/explore?${params.toString()}`, { replace: true });
 
-    // Refetch spots with new times
-    fetchNearbySpots(userLocation, 15000, false);
+    // Refetch spots with new times around the current search location
+    fetchNearbySpots(searchLocation, 15000, false);
   };
   const formatDateDisplay = (date: Date) => {
     return isToday(date) ? 'Today' : format(date, 'MMM dd');
@@ -518,14 +540,14 @@ const Explore = () => {
 
       <MapView 
         spots={parkingSpots} 
-        searchCenter={userLocation} 
-        currentLocation={userLocation}
+        searchCenter={searchLocation} 
+        currentLocation={currentLocation || searchLocation}
         onVisibleSpotsChange={() => {}} 
         onMapMove={handleMapMove}
         searchQuery={searchQuery}
         exploreParams={{
-          lat: userLocation?.lat.toString(),
-          lng: userLocation?.lng.toString(),
+          lat: searchLocation.lat.toString(),
+          lng: searchLocation.lng.toString(),
           start: startTime?.toISOString(),
           end: endTime?.toISOString(),
           q: searchQuery
