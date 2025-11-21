@@ -40,7 +40,12 @@ serve(async (req) => {
         break;
         
       case 'checkout.session.completed':
-        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+        const session = event.data.object as Stripe.Checkout.Session;
+        if (session.mode === 'payment' && session.metadata?.booking_id) {
+          await handleCheckoutPaymentCompleted(session);
+        } else if (session.metadata?.type === 'extension') {
+          await handleCheckoutCompleted(session);
+        }
         break;
         
       case 'account.updated':
@@ -141,6 +146,58 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
 
   if (error) {
     console.error('Failed to update booking status:', error);
+  }
+}
+
+async function handleCheckoutPaymentCompleted(session: Stripe.Checkout.Session) {
+  console.log('Processing checkout payment completion for session:', session.id);
+  
+  const bookingId = session.metadata?.booking_id;
+  if (!bookingId) {
+    console.error('No booking_id in session metadata');
+    return;
+  }
+
+  try {
+    // Update booking status to active
+    const { error: updateError } = await supabase
+      .from('bookings')
+      .update({ 
+        status: 'active',
+        stripe_charge_id: session.payment_intent as string,
+      })
+      .eq('id', bookingId);
+
+    if (updateError) throw updateError;
+
+    // Get booking details for notifications
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('*, spots(host_id, title)')
+      .eq('id', bookingId)
+      .single();
+
+    if (booking) {
+      // Credit host balance
+      const hostEarnings = booking.subtotal;
+      await supabase.rpc('increment_balance', {
+        user_id: (booking.spots as any).host_id,
+        amount: hostEarnings,
+      });
+
+      // Send notification to renter
+      await supabase.from('notifications').insert({
+        user_id: booking.renter_id,
+        type: 'booking_confirmed',
+        title: 'Booking Confirmed',
+        message: `Your parking at ${(booking.spots as any).title} has been confirmed.`,
+        related_id: bookingId,
+      });
+    }
+
+    console.log('Successfully processed checkout payment for booking:', bookingId);
+  } catch (error) {
+    console.error('Error processing checkout payment:', error);
   }
 }
 
