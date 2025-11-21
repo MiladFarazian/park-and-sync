@@ -423,10 +423,10 @@ const BookingDetail = () => {
       )}
 
       {/* Extend Duration Dialog */}
-      <Dialog open={showExtendDialog} onOpenChange={(open) => {
-        setShowExtendDialog(open);
-        if (!open) setNewEndTime(null);
-      }}>
+      <Dialog 
+        open={showExtendDialog} 
+        onOpenChange={setShowExtendDialog}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Extend Parking Duration</DialogTitle>
