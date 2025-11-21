@@ -866,7 +866,7 @@ const Booking = () => {
         )}
 
         {/* Book Now Button */}
-        <div className="space-y-2 pb-6">
+        <div className="space-y-2 pb-24">
           {!serverAvailable.ok && startDateTime && endDateTime && (
             <div className="mb-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
               <p className="text-sm text-destructive font-medium">

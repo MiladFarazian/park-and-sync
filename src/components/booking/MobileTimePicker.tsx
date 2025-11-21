@@ -173,7 +173,7 @@ export const MobileTimePicker = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 animate-fade-in">
-      <div className="absolute inset-x-0 bottom-0 bg-background rounded-t-3xl animate-slide-in-bottom">
+      <div className="absolute inset-x-0 bottom-0 bg-background rounded-t-3xl animate-slide-in-bottom pb-20">
         {/* Header */}
         <div className="p-6 border-b">
           <div className="flex items-start justify-between mb-2">
