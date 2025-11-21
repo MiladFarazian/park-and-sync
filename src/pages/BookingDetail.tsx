@@ -267,7 +267,15 @@ const BookingDetail = () => {
 
         {/* Time Details */}
         <Card className="p-4 space-y-3">
-          <h3 className="font-semibold">Parking Time</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">Parking Time</h3>
+            {canExtend && (
+              <Button size="sm" variant="outline" onClick={() => setShowExtendDialog(true)}>
+                <Plus className="h-4 w-4 mr-1" />
+                Extend
+              </Button>
+            )}
+          </div>
           <div className="space-y-2">
             <div className="flex items-center gap-3">
               <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -359,23 +367,6 @@ const BookingDetail = () => {
             </div>
           )}
         </Card>
-
-        {/* Extend Duration Button */}
-        {canExtend && (
-          <Card className="p-4 bg-primary/5 border-primary/20">
-            <div className="flex items-start gap-3">
-              <Plus className="h-5 w-5 text-primary mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm font-medium mb-1">Need more time?</p>
-                <p className="text-xs text-muted-foreground mb-3">Extend your parking duration</p>
-                <Button size="sm" onClick={() => setShowExtendDialog(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Extend Duration
-                </Button>
-              </div>
-            </div>
-          </Card>
-        )}
 
         {/* Cancel Button */}
         {canCancel && (
