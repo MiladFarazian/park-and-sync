@@ -13,7 +13,7 @@ import { TimePicker } from '@/components/ui/time-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { differenceInHours, addHours, format } from 'date-fns';
+import { differenceInHours, differenceInMinutes, addHours, format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -336,8 +336,10 @@ const Booking = () => {
       return null;
     }
     
-    const hours = differenceInHours(endDateTime, startDateTime);
-    console.log('Hours calculated:', hours);
+    // Calculate exact hours including minutes (e.g., 2.75 hours for 2h 45m)
+    const minutes = differenceInMinutes(endDateTime, startDateTime);
+    const hours = minutes / 60;
+    console.log('Time calculated:', { minutes, hours });
     
     if (hours <= 0) {
       console.log('Hours less than or equal to 0');
@@ -351,7 +353,7 @@ const Booking = () => {
     console.log('Pricing:', { hours, subtotal, platformFee, total });
 
     return {
-      hours: hours.toString(),
+      hours: hours.toFixed(2), // Show decimal hours (e.g., 2.75)
       subtotal: subtotal.toFixed(2),
       platformFee: platformFee.toFixed(2),
       total: total.toFixed(2),
