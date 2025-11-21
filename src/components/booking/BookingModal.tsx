@@ -166,17 +166,18 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
           start_at: startAt.toISOString(),
           end_at: endAt.toISOString(),
           total_amount: parseFloat(pricing.total),
+          idempotency_key: Date.now().toString(),
         },
       });
 
       if (bookingError) throw bookingError;
 
-      toast({
-        title: "Booking created!",
-        description: "Your booking has been confirmed",
-      });
-
-      onOpenChange(false);
+      // Redirect to Stripe Checkout
+      if (bookingData?.checkout_url) {
+        window.location.href = bookingData.checkout_url;
+      } else {
+        throw new Error('No checkout URL received');
+      }
     } catch (error) {
       console.error('Booking error:', error);
       toast({

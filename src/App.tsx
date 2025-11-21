@@ -19,6 +19,7 @@ import SpotDetail from "./pages/SpotDetail";
 import Booking from "./pages/Booking";
 import BookingConfirmation from "./pages/BookingConfirmation";
 import BookingDetail from "./pages/BookingDetail";
+import CheckoutSuccess from "./pages/CheckoutSuccess";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import EmailConfirmation from "./pages/EmailConfirmation";
@@ -71,6 +72,7 @@ const App = () => {
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/email-confirmation" element={<EmailConfirmation />} />
+            <Route path="/checkout-success" element={<CheckoutSuccess />} />
             <Route path="/search-results" element={<SearchResults />} />
             <Route path="/spot/:id" element={<div className="h-screen overflow-y-auto bg-background"><SpotDetail /></div>} />
             <Route path="/personal-information" element={<PersonalInformation />} />

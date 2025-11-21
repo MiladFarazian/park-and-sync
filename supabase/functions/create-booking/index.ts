@@ -144,7 +144,7 @@ serve(async (req) => {
     if (!stripeSecret) {
       throw new Error('Stripe secret key not configured');
     }
-    const stripe = new Stripe(stripeSecret, {});
+    const stripe = new Stripe(stripeSecret, { apiVersion: '2023-10-16' });
 
     // Get or create Stripe customer
     const { data: profile } = await supabase
@@ -171,21 +171,6 @@ serve(async (req) => {
         .eq('user_id', userData.user.id);
     }
 
-    // Create payment intent (charge to platform account, track host balance)
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(totalAmount * 100), // Convert to cents
-      currency: 'usd',
-      customer: customerId,
-      metadata: {
-        spot_id,
-        host_id: spot.host_id,
-        renter_id: userData.user.id,
-        start_at,
-        end_at,
-        host_earnings: hostEarnings.toString()
-      }
-    });
-
     // Create booking record
     const { data: booking, error: bookingError } = await supabase
       .from('bookings')
@@ -202,7 +187,6 @@ serve(async (req) => {
         platform_fee: platformFee,
         total_amount: totalAmount,
         host_earnings: hostEarnings,
-        stripe_payment_intent_id: paymentIntent.id,
         idempotency_key: idempotency_key || crypto.randomUUID()
       })
       .select()
@@ -210,10 +194,43 @@ serve(async (req) => {
 
     if (bookingError) {
       console.error('Booking creation error:', bookingError);
-      // Cancel the payment intent if booking creation failed
-      await stripe.paymentIntents.cancel(paymentIntent.id);
       throw bookingError;
     }
+
+    // Create Stripe Checkout Session
+    const origin = req.headers.get('origin') || 'http://localhost:8080';
+    const checkoutSession = await stripe.checkout.sessions.create({
+      customer: customerId,
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `Parking at ${spot.title}`,
+              description: `${new Date(start_at).toLocaleString()} - ${new Date(end_at).toLocaleString()}`,
+            },
+            unit_amount: Math.round(totalAmount * 100),
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${origin}/checkout-success?session_id={CHECKOUT_SESSION_ID}&booking_id=${booking.id}`,
+      cancel_url: `${origin}/spot/${spot_id}`,
+      metadata: {
+        booking_id: booking.id,
+        spot_id,
+        host_id: spot.host_id,
+        renter_id: userData.user.id,
+      },
+    });
+
+    // Store the checkout session ID
+    await supabase
+      .from('bookings')
+      .update({ stripe_payment_intent_id: checkoutSession.id })
+      .eq('id', booking.id);
 
     // Release the hold if provided
     if (hold_id) {
@@ -290,7 +307,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       booking_id: booking.id,
-      client_secret: paymentIntent.client_secret,
+      checkout_url: checkoutSession.url,
       total_amount: totalAmount,
       platform_fee: platformFee
     }), {
