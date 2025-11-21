@@ -3,10 +3,8 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { TimePicker } from '@/components/ui/time-picker';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format, isToday } from 'date-fns';
+import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
+import { format, isToday, addHours } from 'date-fns';
 import { CalendarIcon, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Star, MapPin, Loader2, Search, Plus, Activity, Zap } from 'lucide-react';
@@ -29,6 +27,8 @@ const Home = () => {
   const sessionTokenRef = useRef<string>(crypto.randomUUID());
   const [startTime, setStartTime] = useState(new Date());
   const [endTime, setEndTime] = useState(new Date(Date.now() + 2 * 60 * 60 * 1000)); // 2 hours later
+  const [mobileStartPickerOpen, setMobileStartPickerOpen] = useState(false);
+  const [mobileEndPickerOpen, setMobileEndPickerOpen] = useState(false);
 
   // Ensure end time is always after start time
   const handleStartTimeChange = (date: Date) => {
@@ -380,122 +380,33 @@ const Home = () => {
             <p className="font-semibold mb-4">When do you need parking?</p>
             
             <div className="space-y-3">
-              {/* Start Time Section */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Start Time</label>
-                <div className="flex border border-input rounded-lg overflow-hidden h-12">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        className={cn(
-                          "flex-1 justify-start text-left font-normal h-full rounded-none border-0 hover:bg-accent",
-                          !startTime && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
-                        <span className="truncate">
-                          {startTime ? (isToday(startTime) ? "Today" : format(startTime, "MMM d, yyyy")) : "Pick date"}
-                        </span>
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={startTime}
-                        onSelect={(date) => {
-                          if (date) {
-                            const newDate = new Date(date);
-                            newDate.setHours(startTime.getHours());
-                            newDate.setMinutes(startTime.getMinutes());
-                            handleStartTimeChange(newDate);
-                          }
-                        }}
-                        disabled={(date) => {
-                          const today = new Date();
-                          today.setHours(0, 0, 0, 0);
-                          const checkDate = new Date(date);
-                          checkDate.setHours(0, 0, 0, 0);
-                          return checkDate < today;
-                        }}
-                        initialFocus
-                        className="pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
-
-                  <span className="flex items-center px-2 text-muted-foreground">·</span>
-
-                  <TimePicker date={startTime} setDate={handleStartTimeChange}>
-                    <Button
-                      variant="ghost"
-                      className="justify-start text-left font-normal h-full rounded-none border-0 hover:bg-accent flex-shrink-0"
-                    >
-                      <Clock className="mr-2 h-4 w-4 flex-shrink-0" />
-                      <span className="flex-shrink-0">{format(startTime, "h:mm a")}</span>
-                    </Button>
-                  </TimePicker>
+              {/* Start Time */}
+              <button
+                onClick={() => setMobileStartPickerOpen(true)}
+                className="w-full flex items-center gap-3 p-3 rounded-lg border bg-background hover:bg-accent transition-colors text-left"
+              >
+                <CalendarIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-muted-foreground">Start Time</div>
+                  <div className="text-sm font-medium truncate">
+                    {format(startTime, 'MMM d, yyyy')} · {format(startTime, 'h:mm a')}
+                  </div>
                 </div>
-              </div>
+              </button>
 
-              {/* End Time Section */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">End Time</label>
-                <div className="flex border border-input rounded-lg overflow-hidden h-12">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        className={cn(
-                          "flex-1 justify-start text-left font-normal h-full rounded-none border-0 hover:bg-accent",
-                          !endTime && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
-                        <span className="truncate">
-                          {endTime ? (isToday(endTime) ? "Today" : format(endTime, "MMM d, yyyy")) : "Pick date"}
-                        </span>
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={endTime}
-                        onSelect={(date) => {
-                          if (date) {
-                            const newDate = new Date(date);
-                            newDate.setHours(endTime.getHours());
-                            newDate.setMinutes(endTime.getMinutes());
-                            handleEndTimeChange(newDate);
-                          }
-                        }}
-                        disabled={(date) => {
-                          // Disable dates before start date
-                          const startDateOnly = new Date(startTime);
-                          startDateOnly.setHours(0, 0, 0, 0);
-                          const checkDate = new Date(date);
-                          checkDate.setHours(0, 0, 0, 0);
-                          return checkDate < startDateOnly;
-                        }}
-                        initialFocus
-                        className="pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
-
-                  <span className="flex items-center px-2 text-muted-foreground">·</span>
-
-                  <TimePicker date={endTime} setDate={handleEndTimeChange}>
-                    <Button
-                      variant="ghost"
-                      className="justify-start text-left font-normal h-full rounded-none border-0 hover:bg-accent flex-shrink-0"
-                    >
-                      <Clock className="mr-2 h-4 w-4 flex-shrink-0" />
-                      <span className="flex-shrink-0">{format(endTime, "h:mm a")}</span>
-                    </Button>
-                  </TimePicker>
+              {/* End Time */}
+              <button
+                onClick={() => setMobileEndPickerOpen(true)}
+                className="w-full flex items-center gap-3 p-3 rounded-lg border bg-background hover:bg-accent transition-colors text-left"
+              >
+                <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-muted-foreground">End Time</div>
+                  <div className="text-sm font-medium truncate">
+                    {format(endTime, 'MMM d, yyyy')} · {format(endTime, 'h:mm a')}
+                  </div>
                 </div>
-              </div>
+              </button>
             </div>
           </div>
 
@@ -554,6 +465,34 @@ const Home = () => {
           </div>
         )}
       </div>
+
+      {/* Mobile Time Pickers */}
+      {mobileStartPickerOpen && (
+        <MobileTimePicker
+          isOpen={mobileStartPickerOpen}
+          onClose={() => setMobileStartPickerOpen(false)}
+          onConfirm={(date) => {
+            handleStartTimeChange(date);
+            setMobileStartPickerOpen(false);
+          }}
+          mode="start"
+          initialValue={startTime}
+        />
+      )}
+
+      {mobileEndPickerOpen && (
+        <MobileTimePicker
+          isOpen={mobileEndPickerOpen}
+          onClose={() => setMobileEndPickerOpen(false)}
+          onConfirm={(date) => {
+            handleEndTimeChange(date);
+            setMobileEndPickerOpen(false);
+          }}
+          mode="end"
+          startTime={startTime}
+          initialValue={endTime}
+        />
+      )}
     </div>
   );
 };
