@@ -7,9 +7,11 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2 } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { loadStripe } from '@stripe/stripe-js';
 
 interface BookingDetails {
   id: string;
@@ -46,6 +48,9 @@ const BookingDetail = () => {
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showExtendDialog, setShowExtendDialog] = useState(false);
+  const [extensionHours, setExtensionHours] = useState(1);
+  const [extending, setExtending] = useState(false);
 
   useEffect(() => {
     if (!bookingId || !user) return;
@@ -127,6 +132,65 @@ const BookingDetail = () => {
     navigate(`/messages?userId=${booking.spots.host_id}`);
   };
 
+  const handleExtendBooking = async () => {
+    if (!booking) return;
+
+    setExtending(true);
+    try {
+      // Get Stripe publishable key
+      const { data: keyData, error: keyError } = await supabase.functions.invoke('get-stripe-publishable-key');
+      if (keyError) throw keyError;
+
+      const stripe = await loadStripe(keyData.publishableKey);
+      if (!stripe) throw new Error('Failed to load Stripe');
+
+      // Call extend-booking function
+      const { data, error } = await supabase.functions.invoke('extend-booking', {
+        body: {
+          bookingId: booking.id,
+          extensionHours
+        }
+      });
+
+      if (error) throw error;
+
+      // If payment requires action (3D Secure)
+      if (data.requiresAction && data.clientSecret) {
+        const { error: confirmError } = await stripe.confirmCardPayment(data.clientSecret);
+        if (confirmError) throw confirmError;
+
+        // Finalize the payment
+        const { error: finalizeError } = await supabase.functions.invoke('extend-booking', {
+          body: {
+            bookingId: booking.id,
+            extensionHours,
+            paymentIntentId: data.paymentIntentId,
+            finalize: true
+          }
+        });
+
+        if (finalizeError) throw finalizeError;
+      }
+
+      toast.success('Booking extended successfully!');
+      setShowExtendDialog(false);
+      loadBookingDetails(); // Reload to show updated times
+    } catch (error: any) {
+      console.error('Error extending booking:', error);
+      toast.error(error.message || 'Failed to extend booking');
+    } finally {
+      setExtending(false);
+    }
+  };
+
+  const calculateExtensionCost = () => {
+    if (!booking) return { subtotal: 0, platformFee: 0, total: 0 };
+    const subtotal = booking.hourly_rate * extensionHours;
+    const platformFee = subtotal * 0.15; // 15% platform fee
+    const total = subtotal + platformFee;
+    return { subtotal, platformFee, total };
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -150,6 +214,9 @@ const BookingDetail = () => {
   const isCancelled = booking.status === 'canceled';
   const isCompleted = booking.status === 'completed';
   const canCancel = isActive && new Date() < new Date(booking.start_at);
+  const canExtend = isActive && new Date() < new Date(booking.end_at);
+
+  const extensionCost = calculateExtensionCost();
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -293,6 +360,23 @@ const BookingDetail = () => {
           )}
         </Card>
 
+        {/* Extend Duration Button */}
+        {canExtend && (
+          <Card className="p-4 bg-primary/5 border-primary/20">
+            <div className="flex items-start gap-3">
+              <Plus className="h-5 w-5 text-primary mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium mb-1">Need more time?</p>
+                <p className="text-xs text-muted-foreground mb-3">Extend your parking duration</p>
+                <Button size="sm" onClick={() => setShowExtendDialog(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Extend Duration
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Cancel Button */}
         {canCancel && (
           <Card className="p-4 bg-muted/50">
@@ -310,6 +394,74 @@ const BookingDetail = () => {
           </Card>
         )}
       </div>
+
+      {/* Extend Duration Dialog */}
+      <Dialog open={showExtendDialog} onOpenChange={setShowExtendDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Extend Parking Duration</DialogTitle>
+            <DialogDescription>
+              Add more time to your parking reservation. Payment will be charged immediately.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <label className="text-sm font-medium">Additional Hours</label>
+                <span className="text-sm font-semibold">{extensionHours} hour{extensionHours !== 1 ? 's' : ''}</span>
+              </div>
+              <Slider
+                value={[extensionHours]}
+                onValueChange={(value) => setExtensionHours(value[0])}
+                min={1}
+                max={12}
+                step={1}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>1 hour</span>
+                <span>12 hours</span>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Extension ({extensionHours}h × ${booking?.hourly_rate}/hr)</span>
+                <span className="font-medium">${extensionCost.subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Platform Fee (15%)</span>
+                <span className="font-medium">${extensionCost.platformFee.toFixed(2)}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between text-base font-semibold">
+                <span>Total Charge</span>
+                <span className="text-primary">${extensionCost.total.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {booking && (
+              <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
+                <p className="font-medium mb-1">New end time</p>
+                <p>{format(new Date(new Date(booking.end_at).getTime() + extensionHours * 60 * 60 * 1000), 'EEE, MMM d, yyyy • h:mm a')}</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowExtendDialog(false)} disabled={extending}>
+              Cancel
+            </Button>
+            <Button onClick={handleExtendBooking} disabled={extending}>
+              {extending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <DollarSign className="h-4 w-4 mr-2" />}
+              Pay ${extensionCost.total.toFixed(2)}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Cancel Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
