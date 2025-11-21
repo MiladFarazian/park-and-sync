@@ -71,7 +71,7 @@ const App = () => {
             <Route path="/auth" element={<Auth />} />
             <Route path="/email-confirmation" element={<EmailConfirmation />} />
             <Route path="/search-results" element={<SearchResults />} />
-            <Route path="/spot/:id" element={<SpotDetail />} />
+            <Route path="/spot/:id" element={<div className="h-screen overflow-y-auto bg-background"><SpotDetail /></div>} />
             <Route path="/personal-information" element={<PersonalInformation />} />
             <Route path="/my-vehicles" element={<MyVehicles />} />
             <Route path="/add-vehicle" element={<AddVehicle />} />
