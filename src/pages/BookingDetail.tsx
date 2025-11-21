@@ -214,7 +214,7 @@ const BookingDetail = () => {
   const isCancelled = booking.status === 'canceled';
   const isCompleted = booking.status === 'completed';
   const canCancel = isActive && new Date() < new Date(booking.start_at);
-  const canExtend = isActive && new Date() < new Date(booking.end_at);
+  const canExtend = (booking.status === 'pending' || booking.status === 'active' || booking.status === 'paid') && new Date() < new Date(booking.end_at);
 
   const extensionCost = calculateExtensionCost();
 
