@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Calendar, XCircle, MessageCircle } from 'lucide-react';
+import { MapPin, Clock, Calendar, XCircle, MessageCircle, Navigation, Edit, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -176,7 +176,21 @@ const Activity = () => {
   }) => {
     const isHost = booking.userRole === 'host';
     const otherPartyId = isHost ? booking.renter_id : booking.spots?.host_id;
-    return <Card>
+    const canExtend = !isPast && booking.status !== 'canceled' && booking.userRole === 'renter';
+    
+    const handleGetDirections = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!booking.spots?.address) return;
+      const address = encodeURIComponent(booking.spots.address);
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${address}`, '_blank');
+    };
+
+    const handleModify = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      navigate(`/booking/${booking.id}`);
+    };
+
+    return <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/booking/${booking.id}`)}>
         <CardContent className="p-4">
           <div className="flex justify-between items-start mb-3">
             <div>
@@ -206,25 +220,35 @@ const Activity = () => {
           </div>
 
           <div className="mt-3 pt-3 border-t flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              
-              <span className="font-semibold text-lg">${Number(booking.total_amount).toFixed(2)}</span>
-            </div>
+            <span className="font-semibold text-lg">${Number(booking.total_amount).toFixed(2)}</span>
           </div>
         </CardContent>
-        <div className="p-4 pt-0 flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={() => navigate(`/booking-confirmation/${booking.id}`)}>View Details</Button>
-          <Button variant="outline" size="icon" onClick={() => {
-          if (otherPartyId) {
-            navigate(`/messages?userId=${otherPartyId}`);
-          }
-        }} disabled={!otherPartyId}>
+        <div className="p-4 pt-0 flex gap-2" onClick={(e) => e.stopPropagation()}>
+          {booking.userRole === 'renter' && (
+            <>
+              <Button variant="outline" size="sm" onClick={handleGetDirections}>
+                <Navigation className="h-4 w-4 mr-1.5" />
+                <span className="hidden sm:inline">Directions</span>
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleModify}>
+                <Edit className="h-4 w-4 mr-1.5" />
+                <span className="hidden sm:inline">Details</span>
+              </Button>
+            </>
+          )}
+          <Button variant="outline" size="icon" onClick={(e) => {
+            e.stopPropagation();
+            if (otherPartyId) {
+              navigate(`/messages?userId=${otherPartyId}`);
+            }
+          }} disabled={!otherPartyId}>
             <MessageCircle className="h-4 w-4" />
           </Button>
-          {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && <Button variant="destructive" size="icon" onClick={() => {
-          setSelectedBooking(booking);
-          setCancelDialogOpen(true);
-        }}>
+          {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && <Button variant="destructive" size="icon" onClick={(e) => {
+            e.stopPropagation();
+            setSelectedBooking(booking);
+            setCancelDialogOpen(true);
+          }}>
               <XCircle className="h-4 w-4" />
             </Button>}
         </div>
