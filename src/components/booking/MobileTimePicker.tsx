@@ -112,6 +112,7 @@ export const MobileTimePicker = ({
     setter: (value: any) => void
   ) => {
     let scrollTimeout: NodeJS.Timeout;
+    let lastIndex = -1;
     
     return () => {
       clearTimeout(scrollTimeout);
@@ -122,6 +123,12 @@ export const MobileTimePicker = ({
         const scrollTop = ref.current.scrollTop;
         const index = Math.round(scrollTop / itemHeight);
         const clampedIndex = Math.max(0, Math.min(items.length - 1, index));
+        
+        // Trigger haptic feedback when selection changes
+        if (clampedIndex !== lastIndex && 'vibrate' in navigator) {
+          navigator.vibrate(10); // Short 10ms vibration
+          lastIndex = clampedIndex;
+        }
         
         // Smooth snap
         ref.current.scrollTo({
