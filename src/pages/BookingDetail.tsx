@@ -7,9 +7,9 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Slider } from '@/components/ui/slider';
+import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, Plus } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, differenceInMinutes } from 'date-fns';
 import { toast } from 'sonner';
 import { loadStripe } from '@stripe/stripe-js';
 
@@ -49,7 +49,8 @@ const BookingDetail = () => {
   const [cancelling, setCancelling] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showExtendDialog, setShowExtendDialog] = useState(false);
-  const [extensionHours, setExtensionHours] = useState(1);
+  const [showExtendTimePicker, setShowExtendTimePicker] = useState(false);
+  const [newEndTime, setNewEndTime] = useState<Date | null>(null);
   const [extending, setExtending] = useState(false);
 
   useEffect(() => {
@@ -133,7 +134,16 @@ const BookingDetail = () => {
   };
 
   const handleExtendBooking = async () => {
-    if (!booking) return;
+    if (!booking || !newEndTime) return;
+
+    // Calculate extension hours from the new end time
+    const extensionMinutes = differenceInMinutes(newEndTime, new Date(booking.end_at));
+    const extensionHours = extensionMinutes / 60;
+
+    if (extensionHours <= 0) {
+      toast.error('Please select a time after the current end time');
+      return;
+    }
 
     setExtending(true);
     try {
@@ -174,6 +184,7 @@ const BookingDetail = () => {
 
       toast.success('Booking extended successfully!');
       setShowExtendDialog(false);
+      setNewEndTime(null);
       loadBookingDetails(); // Reload to show updated times
     } catch (error: any) {
       console.error('Error extending booking:', error);
@@ -184,11 +195,17 @@ const BookingDetail = () => {
   };
 
   const calculateExtensionCost = () => {
-    if (!booking) return { subtotal: 0, platformFee: 0, total: 0 };
-    const subtotal = booking.hourly_rate * extensionHours;
+    if (!booking || !newEndTime) return { subtotal: 0, platformFee: 0, total: 0, hours: 0 };
+    
+    const extensionMinutes = differenceInMinutes(newEndTime, new Date(booking.end_at));
+    const hours = extensionMinutes / 60;
+    
+    if (hours <= 0) return { subtotal: 0, platformFee: 0, total: 0, hours: 0 };
+    
+    const subtotal = booking.hourly_rate * hours;
     const platformFee = subtotal * 0.15; // 15% platform fee
     const total = subtotal + platformFee;
-    return { subtotal, platformFee, total };
+    return { subtotal, platformFee, total, hours };
   };
 
   if (loading) {
@@ -270,7 +287,7 @@ const BookingDetail = () => {
           <div className="flex items-center justify-between">
             <h3 className="font-semibold">Parking Time</h3>
             {canExtend && (
-              <Button size="sm" variant="outline" onClick={() => setShowExtendDialog(true)}>
+              <Button size="sm" variant="outline" onClick={() => setShowExtendTimePicker(true)}>
                 <Plus className="h-4 w-4 mr-1" />
                 Extend
               </Button>
@@ -386,69 +403,98 @@ const BookingDetail = () => {
         )}
       </div>
 
+      {/* Mobile Time Picker for Extension */}
+      {booking && (
+        <MobileTimePicker
+          isOpen={showExtendTimePicker}
+          onClose={() => {
+            setShowExtendTimePicker(false);
+            setNewEndTime(null);
+          }}
+          onConfirm={(date) => {
+            setNewEndTime(date);
+            setShowExtendTimePicker(false);
+            setShowExtendDialog(true);
+          }}
+          mode="end"
+          startTime={new Date(booking.end_at)}
+          initialValue={new Date(booking.end_at)}
+        />
+      )}
+
       {/* Extend Duration Dialog */}
-      <Dialog open={showExtendDialog} onOpenChange={setShowExtendDialog}>
-        <DialogContent>
+      <Dialog open={showExtendDialog} onOpenChange={(open) => {
+        setShowExtendDialog(open);
+        if (!open) setNewEndTime(null);
+      }}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Extend Parking Duration</DialogTitle>
             <DialogDescription>
-              Add more time to your parking reservation. Payment will be charged immediately.
+              Confirm your extension. Payment will be charged immediately.
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <label className="text-sm font-medium">Additional Hours</label>
-                <span className="text-sm font-semibold">{extensionHours} hour{extensionHours !== 1 ? 's' : ''}</span>
+            {/* Current Booking Time */}
+            <div className="bg-muted/50 p-3 rounded-md space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Current end time</span>
+                <span className="font-medium">{booking && format(new Date(booking.end_at), 'h:mm a, MMM d')}</span>
               </div>
-              <Slider
-                value={[extensionHours]}
-                onValueChange={(value) => setExtensionHours(value[0])}
-                min={1}
-                max={12}
-                step={1}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>1 hour</span>
-                <span>12 hours</span>
-              </div>
+              {newEndTime && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">New end time</span>
+                  <span className="font-medium text-primary">{format(newEndTime, 'h:mm a, MMM d')}</span>
+                </div>
+              )}
             </div>
 
-            <Separator />
+            {/* Change Time Button */}
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => {
+                setShowExtendDialog(false);
+                setShowExtendTimePicker(true);
+              }}
+            >
+              <Clock className="h-4 w-4 mr-2" />
+              {newEndTime ? 'Change time' : 'Select new end time'}
+            </Button>
 
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Extension ({extensionHours}h × ${booking?.hourly_rate}/hr)</span>
-                <span className="font-medium">${extensionCost.subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Platform Fee (15%)</span>
-                <span className="font-medium">${extensionCost.platformFee.toFixed(2)}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between text-base font-semibold">
-                <span>Total Charge</span>
-                <span className="text-primary">${extensionCost.total.toFixed(2)}</span>
-              </div>
-            </div>
-
-            {booking && (
-              <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
-                <p className="font-medium mb-1">New end time</p>
-                <p>{format(new Date(new Date(booking.end_at).getTime() + extensionHours * 60 * 60 * 1000), 'EEE, MMM d, yyyy • h:mm a')}</p>
-              </div>
+            {newEndTime && extensionCost.hours > 0 && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Extension ({extensionCost.hours.toFixed(1)}h × ${booking?.hourly_rate}/hr)</span>
+                    <span className="font-medium">${extensionCost.subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Platform Fee (15%)</span>
+                    <span className="font-medium">${extensionCost.platformFee.toFixed(2)}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between text-base font-semibold">
+                    <span>Total Charge</span>
+                    <span className="text-primary">${extensionCost.total.toFixed(2)}</span>
+                  </div>
+                </div>
+              </>
             )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowExtendDialog(false)} disabled={extending}>
+            <Button variant="outline" onClick={() => {
+              setShowExtendDialog(false);
+              setNewEndTime(null);
+            }} disabled={extending}>
               Cancel
             </Button>
-            <Button onClick={handleExtendBooking} disabled={extending}>
+            <Button onClick={handleExtendBooking} disabled={extending || !newEndTime || extensionCost.hours <= 0}>
               {extending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <DollarSign className="h-4 w-4 mr-2" />}
-              Pay ${extensionCost.total.toFixed(2)}
+              {newEndTime && extensionCost.hours > 0 ? `Pay $${extensionCost.total.toFixed(2)}` : 'Select Time'}
             </Button>
           </DialogFooter>
         </DialogContent>
