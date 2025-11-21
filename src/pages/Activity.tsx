@@ -207,116 +207,220 @@ const Activity = () => {
       onClick={() => navigate(`/booking/${booking.id}`)}
     >
         <CardContent className="p-0">
-          {/* Header Section with Gradient Background */}
-          <div className="bg-gradient-to-br from-primary/5 via-primary/3 to-transparent p-5 pb-4">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <h3 className="font-semibold text-lg truncate group-hover:text-primary transition-colors">
+          {/* Mobile Compact Layout */}
+          <div className="md:hidden">
+            {/* Mobile Header - More Compact */}
+            <div className="bg-gradient-to-br from-primary/5 via-primary/3 to-transparent p-3">
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors mb-1">
                     {booking.spots?.title || 'Parking Spot'}
                   </h3>
+                  <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                    <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span className="line-clamp-1">{booking.spots?.address || 'Address not available'}</span>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <Badge 
+                    className={`text-xs border ${getStatusColor()}`}
+                    variant="outline"
+                  >
+                    {getStatusText()}
+                  </Badge>
                   {isHost && (
-                    <Badge variant="outline" className="text-xs shrink-0 border-primary/20 bg-primary/5">
-                      As Host
+                    <Badge variant="outline" className="text-xs border-primary/20 bg-primary/5">
+                      Host
                     </Badge>
                   )}
                 </div>
-                <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
-                  <span className="line-clamp-1">{booking.spots?.address || 'Address not available'}</span>
-                </div>
               </div>
-              <Badge 
-                className={`shrink-0 border ${getStatusColor()}`}
-                variant="outline"
-              >
-                {getStatusText()}
-              </Badge>
-            </div>
 
-            {/* Date and Time Info */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center gap-2.5 bg-background/60 backdrop-blur-sm rounded-lg px-3 py-2.5 border border-border/50">
-                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <Calendar className="h-4 w-4 text-primary" />
+              {/* Mobile Date/Time - Horizontal Compact */}
+              <div className="flex items-center gap-2 text-xs">
+                <div className="flex items-center gap-1.5 flex-1 bg-background/60 backdrop-blur-sm rounded-md px-2 py-1.5 border border-border/50">
+                  <Calendar className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span className="font-medium truncate">{formatDate(booking.start_at)}</span>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground font-medium mb-0.5">Date</p>
-                  <p className="text-sm font-semibold truncate">{formatDate(booking.start_at)}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5 bg-background/60 backdrop-blur-sm rounded-lg px-3 py-2.5 border border-border/50">
-                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <Clock className="h-4 w-4 text-primary" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground font-medium mb-0.5">Time</p>
-                  <p className="text-sm font-semibold truncate">{formatTime(booking.start_at, booking.end_at)}</p>
+                <div className="flex items-center gap-1.5 flex-1 bg-background/60 backdrop-blur-sm rounded-md px-2 py-1.5 border border-border/50">
+                  <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span className="font-medium truncate text-xs">{formatTime(booking.start_at, booking.end_at)}</span>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Price Section */}
-          <div className="px-5 py-4 bg-muted/30 border-t">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground font-medium">Total Amount</span>
-              <span className="text-2xl font-bold text-primary">${Number(booking.total_amount).toFixed(2)}</span>
+            {/* Mobile Price - More Compact */}
+            <div className="px-3 py-2.5 bg-muted/30 border-t flex items-center justify-between">
+              <span className="text-xs text-muted-foreground font-medium">Total</span>
+              <span className="text-xl font-bold text-primary">${Number(booking.total_amount).toFixed(2)}</span>
             </div>
-          </div>
 
-          {/* Action Buttons */}
-          <div className="p-4 flex gap-2 border-t bg-background" onClick={(e) => e.stopPropagation()}>
-            {booking.userRole === 'renter' && (
-              <>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
-                  onClick={handleGetDirections}
-                >
-                  <Navigation className="h-4 w-4 mr-2" />
-                  Directions
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
-                  onClick={handleModify}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Details
-                </Button>
-              </>
-            )}
-            <Button 
-              variant="outline" 
-              size="icon"
-              className="shrink-0 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (otherPartyId) {
-                  navigate(`/messages?userId=${otherPartyId}`);
-                }
-              }} 
-              disabled={!otherPartyId}
-            >
-              <MessageCircle className="h-4 w-4" />
-            </Button>
-            {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && (
+            {/* Mobile Actions - Icon Only */}
+            <div className="p-3 flex gap-2 border-t bg-background" onClick={(e) => e.stopPropagation()}>
+              {booking.userRole === 'renter' && (
+                <>
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+                    onClick={handleGetDirections}
+                  >
+                    <Navigation className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+                    onClick={handleModify}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
               <Button 
-                variant="destructive" 
+                variant="outline" 
                 size="icon"
-                className="shrink-0"
+                className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setSelectedBooking(booking);
-                  setCancelDialogOpen(true);
-                }}
+                  if (otherPartyId) {
+                    navigate(`/messages?userId=${otherPartyId}`);
+                  }
+                }} 
+                disabled={!otherPartyId}
               >
-                <XCircle className="h-4 w-4" />
+                <MessageCircle className="h-4 w-4" />
               </Button>
-            )}
+              {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && (
+                <Button 
+                  variant="destructive" 
+                  size="icon"
+                  className="flex-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedBooking(booking);
+                    setCancelDialogOpen(true);
+                  }}
+                >
+                  <XCircle className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Desktop Layout - Unchanged */}
+          <div className="hidden md:block">
+            {/* Header Section with Gradient Background */}
+            <div className="bg-gradient-to-br from-primary/5 via-primary/3 to-transparent p-5 pb-4">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="font-semibold text-lg truncate group-hover:text-primary transition-colors">
+                      {booking.spots?.title || 'Parking Spot'}
+                    </h3>
+                    {isHost && (
+                      <Badge variant="outline" className="text-xs shrink-0 border-primary/20 bg-primary/5">
+                        As Host
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+                    <span className="line-clamp-1">{booking.spots?.address || 'Address not available'}</span>
+                  </div>
+                </div>
+                <Badge 
+                  className={`shrink-0 border ${getStatusColor()}`}
+                  variant="outline"
+                >
+                  {getStatusText()}
+                </Badge>
+              </div>
+
+              {/* Date and Time Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-2.5 bg-background/60 backdrop-blur-sm rounded-lg px-3 py-2.5 border border-border/50">
+                  <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Calendar className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground font-medium mb-0.5">Date</p>
+                    <p className="text-sm font-semibold truncate">{formatDate(booking.start_at)}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2.5 bg-background/60 backdrop-blur-sm rounded-lg px-3 py-2.5 border border-border/50">
+                  <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Clock className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground font-medium mb-0.5">Time</p>
+                    <p className="text-sm font-semibold truncate">{formatTime(booking.start_at, booking.end_at)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Price Section */}
+            <div className="px-5 py-4 bg-muted/30 border-t">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground font-medium">Total Amount</span>
+                <span className="text-2xl font-bold text-primary">${Number(booking.total_amount).toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="p-4 flex gap-2 border-t bg-background" onClick={(e) => e.stopPropagation()}>
+              {booking.userRole === 'renter' && (
+                <>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+                    onClick={handleGetDirections}
+                  >
+                    <Navigation className="h-4 w-4 mr-2" />
+                    Directions
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+                    onClick={handleModify}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Details
+                  </Button>
+                </>
+              )}
+              <Button 
+                variant="outline" 
+                size="icon"
+                className="shrink-0 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (otherPartyId) {
+                    navigate(`/messages?userId=${otherPartyId}`);
+                  }
+                }} 
+                disabled={!otherPartyId}
+              >
+                <MessageCircle className="h-4 w-4" />
+              </Button>
+              {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && (
+                <Button 
+                  variant="destructive" 
+                  size="icon"
+                  className="shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedBooking(booking);
+                    setCancelDialogOpen(true);
+                  }}
+                >
+                  <XCircle className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>;
