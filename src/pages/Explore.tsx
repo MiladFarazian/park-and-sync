@@ -6,9 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import MapView from '@/components/map/MapView';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { format, isToday } from 'date-fns';
-import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { TimePicker } from '@/components/ui/time-picker';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 const Explore = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -33,6 +31,8 @@ const Explore = () => {
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [endTime, setEndTime] = useState<Date | null>(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [mobileStartPickerOpen, setMobileStartPickerOpen] = useState(false);
+  const [mobileEndPickerOpen, setMobileEndPickerOpen] = useState(false);
 
   // Ensure end time is always after start time
   const validateAndSetTimes = (newStartTime: Date, newEndTime: Date | null) => {
@@ -445,71 +445,31 @@ const Explore = () => {
         {(startTime || endTime) && <div className="max-w-md mx-auto">
             <Card className="p-2.5 bg-background/95 backdrop-blur-sm shadow-lg">
               <div className="flex items-center gap-2 text-sm justify-center mx-0">
-                {startTime && <>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className="flex items-center gap-1 hover:bg-accent/50 rounded px-1.5 py-1 transition-colors flex-shrink-0">
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                          <span className="whitespace-nowrap text-xs">{formatDateDisplay(startTime)}</span>
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarComponent mode="single" selected={startTime} onSelect={date => {
-                    if (date) {
-                      const newDate = new Date(date);
-                      newDate.setHours(startTime.getHours());
-                      newDate.setMinutes(startTime.getMinutes());
-                      handleStartTimeChange(newDate);
-                    }
-                  }} disabled={date => date < new Date()} initialFocus className="pointer-events-auto" />
-                      </PopoverContent>
-                    </Popover>
-                    
-                    <TimePicker date={startTime} setDate={handleStartTimeChange}>
-                      <button className="flex items-center gap-1 hover:bg-accent/50 rounded px-1.5 py-1 transition-colors flex-shrink-0">
-                        <Clock className="h-3 w-3 text-muted-foreground" />
-                        <span className="whitespace-nowrap text-xs">{format(startTime, 'h:mma')}</span>
-                      </button>
-                    </TimePicker>
-                  </>}
+                {startTime && (
+                  <button 
+                    onClick={() => setMobileStartPickerOpen(true)}
+                    className="flex items-center gap-1 hover:bg-accent/50 rounded px-2 py-1.5 transition-colors flex-shrink-0"
+                  >
+                    <Calendar className="h-3 w-3 text-muted-foreground" />
+                    <span className="whitespace-nowrap text-xs">{formatDateDisplay(startTime)}</span>
+                    <Clock className="h-3 w-3 text-muted-foreground ml-1" />
+                    <span className="whitespace-nowrap text-xs">{format(startTime, 'h:mma')}</span>
+                  </button>
+                )}
                 
                 {startTime && endTime && <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
                 
-                {endTime && <>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className="flex items-center gap-1 hover:bg-accent/50 rounded px-1.5 py-1 transition-colors flex-shrink-0">
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                          <span className="whitespace-nowrap text-xs">{formatDateDisplay(endTime)}</span>
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarComponent mode="single" selected={endTime} onSelect={date => {
-                    if (date) {
-                      const newDate = new Date(date);
-                      newDate.setHours(endTime.getHours());
-                      newDate.setMinutes(endTime.getMinutes());
-                      handleEndTimeChange(newDate);
-                    }
-                  }} disabled={date => {
-                    if (!startTime) return date < new Date();
-                    // Disable dates before start date
-                    const startDateOnly = new Date(startTime);
-                    startDateOnly.setHours(0, 0, 0, 0);
-                    const checkDate = new Date(date);
-                    checkDate.setHours(0, 0, 0, 0);
-                    return checkDate < startDateOnly;
-                  }} initialFocus className="pointer-events-auto" />
-                      </PopoverContent>
-                    </Popover>
-                    
-                    <TimePicker date={endTime} setDate={handleEndTimeChange}>
-                      <button className="flex items-center gap-1 hover:bg-accent/50 rounded px-1.5 py-1 transition-colors flex-shrink-0">
-                        <Clock className="h-3 w-3 text-muted-foreground" />
-                        <span className="whitespace-nowrap text-xs">{format(endTime, 'h:mma')}</span>
-                      </button>
-                    </TimePicker>
-                  </>}
+                {endTime && (
+                  <button 
+                    onClick={() => setMobileEndPickerOpen(true)}
+                    className="flex items-center gap-1 hover:bg-accent/50 rounded px-2 py-1.5 transition-colors flex-shrink-0"
+                  >
+                    <Calendar className="h-3 w-3 text-muted-foreground" />
+                    <span className="whitespace-nowrap text-xs">{formatDateDisplay(endTime)}</span>
+                    <Clock className="h-3 w-3 text-muted-foreground ml-1" />
+                    <span className="whitespace-nowrap text-xs">{format(endTime, 'h:mma')}</span>
+                  </button>
+                )}
               </div>
             </Card>
           </div>}
@@ -543,6 +503,34 @@ const Explore = () => {
           q: searchQuery
         }} 
       />
+
+      {/* Mobile Time Pickers */}
+      {mobileStartPickerOpen && startTime && (
+        <MobileTimePicker
+          isOpen={mobileStartPickerOpen}
+          onClose={() => setMobileStartPickerOpen(false)}
+          onConfirm={(date) => {
+            handleStartTimeChange(date);
+            setMobileStartPickerOpen(false);
+          }}
+          mode="start"
+          initialValue={startTime}
+        />
+      )}
+
+      {mobileEndPickerOpen && endTime && (
+        <MobileTimePicker
+          isOpen={mobileEndPickerOpen}
+          onClose={() => setMobileEndPickerOpen(false)}
+          onConfirm={(date) => {
+            handleEndTimeChange(date);
+            setMobileEndPickerOpen(false);
+          }}
+          mode="end"
+          startTime={startTime || undefined}
+          initialValue={endTime}
+        />
+      )}
     </div>;
 };
 export default Explore;
