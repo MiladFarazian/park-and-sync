@@ -345,7 +345,7 @@ const SpotDetail = () => {
   }
 
   return (
-    <div className="bg-background pb-20">
+    <div className="bg-background pb-20 min-h-screen overflow-y-auto">
       {/* Image Gallery */}
       <div className="relative h-80">
         <img 
