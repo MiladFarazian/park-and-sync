@@ -18,6 +18,7 @@ import SearchResults from "./pages/SearchResults";
 import SpotDetail from "./pages/SpotDetail";
 import Booking from "./pages/Booking";
 import BookingConfirmation from "./pages/BookingConfirmation";
+import BookingDetail from "./pages/BookingDetail";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import EmailConfirmation from "./pages/EmailConfirmation";
@@ -93,6 +94,7 @@ const App = () => {
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/manage-account" element={<ManageAccount />} />
                   <Route path="/book/:spotId" element={<Booking />} />
+                  <Route path="/booking/:bookingId" element={<BookingDetail />} />
                   <Route path="/booking-confirmation/:bookingId" element={<BookingConfirmation />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
