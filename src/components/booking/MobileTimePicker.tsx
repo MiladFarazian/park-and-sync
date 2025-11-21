@@ -197,7 +197,7 @@ export const MobileTimePicker = ({
             {/* Selection highlight */}
             <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 h-14 bg-background/80 rounded-xl pointer-events-none border-2 border-primary/20" />
             
-            <div className="grid grid-cols-4 gap-2 relative">
+            <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-2 relative">
               {/* Day Column */}
               <div className="overflow-hidden">
                 <div 
@@ -210,7 +210,7 @@ export const MobileTimePicker = ({
                   {days.map((day, index) => (
                     <div
                       key={index}
-                      className="h-14 flex items-center justify-center snap-center cursor-pointer transition-all"
+                      className="h-14 flex items-center justify-center snap-center cursor-pointer transition-all px-2"
                       style={{
                         opacity: selectedDay === index ? 1 : 0.3,
                         transform: selectedDay === index ? 'scale(1)' : 'scale(0.9)'
@@ -220,7 +220,7 @@ export const MobileTimePicker = ({
                         scrollToIndex(dayRef, index);
                       }}
                     >
-                      <span className="text-lg font-medium whitespace-nowrap">
+                      <span className="text-base font-medium whitespace-nowrap">
                         {day.label}
                       </span>
                     </div>
