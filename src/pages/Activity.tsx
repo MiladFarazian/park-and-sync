@@ -190,68 +190,135 @@ const Activity = () => {
       navigate(`/booking/${booking.id}`);
     };
 
-    return <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/booking/${booking.id}`)}>
-        <CardContent className="p-4">
-          <div className="flex justify-between items-start mb-3">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-semibold">{booking.spots?.title || 'Parking Spot'}</h3>
-                {isHost && <Badge variant="outline" className="text-xs">As Host</Badge>}
+    const getStatusColor = () => {
+      if (booking.status === 'canceled') return 'bg-destructive/10 text-destructive border-destructive/20';
+      if (isPast) return 'bg-muted text-muted-foreground border-border';
+      return 'bg-primary/10 text-primary border-primary/20';
+    };
+
+    const getStatusText = () => {
+      if (booking.status === 'canceled') return 'Cancelled';
+      if (booking.status === 'paid') return isPast ? 'Completed' : 'Confirmed';
+      return booking.status.charAt(0).toUpperCase() + booking.status.slice(1);
+    };
+
+    return <Card 
+      className="group cursor-pointer hover:shadow-elegant hover:border-primary/30 transition-all duration-300 overflow-hidden animate-fade-in" 
+      onClick={() => navigate(`/booking/${booking.id}`)}
+    >
+        <CardContent className="p-0">
+          {/* Header Section with Gradient Background */}
+          <div className="bg-gradient-to-br from-primary/5 via-primary/3 to-transparent p-5 pb-4">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="font-semibold text-lg truncate group-hover:text-primary transition-colors">
+                    {booking.spots?.title || 'Parking Spot'}
+                  </h3>
+                  {isHost && (
+                    <Badge variant="outline" className="text-xs shrink-0 border-primary/20 bg-primary/5">
+                      As Host
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span className="line-clamp-1">{booking.spots?.address || 'Address not available'}</span>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
-                {booking.spots?.address || 'Address not available'}
-              </p>
+              <Badge 
+                className={`shrink-0 border ${getStatusColor()}`}
+                variant="outline"
+              >
+                {getStatusText()}
+              </Badge>
             </div>
-            <Badge variant={isPast ? 'secondary' : 'default'}>
-              {booking.status === 'canceled' ? 'Canceled' : booking.status === 'paid' ? isPast ? 'Completed' : 'Confirmed' : booking.status}
-            </Badge>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span>{formatDate(booking.start_at)}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span>{formatTime(booking.start_at, booking.end_at)}</span>
+
+            {/* Date and Time Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center gap-2.5 bg-background/60 backdrop-blur-sm rounded-lg px-3 py-2.5 border border-border/50">
+                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Calendar className="h-4 w-4 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground font-medium mb-0.5">Date</p>
+                  <p className="text-sm font-semibold truncate">{formatDate(booking.start_at)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5 bg-background/60 backdrop-blur-sm rounded-lg px-3 py-2.5 border border-border/50">
+                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Clock className="h-4 w-4 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground font-medium mb-0.5">Time</p>
+                  <p className="text-sm font-semibold truncate">{formatTime(booking.start_at, booking.end_at)}</p>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="mt-3 pt-3 border-t flex justify-between items-center">
-            <span className="font-semibold text-lg">${Number(booking.total_amount).toFixed(2)}</span>
+          {/* Price Section */}
+          <div className="px-5 py-4 bg-muted/30 border-t">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground font-medium">Total Amount</span>
+              <span className="text-2xl font-bold text-primary">${Number(booking.total_amount).toFixed(2)}</span>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="p-4 flex gap-2 border-t bg-background" onClick={(e) => e.stopPropagation()}>
+            {booking.userRole === 'renter' && (
+              <>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+                  onClick={handleGetDirections}
+                >
+                  <Navigation className="h-4 w-4 mr-2" />
+                  Directions
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+                  onClick={handleModify}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Details
+                </Button>
+              </>
+            )}
+            <Button 
+              variant="outline" 
+              size="icon"
+              className="shrink-0 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (otherPartyId) {
+                  navigate(`/messages?userId=${otherPartyId}`);
+                }
+              }} 
+              disabled={!otherPartyId}
+            >
+              <MessageCircle className="h-4 w-4" />
+            </Button>
+            {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && (
+              <Button 
+                variant="destructive" 
+                size="icon"
+                className="shrink-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedBooking(booking);
+                  setCancelDialogOpen(true);
+                }}
+              >
+                <XCircle className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </CardContent>
-        <div className="p-4 pt-0 flex gap-2" onClick={(e) => e.stopPropagation()}>
-          {booking.userRole === 'renter' && (
-            <>
-              <Button variant="outline" size="sm" onClick={handleGetDirections}>
-                <Navigation className="h-4 w-4 mr-1.5" />
-                <span className="hidden sm:inline">Directions</span>
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleModify}>
-                <Edit className="h-4 w-4 mr-1.5" />
-                <span className="hidden sm:inline">Details</span>
-              </Button>
-            </>
-          )}
-          <Button variant="outline" size="icon" onClick={(e) => {
-            e.stopPropagation();
-            if (otherPartyId) {
-              navigate(`/messages?userId=${otherPartyId}`);
-            }
-          }} disabled={!otherPartyId}>
-            <MessageCircle className="h-4 w-4" />
-          </Button>
-          {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && <Button variant="destructive" size="icon" onClick={(e) => {
-            e.stopPropagation();
-            setSelectedBooking(booking);
-            setCancelDialogOpen(true);
-          }}>
-              <XCircle className="h-4 w-4" />
-            </Button>}
-        </div>
       </Card>;
   };
   return <div className="bg-background">
