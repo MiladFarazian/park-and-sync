@@ -588,13 +588,13 @@ const Booking = () => {
         });
       }
 
-      toast({
-        title: "Booking created!",
-        description: "Your booking has been confirmed",
-      });
+      // Store the client secret in session storage for the checkout page
+      if (bookingData.client_secret) {
+        sessionStorage.setItem(`checkout_${bookingData.booking_id}`, bookingData.client_secret);
+      }
 
-      // Navigate to confirmation page with booking ID
-      navigate(`/booking-confirmation/${bookingData.booking_id}`);
+      // Navigate to embedded checkout page
+      navigate(`/embedded-checkout/${bookingData.booking_id}`);
     } catch (error) {
       console.error('Booking error:', error);
       toast({
