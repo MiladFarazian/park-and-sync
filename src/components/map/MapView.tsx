@@ -77,10 +77,16 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<mapboxgl.Marker[]>([]);
   const searchMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const spotsRef = useRef<Spot[]>([]); // Keep current spots for event handlers
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
+
+  // Update spots ref whenever spots change
+  useEffect(() => {
+    spotsRef.current = spots;
+  }, [spots]);
 
   // Fetch Mapbox token
   useEffect(() => {
@@ -653,11 +659,13 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           return;
         }
         
-        const spot = spots.find((s) => s.id === f.properties.id);
+        // Use spotsRef.current to get the most recent spots array
+        const spot = spotsRef.current.find((s) => s.id === f.properties.id);
         console.log('[MapView] Spot lookup result:', { 
           spotId: f.properties.id, 
           foundSpot: !!spot,
-          spotTitle: spot?.title 
+          spotTitle: spot?.title,
+          totalSpotsInRef: spotsRef.current.length
         });
         
         if (spot) {
