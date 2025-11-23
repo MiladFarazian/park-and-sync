@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
-import { format, addDays, startOfDay, setHours, setMinutes, isBefore, isAfter, addMinutes } from 'date-fns';
+import { format, addDays, startOfDay, setHours, setMinutes, isBefore, isAfter, addMinutes, differenceInMinutes } from 'date-fns';
 
 interface MobileTimePickerProps {
   isOpen: boolean;
@@ -160,9 +160,24 @@ export const MobileTimePicker = ({
     }
     
     // Check if end time is before start time
-    if (mode === 'end' && startTime && isBefore(selectedDate, startTime)) {
-      setError('End time must be after start time');
-      return false;
+    if (mode === 'end' && startTime) {
+      if (isBefore(selectedDate, startTime)) {
+        setError('End time must be after start time');
+        return false;
+      }
+      
+      // For extensions, require at least 1 hour
+      const extensionMinutes = differenceInMinutes(selectedDate, startTime);
+      if (extensionMinutes < 60) {
+        setError('Extension must be at least 1 hour');
+        return false;
+      }
+      
+      // Maximum 24 hours extension
+      if (extensionMinutes > 1440) {
+        setError('Extension cannot exceed 24 hours');
+        return false;
+      }
     }
     
     setError('');
