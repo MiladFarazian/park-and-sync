@@ -53,8 +53,8 @@ serve(async (req) => {
     console.log('Extending booking:', { bookingId, extensionHours, userId: userData.user.id });
 
     // Validate extension hours
-    if (!extensionHours || extensionHours < 1 || extensionHours > 24) {
-      throw new Error('Extension must be between 1 and 24 hours');
+    if (!extensionHours || extensionHours < 0.25 || extensionHours > 24) {
+      throw new Error('Extension must be between 15 minutes and 24 hours');
     }
 
     // Get booking details

@@ -166,10 +166,10 @@ export const MobileTimePicker = ({
         return false;
       }
       
-      // For extensions, require at least 1 hour
+      // For extensions, require at least 15 minutes
       const extensionMinutes = differenceInMinutes(selectedDate, startTime);
-      if (extensionMinutes < 60) {
-        setError('Extension must be at least 1 hour');
+      if (extensionMinutes < 15) {
+        setError('Extension must be at least 15 minutes');
         return false;
       }
       
