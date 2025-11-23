@@ -198,6 +198,7 @@ serve(async (req) => {
     }
 
     // Create Stripe Checkout Session with embedded UI mode
+    console.log('Creating Stripe checkout session...');
     const origin = req.headers.get('origin') || 'http://localhost:8080';
     const checkoutSession = await stripe.checkout.sessions.create({
       ui_mode: 'embedded',
@@ -226,11 +227,20 @@ serve(async (req) => {
       },
     });
 
-    // Store the checkout session ID
-    await supabase
+    console.log('Checkout session created:', checkoutSession.id);
+
+    // Store the checkout session ID using admin client to bypass RLS
+    const { error: updateError } = await supabaseAdmin
       .from('bookings')
       .update({ stripe_payment_intent_id: checkoutSession.id })
       .eq('id', booking.id);
+
+    if (updateError) {
+      console.error('Failed to store checkout session ID:', updateError);
+      throw updateError;
+    }
+
+    console.log('Stored checkout session ID in booking');
 
     // Release the hold if provided
     if (hold_id) {
