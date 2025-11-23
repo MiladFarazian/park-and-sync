@@ -197,9 +197,10 @@ serve(async (req) => {
       throw bookingError;
     }
 
-    // Create Stripe Checkout Session
+    // Create Stripe Checkout Session with embedded UI mode
     const origin = req.headers.get('origin') || 'http://localhost:8080';
     const checkoutSession = await stripe.checkout.sessions.create({
+      ui_mode: 'embedded',
       customer: customerId,
       payment_method_types: ['card'],
       line_items: [
@@ -216,8 +217,7 @@ serve(async (req) => {
         },
       ],
       mode: 'payment',
-      success_url: `${origin}/checkout-success?session_id={CHECKOUT_SESSION_ID}&booking_id=${booking.id}`,
-      cancel_url: `${origin}/spot/${spot_id}`,
+      return_url: `${origin}/checkout-success?session_id={CHECKOUT_SESSION_ID}&booking_id=${booking.id}`,
       metadata: {
         booking_id: booking.id,
         spot_id,
@@ -307,7 +307,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       booking_id: booking.id,
-      checkout_url: checkoutSession.url,
+      client_secret: checkoutSession.client_secret,
       total_amount: totalAmount,
       platform_fee: platformFee
     }), {

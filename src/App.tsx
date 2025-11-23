@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import AppLayout from "./components/layout/AppLayout";
 import Home from "./pages/Home";
 import Explore from "./pages/Explore";
+import EmbeddedCheckout from "./pages/EmbeddedCheckout";
 
 import ListSpot from "./pages/ListSpot";
 import Activity from "./pages/Activity";
@@ -73,6 +74,7 @@ const App = () => {
             <Route path="/auth" element={<Auth />} />
             <Route path="/email-confirmation" element={<EmailConfirmation />} />
             <Route path="/checkout-success" element={<CheckoutSuccess />} />
+            <Route path="/embedded-checkout/:bookingId" element={<EmbeddedCheckout />} />
             <Route path="/search-results" element={<SearchResults />} />
             <Route path="/spot/:id" element={<div className="h-screen overflow-y-auto bg-background"><SpotDetail /></div>} />
             <Route path="/personal-information" element={<PersonalInformation />} />
