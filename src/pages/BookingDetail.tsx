@@ -140,8 +140,13 @@ const BookingDetail = () => {
     const extensionMinutes = differenceInMinutes(newEndTime, new Date(booking.end_at));
     const extensionHours = extensionMinutes / 60;
 
-    if (extensionHours <= 0) {
-      toast.error('Please select a time after the current end time');
+    if (extensionHours < 1) {
+      toast.error('Extension must be at least 1 hour');
+      return;
+    }
+
+    if (extensionHours > 24) {
+      toast.error('Extension cannot exceed 24 hours');
       return;
     }
 
