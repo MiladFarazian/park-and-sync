@@ -476,7 +476,7 @@ const Booking = () => {
       return;
     }
 
-    // Validate availability - client side
+    // Validate availability - client side (warning only)
     const availabilityCheck = validateAvailability(startDateTime, endDateTime);
     console.log('[Booking] Client availability check:', { 
       valid: availabilityCheck.valid, 
@@ -492,12 +492,8 @@ const Booking = () => {
     });
     
     if (!availabilityCheck.valid) {
-      toast({
-        title: "Time not available",
-        description: availabilityCheck.message,
-        variant: "destructive",
-      });
-      return;
+      // Don't block booking purely on client estimate; trust server below
+      console.warn('[Booking] Client-side availability warning (not blocking):', availabilityCheck);
     }
     
     // Prioritize server-side availability check
@@ -509,6 +505,7 @@ const Booking = () => {
       });
       return;
     }
+
 
     setBookingLoading(true);
 
