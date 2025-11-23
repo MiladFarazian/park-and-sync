@@ -246,6 +246,8 @@ const SpotDetail = () => {
   const fetchSpotDetails = async () => {
     try {
       setLoading(true);
+      console.log('[SpotDetail] Fetching spot:', id);
+      
       const { data: spotData, error: spotError } = await supabase
         .from('spots')
         .select(`
@@ -272,8 +274,36 @@ const SpotDetail = () => {
         .eq('id', id)
         .single();
 
-      if (spotError || !spotData) {
+      console.log('[SpotDetail] Fetch result:', { 
+        id, 
+        hasData: !!spotData, 
+        hasError: !!spotError,
+        errorCode: spotError?.code,
+        errorMessage: spotError?.message,
+        spotStatus: spotData?.status
+      });
+
+      if (spotError) {
+        console.error('[SpotDetail] RLS/Permission error:', spotError);
+        if (spotError.code === 'PGRST116' || spotError.message?.includes('not found')) {
+          setError('This parking spot is not available');
+        } else if (spotError.code === 'PGRST301' || spotError.message?.includes('permission')) {
+          setError('You do not have permission to view this spot');
+        } else {
+          setError('Unable to load parking spot details');
+        }
+        return;
+      }
+
+      if (!spotData) {
+        console.error('[SpotDetail] No spot data returned for ID:', id);
         setError('Parking spot not found');
+        return;
+      }
+
+      if (spotData.status !== 'active') {
+        console.warn('[SpotDetail] Spot is not active:', { id, status: spotData.status });
+        setError('This spot is not currently active and cannot be booked');
         return;
       }
 

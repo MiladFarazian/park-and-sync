@@ -99,6 +99,8 @@ const Booking = () => {
       if (!spotId) return;
       
       try {
+        console.log('[Booking] Fetching spot:', spotId);
+        
         // Fetch spot with host info and first photo
         const { data: spotData, error: spotError } = await supabase
           .from('spots')
@@ -115,7 +117,56 @@ const Booking = () => {
           .eq('id', spotId)
           .single();
 
-        if (spotError) throw spotError;
+        console.log('[Booking] Fetch result:', { 
+          spotId, 
+          hasData: !!spotData, 
+          hasError: !!spotError,
+          errorCode: spotError?.code,
+          errorMessage: spotError?.message,
+          spotStatus: spotData?.status
+        });
+
+        if (spotError) {
+          console.error('[Booking] RLS/Permission error:', spotError);
+          if (spotError.code === 'PGRST116' || spotError.message?.includes('not found')) {
+            toast({
+              title: "Spot not available",
+              description: "This parking spot is not available for booking",
+              variant: "destructive",
+            });
+          } else if (spotError.code === 'PGRST301' || spotError.message?.includes('permission')) {
+            toast({
+              title: "Access denied",
+              description: "You do not have permission to book this spot",
+              variant: "destructive",
+            });
+          }
+          navigate('/explore');
+          return;
+        }
+
+        if (!spotData) {
+          console.error('[Booking] No spot data returned');
+          toast({
+            title: "Error",
+            description: "Spot not found",
+            variant: "destructive",
+          });
+          navigate('/explore');
+          return;
+        }
+
+        // Check if spot is active
+        if (spotData.status !== 'active') {
+          console.warn('[Booking] Spot is not active:', { spotId, status: spotData.status });
+          toast({
+            title: "Spot not active",
+            description: "This spot is not currently active and cannot be booked",
+            variant: "destructive",
+          });
+          navigate('/explore');
+          return;
+        }
 
         setSpot(spotData);
         setHost(spotData.profiles);
@@ -425,12 +476,35 @@ const Booking = () => {
       return;
     }
 
-    // Validate availability
+    // Validate availability - client side
     const availabilityCheck = validateAvailability(startDateTime, endDateTime);
+    console.log('[Booking] Client availability check:', { 
+      valid: availabilityCheck.valid, 
+      message: availabilityCheck.message,
+      start: startDateTime.toISOString(),
+      end: endDateTime.toISOString()
+    });
+    
+    // Log server availability state
+    console.log('[Booking] Server availability state:', { 
+      ok: serverAvailable.ok, 
+      reason: serverAvailable.reason 
+    });
+    
     if (!availabilityCheck.valid) {
       toast({
         title: "Time not available",
         description: availabilityCheck.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Prioritize server-side availability check
+    if (!serverAvailable.ok) {
+      toast({
+        title: "Time slot unavailable",
+        description: serverAvailable.reason || "This time is not available",
         variant: "destructive",
       });
       return;

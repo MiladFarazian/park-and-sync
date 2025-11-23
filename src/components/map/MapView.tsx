@@ -642,9 +642,30 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       // Handle unclustered point clicks - show spot details
       const onClick = (e: any) => {
         const f = e.features?.[0];
-        if (!f) return;
+        console.log('[MapView] Pin clicked:', { 
+          featureId: f?.properties?.id, 
+          featureTitle: f?.properties?.title,
+          hasFeature: !!f 
+        });
+        
+        if (!f) {
+          console.warn('[MapView] No feature found on click');
+          return;
+        }
+        
         const spot = spots.find((s) => s.id === f.properties.id);
-        if (spot) setSelectedSpot(spot);
+        console.log('[MapView] Spot lookup result:', { 
+          spotId: f.properties.id, 
+          foundSpot: !!spot,
+          spotTitle: spot?.title 
+        });
+        
+        if (spot) {
+          console.log('[MapView] Setting selected spot:', spot.id);
+          setSelectedSpot(spot);
+        } else {
+          console.error('[MapView] Spot not found in spots array for ID:', f.properties.id);
+        }
       };
       (map.current as any).on('click', circleId, onClick);
       (map.current as any).on('click', labelId, onClick);
