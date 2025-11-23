@@ -407,10 +407,7 @@ const BookingDetail = () => {
       {booking && (
         <MobileTimePicker
           isOpen={showExtendTimePicker}
-          onClose={() => {
-            setShowExtendTimePicker(false);
-            setNewEndTime(null);
-          }}
+          onClose={() => setShowExtendTimePicker(false)}
           onConfirm={(date) => {
             setNewEndTime(date);
             setShowExtendTimePicker(false);
@@ -418,7 +415,7 @@ const BookingDetail = () => {
           }}
           mode="end"
           startTime={new Date(booking.end_at)}
-          initialValue={new Date(booking.end_at)}
+          initialValue={newEndTime || new Date(booking.end_at)}
         />
       )}
 
