@@ -171,47 +171,21 @@ serve(async (req) => {
         .eq('user_id', userData.user.id);
     }
 
-    // Create Stripe Checkout Session FIRST (before booking to get the session ID)
-    console.log('Creating Stripe checkout session...');
-    const origin = req.headers.get('origin') || 'http://localhost:8080';
-    
-    // Generate a temporary booking ID for the checkout session metadata
-    const tempBookingId = crypto.randomUUID();
-    
-    const checkoutSession = await stripe.checkout.sessions.create({
-      ui_mode: 'embedded',
+    // Check for saved payment methods
+    console.log('Checking for saved payment methods...');
+    const paymentMethods = await stripe.paymentMethods.list({
       customer: customerId,
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `Parking at ${spot.title}`,
-              description: `${new Date(start_at).toLocaleString()} - ${new Date(end_at).toLocaleString()}`,
-            },
-            unit_amount: Math.round(totalAmount * 100),
-          },
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      return_url: `${origin}/checkout-success?session_id={CHECKOUT_SESSION_ID}&booking_id=${tempBookingId}`,
-      metadata: {
-        booking_id: tempBookingId,
-        spot_id,
-        host_id: spot.host_id,
-        renter_id: userData.user.id,
-      },
+      type: 'card',
+      limit: 1,
     });
 
-    console.log('Checkout session created:', checkoutSession.id);
-
-    // Now create booking record with stripe_payment_intent_id included
+    const bookingId = crypto.randomUUID();
+    
+    // Create booking record first
     const { data: booking, error: bookingError } = await supabase
       .from('bookings')
       .insert({
-        id: tempBookingId, // Use the same ID we put in checkout session metadata
+        id: bookingId,
         spot_id,
         renter_id: userData.user.id,
         vehicle_id,
@@ -224,7 +198,6 @@ serve(async (req) => {
         platform_fee: platformFee,
         total_amount: totalAmount,
         host_earnings: hostEarnings,
-        stripe_payment_intent_id: checkoutSession.id,
         idempotency_key: idempotency_key || crypto.randomUUID()
       })
       .select()
@@ -235,7 +208,58 @@ serve(async (req) => {
       throw bookingError;
     }
 
-    console.log('Booking created with checkout session ID:', booking.id);
+    console.log('Booking created:', booking.id);
+
+    // If no saved card, return error prompting user to add one
+    if (paymentMethods.data.length === 0) {
+      console.log('No saved payment methods found');
+      return new Response(JSON.stringify({ 
+        error: 'no_payment_method',
+        message: 'Please add a payment method before booking',
+        booking_id: booking.id
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Try to charge the saved card
+    console.log('Creating PaymentIntent with saved card...');
+    try {
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(totalAmount * 100),
+        currency: 'usd',
+        customer: customerId,
+        payment_method: paymentMethods.data[0].id,
+        off_session: true,
+        confirm: true,
+        metadata: {
+          booking_id: booking.id,
+          spot_id,
+          host_id: spot.host_id,
+          renter_id: userData.user.id,
+        },
+        description: `Parking at ${spot.title}`,
+      });
+
+      console.log('PaymentIntent created and confirmed:', paymentIntent.id);
+
+      // Update booking to active and store payment intent ID
+      const { error: updateError } = await supabase
+        .from('bookings')
+        .update({ 
+          status: 'active',
+          stripe_payment_intent_id: paymentIntent.id,
+          stripe_charge_id: paymentIntent.latest_charge as string
+        })
+        .eq('id', booking.id);
+
+      if (updateError) {
+        console.error('Failed to update booking status:', updateError);
+        throw updateError;
+      }
+
+      console.log('Booking activated successfully');
 
     // Release the hold if provided
     if (hold_id) {
@@ -308,16 +332,72 @@ serve(async (req) => {
       }
     }
 
-    console.log('Booking created:', booking.id);
+      // Return success
+      return new Response(JSON.stringify({
+        success: true,
+        booking_id: booking.id,
+        total_amount: totalAmount,
+        platform_fee: platformFee
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
 
-    return new Response(JSON.stringify({
-      booking_id: booking.id,
-      client_secret: checkoutSession.client_secret,
-      total_amount: totalAmount,
-      platform_fee: platformFee
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    } catch (paymentError: any) {
+      console.error('Payment failed:', paymentError);
+      
+      // If 3DS is required or card declined, fallback to checkout session
+      const requiresAction = paymentError.type === 'StripeCardError' || 
+                            paymentError.code === 'authentication_required' ||
+                            paymentError.code === 'card_declined';
+
+      if (requiresAction) {
+        console.log('Payment requires additional action, creating checkout session...');
+        const origin = req.headers.get('origin') || 'http://localhost:8080';
+        
+        const checkoutSession = await stripe.checkout.sessions.create({
+          ui_mode: 'embedded',
+          customer: customerId,
+          payment_method_types: ['card'],
+          line_items: [{
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: `Parking at ${spot.title}`,
+                description: `${new Date(start_at).toLocaleString()} - ${new Date(end_at).toLocaleString()}`,
+              },
+              unit_amount: Math.round(totalAmount * 100),
+            },
+            quantity: 1,
+          }],
+          mode: 'payment',
+          return_url: `${origin}/checkout-success?session_id={CHECKOUT_SESSION_ID}&booking_id=${booking.id}`,
+          metadata: {
+            booking_id: booking.id,
+            spot_id,
+            host_id: spot.host_id,
+            renter_id: userData.user.id,
+          },
+        });
+
+        // Update booking with checkout session ID
+        await supabase
+          .from('bookings')
+          .update({ stripe_payment_intent_id: checkoutSession.id })
+          .eq('id', booking.id);
+
+        return new Response(JSON.stringify({
+          requires_action: true,
+          client_secret: checkoutSession.client_secret,
+          booking_id: booking.id,
+          message: paymentError.code === 'card_declined' ? 'Card declined' : 'Additional verification required'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // For other errors, throw
+      throw paymentError;
+    }
 
   } catch (error) {
     console.error('Booking creation error:', error);
