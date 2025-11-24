@@ -19,11 +19,26 @@ const EditSpotAvailability = () => {
   const [spotTitle, setSpotTitle] = useState('');
   const [activeTab, setActiveTab] = useState('weekly');
 
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
+  }, []);
+
   useEffect(() => {
     const fetchAvailability = async () => {
       if (!spotId) return;
 
       try {
+        // Check authentication first
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setIsLoading(false);
+          return;
+        }
+
         // Fetch spot details
         const { data: spotData, error: spotError } = await supabase
           .from('spots')
@@ -34,8 +49,7 @@ const EditSpotAvailability = () => {
         if (spotError) throw spotError;
 
         // Verify ownership
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user || spotData.host_id !== user.id) {
+        if (spotData.host_id !== user.id) {
           toast.error('You do not have permission to edit this spot');
           navigate('/dashboard');
           return;
@@ -163,6 +177,25 @@ const EditSpotAvailability = () => {
         <div className="p-4 space-y-6 max-w-2xl mx-auto">
           <p className="text-center text-muted-foreground">Loading...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] p-4">
+        <Card className="max-w-md w-full p-6 text-center">
+          <h2 className="text-2xl font-bold mb-2">Sign In Required</h2>
+          <p className="text-muted-foreground mb-6">
+            Please sign in to manage your spot's availability.
+          </p>
+          <Button 
+            onClick={() => navigate('/auth')}
+            className="w-full"
+          >
+            Sign In
+          </Button>
+        </Card>
       </div>
     );
   }

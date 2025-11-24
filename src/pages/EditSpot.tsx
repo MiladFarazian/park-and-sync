@@ -64,6 +64,7 @@ const EditSpot = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [hasOrderChanged, setHasOrderChanged] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
   const {
     register,
@@ -75,10 +76,23 @@ const EditSpot = () => {
   });
 
   useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
+  }, []);
+
+  useEffect(() => {
     const fetchSpot = async () => {
       if (!spotId) return;
 
       try {
+        // Check authentication first
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setIsLoading(false);
+          return;
+        }
+
         const { data: spotData, error: spotError } = await supabase
           .from('spots')
           .select('*')
@@ -88,8 +102,7 @@ const EditSpot = () => {
         if (spotError) throw spotError;
 
         // Verify ownership
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user || spotData.host_id !== user.id) {
+        if (spotData.host_id !== user.id) {
           toast.error('You do not have permission to edit this spot');
           navigate('/dashboard');
           return;
@@ -499,6 +512,25 @@ const EditSpot = () => {
         <div className="p-4 space-y-6 max-w-2xl mx-auto">
           <p className="text-center text-muted-foreground">Loading...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] p-4">
+        <Card className="max-w-md w-full p-6 text-center">
+          <h2 className="text-2xl font-bold mb-2">Sign In Required</h2>
+          <p className="text-muted-foreground mb-6">
+            Please sign in to edit your spot.
+          </p>
+          <Button 
+            onClick={() => navigate('/auth')}
+            className="w-full"
+          >
+            Sign In
+          </Button>
+        </Card>
       </div>
     );
   }
