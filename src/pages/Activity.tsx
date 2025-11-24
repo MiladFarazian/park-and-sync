@@ -192,12 +192,24 @@ const Activity = () => {
 
     const getStatusColor = () => {
       if (booking.status === 'canceled') return 'bg-destructive/10 text-destructive border-destructive/20';
+      if (booking.status === 'completed') {
+        if (booking.overstay_charge_amount && booking.overstay_charge_amount > 0) {
+          return 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-500 border-yellow-200 dark:border-yellow-800';
+        }
+        return 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-500 border-green-200 dark:border-green-800';
+      }
       if (isPast) return 'bg-muted text-muted-foreground border-border';
       return 'bg-primary/10 text-primary border-primary/20';
     };
 
     const getStatusText = () => {
       if (booking.status === 'canceled') return 'Cancelled';
+      if (booking.status === 'completed') {
+        if (booking.overstay_charge_amount && booking.overstay_charge_amount > 0) {
+          return 'Completed - Late';
+        }
+        return 'Completed';
+      }
       if (booking.status === 'paid') return isPast ? 'Completed' : 'Confirmed';
       return booking.status.charAt(0).toUpperCase() + booking.status.slice(1);
     };
@@ -366,6 +378,14 @@ const Activity = () => {
                 <span className="text-sm text-muted-foreground font-medium">Total Amount</span>
                 <span className="text-2xl font-bold text-primary">${Number(booking.total_amount).toFixed(2)}</span>
               </div>
+              {booking.overstay_charge_amount && booking.overstay_charge_amount > 0 && (
+                <div className="flex items-center justify-between mt-2 pt-2 border-t">
+                  <span className="text-xs text-yellow-600 dark:text-yellow-500">Overstay Charge</span>
+                  <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-500">
+                    +${Number(booking.overstay_charge_amount).toFixed(2)}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}

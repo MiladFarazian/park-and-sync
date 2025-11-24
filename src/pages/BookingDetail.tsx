@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, Plus, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, Plus, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { format, differenceInMinutes } from 'date-fns';
 import { toast } from 'sonner';
 import { loadStripe } from '@stripe/stripe-js';
@@ -57,6 +57,7 @@ const BookingDetail = () => {
   const [extending, setExtending] = useState(false);
   const [cancellingTow, setCancellingTow] = useState(false);
   const [overstayLoading, setOverstayLoading] = useState(false);
+  const [confirmingDeparture, setConfirmingDeparture] = useState(false);
 
   useEffect(() => {
     if (!bookingId || !user) return;
@@ -239,6 +240,27 @@ const BookingDetail = () => {
     setOverstayLoading(false);
   };
 
+  const handleConfirmDeparture = async () => {
+    if (!booking) return;
+
+    setConfirmingDeparture(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('confirm-departure', {
+        body: { bookingId: booking.id },
+      });
+
+      if (error) throw error;
+
+      toast.success('Departure confirmed! Thank you.');
+      await loadBookingDetails();
+    } catch (error) {
+      console.error('Error confirming departure:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to confirm departure');
+    } finally {
+      setConfirmingDeparture(false);
+    }
+  };
+
   const handleExtendBooking = async () => {
     if (!booking || !newEndTime) return;
 
@@ -344,6 +366,17 @@ const BookingDetail = () => {
   const canCancel = isActive && new Date() < new Date(booking.start_at);
   const canExtend = (booking.status === 'pending' || booking.status === 'active' || booking.status === 'paid') && new Date() < new Date(booking.end_at);
   const isHost = user?.id === booking.spots.host_id;
+  const isRenter = booking?.renter_id === user?.id;
+
+  // Check if booking is ending soon or has just ended for departure confirmation
+  const canConfirmDeparture = () => {
+    if (!booking || !isRenter || (booking.status !== 'active' && booking.status !== 'paid')) return false;
+    const now = new Date();
+    const endTime = new Date(booking.end_at);
+    const fifteenMinBefore = new Date(endTime.getTime() - 15 * 60 * 1000);
+    const fifteenMinAfter = new Date(endTime.getTime() + 15 * 60 * 1000);
+    return now >= fifteenMinBefore && now <= fifteenMinAfter && !booking.overstay_action;
+  };
   
   // Correct overstay detection logic
   const now = new Date();
@@ -374,6 +407,33 @@ const BookingDetail = () => {
       </div>
 
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
+        {/* Departure Confirmation for Renters */}
+        {isRenter && canConfirmDeparture() && (
+          <Card className="overflow-hidden border-primary/20 bg-primary/5">
+            <div className="p-6 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold mb-1">Confirm Your Departure</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Your booking is ending soon. Please confirm when you've left the parking spot.
+                  </p>
+                  <Button
+                    onClick={handleConfirmDeparture}
+                    disabled={confirmingDeparture}
+                    className="w-full"
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    {confirmingDeparture ? 'Confirming...' : 'I\'ve Left the Spot'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Status Badge */}
         <div className="flex justify-center">
           {isActive && <Badge className="text-sm px-4 py-1">Active</Badge>}

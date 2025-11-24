@@ -162,10 +162,63 @@ serve(async (req) => {
       }
     }
 
+    // Auto-complete bookings that ended cleanly (no overstay)
+    const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
+    const { data: cleanBookings, error: cleanError } = await supabaseClient
+      .from('bookings')
+      .select(`
+        *,
+        spots (
+          title,
+          host_id
+        )
+      `)
+      .in('status', ['active', 'paid'])
+      .lt('end_at', fifteenMinutesAgo.toISOString())
+      .is('overstay_detected_at', null)
+      .is('departed_at', null);
+
+    if (cleanError) throw cleanError;
+
+    console.log(`Found ${cleanBookings?.length || 0} bookings to auto-complete`);
+
+    for (const booking of cleanBookings || []) {
+      // Auto-complete booking
+      await supabaseClient
+        .from('bookings')
+        .update({
+          status: 'completed',
+          updated_at: now.toISOString(),
+        })
+        .eq('id', booking.id);
+
+      // Notify host
+      await supabaseClient
+        .from('notifications')
+        .insert({
+          user_id: booking.spots.host_id,
+          type: 'booking_completed',
+          title: 'Booking Completed',
+          message: `Booking at ${booking.spots.title} completed successfully.`,
+          related_id: booking.id,
+        });
+
+      // Notify renter
+      await supabaseClient
+        .from('notifications')
+        .insert({
+          user_id: booking.renter_id,
+          type: 'booking_completed',
+          title: 'Booking Completed',
+          message: `Your booking at ${booking.spots.title} has been completed.`,
+          related_id: booking.id,
+        });
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Processed ${overstayedBookings?.length || 0} new overstays and ${postGraceBookings?.length || 0} grace period endings` 
+        message: `Processed ${overstayedBookings?.length || 0} new overstays, ${postGraceBookings?.length || 0} grace period endings, and auto-completed ${cleanBookings?.length || 0} bookings` 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );

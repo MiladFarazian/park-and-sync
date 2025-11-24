@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.detect-overstays]
 verify_jwt = false
+
+[functions.confirm-departure]
+verify_jwt = true
