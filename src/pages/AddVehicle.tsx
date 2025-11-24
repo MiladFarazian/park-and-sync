@@ -49,9 +49,10 @@ const AddVehicle = () => {
   };
 
   return (
-    <div className="container max-w-2xl mx-auto p-4 space-y-6 pb-20">
+    <div className="h-full overflow-y-auto">
+      <div className="container max-w-2xl mx-auto p-4 space-y-6 pb-24">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/my-vehicles')}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
@@ -165,7 +166,7 @@ const AddVehicle = () => {
                 type="button"
                 variant="outline"
                 className="flex-1"
-                onClick={() => navigate(-1)}
+                onClick={() => navigate('/my-vehicles')}
               >
                 Cancel
               </Button>
@@ -176,6 +177,7 @@ const AddVehicle = () => {
           </Card>
         </form>
       </div>
+    </div>
   );
 };
 
