@@ -106,6 +106,7 @@ export type Database = {
           check_in_photo_url: string | null
           check_out_photo_url: string | null
           created_at: string
+          departed_at: string | null
           end_at: string
           host_earnings: number | null
           hourly_rate: number
@@ -135,6 +136,7 @@ export type Database = {
           check_in_photo_url?: string | null
           check_out_photo_url?: string | null
           created_at?: string
+          departed_at?: string | null
           end_at: string
           host_earnings?: number | null
           hourly_rate: number
@@ -164,6 +166,7 @@ export type Database = {
           check_in_photo_url?: string | null
           check_out_photo_url?: string | null
           created_at?: string
+          departed_at?: string | null
           end_at?: string
           host_earnings?: number | null
           hourly_rate?: number

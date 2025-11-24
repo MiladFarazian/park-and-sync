@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus, Navigation, Edit, AlertCircle } from "lucide-react";
+import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus, Navigation, Edit, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { toast } from "sonner";
@@ -52,6 +52,7 @@ export const ActiveBookingBanner = () => {
   const [setupClientSecret, setSetupClientSecret] = useState<string | null>(null);
   const [stripePublishableKey, setStripePublishableKey] = useState<string | null>(null);
   const [stripePromise, setStripePromise] = useState<Promise<any> | null>(null);
+  const [confirmingDeparture, setConfirmingDeparture] = useState(false);
   const isHost = activeBooking && profile?.user_id === activeBooking.spots.host_id;
 
   useEffect(() => {
@@ -142,6 +143,28 @@ export const ActiveBookingBanner = () => {
       toast.error('Unable to start card setup. Please try again.');
     }
   };
+
+  const handleConfirmDeparture = async () => {
+    if (!activeBooking) return;
+
+    setConfirmingDeparture(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('confirm-departure', {
+        body: { bookingId: activeBooking.id },
+      });
+
+      if (error) throw error;
+
+      toast.success('Departure confirmed! Thank you.');
+      await loadActiveBooking();
+    } catch (error) {
+      console.error('Error confirming departure:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to confirm departure');
+    } finally {
+      setConfirmingDeparture(false);
+    }
+  };
+
   const handleMessage = () => {
     if (!activeBooking) return;
     
@@ -320,6 +343,16 @@ export const ActiveBookingBanner = () => {
     return activeBooking.spots.hourly_rate * extensionHours;
   };
 
+  // Check if booking is ending soon (within 15 min) or has just ended (within 15 min past)
+  const canConfirmDeparture = () => {
+    if (!activeBooking || isHost) return false;
+    const now = new Date();
+    const endTime = new Date(activeBooking.end_at);
+    const fifteenMinBefore = new Date(endTime.getTime() - 15 * 60 * 1000);
+    const fifteenMinAfter = new Date(endTime.getTime() + 15 * 60 * 1000);
+    return now >= fifteenMinBefore && now <= fifteenMinAfter && !activeBooking.overstay_action;
+  };
+
   const AddCardInline = () => {
     const stripe = useStripe();
     const elements = useElements();
@@ -423,6 +456,17 @@ export const ActiveBookingBanner = () => {
             <div className="flex items-center gap-2 justify-end flex-wrap" onClick={(e) => e.stopPropagation()}>
               {!isHost && (
                 <>
+                  {canConfirmDeparture() && (
+                    <Button
+                      size="sm"
+                      onClick={handleConfirmDeparture}
+                      disabled={confirmingDeparture}
+                      className="flex-1"
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-1" />
+                      {confirmingDeparture ? 'Confirming...' : "I've Left"}
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"

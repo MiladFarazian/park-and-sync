@@ -264,13 +264,13 @@ const HostBookingConfirmation = () => {
           )}
         </Card>
 
-        {/* Overstay Management Notice */}
+        {/* Departure Confirmation Info */}
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            <strong>Overstay Management:</strong> If the driver stays beyond their booking time, 
-            you can send warnings or request towing through the booking details page. A 15-minute 
-            grace period applies before actions can be taken.
+            <strong>Departure Confirmation:</strong> The driver can confirm their departure when the booking 
+            is ending or has just ended. You'll be notified when they confirm. If they don't confirm departure 
+            and overstay their time, you can send warnings or request towing through the booking details page.
           </AlertDescription>
         </Alert>
 
