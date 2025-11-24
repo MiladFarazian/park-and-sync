@@ -26,7 +26,10 @@ interface BookingDetails {
   created_at: string;
   overstay_charge_amount: number;
   overstay_detected_at: string | null;
+  overstay_grace_end: string | null;
+  overstay_action: string | null;
   cancellation_reason: string | null;
+  renter_id: string;
   spots: {
     id: string;
     title: string;
@@ -52,6 +55,7 @@ const BookingDetail = () => {
   const [showExtendTimePicker, setShowExtendTimePicker] = useState(false);
   const [newEndTime, setNewEndTime] = useState<Date | null>(null);
   const [extending, setExtending] = useState(false);
+  const [cancellingTow, setCancellingTow] = useState(false);
 
   useEffect(() => {
     if (!bookingId || !user) return;
@@ -76,6 +80,9 @@ const BookingDetail = () => {
           created_at,
           overstay_charge_amount,
           overstay_detected_at,
+          overstay_grace_end,
+          overstay_action,
+          renter_id,
           cancellation_reason,
           spots!inner(id, title, address, host_id),
           profiles!bookings_renter_id_fkey(first_name, last_name, avatar_url)
@@ -130,7 +137,29 @@ const BookingDetail = () => {
 
   const handleMessage = () => {
     if (!booking) return;
-    navigate(`/messages?userId=${booking.spots.host_id}`);
+    const otherUserId = user?.id === booking.spots.host_id ? booking.renter_id : booking.spots.host_id;
+    navigate(`/messages?userId=${otherUserId}`);
+  };
+
+  const handleCancelTowRequest = async () => {
+    if (!booking) return;
+
+    setCancellingTow(true);
+    try {
+      const { error } = await supabase.functions.invoke('cancel-tow-request', {
+        body: { bookingId: booking.id }
+      });
+
+      if (error) throw error;
+
+      toast.success('Tow request cancelled successfully');
+      loadBookingDetails(); // Reload to show updated status
+    } catch (error: any) {
+      console.error('Error cancelling tow request:', error);
+      toast.error(error.message || 'Failed to cancel tow request');
+    } finally {
+      setCancellingTow(false);
+    }
   };
 
   const handleExtendBooking = async () => {
@@ -237,6 +266,9 @@ const BookingDetail = () => {
   const isCompleted = booking.status === 'completed';
   const canCancel = isActive && new Date() < new Date(booking.start_at);
   const canExtend = (booking.status === 'pending' || booking.status === 'active' || booking.status === 'paid') && new Date() < new Date(booking.end_at);
+  const isHost = user?.id === booking.spots.host_id;
+  const hasOverstay = booking.overstay_detected_at !== null;
+  const hasTowRequest = booking.overstay_action === 'towing';
 
   const extensionCost = calculateExtensionCost();
 
@@ -372,6 +404,56 @@ const BookingDetail = () => {
           </div>
         </Card>
 
+        {/* Overstay Status (Host Only) */}
+        {isHost && hasOverstay && (
+          <Card className="p-4 border-destructive bg-destructive/5">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
+              <div className="flex-1 space-y-3">
+                <div>
+                  <p className="font-semibold text-destructive mb-1">Overstay Detected</p>
+                  <p className="text-sm text-muted-foreground">
+                    Guest has exceeded their booking time.
+                    {booking.overstay_grace_end && new Date() < new Date(booking.overstay_grace_end) && (
+                      <> Grace period ends at {format(new Date(booking.overstay_grace_end), 'h:mm a')}.</>
+                    )}
+                  </p>
+                </div>
+                
+                {hasTowRequest && (
+                  <div className="bg-background p-3 rounded-md border border-border">
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge variant="destructive" className="text-xs">Tow Request Active</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      A towing service request has been initiated for this vehicle.
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleCancelTowRequest}
+                      disabled={cancellingTow}
+                      className="w-full"
+                    >
+                      {cancellingTow ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Cancelling...
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Cancel Tow Request
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Additional Info */}
         <Card className="p-4 space-y-2">
           <div className="flex justify-between text-sm">
@@ -390,8 +472,8 @@ const BookingDetail = () => {
           )}
         </Card>
 
-        {/* Cancel Button */}
-        {canCancel && (
+        {/* Cancel Button (Renter Only) */}
+        {!isHost && canCancel && (
           <Card className="p-4 bg-muted/50">
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-muted-foreground mt-0.5" />
