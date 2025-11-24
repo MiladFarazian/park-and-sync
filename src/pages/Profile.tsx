@@ -455,7 +455,7 @@ const Profile = () => {
         </div>
 
         {/* Logout Button */}
-        <Button variant="outline" onClick={handleSignOut} className="w-full mb-8">
+        <Button variant="outline" onClick={handleSignOut} className="w-full mb-24">
           <LogOut className="h-4 w-4 mr-2" />
           Logout
         </Button>
