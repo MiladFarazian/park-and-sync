@@ -462,7 +462,20 @@ const Activity = () => {
                   {mode === 'driver' && <Button onClick={() => {
                 const now = new Date();
                 const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-                navigate(`/explore?start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
+                
+                if (navigator.geolocation) {
+                  navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                      navigate(`/explore?lat=${position.coords.latitude}&lng=${position.coords.longitude}&start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
+                    },
+                    (error) => {
+                      console.error('Location error:', error);
+                      navigate(`/explore?start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
+                    }
+                  );
+                } else {
+                  navigate(`/explore?start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
+                }
               }}>
                       Find Parking
                     </Button>}
