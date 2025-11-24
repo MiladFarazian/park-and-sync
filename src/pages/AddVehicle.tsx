@@ -49,8 +49,7 @@ const AddVehicle = () => {
   };
 
   return (
-    <div className="bg-background min-h-screen pb-20">
-      <div className="container max-w-2xl mx-auto p-4 space-y-6">
+    <div className="container max-w-2xl mx-auto p-4 space-y-6 pb-20">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
@@ -177,7 +176,6 @@ const AddVehicle = () => {
           </Card>
         </form>
       </div>
-    </div>
   );
 };
 
