@@ -25,6 +25,8 @@ const Dashboard = () => {
   useEffect(() => {
     if (user) {
       fetchHostData();
+    } else {
+      setLoading(false);
     }
   }, [user]);
 
@@ -183,6 +185,25 @@ const Dashboard = () => {
           <h1 className="text-2xl font-bold">Host Dashboard</h1>
           <p className="text-muted-foreground">Loading...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] p-4">
+        <Card className="max-w-md w-full p-6 text-center">
+          <h2 className="text-2xl font-bold mb-2">Sign In Required</h2>
+          <p className="text-muted-foreground mb-6">
+            Please sign in to access your host dashboard and manage your listings.
+          </p>
+          <Button 
+            onClick={() => navigate('/auth')}
+            className="w-full"
+          >
+            Sign In
+          </Button>
+        </Card>
       </div>
     );
   }
