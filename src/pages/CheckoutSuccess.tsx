@@ -12,10 +12,12 @@ export default function CheckoutSuccess() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [bookingId, setBookingId] = useState<string | null>(null);
+  const [status, setStatus] = useState<"pending" | "active" | "error">("pending");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const sessionId = searchParams.get('session_id');
-    const bookingIdParam = searchParams.get('booking_id');
+    const sessionId = searchParams.get("session_id");
+    const bookingIdParam = searchParams.get("booking_id");
 
     if (!sessionId || !bookingIdParam) {
       toast({
@@ -23,37 +25,64 @@ export default function CheckoutSuccess() {
         description: "Invalid confirmation link",
         variant: "destructive",
       });
-      navigate('/');
+      navigate("/");
       return;
     }
 
     setBookingId(bookingIdParam);
 
-    // Wait a moment for webhook to process
-    const timer = setTimeout(async () => {
+    let attempts = 0;
+    const maxAttempts = 10; // ~20 seconds total (2s * 10)
+
+    const checkStatus = async () => {
       try {
-        // Verify booking status
         const { data: booking, error } = await supabase
-          .from('bookings')
-          .select('status')
-          .eq('id', bookingIdParam)
+          .from("bookings")
+          .select("status")
+          .eq("id", bookingIdParam)
           .single();
 
         if (error) throw error;
 
-        if (booking.status === 'active') {
+        if (booking.status === "active") {
+          setStatus("active");
           setLoading(false);
+          return;
+        }
+
+        attempts += 1;
+        if (attempts < maxAttempts) {
+          setTimeout(checkStatus, 2000);
         } else {
-          // Still pending, check again shortly
-          setTimeout(() => setLoading(false), 2000);
+          console.error("Booking did not become active in time", {
+            bookingId: bookingIdParam,
+            status: booking.status,
+          });
+          setStatus("error");
+          setErrorMessage(
+            "Your payment was processed, but we could not confirm the booking. Please check your Activity or try again.",
+          );
+          setLoading(false);
         }
       } catch (error) {
-        console.error('Error checking booking status:', error);
-        setLoading(false);
+        console.error("Error checking booking status:", error);
+        attempts += 1;
+        if (attempts < maxAttempts) {
+          setTimeout(checkStatus, 2000);
+        } else {
+          setStatus("error");
+          setErrorMessage("We could not verify your booking status. Please check your Activity page.");
+          setLoading(false);
+        }
       }
-    }, 2000);
+    };
 
-    return () => clearTimeout(timer);
+    // Initial slight delay to give webhooks time to run
+    const initialTimer = setTimeout(checkStatus, 2000);
+
+    return () => {
+      clearTimeout(initialTimer);
+    };
   }, [searchParams, navigate, toast]);
 
   if (loading) {
@@ -62,34 +91,42 @@ export default function CheckoutSuccess() {
         <Card className="p-8 text-center max-w-md w-full">
           <Loader2 className="h-16 w-16 animate-spin text-primary mx-auto mb-4" />
           <h2 className="text-2xl font-semibold mb-2">Processing Payment</h2>
-          <p className="text-muted-foreground">
-            Please wait while we confirm your booking...
-          </p>
+          <p className="text-muted-foreground">Please wait while we confirm your booking...</p>
         </Card>
       </div>
     );
   }
 
+  const isSuccess = status === "active";
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="p-8 text-center max-w-md w-full">
-        <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
-        <h2 className="text-2xl font-semibold mb-2">Booking Confirmed!</h2>
-        <p className="text-muted-foreground mb-6">
-          Your parking spot has been successfully reserved and payment confirmed.
-        </p>
+        {isSuccess ? (
+          <>
+            <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-semibold mb-2">Booking Confirmed!</h2>
+            <p className="text-muted-foreground mb-6">
+              Your parking spot has been successfully reserved and payment confirmed.
+            </p>
+          </>
+        ) : (
+          <>
+            <CheckCircle2 className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-semibold mb-2">Payment Received</h2>
+            <p className="text-muted-foreground mb-6">
+              {errorMessage ||
+                "We are still finalizing your booking. Please check your Activity page in a moment."}
+            </p>
+          </>
+        )}
         <div className="space-y-3">
-          <Button 
-            onClick={() => navigate(`/booking/${bookingId}`)}
-            className="w-full"
-          >
-            View Booking Details
-          </Button>
-          <Button 
-            onClick={() => navigate('/activity')}
-            variant="outline"
-            className="w-full"
-          >
+          {isSuccess && (
+            <Button onClick={() => navigate(`/booking/${bookingId}`)} className="w-full">
+              View Booking Details
+            </Button>
+          )}
+          <Button onClick={() => navigate("/activity")} variant="outline" className="w-full">
             Go to Activity
           </Button>
         </div>

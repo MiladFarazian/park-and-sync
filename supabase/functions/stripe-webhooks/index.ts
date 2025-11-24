@@ -71,32 +71,70 @@ serve(async (req) => {
 
 async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   console.log('Payment succeeded:', paymentIntent.id);
-  
-  // Get the booking details
-  const { data: booking, error: bookingError } = await supabase
-    .from('bookings')
-    .select('id, host_earnings, renter_id, spot_id, spots!inner(host_id, title, address)')
-    .eq('stripe_payment_intent_id', paymentIntent.id)
-    .single();
+
+  // Prefer explicit booking_id from metadata when available
+  const metadata = (paymentIntent.metadata || {}) as Record<string, string>;
+  const bookingIdFromMetadata = metadata.booking_id;
+
+  let booking: any = null;
+  let bookingError: any = null;
+
+  try {
+    if (bookingIdFromMetadata) {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('id, status, host_earnings, renter_id, spot_id, spots!inner(host_id, title, address)')
+        .eq('id', bookingIdFromMetadata)
+        .single();
+
+      booking = data;
+      bookingError = error;
+    } else {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('id, status, host_earnings, renter_id, spot_id, spots!inner(host_id, title, address)')
+        .eq('stripe_payment_intent_id', paymentIntent.id)
+        .single();
+
+      booking = data;
+      bookingError = error;
+    }
+  } catch (err) {
+    console.error('Unexpected error fetching booking for payment_intent.succeeded:', err);
+    return;
+  }
 
   if (bookingError || !booking) {
-    console.error('Failed to fetch booking:', bookingError);
+    console.error('Failed to fetch booking for payment_intent.succeeded:', bookingError, {
+      payment_intent_id: paymentIntent.id,
+      booking_id_metadata: bookingIdFromMetadata,
+    });
     return;
   }
 
-  // Update booking status to active (paid and ready to use)
+  if (booking.status === 'active' || booking.status === 'completed') {
+    console.log('Booking already active/completed, skipping update for PaymentIntent:', paymentIntent.id);
+    return;
+  }
+
+  // Update booking status to active and store PaymentIntent + charge IDs
   const { error: updateError } = await supabase
     .from('bookings')
-    .update({ 
+    .update({
       status: 'active',
-      stripe_charge_id: paymentIntent.latest_charge as string
+      stripe_payment_intent_id: paymentIntent.id,
+      stripe_charge_id: paymentIntent.latest_charge as string,
     })
-    .eq('stripe_payment_intent_id', paymentIntent.id);
+    .eq('id', booking.id);
 
   if (updateError) {
-    console.error('Failed to update booking status:', updateError);
+    console.error('Failed to update booking status on payment_intent.succeeded:', updateError, {
+      booking_id: booking.id,
+    });
     return;
   }
+
+  console.log('Booking activated from payment_intent.succeeded:', booking.id);
 
   // Send confirmation notification to renter
   const renterNotification = {
@@ -109,31 +147,24 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
 
   await supabase.from('notifications').insert(renterNotification);
 
-  // Credit host's balance
+  // Credit host's balance (idempotent because we only do this when booking was not active)
   const hostId = (booking.spots as any).host_id;
   const hostEarnings = booking.host_earnings || 0;
 
-  const { error: balanceError } = await supabase.rpc('increment_balance', {
-    user_id: hostId,
-    amount: hostEarnings
-  });
+  if (hostEarnings > 0) {
+    const { error: balanceError } = await supabase.rpc('increment_balance', {
+      user_id: hostId,
+      amount: hostEarnings,
+    });
 
-  if (balanceError) {
-    console.error('Failed to update host balance:', balanceError);
-    // Try direct update as fallback
-    const { error: fallbackError } = await supabase
-      .from('profiles')
-      .update({ 
-        balance: supabase.sql`balance + ${hostEarnings}`
-      })
-      .eq('user_id', hostId);
-    
-    if (fallbackError) {
-      console.error('Failed to update host balance (fallback):', fallbackError);
+    if (balanceError) {
+      console.error('Failed to update host balance on payment_intent.succeeded:', balanceError, {
+        host_id: hostId,
+      });
+    } else {
+      console.log(`Credited ${hostEarnings} to host ${hostId} from payment_intent.succeeded`);
     }
   }
-
-  console.log(`Credited ${hostEarnings} to host ${hostId}`);
 }
 
 async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
@@ -151,53 +182,84 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
 
 async function handleCheckoutPaymentCompleted(session: Stripe.Checkout.Session) {
   console.log('Processing checkout payment completion for session:', session.id);
-  
+
   const bookingId = session.metadata?.booking_id;
   if (!bookingId) {
-    console.error('No booking_id in session metadata');
+    console.error('No booking_id in checkout.session.completed metadata');
     return;
   }
 
   try {
-    // Update booking status to active
-    const { error: updateError } = await supabase
+    // Fetch booking first so we can enforce idempotency and compute earnings
+    const { data: booking, error: bookingError } = await supabase
       .from('bookings')
-      .update({ 
-        status: 'active',
-        stripe_charge_id: session.payment_intent as string,
-      })
-      .eq('id', bookingId);
-
-    if (updateError) throw updateError;
-
-    // Get booking details for notifications
-    const { data: booking } = await supabase
-      .from('bookings')
-      .select('*, spots(host_id, title)')
+      .select('id, status, subtotal, host_earnings, renter_id, spots!inner(host_id, title)')
       .eq('id', bookingId)
       .single();
 
-    if (booking) {
-      // Credit host balance
-      const hostEarnings = booking.subtotal;
-      await supabase.rpc('increment_balance', {
-        user_id: (booking.spots as any).host_id,
+    if (bookingError || !booking) {
+      console.error('Failed to fetch booking for checkout.session.completed:', bookingError, {
+        booking_id: bookingId,
+      });
+      return;
+    }
+
+    if (booking.status === 'active' || booking.status === 'completed') {
+      console.log('Booking already active/completed, skipping checkout.session.completed handling for:', bookingId);
+      return;
+    }
+
+    // Ensure host_earnings is populated (fallback to subtotal if needed)
+    const hostEarnings = (booking.host_earnings ?? booking.subtotal) || 0;
+
+    // Update booking status and Stripe references
+    const { error: updateError } = await supabase
+      .from('bookings')
+      .update({
+        status: 'active',
+        stripe_payment_intent_id: session.payment_intent as string,
+        stripe_charge_id: session.payment_intent as string,
+        host_earnings: hostEarnings,
+      })
+      .eq('id', bookingId);
+
+    if (updateError) {
+      console.error('Failed to update booking on checkout.session.completed:', updateError, {
+        booking_id: bookingId,
+      });
+      return;
+    }
+
+    // Credit host balance once
+    if (hostEarnings > 0) {
+      const hostId = (booking.spots as any).host_id;
+      const { error: balanceError } = await supabase.rpc('increment_balance', {
+        user_id: hostId,
         amount: hostEarnings,
       });
 
-      // Send notification to renter
-      await supabase.from('notifications').insert({
-        user_id: booking.renter_id,
-        type: 'booking_confirmed',
-        title: 'Booking Confirmed',
-        message: `Your parking at ${(booking.spots as any).title} has been confirmed.`,
-        related_id: bookingId,
-      });
+      if (balanceError) {
+        console.error('Failed to update host balance on checkout.session.completed:', balanceError, {
+          host_id: hostId,
+        });
+      }
     }
+
+    // Send notification to renter
+    await supabase.from('notifications').insert({
+      user_id: booking.renter_id,
+      type: 'booking_confirmed',
+      title: 'Booking Confirmed',
+      message: `Your parking at ${(booking.spots as any).title} has been confirmed.`,
+      related_id: bookingId,
+    });
 
     console.log('Successfully processed checkout payment for booking:', bookingId);
   } catch (error) {
-    console.error('Error processing checkout payment:', error);
+    console.error('Error processing checkout payment:', error, {
+      booking_id: session.metadata?.booking_id,
+      session_id: session.id,
+    });
   }
 }
 
