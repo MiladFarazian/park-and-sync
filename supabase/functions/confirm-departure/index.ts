@@ -89,16 +89,43 @@ serve(async (req) => {
       throw new Error('Failed to confirm departure');
     }
 
-    // Send notification to host
-    await supabaseClient
-      .from('notifications')
-      .insert({
-        user_id: booking.spots.host_id,
-        type: 'departure_confirmed',
-        title: 'Driver Departed',
-        message: `Driver has confirmed departure from ${booking.spots.title}. Booking completed successfully.`,
-        related_id: booking.id,
-      });
+    // Check if there were overstay charges
+    const hasOverstayCharges = booking.overstay_charge_amount && booking.overstay_charge_amount > 0;
+
+    if (hasOverstayCharges) {
+      // Send notification to renter about the charge
+      await supabaseClient
+        .from('notifications')
+        .insert({
+          user_id: booking.renter_id,
+          type: 'overstay_charge_applied',
+          title: 'Overtime Charge Applied',
+          message: `You were charged $${booking.overstay_charge_amount} for overstaying at ${booking.spots.title}. This charge has been added to your total.`,
+          related_id: booking.id,
+        });
+      
+      // Notify host with charge details
+      await supabaseClient
+        .from('notifications')
+        .insert({
+          user_id: booking.spots.host_id,
+          type: 'departure_confirmed',
+          title: 'Driver Departed - Overtime Charged',
+          message: `Driver confirmed departure from ${booking.spots.title}. Overtime charge of $${booking.overstay_charge_amount} was applied.`,
+          related_id: booking.id,
+        });
+    } else {
+      // Existing notification for clean departures (no overstay)
+      await supabaseClient
+        .from('notifications')
+        .insert({
+          user_id: booking.spots.host_id,
+          type: 'departure_confirmed',
+          title: 'Driver Departed',
+          message: `Driver has confirmed departure from ${booking.spots.title}. Booking completed successfully.`,
+          related_id: booking.id,
+        });
+    }
 
     console.log(`Departure confirmed successfully for booking ${bookingId}`);
 

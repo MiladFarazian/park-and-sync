@@ -159,6 +159,22 @@ serve(async (req) => {
             overstay_charge_amount: overtimeCharge,
           })
           .eq('id', booking.id);
+
+        console.log(`Updated overstay charge for booking ${booking.id}: $${overtimeCharge}`);
+
+        // Send notification every $25 increment
+        const chargeIncrease = overtimeCharge - (booking.overstay_charge_amount || 0);
+        if (chargeIncrease >= 25) {
+          await supabaseClient
+            .from('notifications')
+            .insert({
+              user_id: booking.renter_id,
+              type: 'overstay_charge_update',
+              title: 'Overtime Charges Increasing',
+              message: `You are still parked at ${booking.spots.title} past your booking time. Current overtime charge: $${overtimeCharge}. Please vacate immediately.`,
+              related_id: booking.id,
+            });
+        }
       }
     }
 
@@ -212,7 +228,70 @@ serve(async (req) => {
           title: 'Booking Completed',
           message: `Your booking at ${booking.spots.title} has been completed.`,
           related_id: booking.id,
-        });
+      });
+    }
+
+    // Auto-complete bookings with overstays that have been resolved
+    // These are bookings where driver overstayed, host charged them, and enough time has passed
+    const { data: overstayCompletionBookings, error: overstayCompleteError } = await supabaseClient
+      .from('bookings')
+      .select(`
+        *,
+        spots (
+          title,
+          host_id
+        )
+      `)
+      .in('status', ['active', 'paid'])
+      .not('overstay_detected_at', 'is', null)
+      .eq('overstay_action', 'charging')
+      .lt('end_at', new Date(now.getTime() - 30 * 60 * 1000).toISOString());
+
+    if (!overstayCompleteError && overstayCompletionBookings && overstayCompletionBookings.length > 0) {
+      console.log(`Found ${overstayCompletionBookings.length} overstay bookings to complete`);
+      
+      for (const booking of overstayCompletionBookings) {
+        // Finalize the charge amount one last time
+        const graceEnd = new Date(booking.overstay_grace_end);
+        const minutesOverstayed = Math.max(0, (now.getTime() - graceEnd.getTime()) / (1000 * 60));
+        const hoursOverstayed = minutesOverstayed / 60;
+        const overtimeRate = 25;
+        const finalCharge = Math.ceil(hoursOverstayed) * overtimeRate;
+        
+        // Mark as completed with final charge
+        await supabaseClient
+          .from('bookings')
+          .update({
+            status: 'completed',
+            overstay_charge_amount: finalCharge,
+            updated_at: now.toISOString(),
+          })
+          .eq('id', booking.id);
+        
+        console.log(`Completed overstay booking ${booking.id} with final charge: $${finalCharge}`);
+        
+        // Notify renter about the final charge
+        await supabaseClient
+          .from('notifications')
+          .insert({
+            user_id: booking.renter_id,
+            type: 'overstay_charge_finalized',
+            title: 'Overtime Charge Applied',
+            message: `Your booking at ${booking.spots.title} has been completed. You were charged $${finalCharge} for overstaying. Total charge: $${(booking.total_amount + finalCharge).toFixed(2)}.`,
+            related_id: booking.id,
+          });
+        
+        // Notify host
+        await supabaseClient
+          .from('notifications')
+          .insert({
+            user_id: booking.spots.host_id,
+            type: 'overstay_booking_completed',
+            title: 'Overstay Booking Completed',
+            message: `Booking at ${booking.spots.title} completed with $${finalCharge} overtime charge applied.`,
+            related_id: booking.id,
+          });
+      }
     }
 
     return new Response(

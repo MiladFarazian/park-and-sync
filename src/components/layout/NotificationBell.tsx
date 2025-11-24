@@ -81,10 +81,22 @@ export const NotificationBell = () => {
   const handleNotificationClick = async (notification: Notification) => {
     await markAsRead(notification.id);
 
+    // Handle navigation based on notification type
     if (notification.type === "booking") {
       navigate(`/booking-confirmation/${notification.related_id}`);
     } else if (notification.type === "message") {
       navigate(`/messages`);
+    } else if (
+      notification.type === "overstay_charge_applied" ||
+      notification.type === "overstay_charge_finalized" ||
+      notification.type === "overstay_charge_update" ||
+      notification.type === "overstay_booking_completed" ||
+      notification.type === "departure_confirmed"
+    ) {
+      // Navigate to booking detail for overstay-related notifications
+      if (notification.related_id) {
+        navigate(`/booking/${notification.related_id}`);
+      }
     }
 
     setOpen(false);
