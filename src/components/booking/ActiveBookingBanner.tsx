@@ -157,7 +157,10 @@ export const ActiveBookingBanner = () => {
   };
 
   const handleSendWarning = async () => {
-    if (!activeBooking) return;
+    if (!activeBooking || !inGracePeriod) {
+      toast.error('Warning can only be sent during grace period');
+      return;
+    }
     
     setLoading(true);
 
@@ -168,14 +171,14 @@ export const ActiveBookingBanner = () => {
         .insert({
           user_id: activeBooking.renter_id,
           type: 'overstay_warning',
-          title: 'Final Warning - Parking Expired',
-          message: `Your parking at ${activeBooking.spots.title} has expired. Please vacate immediately or extend your booking to avoid overtime charges of $25/hour.`,
+          title: 'Grace Period Active - Please Vacate',
+          message: `Your parking at ${activeBooking.spots.title} has expired and you are in the 10-minute grace period. Please vacate immediately to avoid overtime charges of $25/hour or towing.`,
           related_id: activeBooking.id,
         });
 
       if (notifError) throw notifError;
 
-      toast.success('Warning sent to driver');
+      toast.success('Grace period warning sent to driver');
     } catch (error) {
       console.error('Error sending warning:', error);
       toast.error('Failed to send warning');
@@ -185,19 +188,18 @@ export const ActiveBookingBanner = () => {
   };
 
   const handleOverstayAction = async (action: 'charging' | 'towing') => {
-    if (!activeBooking) return;
+    if (!activeBooking || !gracePeriodEnded) {
+      toast.error('This action can only be taken after grace period ends');
+      return;
+    }
     
     setLoading(true);
     
     try {
-      const now = new Date();
-
       const { error } = await supabase
         .from('bookings')
         .update({
           overstay_action: action,
-          overstay_detected_at: activeBooking.overstay_detected_at || now.toISOString(),
-          overstay_grace_end: activeBooking.overstay_grace_end || new Date(now.getTime() + 10 * 60 * 1000).toISOString(),
         })
         .eq('id', activeBooking.id);
 
@@ -209,17 +211,17 @@ export const ActiveBookingBanner = () => {
         .insert({
           user_id: activeBooking.renter_id,
           type: action === 'charging' ? 'overstay_charging' : 'overstay_towing',
-          title: action === 'charging' ? 'Overtime Charges Applied' : 'Towing Requested',
+          title: action === 'charging' ? 'Overtime Charges Applied' : 'Tow Request Initiated',
           message: action === 'charging' 
-            ? `You are being charged $25/hour for overstaying at ${activeBooking.spots.title}. Please vacate immediately.`
-            : `Towing has been requested for ${activeBooking.spots.title}. Please vacate immediately to avoid additional fees.`,
+            ? `Overtime charges of $25/hour are now being applied at ${activeBooking.spots.title}. Please vacate immediately.`
+            : `A tow request has been initiated for your vehicle at ${activeBooking.spots.title}. Please vacate immediately to avoid towing.`,
           related_id: activeBooking.id,
         });
 
       toast.success(
         action === 'charging' 
           ? 'Overtime charging activated at $25/hour. Driver notified.' 
-          : 'Towing process initiated. Driver notified.'
+          : 'Tow request initiated. Driver notified.'
       );
       loadActiveBooking();
     } catch (error) {
@@ -356,8 +358,13 @@ export const ActiveBookingBanner = () => {
   };
   if (!activeBooking) return null;
 
+  const now = new Date();
   const endTime = format(new Date(activeBooking.end_at), 'h:mm a');
-  const isOverstayed = new Date() > new Date(activeBooking.end_at);
+  const endTimeDate = new Date(activeBooking.end_at);
+  const isActuallyOverstayed = now > endTimeDate; // Driver has exceeded their booking time
+  const isOverstayed = activeBooking.overstay_detected_at !== null && isActuallyOverstayed;
+  const inGracePeriod = isOverstayed && activeBooking.overstay_grace_end && new Date(activeBooking.overstay_grace_end) > now;
+  const gracePeriodEnded = isOverstayed && activeBooking.overstay_grace_end && new Date(activeBooking.overstay_grace_end) <= now;
   const hasOverstayCharges = activeBooking.overstay_charge_amount > 0;
 
   return (
@@ -466,40 +473,46 @@ export const ActiveBookingBanner = () => {
                     <span className="hidden sm:inline">Message</span>
                   </Button>
 
-                  {/* Overstay Actions - Progressive Warning System */}
-                  {!activeBooking.overstay_action && (
+                  {/* Overstay Actions - Time-Gated Progressive System */}
+                  {isOverstayed && !activeBooking.overstay_action && (
                     <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleSendWarning}
-                        disabled={loading}
-                        className="border-amber-500 text-amber-600 hover:bg-amber-50 dark:border-amber-600 dark:text-amber-500 dark:hover:bg-amber-950"
-                      >
-                        <AlertCircle className="h-4 w-4 mr-1" />
-                        Send Warning
-                      </Button>
+                      {inGracePeriod && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSendWarning}
+                          disabled={loading}
+                          className="border-amber-500 text-amber-600 hover:bg-amber-50 dark:border-amber-600 dark:text-amber-500 dark:hover:bg-amber-950"
+                        >
+                          <AlertCircle className="h-4 w-4 mr-1" />
+                          Send Warning
+                        </Button>
+                      )}
 
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleOverstayAction('charging')}
-                        disabled={loading}
-                      >
-                        <DollarSign className="h-4 w-4 mr-1" />
-                        Charge $25/hr
-                      </Button>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOverstayAction('towing')}
-                        disabled={loading}
-                        className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                      >
-                        <AlertTriangle className="h-4 w-4 mr-1" />
-                        Request Tow
-                      </Button>
+                      {gracePeriodEnded && (
+                        <>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleOverstayAction('charging')}
+                            disabled={loading}
+                          >
+                            <DollarSign className="h-4 w-4 mr-1" />
+                            Charge $25/hr
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOverstayAction('towing')}
+                            disabled={loading}
+                            className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                          >
+                            <AlertTriangle className="h-4 w-4 mr-1" />
+                            Request Tow
+                          </Button>
+                        </>
+                      )}
                     </>
                   )}
                   
