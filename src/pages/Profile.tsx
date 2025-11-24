@@ -380,7 +380,7 @@ const Profile = () => {
         </Card>
       </div>
 
-      <div className="px-4 pb-24 space-y-6">
+      <div className="px-4 pb-4 space-y-6">
         {/* Become a Host Widget */}
         {mode === 'driver' && !hasListedSpots && <Card className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
             <div className="flex items-start gap-4">
