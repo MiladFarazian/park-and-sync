@@ -171,35 +171,13 @@ serve(async (req) => {
         .eq('user_id', userData.user.id);
     }
 
-    // Create booking record
-    const { data: booking, error: bookingError } = await supabase
-      .from('bookings')
-      .insert({
-        spot_id,
-        renter_id: userData.user.id,
-        vehicle_id,
-        start_at,
-        end_at,
-        status: 'pending',
-        hourly_rate: spot.hourly_rate,
-        total_hours: totalHours,
-        subtotal,
-        platform_fee: platformFee,
-        total_amount: totalAmount,
-        host_earnings: hostEarnings,
-        idempotency_key: idempotency_key || crypto.randomUUID()
-      })
-      .select()
-      .single();
-
-    if (bookingError) {
-      console.error('Booking creation error:', bookingError);
-      throw bookingError;
-    }
-
-    // Create Stripe Checkout Session with embedded UI mode
+    // Create Stripe Checkout Session FIRST (before booking to get the session ID)
     console.log('Creating Stripe checkout session...');
     const origin = req.headers.get('origin') || 'http://localhost:8080';
+    
+    // Generate a temporary booking ID for the checkout session metadata
+    const tempBookingId = crypto.randomUUID();
+    
     const checkoutSession = await stripe.checkout.sessions.create({
       ui_mode: 'embedded',
       customer: customerId,
@@ -218,9 +196,9 @@ serve(async (req) => {
         },
       ],
       mode: 'payment',
-      return_url: `${origin}/checkout-success?session_id={CHECKOUT_SESSION_ID}&booking_id=${booking.id}`,
+      return_url: `${origin}/checkout-success?session_id={CHECKOUT_SESSION_ID}&booking_id=${tempBookingId}`,
       metadata: {
-        booking_id: booking.id,
+        booking_id: tempBookingId,
         spot_id,
         host_id: spot.host_id,
         renter_id: userData.user.id,
@@ -229,18 +207,35 @@ serve(async (req) => {
 
     console.log('Checkout session created:', checkoutSession.id);
 
-    // Store the checkout session ID using admin client to bypass RLS
-    const { error: updateError } = await supabaseAdmin
+    // Now create booking record with stripe_payment_intent_id included
+    const { data: booking, error: bookingError } = await supabase
       .from('bookings')
-      .update({ stripe_payment_intent_id: checkoutSession.id })
-      .eq('id', booking.id);
+      .insert({
+        id: tempBookingId, // Use the same ID we put in checkout session metadata
+        spot_id,
+        renter_id: userData.user.id,
+        vehicle_id,
+        start_at,
+        end_at,
+        status: 'pending',
+        hourly_rate: spot.hourly_rate,
+        total_hours: totalHours,
+        subtotal,
+        platform_fee: platformFee,
+        total_amount: totalAmount,
+        host_earnings: hostEarnings,
+        stripe_payment_intent_id: checkoutSession.id,
+        idempotency_key: idempotency_key || crypto.randomUUID()
+      })
+      .select()
+      .single();
 
-    if (updateError) {
-      console.error('Failed to store checkout session ID:', updateError);
-      throw updateError;
+    if (bookingError) {
+      console.error('Booking creation error:', bookingError);
+      throw bookingError;
     }
 
-    console.log('Stored checkout session ID in booking');
+    console.log('Booking created with checkout session ID:', booking.id);
 
     // Release the hold if provided
     if (hold_id) {
