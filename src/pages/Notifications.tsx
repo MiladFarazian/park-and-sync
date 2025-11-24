@@ -3,8 +3,10 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import NotificationSettings from "@/components/settings/NotificationSettings";
 
 const Notifications = () => {
   const navigate = useNavigate();
@@ -39,6 +41,20 @@ const Notifications = () => {
           </div>
         </div>
 
+        {/* Push Notifications Section */}
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">Push Notifications</h2>
+            <p className="text-sm text-muted-foreground">
+              Manage browser notification settings
+            </p>
+          </div>
+          <NotificationSettings />
+        </div>
+
+        <Separator />
+
+        {/* Email Notifications Section */}
         <div className="space-y-4">
           <Card className="p-6">
             <div className="flex justify-between items-center">

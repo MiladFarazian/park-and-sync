@@ -9,6 +9,8 @@ import parkzyLogo from '@/assets/parkzy-logo.png';
 import ModeSwitcher from './ModeSwitcher';
 import ModeLoadingOverlay from './ModeLoadingOverlay';
 import { NotificationBell } from './NotificationBell';
+import NotificationPermissionBanner from './NotificationPermissionBanner';
+import { useNotifications } from '@/hooks/useNotifications';
 interface AppLayoutProps {
   children: React.ReactNode;
 }
@@ -18,8 +20,13 @@ const AppLayout = ({
   const location = useLocation();
   const navigate = useNavigate();
   const isProfilePage = location.pathname === '/profile';
+  
+  // Initialize notifications hook to set up realtime listeners
+  useNotifications();
+  
   return <>
       <ModeLoadingOverlay />
+      <NotificationPermissionBanner />
       
       {/* Desktop Layout with Sidebar */}
       <div className="hidden md:flex h-screen flex-col">
