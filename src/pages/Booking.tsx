@@ -567,11 +567,14 @@ const Booking = () => {
           spot_id: spotId,
           start_at: startAt.toISOString(),
           end_at: endAt.toISOString(),
-          total_amount: parseFloat(pricing.total),
+          vehicle_id: selectedVehicle?.id,
+          hold_id: holdData?.hold_id,
         },
       });
 
       if (bookingError) throw bookingError;
+
+      console.log('[Booking] Booking response:', bookingData);
 
       // Broadcast booking creation for instant feedback to other users
       if (channelRef.current) {
@@ -588,13 +591,35 @@ const Booking = () => {
         });
       }
 
-      // Store the client secret in session storage for the checkout page
-      if (bookingData.client_secret) {
-        sessionStorage.setItem(`checkout_${bookingData.booking_id}`, bookingData.client_secret);
+      // Handle response based on type
+      if (bookingData.error === 'no_payment_method') {
+        toast({
+          title: "No payment method",
+          description: "Please add a payment method before booking",
+          variant: "destructive",
+        });
+        navigate('/payment-methods');
+        return;
       }
 
-      // Navigate to embedded checkout page
-      navigate(`/embedded-checkout/${bookingData.booking_id}`);
+      if (bookingData.success) {
+        // Payment successful, booking is active
+        toast({
+          title: "Booking confirmed!",
+          description: "Your payment was processed successfully",
+        });
+        navigate(`/booking/${bookingData.booking_id}`);
+      } else if (bookingData.requires_action) {
+        // Fallback to embedded checkout for 3DS or declined card
+        toast({
+          title: bookingData.message || "Additional verification needed",
+          description: "Please complete the payment verification",
+        });
+        sessionStorage.setItem(`checkout_${bookingData.booking_id}`, bookingData.client_secret);
+        navigate(`/embedded-checkout/${bookingData.booking_id}`);
+      } else {
+        throw new Error('Unexpected booking response');
+      }
     } catch (error) {
       console.error('Booking error:', error);
       toast({
@@ -897,19 +922,32 @@ const Booking = () => {
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <CreditCard className="h-5 w-5" />
-              <div>
-                <div className="font-medium">No payment method</div>
-                <Button
-                  variant="link"
-                  className="h-auto p-0 text-xs text-primary"
-                  onClick={() => navigate('/payment-methods')}
-                >
-                  Add payment method
-                </Button>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <CreditCard className="h-5 w-5" />
+                <div>
+                  <div className="font-medium">No payment method</div>
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 text-xs text-primary"
+                    onClick={() => navigate('/payment-methods')}
+                  >
+                    Add payment method
+                  </Button>
+                </div>
               </div>
+              <Alert variant="destructive" className="mt-2">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  You must add a payment method before booking
+                </AlertDescription>
+              </Alert>
             </div>
+          )}
+          {selectedPaymentMethod && (
+            <p className="text-xs text-muted-foreground mt-2">
+              This card will be charged automatically when you book
+            </p>
           )}
         </Card>
 
@@ -957,7 +995,7 @@ const Booking = () => {
             {bookingLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
+                Processing payment...
               </>
             ) : checkingAvailability ? (
               <>
