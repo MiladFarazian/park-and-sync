@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, Plus } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, Plus, AlertTriangle } from 'lucide-react';
 import { format, differenceInMinutes } from 'date-fns';
 import { toast } from 'sonner';
 import { loadStripe } from '@stripe/stripe-js';
@@ -56,6 +56,7 @@ const BookingDetail = () => {
   const [newEndTime, setNewEndTime] = useState<Date | null>(null);
   const [extending, setExtending] = useState(false);
   const [cancellingTow, setCancellingTow] = useState(false);
+  const [overstayLoading, setOverstayLoading] = useState(false);
 
   useEffect(() => {
     if (!bookingId || !user) return;
@@ -160,6 +161,82 @@ const BookingDetail = () => {
     } finally {
       setCancellingTow(false);
     }
+  };
+
+  const handleSendWarning = async () => {
+    if (!booking || !inGracePeriod) {
+      toast.error('Warning can only be sent during grace period');
+      return;
+    }
+    
+    setOverstayLoading(true);
+
+    try {
+      // Send warning notification to the renter
+      const { error: notifError } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: booking.renter_id,
+          type: 'overstay_warning',
+          title: 'Grace Period Active - Please Vacate',
+          message: `Your parking at ${booking.spots.title} has expired and you are in the 10-minute grace period. Please vacate immediately to avoid overtime charges of $25/hour or towing.`,
+          related_id: booking.id,
+        });
+
+      if (notifError) throw notifError;
+
+      toast.success('Grace period warning sent to driver');
+    } catch (error) {
+      console.error('Error sending warning:', error);
+      toast.error('Failed to send warning');
+    }
+
+    setOverstayLoading(false);
+  };
+
+  const handleOverstayAction = async (action: 'charging' | 'towing') => {
+    if (!booking || !gracePeriodEnded) {
+      toast.error('This action can only be taken after grace period ends');
+      return;
+    }
+    
+    setOverstayLoading(true);
+    
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({
+          overstay_action: action,
+        })
+        .eq('id', booking.id);
+
+      if (error) throw error;
+
+      // Send notification to renter
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: booking.renter_id,
+          type: action === 'charging' ? 'overstay_charging' : 'overstay_towing',
+          title: action === 'charging' ? 'Overtime Charges Applied' : 'Tow Request Initiated',
+          message: action === 'charging' 
+            ? `Overtime charges of $25/hour are now being applied at ${booking.spots.title}. Please vacate immediately.`
+            : `A tow request has been initiated for your vehicle at ${booking.spots.title}. Please vacate immediately to avoid towing.`,
+          related_id: booking.id,
+        });
+
+      toast.success(
+        action === 'charging' 
+          ? 'Overtime charging activated at $25/hour. Driver notified.' 
+          : 'Tow request initiated. Driver notified.'
+      );
+      loadBookingDetails();
+    } catch (error) {
+      console.error('Error updating overstay:', error);
+      toast.error('Failed to update overstay status');
+    }
+    
+    setOverstayLoading(false);
   };
 
   const handleExtendBooking = async () => {
@@ -267,7 +344,14 @@ const BookingDetail = () => {
   const canCancel = isActive && new Date() < new Date(booking.start_at);
   const canExtend = (booking.status === 'pending' || booking.status === 'active' || booking.status === 'paid') && new Date() < new Date(booking.end_at);
   const isHost = user?.id === booking.spots.host_id;
-  const hasOverstay = booking.overstay_detected_at !== null;
+  
+  // Correct overstay detection logic
+  const now = new Date();
+  const endTimeDate = new Date(booking.end_at);
+  const isActuallyOverstayed = now > endTimeDate;
+  const isOverstayed = booking.overstay_detected_at !== null && isActuallyOverstayed;
+  const inGracePeriod = isOverstayed && booking.overstay_grace_end && new Date(booking.overstay_grace_end) > now;
+  const gracePeriodEnded = isOverstayed && booking.overstay_grace_end && new Date(booking.overstay_grace_end) <= now;
   const hasTowRequest = booking.overstay_action === 'towing';
 
   const extensionCost = calculateExtensionCost();
@@ -405,7 +489,7 @@ const BookingDetail = () => {
         </Card>
 
         {/* Overstay Status (Host Only) */}
-        {isHost && hasOverstay && (
+        {isHost && isOverstayed && (
           <Card className="p-4 border-destructive bg-destructive/5">
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
@@ -414,11 +498,70 @@ const BookingDetail = () => {
                   <p className="font-semibold text-destructive mb-1">Overstay Detected</p>
                   <p className="text-sm text-muted-foreground">
                     Guest has exceeded their booking time.
-                    {booking.overstay_grace_end && new Date() < new Date(booking.overstay_grace_end) && (
+                    {inGracePeriod && booking.overstay_grace_end && (
                       <> Grace period ends at {format(new Date(booking.overstay_grace_end), 'h:mm a')}.</>
+                    )}
+                    {gracePeriodEnded && (
+                      <> Grace period has ended.</>
                     )}
                   </p>
                 </div>
+
+                {/* Action Buttons - Progressive System */}
+                {!booking.overstay_action && (
+                  <div className="flex gap-2 flex-wrap">
+                    {inGracePeriod && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSendWarning}
+                        disabled={overstayLoading}
+                        className="border-amber-500 text-amber-600 hover:bg-amber-50 dark:border-amber-600 dark:text-amber-500 dark:hover:bg-amber-950"
+                      >
+                        <AlertCircle className="h-4 w-4 mr-2" />
+                        Send Warning
+                      </Button>
+                    )}
+
+                    {gracePeriodEnded && (
+                      <>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleOverstayAction('charging')}
+                          disabled={overstayLoading}
+                        >
+                          <DollarSign className="h-4 w-4 mr-2" />
+                          Charge $25/hr
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOverstayAction('towing')}
+                          disabled={overstayLoading}
+                          className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                        >
+                          <AlertCircle className="h-4 w-4 mr-2" />
+                          Request Tow
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                )}
+                
+                {/* Active Overstay Action Status */}
+                {booking.overstay_action === 'charging' && booking.overstay_charge_amount > 0 && (
+                  <div className="bg-background p-3 rounded-md border border-destructive">
+                    <Badge variant="destructive" className="text-xs mb-2">Overtime Charges Active</Badge>
+                    <p className="text-sm font-semibold text-destructive">
+                      Total Overtime: ${Number(booking.overstay_charge_amount).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Charging $25/hour until vehicle is vacated
+                    </p>
+                  </div>
+                )}
                 
                 {hasTowRequest && (
                   <div className="bg-background p-3 rounded-md border border-border">
