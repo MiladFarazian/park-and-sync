@@ -45,7 +45,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     const encodedAddress = encodeURIComponent(spotAddress);
     const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
-    const bookingUrl = `https://mqbupmusmciijsjmzbcu.supabase.co/activity`;
+    const hostBookingUrl = `https://mqbupmusmciijsjmzbcu.supabase.co/host-booking-confirmation/${bookingId}`;
+    const driverBookingUrl = `https://mqbupmusmciijsjmzbcu.supabase.co/booking-confirmation/${bookingId}`;
 
     const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'Parkway <onboarding@resend.dev>';
     let hostEmailId: string | undefined;
@@ -134,7 +135,7 @@ const handler = async (req: Request): Promise<Response> => {
                         <table width="100%" cellpadding="0" cellspacing="0" style="margin: 32px 0 24px 0;">
                           <tr>
                             <td align="center">
-                              <a href="${bookingUrl}" style="display: inline-block; background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 0 8px 8px 8px;">View Booking</a>
+                              <a href="${hostBookingUrl}" style="display: inline-block; background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 0 8px 8px 8px;">View Booking</a>
                               <a href="${directionsUrl}" style="display: inline-block; background-color: #f3f4f6; color: #1f2937; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 0 8px 8px 8px;">Get Directions</a>
                             </td>
                           </tr>
@@ -270,7 +271,7 @@ const handler = async (req: Request): Promise<Response> => {
                           <tr>
                             <td align="center">
                               <a href="${directionsUrl}" style="display: inline-block; background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 0 8px 8px 8px;">🗺️ Get Directions</a>
-                              <a href="${bookingUrl}" style="display: inline-block; background-color: #f3f4f6; color: #1f2937; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 0 8px 8px 8px;">View Booking</a>
+                              <a href="${driverBookingUrl}" style="display: inline-block; background-color: #f3f4f6; color: #1f2937; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 0 8px 8px 8px;">View Booking</a>
                             </td>
                           </tr>
                         </table>

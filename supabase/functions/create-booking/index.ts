@@ -285,22 +285,22 @@ serve(async (req) => {
       .eq('user_id', userData.user.id)
       .single();
 
-    // Create notifications for host and renter
+    // Create notifications for host and renter with appropriate routing
     if (hostProfile && renterProfile) {
       const hostNotification = {
         user_id: spot.host_id,
         type: 'booking',
         title: 'New Booking Confirmed',
         message: `${renterProfile.first_name || 'A driver'} has booked your spot at ${spot.address}`,
-        related_id: booking.id,
+        related_id: `host-booking-confirmation/${booking.id}`, // Route hosts to host confirmation page
       };
 
       const renterNotification = {
         user_id: userData.user.id,
         type: 'booking',
         title: 'Booking Created',
-        message: `Your booking at ${spot.address} will be confirmed once payment is complete`,
-        related_id: booking.id,
+        message: `Your booking at ${spot.address} has been confirmed`,
+        related_id: booking.id, // Route drivers to standard booking detail
       };
 
       await supabase.from('notifications').insert([hostNotification, renterNotification]);
