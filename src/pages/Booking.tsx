@@ -608,7 +608,7 @@ const Booking = () => {
           title: "Booking confirmed!",
           description: "Your payment was processed successfully",
         });
-        navigate(`/booking/${bookingData.booking_id}`);
+        navigate(`/booking-confirmation/${bookingData.booking_id}`);
       } else if (bookingData.requires_action) {
         // Fallback to embedded checkout for 3DS or declined card
         toast({

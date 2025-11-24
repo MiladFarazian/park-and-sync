@@ -19,6 +19,7 @@ import SearchResults from "./pages/SearchResults";
 import SpotDetail from "./pages/SpotDetail";
 import Booking from "./pages/Booking";
 import BookingConfirmation from "./pages/BookingConfirmation";
+import HostBookingConfirmation from "./pages/HostBookingConfirmation";
 import BookingDetail from "./pages/BookingDetail";
 import CheckoutSuccess from "./pages/CheckoutSuccess";
 import Profile from "./pages/Profile";
@@ -77,6 +78,7 @@ const App = () => {
             <Route path="/embedded-checkout/:bookingId" element={<EmbeddedCheckout />} />
             <Route path="/search-results" element={<SearchResults />} />
             <Route path="/spot/:id" element={<div className="h-screen overflow-y-auto bg-background"><SpotDetail /></div>} />
+            <Route path="/host-booking-confirmation/:bookingId" element={<HostBookingConfirmation />} />
             <Route path="/personal-information" element={<PersonalInformation />} />
             <Route path="/my-vehicles" element={<MyVehicles />} />
             <Route path="/add-vehicle" element={<AddVehicle />} />
