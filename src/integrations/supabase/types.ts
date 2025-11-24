@@ -846,15 +846,26 @@ export type Database = {
             }
             Returns: string
           }
-      check_spot_availability: {
-        Args: {
-          p_end_at: string
-          p_exclude_user_id?: string
-          p_spot_id: string
-          p_start_at: string
-        }
-        Returns: boolean
-      }
+      check_spot_availability:
+        | {
+            Args: {
+              p_end_at: string
+              p_exclude_booking_id?: string
+              p_exclude_user_id?: string
+              p_spot_id: string
+              p_start_at: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              p_end_at: string
+              p_exclude_user_id?: string
+              p_spot_id: string
+              p_start_at: string
+            }
+            Returns: boolean
+          }
       cleanup_expired_holds: { Args: never; Returns: undefined }
       create_booking_hold: {
         Args: {
