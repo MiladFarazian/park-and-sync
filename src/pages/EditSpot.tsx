@@ -378,11 +378,11 @@ const EditSpot = () => {
     setNewPhotos((prev) => {
       const existingKeys = new Set(prev.map((f) => `${f.name}-${f.size}`));
       const deduped = dropped.filter((f) => !existingKeys.has(`${f.name}-${f.size}`));
-      if (deduped.length > 0) {
-        toast.success(`${deduped.length} photo${deduped.length > 1 ? 's' : ''} added`);
-      }
       return [...prev, ...deduped];
     });
+    
+    // Toast OUTSIDE the setter
+    toast.success(`Photo(s) ready to upload`);
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -543,6 +543,9 @@ const EditSpot = () => {
       </div>
     );
   }
+
+  // DEBUG: Log render state
+  console.log('[DEBUG] Render: newPhotos.length =', newPhotos.length);
 
   return (
     <div className="bg-background pb-20">
@@ -826,9 +829,10 @@ const EditSpot = () => {
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         {newPhotos.map((photo, index) => {
+                          console.log('[DEBUG] Rendering photo preview', index);
                           const previewUrl = URL.createObjectURL(photo);
-                          const isUploading = uploadProgress[index] !== undefined;
-                          const progress = uploadProgress[index] || 0;
+                          const isUploading = isUploadingPhotos;
+                          const progress = Math.round(uploadProgress);
 
                           return (
                             <div key={index} className="relative group">
