@@ -66,6 +66,10 @@ const EditSpot = () => {
   const [hasOrderChanged, setHasOrderChanged] = useState(false);
   const [user, setUser] = useState<any>(null);
 
+  useEffect(() => {
+    console.log('[DEBUG] newPhotos state changed:', newPhotos.length, 'photos');
+  }, [newPhotos]);
+
   const {
     register,
     handleSubmit,
@@ -152,19 +156,30 @@ const EditSpot = () => {
   };
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[DEBUG] handlePhotoSelect called');
     const selected = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith('image/'));
+    console.log('[DEBUG] Selected files:', selected.length);
+    
     if (selected.length === 0) {
       e.target.value = '';
       return;
     }
+    
     setNewPhotos((prev) => {
+      console.log('[DEBUG] Previous newPhotos:', prev.length);
       const existingKeys = new Set(prev.map((f) => `${f.name}-${f.size}`));
       const deduped = selected.filter((f) => !existingKeys.has(`${f.name}-${f.size}`));
+      console.log('[DEBUG] Deduped photos to add:', deduped.length);
+      
       if (deduped.length > 0) {
         toast.success(`${deduped.length} photo${deduped.length > 1 ? 's' : ''} added`);
       }
-      return [...prev, ...deduped];
+      
+      const newState = [...prev, ...deduped];
+      console.log('[DEBUG] New state will have:', newState.length, 'photos');
+      return newState;
     });
+    
     // Reset so selecting the same files again will trigger onChange
     e.target.value = '';
   };
