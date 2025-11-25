@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Heart, Share, Star, MapPin, Calendar, Navigation, MessageCircle, Phone, Camera, Clock, Shield, Zap, Loader2 } from 'lucide-react';
+import { ArrowLeft, Heart, Share, Star, MapPin, Calendar, Navigation, MessageCircle, Phone, Camera, Clock, Shield, Zap, Loader2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -44,7 +44,7 @@ import griffithObservatoryArea from '@/assets/griffith-observatory-area.jpg';
 const SpotDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { mode } = useMode();
+  const { mode, setMode } = useMode();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -243,6 +243,17 @@ const SpotDetail = () => {
     }
   };
 
+  const handleEditSpot = () => {
+    if (!id) return;
+    
+    // If in driver mode but it's our spot, switch to host mode first
+    if (mode === 'driver') {
+      setMode('host');
+    }
+    
+    navigate(`/edit-spot/${id}`);
+  };
+
   const fetchSpotDetails = async () => {
     try {
       setLoading(true);
@@ -390,6 +401,11 @@ const SpotDetail = () => {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex gap-2">
+            {isOwnSpot && (
+              <Button variant="secondary" size="sm" onClick={handleEditSpot}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
             <Button variant="secondary" size="sm">
               <Heart className="h-4 w-4" />
             </Button>
