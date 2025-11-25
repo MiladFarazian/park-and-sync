@@ -818,53 +818,50 @@ const EditSpot = () => {
                     </div>
                   )}
 
-                  {/* New Photos Preview */}
+                  {/* DEBUG: Force visible pending photos */}
                   {newPhotos.length > 0 && (
-                    <div className="mb-6">
-                      <div className="flex items-center gap-2 mb-3">
-                        <p className="text-sm font-medium">Pending Upload</p>
-                        <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400">
-                          Not yet saved
-                        </Badge>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        {newPhotos.map((photo, index) => {
-                          console.log('[DEBUG] Rendering photo preview', index);
-                          const previewUrl = URL.createObjectURL(photo);
-                          const isUploading = isUploadingPhotos;
-                          const progress = Math.round(uploadProgress);
+                    <div
+                      style={{
+                        border: '4px solid red',
+                        padding: '16px',
+                        backgroundColor: 'yellow',
+                        marginTop: '16px',
+                        position: 'relative',
+                        zIndex: 9999,
+                      }}
+                    >
+                      <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '12px', color: 'black' }}>
+                        DEBUG PENDING UPLOAD ({newPhotos.length})
+                      </h3>
 
-                          return (
-                            <div key={index} className="relative group">
-                              <div className="relative aspect-square rounded-lg overflow-hidden bg-muted">
-                                <img
-                                  src={previewUrl}
-                                  alt={`New photo ${index + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-                                {isUploading && (
-                                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                    <div className="text-white text-sm font-medium">
-                                      {progress}%
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => removeNewPhoto(index)}
-                                disabled={isUploading}
-                                className="absolute top-2 right-2 bg-destructive text-destructive-foreground rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                              <div className="mt-2 text-xs text-muted-foreground truncate">
-                                {photo.name}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                      {newPhotos.map((file, index) => {
+                        console.log('[DEBUG] Rendering photo preview', index);
+                        return (
+                          <div
+                            key={index}
+                            style={{
+                              border: '2px solid blue',
+                              marginBottom: '12px',
+                              padding: '8px',
+                              backgroundColor: 'white',
+                            }}
+                          >
+                            <p style={{ marginBottom: '8px', color: 'black', fontWeight: 'bold' }}>
+                              DEBUG FILE {index}: {file.name}
+                            </p>
+                            <img
+                              src={URL.createObjectURL(file)}
+                              alt={`preview-${index}`}
+                              style={{
+                                maxWidth: '200px',
+                                maxHeight: '200px',
+                                display: 'block',
+                                border: '1px solid black',
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
