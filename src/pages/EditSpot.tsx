@@ -550,6 +550,8 @@ const EditSpot = () => {
     );
   }
 
+  console.log('[DEBUG] EditSpot rendering, newPhotos.length:', newPhotos.length);
+  
   return (
     <div className="bg-background pb-20">
       <div className="p-4 space-y-6 max-w-2xl mx-auto">
@@ -821,15 +823,17 @@ const EditSpot = () => {
                     </div>
                   )}
 
-                  {/* New Photos Preview */}
-                  {newPhotos.length > 0 && (
-                    <div className="mb-6">
-                      <div className="flex items-center gap-2 mb-3">
-                        <p className="text-sm font-medium">Pending Upload</p>
-                        <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400">
-                          Not yet saved
-                        </Badge>
-                      </div>
+                  {/* New Photos Preview - DEBUG WRAPPER */}
+                  <div className="mb-6" style={{ border: '2px solid red', padding: '8px' }}>
+                    <p style={{ color: 'red', fontWeight: 'bold' }}>Debug: newPhotos.length = {newPhotos.length}</p>
+                    {newPhotos.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <p className="text-sm font-medium">Pending Upload</p>
+                          <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400">
+                            Not yet saved
+                          </Badge>
+                        </div>
                       <div className="grid grid-cols-2 gap-3">
                         {newPhotos.map((photo, index) => {
                           console.log('[DEBUG] Rendering pending photo:', index, photo.name);
@@ -872,8 +876,9 @@ const EditSpot = () => {
                           );
                         })}
                       </div>
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
 
                   {/* Upload Progress */}
                   {isUploadingPhotos && (
