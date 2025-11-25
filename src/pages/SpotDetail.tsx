@@ -354,7 +354,13 @@ const SpotDetail = () => {
       
       // Check if user owns this spot
       if (user && transformedData.host_id) {
-        setIsOwnSpot(user.id === transformedData.host_id);
+        const isOwner = user.id === transformedData.host_id;
+        console.log('[SpotDetail] Ownership check:', {
+          userId: user.id,
+          hostId: transformedData.host_id,
+          isOwner
+        });
+        setIsOwnSpot(isOwner);
       }
     } catch (err) {
       setError('An unexpected error occurred');
