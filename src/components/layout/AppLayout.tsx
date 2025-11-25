@@ -26,10 +26,10 @@ const AppLayout = ({
   
   return <>
       <ModeLoadingOverlay />
-      <NotificationPermissionBanner />
       
       {/* Desktop Layout with Sidebar */}
       <div className="hidden md:flex h-screen flex-col">
+        <NotificationPermissionBanner />
         <SidebarProvider>
           <div className="flex flex-1 w-full overflow-hidden">
             <AppSidebar />
@@ -59,6 +59,7 @@ const AppLayout = ({
 
       {/* Mobile Layout with Bottom Navigation */}
       <div className="md:hidden flex flex-col h-screen">
+        <NotificationPermissionBanner />
         {!isProfilePage && <header className="flex-shrink-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
             <div className="flex items-center gap-3">
               <img src={parkzyLogo} alt="Parkzy" className="h-8" />

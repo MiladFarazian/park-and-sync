@@ -35,9 +35,9 @@ const NotificationPermissionBanner = () => {
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 p-4">
-      <Alert className="max-w-2xl mx-auto bg-primary/10 border-primary/30">
-        <Bell className="h-4 w-4 text-primary" />
+    <div className="w-full p-4 border-b bg-background">
+      <Alert className="max-w-2xl mx-auto bg-accent text-accent-foreground border-accent">
+        <Bell className="h-4 w-4" />
         <AlertDescription className="flex items-center justify-between gap-4">
           <span className="flex-1">
             <strong>Stay updated!</strong> Enable notifications to get instant alerts for bookings, messages, and important updates.
