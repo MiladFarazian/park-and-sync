@@ -565,6 +565,54 @@ const EditSpot = () => {
           </div>
         </div>
 
+        {/* DEBUG: Force visible pending photos - MOVED TO TOP */}
+        {newPhotos.length > 0 && (
+          <div
+            style={{
+              border: '4px solid red',
+              padding: '16px',
+              backgroundColor: 'yellow',
+              marginTop: '16px',
+              marginBottom: '16px',
+              position: 'relative',
+              zIndex: 9999,
+            }}
+          >
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '12px', color: 'black' }}>
+              DEBUG PENDING UPLOAD ({newPhotos.length})
+            </h3>
+
+            {newPhotos.map((file, index) => {
+              console.log('[DEBUG] Rendering photo preview', index);
+              return (
+                <div
+                  key={index}
+                  style={{
+                    border: '2px solid blue',
+                    marginBottom: '12px',
+                    padding: '8px',
+                    backgroundColor: 'white',
+                  }}
+                >
+                  <p style={{ marginBottom: '8px', color: 'black', fontWeight: 'bold' }}>
+                    DEBUG FILE {index}: {file.name}
+                  </p>
+                  <img
+                    src={URL.createObjectURL(file)}
+                    alt={`preview-${index}`}
+                    style={{
+                      maxWidth: '200px',
+                      maxHeight: '200px',
+                      display: 'block',
+                      border: '1px solid black',
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit(onSubmit)}>
           <Card>
             <CardContent className="p-6 space-y-6">
@@ -818,52 +866,6 @@ const EditSpot = () => {
                     </div>
                   )}
 
-                  {/* DEBUG: Force visible pending photos */}
-                  {newPhotos.length > 0 && (
-                    <div
-                      style={{
-                        border: '4px solid red',
-                        padding: '16px',
-                        backgroundColor: 'yellow',
-                        marginTop: '16px',
-                        position: 'relative',
-                        zIndex: 9999,
-                      }}
-                    >
-                      <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '12px', color: 'black' }}>
-                        DEBUG PENDING UPLOAD ({newPhotos.length})
-                      </h3>
-
-                      {newPhotos.map((file, index) => {
-                        console.log('[DEBUG] Rendering photo preview', index);
-                        return (
-                          <div
-                            key={index}
-                            style={{
-                              border: '2px solid blue',
-                              marginBottom: '12px',
-                              padding: '8px',
-                              backgroundColor: 'white',
-                            }}
-                          >
-                            <p style={{ marginBottom: '8px', color: 'black', fontWeight: 'bold' }}>
-                              DEBUG FILE {index}: {file.name}
-                            </p>
-                            <img
-                              src={URL.createObjectURL(file)}
-                              alt={`preview-${index}`}
-                              style={{
-                                maxWidth: '200px',
-                                maxHeight: '200px',
-                                display: 'block',
-                                border: '1px solid black',
-                              }}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
 
                   {/* Upload Progress */}
                   {isUploadingPhotos && (
