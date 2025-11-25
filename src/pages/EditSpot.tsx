@@ -166,19 +166,13 @@ const EditSpot = () => {
     }
     
     setNewPhotos((prev) => {
-      console.log('[DEBUG] Previous newPhotos:', prev.length);
       const existingKeys = new Set(prev.map((f) => `${f.name}-${f.size}`));
       const deduped = selected.filter((f) => !existingKeys.has(`${f.name}-${f.size}`));
-      console.log('[DEBUG] Deduped photos to add:', deduped.length);
-      
-      if (deduped.length > 0) {
-        toast.success(`${deduped.length} photo${deduped.length > 1 ? 's' : ''} added`);
-      }
-      
-      const newState = [...prev, ...deduped];
-      console.log('[DEBUG] New state will have:', newState.length, 'photos');
-      return newState;
+      return [...prev, ...deduped];
     });
+    
+    // Show toast AFTER the state update, outside the callback
+    toast.success(`${selected.length} photo${selected.length > 1 ? 's' : ''} ready to upload`);
     
     // Reset so selecting the same files again will trigger onChange
     e.target.value = '';
@@ -550,8 +544,6 @@ const EditSpot = () => {
     );
   }
 
-  console.log('[DEBUG] EditSpot rendering, newPhotos.length:', newPhotos.length);
-  
   return (
     <div className="bg-background pb-20">
       <div className="p-4 space-y-6 max-w-2xl mx-auto">
@@ -823,62 +815,54 @@ const EditSpot = () => {
                     </div>
                   )}
 
-                  {/* New Photos Preview - DEBUG WRAPPER */}
-                  <div className="mb-6" style={{ border: '2px solid red', padding: '8px' }}>
-                    <p style={{ color: 'red', fontWeight: 'bold' }}>Debug: newPhotos.length = {newPhotos.length}</p>
-                    {newPhotos.length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <p className="text-sm font-medium">Pending Upload</p>
-                          <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400">
-                            Not yet saved
-                          </Badge>
-                        </div>
+                  {/* New Photos Preview */}
+                  {newPhotos.length > 0 && (
+                    <div className="mb-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <p className="text-sm font-medium">Pending Upload</p>
+                        <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400">
+                          Not yet saved
+                        </Badge>
+                      </div>
                       <div className="grid grid-cols-2 gap-3">
                         {newPhotos.map((photo, index) => {
-                          console.log('[DEBUG] Rendering pending photo:', index, photo.name);
+                          const previewUrl = URL.createObjectURL(photo);
+                          const isUploading = uploadProgress[index] !== undefined;
+                          const progress = uploadProgress[index] || 0;
+
                           return (
-                          <div key={index} className="relative group">
-                            <div className="relative aspect-video rounded-lg overflow-hidden border-2 border-dashed border-amber-500 bg-amber-50/50 dark:bg-amber-950/20">
-                              <img
-                                src={URL.createObjectURL(photo)}
-                                alt="Pending upload"
-                                className="w-full h-full object-cover"
-                              />
-                              
-                              {/* Pending Badge */}
-                              <div className="absolute top-2 left-2 bg-amber-500 text-white px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-lg">
-                                <Upload className="h-3.5 w-3.5" />
-                                Pending
+                            <div key={index} className="relative group">
+                              <div className="relative aspect-square rounded-lg overflow-hidden bg-muted">
+                                <img
+                                  src={previewUrl}
+                                  alt={`New photo ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                {isUploading && (
+                                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                    <div className="text-white text-sm font-medium">
+                                      {progress}%
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                              
-                              {/* File Info */}
-                              <div className="absolute bottom-2 left-2 right-2 bg-black/70 backdrop-blur-sm px-2 py-1.5 rounded text-xs text-white">
-                                <p className="truncate font-medium">{photo.name}</p>
-                                <p className="text-white/70">{formatFileSize(photo.size)}</p>
-                              </div>
-                              
-                              {/* Hover Overlay */}
-                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => removeNewPhoto(index)}
-                                  className="shadow-lg"
-                                >
-                                  <X className="h-4 w-4 mr-1.5" />
-                                  Remove
-                                </Button>
+                              <button
+                                type="button"
+                                onClick={() => removeNewPhoto(index)}
+                                disabled={isUploading}
+                                className="absolute top-2 right-2 bg-destructive text-destructive-foreground rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                              <div className="mt-2 text-xs text-muted-foreground truncate">
+                                {photo.name}
                               </div>
                             </div>
-                          </div>
                           );
                         })}
                       </div>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {/* Upload Progress */}
                   {isUploadingPhotos && (
