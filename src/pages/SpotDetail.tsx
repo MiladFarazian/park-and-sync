@@ -444,8 +444,9 @@ const SpotDetail = () => {
 
           <div className="flex gap-3 mb-6">
             {isOwnSpot ? (
-              <Button className="flex-1" variant="outline" disabled>
-                You're the host of this spot
+              <Button className="flex-1" onClick={handleEditSpot}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit Spot
               </Button>
             ) : mode === 'host' ? (
               <Button className="flex-1" variant="outline" onClick={handleBookNow}>
