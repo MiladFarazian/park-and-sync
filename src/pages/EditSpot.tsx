@@ -831,7 +831,9 @@ const EditSpot = () => {
                         </Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
-                        {newPhotos.map((photo, index) => (
+                        {newPhotos.map((photo, index) => {
+                          console.log('[DEBUG] Rendering pending photo:', index, photo.name);
+                          return (
                           <div key={index} className="relative group">
                             <div className="relative aspect-video rounded-lg overflow-hidden border-2 border-dashed border-amber-500 bg-amber-50/50 dark:bg-amber-950/20">
                               <img
@@ -867,7 +869,8 @@ const EditSpot = () => {
                               </div>
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
