@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
-import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, Plus, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { format, differenceInMinutes } from 'date-fns';
 import { toast } from 'sonner';
@@ -59,7 +58,8 @@ const BookingDetail = () => {
   const [cancellingTow, setCancellingTow] = useState(false);
   const [overstayLoading, setOverstayLoading] = useState(false);
   const [confirmingDeparture, setConfirmingDeparture] = useState(false);
-  const [showModifyDialog, setShowModifyDialog] = useState(false);
+  const [showModifyStartPicker, setShowModifyStartPicker] = useState(false);
+  const [showModifyEndPicker, setShowModifyEndPicker] = useState(false);
   const [modifyStartTime, setModifyStartTime] = useState<Date | null>(null);
   const [modifyEndTime, setModifyEndTime] = useState<Date | null>(null);
   const [modifying, setModifying] = useState(false);
@@ -347,7 +347,10 @@ const BookingDetail = () => {
   };
 
   const handleModifyTimes = async () => {
-    if (!booking || !modifyStartTime || !modifyEndTime) return;
+    if (!booking || !modifyStartTime || !modifyEndTime) {
+      toast.error('Please select both start and end times');
+      return;
+    }
 
     if (modifyEndTime <= modifyStartTime) {
       toast.error('End time must be after start time');
@@ -375,7 +378,6 @@ const BookingDetail = () => {
         toast.success('Booking times updated successfully!');
       }
 
-      setShowModifyDialog(false);
       setModifyStartTime(null);
       setModifyEndTime(null);
       loadBookingDetails();
@@ -544,7 +546,7 @@ const BookingDetail = () => {
                 <Button size="sm" variant="outline" onClick={() => {
                   setModifyStartTime(new Date(booking.start_at));
                   setModifyEndTime(new Date(booking.end_at));
-                  setShowModifyDialog(true);
+                  setShowModifyStartPicker(true);
                 }}>
                   <Clock className="h-4 w-4 mr-1" />
                   Modify
@@ -871,80 +873,37 @@ const BookingDetail = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Modify Times Dialog */}
-      <Dialog open={showModifyDialog} onOpenChange={setShowModifyDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Modify Booking Times</DialogTitle>
-            <DialogDescription>
-              Update your booking start and end times. Changes must be made at least 1 hour before the original start time.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <DateTimePicker
-              date={modifyStartTime || new Date(booking.start_at)}
-              setDate={setModifyStartTime}
-              label="New Start Time"
-              minDate={new Date()}
-            />
-            
-            <DateTimePicker
-              date={modifyEndTime || new Date(booking.end_at)}
-              setDate={setModifyEndTime}
-              label="New End Time"
-              minDate={modifyStartTime || new Date()}
-            />
+      {/* Modify Start Time Picker */}
+      <MobileTimePicker
+        isOpen={showModifyStartPicker}
+        onClose={() => setShowModifyStartPicker(false)}
+        onConfirm={(date) => {
+          setModifyStartTime(date);
+          setShowModifyStartPicker(false);
+          setShowModifyEndPicker(true);
+        }}
+        mode="start"
+        initialValue={modifyStartTime || new Date(booking.start_at)}
+      />
 
-            {modifyStartTime && modifyEndTime && modifyEndTime > modifyStartTime && (
-              <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Duration:</span>
-                  <span className="font-medium">{modifyCost.hours.toFixed(2)} hours</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Subtotal:</span>
-                  <span>${modifyCost.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Platform Fee:</span>
-                  <span>${modifyCost.platformFee.toFixed(2)}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-sm font-semibold">
-                  <span>New Total:</span>
-                  <span>${modifyCost.total.toFixed(2)}</span>
-                </div>
-                {Math.abs(modifyCost.difference) > 0.5 && (
-                  <div className={`flex justify-between text-sm font-medium ${modifyCost.difference > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                    <span>{modifyCost.difference > 0 ? 'Additional Charge:' : 'Refund:'}</span>
-                    <span>${Math.abs(modifyCost.difference).toFixed(2)}</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => setShowModifyDialog(false)} disabled={modifying}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleModifyTimes}
-              disabled={modifying || !modifyStartTime || !modifyEndTime || modifyEndTime <= modifyStartTime}
-            >
-              {modifying ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                'Update Booking'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Modify End Time Picker */}
+      <MobileTimePicker
+        isOpen={showModifyEndPicker}
+        onClose={() => {
+          setShowModifyEndPicker(false);
+          if (modifyStartTime && modifyEndTime) {
+            handleModifyTimes();
+          }
+        }}
+        onConfirm={(date) => {
+          setModifyEndTime(date);
+          setShowModifyEndPicker(false);
+          handleModifyTimes();
+        }}
+        mode="end"
+        startTime={modifyStartTime || undefined}
+        initialValue={modifyEndTime || new Date(booking.end_at)}
+      />
 
       {/* Cancel Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
