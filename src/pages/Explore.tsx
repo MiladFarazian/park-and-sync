@@ -403,7 +403,7 @@ const Explore = () => {
         </div>
       </div>;
   }
-  return <div className="h-[calc(100vh-64px)] relative">
+  return <div className="h-full overflow-hidden relative">
       <div className="absolute top-4 left-4 right-4 z-10 space-y-2">
         <div className="relative max-w-md mx-auto">
           <div className="relative flex gap-2">
