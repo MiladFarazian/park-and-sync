@@ -168,9 +168,6 @@ const EditSpot = () => {
       return;
     }
 
-    // Temporary hard alert to prove this is running
-    alert(`Selected ${newFiles.length} photo${newFiles.length > 1 ? 's' : ''}. Pending before: ${newPhotos.length}`);
-
     setNewPhotos([...newPhotos, ...newFiles]);
     toast.success(`${newFiles.length} photo${newFiles.length > 1 ? 's' : ''} ready to upload`);
 
@@ -818,7 +815,34 @@ const EditSpot = () => {
                       </div>
                     </div>
                   )}
-
+                  {/* Pending New Photos */}
+                  {newPhotos.length > 0 && (
+                    <div className="mb-6">
+                      <p className="text-sm font-medium mb-2">Pending Photos (not yet saved)</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {newPhotos.map((file, index) => (
+                          <div key={index} className="relative group">
+                            <div className="relative aspect-video rounded-lg overflow-hidden border border-dashed border-primary/40 bg-muted">
+                              <img
+                                src={URL.createObjectURL(file)}
+                                alt={file.name}
+                                className="w-full h-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeNewPhoto(index)}
+                                className="absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-background/80 text-foreground shadow-sm hover:bg-background"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground truncate">{file.name}</p>
+                            <p className="text-[10px] text-muted-foreground">{formatFileSize(file.size)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Upload Progress */}
                   {isUploadingPhotos && (
