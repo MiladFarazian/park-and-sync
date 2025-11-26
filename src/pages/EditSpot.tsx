@@ -156,24 +156,24 @@ const EditSpot = () => {
   };
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('[DEBUG] handlePhotoSelect called');
-    const selected = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith('image/'));
-    console.log('[DEBUG] Selected files:', selected.length);
-    
-    if (selected.length === 0) {
+    const files = e.target.files;
+    if (!files || files.length === 0) {
       e.target.value = '';
       return;
     }
-    
-    setNewPhotos((prev) => {
-      const existingKeys = new Set(prev.map((f) => `${f.name}-${f.size}`));
-      const deduped = selected.filter((f) => !existingKeys.has(`${f.name}-${f.size}`));
-      return [...prev, ...deduped];
-    });
-    
-    // Show toast AFTER the state update, outside the callback
-    toast.success(`${selected.length} photo${selected.length > 1 ? 's' : ''} ready to upload`);
-    
+
+    const newFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (newFiles.length === 0) {
+      e.target.value = '';
+      return;
+    }
+
+    // Temporary hard alert to prove this is running
+    alert(`Selected ${newFiles.length} photo${newFiles.length > 1 ? 's' : ''}. Pending before: ${newPhotos.length}`);
+
+    setNewPhotos([...newPhotos, ...newFiles]);
+    toast.success(`${newFiles.length} photo${newFiles.length > 1 ? 's' : ''} ready to upload`);
+
     // Reset so selecting the same files again will trigger onChange
     e.target.value = '';
   };
@@ -565,53 +565,6 @@ const EditSpot = () => {
           </div>
         </div>
 
-        {/* DEBUG: Force visible pending photos - MOVED TO TOP */}
-        {newPhotos.length > 0 && (
-          <div
-            style={{
-              border: '4px solid red',
-              padding: '16px',
-              backgroundColor: 'yellow',
-              marginTop: '16px',
-              marginBottom: '16px',
-              position: 'relative',
-              zIndex: 9999,
-            }}
-          >
-            <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '12px', color: 'black' }}>
-              DEBUG PENDING UPLOAD ({newPhotos.length})
-            </h3>
-
-            {newPhotos.map((file, index) => {
-              console.log('[DEBUG] Rendering photo preview', index);
-              return (
-                <div
-                  key={index}
-                  style={{
-                    border: '2px solid blue',
-                    marginBottom: '12px',
-                    padding: '8px',
-                    backgroundColor: 'white',
-                  }}
-                >
-                  <p style={{ marginBottom: '8px', color: 'black', fontWeight: 'bold' }}>
-                    DEBUG FILE {index}: {file.name}
-                  </p>
-                  <img
-                    src={URL.createObjectURL(file)}
-                    alt={`preview-${index}`}
-                    style={{
-                      maxWidth: '200px',
-                      maxHeight: '200px',
-                      display: 'block',
-                      border: '1px solid black',
-                    }}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit(onSubmit)}>
           <Card>
