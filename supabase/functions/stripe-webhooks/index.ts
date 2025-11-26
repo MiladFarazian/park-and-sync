@@ -147,6 +147,16 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
 
   await supabase.from('notifications').insert(renterNotification);
 
+  // Notify host about new booking
+  const hostNotification = {
+    user_id: hostId,
+    type: 'booking',
+    title: 'New Booking Received',
+    message: `A driver has booked your spot at ${(booking.spots as any).address}`,
+    related_id: `host-booking-confirmation/${booking.id}`,
+  };
+  await supabase.from('notifications').insert(hostNotification);
+
   // Credit host's balance (idempotent because we only do this when booking was not active)
   const hostId = (booking.spots as any).host_id;
   const hostEarnings = booking.host_earnings || 0;
@@ -245,14 +255,25 @@ async function handleCheckoutPaymentCompleted(session: Stripe.Checkout.Session) 
       }
     }
 
-    // Send notification to renter
-    await supabase.from('notifications').insert({
-      user_id: booking.renter_id,
-      type: 'booking_confirmed',
-      title: 'Booking Confirmed',
-      message: `Your parking at ${(booking.spots as any).title} has been confirmed.`,
-      related_id: bookingId,
-    });
+    // Send notifications to both renter and host
+    const hostId = (booking.spots as any).host_id;
+    
+    await supabase.from('notifications').insert([
+      {
+        user_id: booking.renter_id,
+        type: 'booking',
+        title: 'Booking Confirmed',
+        message: `Your parking at ${(booking.spots as any).title} has been confirmed.`,
+        related_id: bookingId,
+      },
+      {
+        user_id: hostId,
+        type: 'booking',
+        title: 'New Booking Received',
+        message: `A driver has booked your spot`,
+        related_id: `host-booking-confirmation/${bookingId}`,
+      }
+    ]);
 
     console.log('Successfully processed checkout payment for booking:', bookingId);
   } catch (error) {
