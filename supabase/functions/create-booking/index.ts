@@ -303,7 +303,13 @@ serve(async (req) => {
         related_id: booking.id, // Route drivers to standard booking detail
       };
 
-      await supabase.from('notifications').insert([hostNotification, renterNotification]);
+      const { error: notificationError } = await supabaseAdmin
+        .from('notifications')
+        .insert([hostNotification, renterNotification]);
+
+      if (notificationError) {
+        console.error('Failed to create booking notifications:', notificationError);
+      }
 
       // Send confirmation emails
       try {
