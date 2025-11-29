@@ -1,73 +1,82 @@
-# Welcome to your Lovable project
+<p align="center">
+  <img src="Parkzy.png" alt="Parkzy Logo" width="450"/>
+</p>
 
-## Project info
+<h1 align="center">🚗 Parkzy</h1>
+<p align="center">Find parking. Anywhere. Anytime.</p>
 
-**URL**: https://lovable.dev/projects/bcd0f814-3e2f-427f-8e4e-b211f7011a0e
+---
 
-## How can I edit this code?
+### 🎥 Demo Video
 
-There are several ways of editing your application.
+<p align="center">
+  <video src="demo.mp4" width="600" controls></video>
+</p>
 
-**Use Lovable**
+---
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/bcd0f814-3e2f-427f-8e4e-b211f7011a0e) and start prompting.
+## 🧠 What is Parkzy?
 
-Changes made via Lovable will be committed automatically to this repo.
+**Parkzy** is a peer-to-peer marketplace designed to solve one of the most frustrating urban problems: *parking availability*. We connect drivers who need a spot with property owners who have space to spare.
 
-**Use your preferred IDE**
+Whether you're a homeowner with a driveway that sits empty all day, an apartment complex with unused spaces, or a business with private parking — Parkzy helps you turn your space into revenue while helping drivers skip the circling.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 🏡 For Spot Hosts
+- List unused parking spots in seconds
+- Earn money automatically every time a driver parks
+- Optional **Parkzy physical signage** to show your spot is available
+- Includes scheduling, pricing, and availability controls
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### 🚘 For Drivers
+- Find guaranteed parking when you actually need it
+- Book last-minute or reserve in advance
+- Filter by location, price, availability, and more
+- Pay seamlessly through the app
 
-Follow these steps:
+---
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## ✨ Key Features
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+| Feature | Description |
+|--------|-------------|
+| Peer-to-peer marketplace | Connecting hosts and drivers directly |
+| Real-time availability | Know exactly what’s open before you drive |
+| Secure payments | In-app payments with automatic host payouts |
+| Host signage | Dedicated QR-code parking sign for visibility |
+| Cross-platform | Native web & mobile support |
+| Messaging system | Hosts and drivers can communicate easily |
+| Smart scheduling | Hourly, daily, or custom pricing slots |
 
-# Step 3: Install the necessary dependencies.
-npm i
+---
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+## 🏗️ Tech Stack
 
-**Edit a file directly in GitHub**
+- **Frontend:** React + Vite + TypeScript, Tailwind CSS, shadcn/ui  
+- **Backend & Database:** Supabase (Auth, Storage, Realtime, Edge Functions)  
+- **Dev Tools:** GitHub, CI/CD, Resend for emails  
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+---
 
-**Use GitHub Codespaces**
+## 🚀 Our Mission
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Parking shouldn’t be a treasure hunt.
 
-## What technologies are used for this project?
+Parkzy unlocks underutilized space across cities to:
+- reduce traffic
+- lower emissions
+- make everyday travel less stressful
+- enable passive income for local residents
 
-This project is built with:
+Together, we’re **rebuilding the future of parking** — community-driven and effortless.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+---
 
-## How can I deploy this project?
+## 📬 Contact & Links
 
-Simply open [Lovable](https://lovable.dev/projects/bcd0f814-3e2f-427f-8e4e-b211f7011a0e) and click on Share -> Publish.
+- 🌐 Website: *Coming soon*
+- 📱 Mobile App: *Coming soon*
+- 📧 hello@useparkzy.com  
 
-## Can I connect a custom domain to my Lovable project?
+---
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+<p align="center">Made with ❤️ in Los Angeles</p>
