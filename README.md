@@ -1,8 +1,8 @@
-<p align="center">
+<p align="left">
   <img src="Parkzy.png" alt="Parkzy Logo" width="450"/>
 </p>
 
-<p align="center">Find parking. Anywhere. Anytime.</p>
+<p align="left">Find parking. Anywhere. Anytime.</p>
 
 ---
 
