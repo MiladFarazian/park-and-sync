@@ -73,7 +73,7 @@ Together, we’re **rebuilding the future of parking** — community-driven and 
 
 ## 📬 Contact & Links
 
-- 🌐 Website: *Coming soon*
+- 🌐 Website: useparkzy.com
 - 📱 Mobile App: *Coming soon*
 - 📧 hello@useparkzy.com  
 
