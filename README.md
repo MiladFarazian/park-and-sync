@@ -6,7 +6,7 @@
 
 ---
 
-### 🎥 Demo Video
+### Demo Video
 
 <p align="center">
   <video src="demo.mp4" width="600" controls></video>
@@ -14,19 +14,19 @@
 
 ---
 
-## 🧠 What is Parkzy?
+## What is Parkzy?
 
 **Parkzy** is a peer-to-peer marketplace designed to solve one of the most frustrating urban problems: *parking availability*. We connect drivers who need a spot with property owners who have space to spare.
 
 Whether you're a homeowner with a driveway that sits empty all day, an apartment complex with unused spaces, or a business with private parking — Parkzy helps you turn your space into revenue while helping drivers skip the circling.
 
-### 🏡 For Spot Hosts
+### For Spot Hosts
 - List unused parking spots in seconds
 - Earn money automatically every time a driver parks
 - Optional **Parkzy physical signage** to show your spot is available
 - Includes scheduling, pricing, and availability controls
 
-### 🚘 For Drivers
+### For Drivers
 - Find guaranteed parking when you actually need it
 - Book last-minute or reserve in advance
 - Filter by location, price, availability, and more
@@ -34,7 +34,7 @@ Whether you're a homeowner with a driveway that sits empty all day, an apartment
 
 ---
 
-## ✨ Key Features
+## Key Features
 
 | Feature | Description |
 |--------|-------------|
@@ -48,7 +48,7 @@ Whether you're a homeowner with a driveway that sits empty all day, an apartment
 
 ---
 
-## 🏗️ Tech Stack
+## Tech Stack
 
 - **Frontend:** React + Vite + TypeScript, Tailwind CSS, shadcn/ui  
 - **Backend & Database:** Supabase (Auth, Storage, Realtime, Edge Functions)  
