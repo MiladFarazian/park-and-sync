@@ -2,7 +2,6 @@
   <img src="Parkzy.png" alt="Parkzy Logo" width="450"/>
 </p>
 
-<h1 align="center">🚗 Parkzy</h1>
 <p align="center">Find parking. Anywhere. Anytime.</p>
 
 ---
