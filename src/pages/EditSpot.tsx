@@ -59,9 +59,7 @@ const EditSpot = () => {
   const [existingPhotos, setExistingPhotos] = useState<SpotPhoto[]>([]);
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
-  const [recentlyUploaded, setRecentlyUploaded] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [pendingUploads, setPendingUploads] = useState<File[]>([]);
   const [pendingUploadPreviews, setPendingUploadPreviews] = useState<string[]>([]);
@@ -194,176 +192,6 @@ const EditSpot = () => {
     toast.info('Primary photo updated. Click Save to confirm.');
   };
 
-  const deleteExistingPhoto = async (photoId: string, photoUrl: string) => {
-    try {
-      const urlParts = photoUrl.split('/');
-      const filePath = urlParts.slice(urlParts.indexOf('spot-photos') + 1).join('/');
-
-      const { error: storageError } = await supabase.storage
-        .from('spot-photos')
-        .remove([filePath]);
-
-      if (storageError) {
-        console.error('Error deleting from storage:', storageError);
-      }
-
-      const { error: dbError } = await supabase
-        .from('spot_photos')
-        .delete()
-        .eq('id', photoId);
-
-      if (dbError) throw dbError;
-
-      setExistingPhotos(existingPhotos.filter(p => p.id !== photoId));
-      toast.success('Photo deleted');
-    } catch (error) {
-      console.error('Error deleting photo:', error);
-      toast.error('Failed to delete photo');
-    }
-  };
-
-  const setPrimaryPhoto = async (photoId: string) => {
-    try {
-      await supabase
-        .from('spot_photos')
-        .update({ is_primary: false })
-        .eq('spot_id', spotId);
-
-      const { error } = await supabase
-        .from('spot_photos')
-        .update({ is_primary: true })
-        .eq('id', photoId);
-
-      if (error) throw error;
-
-      setExistingPhotos(existingPhotos.map(p => ({
-        ...p,
-        is_primary: p.id === photoId
-      })));
-      toast.success('Primary photo updated');
-    } catch (error) {
-      console.error('Error setting primary photo:', error);
-      toast.error('Failed to set primary photo');
-    }
-  };
-
-  const uploadPhotos = async (filesToUpload: File[]) => {
-    if (filesToUpload.length === 0 || !spotId) return;
-
-    setIsUploadingPhotos(true);
-    setUploadProgress(0);
-    let successCount = 0;
-    let failCount = 0;
-
-    toast.info(`Uploading ${filesToUpload.length} photo${filesToUpload.length > 1 ? 's' : ''}...`);
-
-    try {
-      for (let i = 0; i < filesToUpload.length; i++) {
-        try {
-          const file = filesToUpload[i];
-          const compressedFile = await compressImage(file);
-          const extFromName = (compressedFile as File).name?.split('.').pop();
-          const extFromType = (compressedFile as File).type?.split('/').pop();
-          const safeExt = (extFromName || extFromType || 'jpg').toLowerCase().replace('jpeg', 'jpg');
-
-          const uid = (globalThis as any)?.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-          const filePath = `${spotId}/${uid}.${safeExt}`;
-
-          console.log('[UPLOAD] Starting upload:', filePath);
-          const { error: uploadError } = await supabase.storage
-            .from('spot-photos')
-            .upload(filePath, compressedFile);
-
-          if (uploadError) {
-            console.error('[UPLOAD] Storage upload error for photo', i + 1, ':', uploadError);
-            throw uploadError;
-          }
-
-          const { data: { publicUrl } } = supabase.storage
-            .from('spot-photos')
-            .getPublicUrl(filePath);
-
-          // Add cache-busting timestamp to URL
-          const publicUrlWithCacheBust = `${publicUrl}?t=${Date.now()}`;
-          console.log('[UPLOAD] Got public URL with cache-bust:', publicUrlWithCacheBust);
-
-          const { error: dbError } = await supabase
-            .from('spot_photos')
-            .insert({
-              spot_id: spotId,
-              url: publicUrlWithCacheBust,
-              is_primary: existingPhotos.length === 0 && i === 0,
-              sort_order: existingPhotos.length + i,
-            });
-
-          if (dbError) {
-            console.error('[UPLOAD] Database insert error for photo', i + 1, ':', dbError);
-            throw dbError;
-          }
-
-          console.log('[UPLOAD] Successfully saved photo', i + 1, 'to database');
-          successCount++;
-
-          setUploadProgress(((i + 1) / filesToUpload.length) * 100);
-        } catch (error) {
-          console.error(`[UPLOAD] Failed to upload photo ${i + 1} of ${filesToUpload.length}:`, error);
-          failCount++;
-        }
-      }
-
-      // Add small delay to ensure Supabase has fully committed the data
-      console.log('[UPLOAD] Waiting 200ms before fetching photos...');
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      const { data: photosData, error: fetchError } = await supabase
-        .from('spot_photos')
-        .select('*')
-        .eq('spot_id', spotId)
-        .order('sort_order', { ascending: true });
-
-      if (fetchError) {
-        console.error('[UPLOAD] Error fetching updated photos:', fetchError);
-        toast.error('Failed to refresh photos. Please reload the page.');
-      } else if (photosData) {
-        console.log('[UPLOAD] Fetched photos after upload:', photosData.length);
-        // Use functional state update to ensure we're working with latest state
-        setExistingPhotos(() => [...photosData]);
-        // Increment render key to force React re-render
-        setPhotoRenderKey(prev => prev + 1);
-        
-        const recentIds = photosData.slice(-successCount).map(p => p.id);
-        setRecentlyUploaded(recentIds);
-        
-        // Clear local previews once we have the canonical DB-backed photos
-        setPreviewPhotos([]);
-        
-        setTimeout(() => {
-          setRecentlyUploaded([]);
-        }, 3000);
-
-        setTimeout(() => {
-          document.getElementById('photos-section')?.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'nearest' 
-          });
-        }, 100);
-      }
-      
-      if (successCount > 0 && failCount === 0) {
-        toast.success(`Successfully uploaded ${successCount} photo${successCount > 1 ? 's' : ''}`);
-      } else if (successCount > 0 && failCount > 0) {
-        toast.warning(`Uploaded ${successCount} photo(s), ${failCount} failed`);
-      } else {
-        toast.error('All photo uploads failed. Please try again.');
-      }
-    } catch (error) {
-      console.error('[UPLOAD] Upload process failed:', error);
-      toast.error('Failed to upload photos. Please try again.');
-    } finally {
-      setIsUploadingPhotos(false);
-      setUploadProgress(0);
-    }
-  };
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -393,6 +221,8 @@ const EditSpot = () => {
     setPendingUploadPreviews(prev => [...prev, ...newPreviews]);
     
     toast.info(`${dropped.length} photo${dropped.length > 1 ? 's' : ''} selected. Click Save to upload.`);
+  };
+
   const moveStagedPhoto = (index: number, direction: 'left' | 'right') => {
     const newPhotos = [...stagedPhotos];
     const newIndex = direction === 'left' ? index - 1 : index + 1;
@@ -404,7 +234,7 @@ const EditSpot = () => {
     setStagedPhotos(newPhotos);
   };
 
-  const savePhotoOrder = async () => {
+  const handleDelete = async () => {
     if (!spotId || isSavingOrder) return;
 
     try {
