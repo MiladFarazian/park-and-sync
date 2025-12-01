@@ -235,30 +235,6 @@ const EditSpot = () => {
   };
 
   const handleDelete = async () => {
-    if (!spotId || isSavingOrder) return;
-
-    try {
-      setIsSavingOrder(true);
-
-      for (let i = 0; i < existingPhotos.length; i++) {
-        const photo = existingPhotos[i];
-        await supabase
-          .from('spot_photos')
-          .update({ sort_order: i })
-          .eq('id', photo.id);
-      }
-
-      setHasOrderChanged(false);
-      toast.success('Photo order saved');
-    } catch (error) {
-      console.error('Error saving photo order:', error);
-      toast.error('Failed to save photo order');
-    } finally {
-      setIsSavingOrder(false);
-    }
-  };
-
-  const handleDelete = async () => {
     if (!spotId || isDeleting) return;
 
     try {
