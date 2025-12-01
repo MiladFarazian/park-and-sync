@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Trash2, Upload, X, Star, CheckCircle2, ChevronLeft, ChevronRight, Save } from 'lucide-react';
+import { ArrowLeft, Shield, Camera, MapPin, DollarSign, Trash2, Upload, Star, CheckCircle2, ChevronLeft, ChevronRight, Save, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { compressImage } from '@/lib/compressImage';
@@ -57,7 +57,6 @@ const EditSpot = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [existingPhotos, setExistingPhotos] = useState<SpotPhoto[]>([]);
-  const [newPhotos, setNewPhotos] = useState<File[]>([]);
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [recentlyUploaded, setRecentlyUploaded] = useState<string[]>([]);
@@ -65,10 +64,6 @@ const EditSpot = () => {
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [hasOrderChanged, setHasOrderChanged] = useState(false);
   const [user, setUser] = useState<any>(null);
-
-  useEffect(() => {
-    console.log('[DEBUG] newPhotos state changed:', newPhotos.length, 'photos');
-  }, [newPhotos]);
 
   const {
     register,
@@ -90,7 +85,6 @@ const EditSpot = () => {
       if (!spotId) return;
 
       try {
-        // Check authentication first
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           setIsLoading(false);
@@ -105,27 +99,23 @@ const EditSpot = () => {
 
         if (spotError) throw spotError;
 
-        // Verify ownership
         if (spotData.host_id !== user.id) {
           toast.error('You do not have permission to edit this spot');
           navigate('/dashboard');
           return;
         }
 
-        // Populate form
         setValue('title', spotData.title);
         setValue('address', spotData.address);
         setValue('hourlyRate', spotData.hourly_rate.toString());
         setValue('description', spotData.description || '');
 
-        // Set amenities
         const amenities = [];
         if (spotData.is_covered) amenities.push('covered');
         if (spotData.is_secure) amenities.push('security');
         if (spotData.has_ev_charging) amenities.push('ev');
         setSelectedAmenities(amenities);
 
-        // Fetch existing photos
         const { data: photosData, error: photosError } = await supabase
           .from('spot_photos')
           .select('*')
@@ -155,7 +145,7 @@ const EditSpot = () => {
     );
   };
 
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) {
       e.target.value = '';
@@ -164,41 +154,20 @@ const EditSpot = () => {
 
     const newFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
     if (newFiles.length === 0) {
+      toast.error('Please select valid image files');
       e.target.value = '';
       return;
     }
 
-    // Add to pending list so they show up in the UI
-    setNewPhotos((prev) => [...prev, ...newFiles]);
-
-    // Make it very clear these are pending and where to look
-    toast.success(
-      `${newFiles.length} photo${newFiles.length > 1 ? 's' : ''} added below  click "Upload" to save`,
-    );
-
-    // Scroll to the photos section so the pending cards + Upload button are visible
-    setTimeout(() => {
-      document.getElementById('photos-section')?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      });
-    }, 50);
-
-    // Reset so selecting the same files again will trigger onChange
     e.target.value = '';
-  };
-
-  const removeNewPhoto = (index: number) => {
-    setNewPhotos(newPhotos.filter((_, i) => i !== index));
+    await uploadPhotos(newFiles);
   };
 
   const deleteExistingPhoto = async (photoId: string, photoUrl: string) => {
     try {
-      // Extract file path from URL
       const urlParts = photoUrl.split('/');
       const filePath = urlParts.slice(urlParts.indexOf('spot-photos') + 1).join('/');
 
-      // Delete from storage
       const { error: storageError } = await supabase.storage
         .from('spot-photos')
         .remove([filePath]);
@@ -207,7 +176,6 @@ const EditSpot = () => {
         console.error('Error deleting from storage:', storageError);
       }
 
-      // Delete from database
       const { error: dbError } = await supabase
         .from('spot_photos')
         .delete()
@@ -225,13 +193,11 @@ const EditSpot = () => {
 
   const setPrimaryPhoto = async (photoId: string) => {
     try {
-      // First, set all photos to non-primary
       await supabase
         .from('spot_photos')
         .update({ is_primary: false })
         .eq('spot_id', spotId);
 
-      // Then set the selected photo as primary
       const { error } = await supabase
         .from('spot_photos')
         .update({ is_primary: true })
@@ -250,29 +216,27 @@ const EditSpot = () => {
     }
   };
 
-  const uploadNewPhotos = async () => {
-    if (newPhotos.length === 0 || !spotId) return;
+  const uploadPhotos = async (filesToUpload: File[]) => {
+    if (filesToUpload.length === 0 || !spotId) return;
 
     setIsUploadingPhotos(true);
     setUploadProgress(0);
     let successCount = 0;
     let failCount = 0;
 
+    toast.info(`Uploading ${filesToUpload.length} photo${filesToUpload.length > 1 ? 's' : ''}...`);
+
     try {
-      for (let i = 0; i < newPhotos.length; i++) {
+      for (let i = 0; i < filesToUpload.length; i++) {
         try {
-          const file = newPhotos[i];
-          // Use compressed file's extension when available; fall back to MIME type mapping
+          const file = filesToUpload[i];
           const compressedFile = await compressImage(file);
           const extFromName = (compressedFile as File).name?.split('.').pop();
           const extFromType = (compressedFile as File).type?.split('/').pop();
           const safeExt = (extFromName || extFromType || 'jpg').toLowerCase().replace('jpeg', 'jpg');
 
-          // Generate a safe unique filename, with fallback if crypto.randomUUID is not available
           const uid = (globalThis as any)?.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
           const filePath = `${spotId}/${uid}.${safeExt}`;
-
-          console.log('[PERF] Compressing image before upload:', file.name);
 
           console.log('[UPLOAD] Starting upload:', filePath);
           const { error: uploadError } = await supabase.storage
@@ -284,14 +248,12 @@ const EditSpot = () => {
             throw uploadError;
           }
 
-
           const { data: { publicUrl } } = supabase.storage
             .from('spot-photos')
             .getPublicUrl(filePath);
 
           console.log('[UPLOAD] Got public URL:', publicUrl);
 
-          // Save to database - removed .select().single() which was causing the error
           const { error: dbError } = await supabase
             .from('spot_photos')
             .insert({
@@ -309,16 +271,13 @@ const EditSpot = () => {
           console.log('[UPLOAD] Successfully saved photo', i + 1, 'to database');
           successCount++;
 
-          // Update progress
-          setUploadProgress(((i + 1) / newPhotos.length) * 100);
+          setUploadProgress(((i + 1) / filesToUpload.length) * 100);
         } catch (error) {
-          console.error(`[UPLOAD] Failed to upload photo ${i + 1} of ${newPhotos.length}:`, error);
+          console.error(`[UPLOAD] Failed to upload photo ${i + 1} of ${filesToUpload.length}:`, error);
           failCount++;
-          // Continue with next photo instead of stopping
         }
       }
 
-      // Refresh photos
       const { data: photosData, error: fetchError } = await supabase
         .from('spot_photos')
         .select('*')
@@ -330,16 +289,13 @@ const EditSpot = () => {
       } else if (photosData) {
         setExistingPhotos(photosData);
         
-        // Mark recently uploaded photos for animation
         const recentIds = photosData.slice(-successCount).map(p => p.id);
         setRecentlyUploaded(recentIds);
         
-        // Clear recently uploaded indicator after 3 seconds
         setTimeout(() => {
           setRecentlyUploaded([]);
         }, 3000);
 
-        // Scroll to photos section
         setTimeout(() => {
           document.getElementById('photos-section')?.scrollIntoView({ 
             behavior: 'smooth', 
@@ -347,13 +303,11 @@ const EditSpot = () => {
           });
         }, 100);
       }
-
-      setNewPhotos([]);
       
       if (successCount > 0 && failCount === 0) {
-        toast.success(`Successfully uploaded ${successCount} photo(s)`);
+        toast.success(`Successfully uploaded ${successCount} photo${successCount > 1 ? 's' : ''}`);
       } else if (successCount > 0 && failCount > 0) {
-        toast.success(`Uploaded ${successCount} photo(s), ${failCount} failed`);
+        toast.warning(`Uploaded ${successCount} photo(s), ${failCount} failed`);
       } else {
         toast.error('All photo uploads failed. Please try again.');
       }
@@ -376,29 +330,20 @@ const EditSpot = () => {
     setIsDragging(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     
     const dropped = Array.from(e.dataTransfer.files).filter((file) =>
       file.type.startsWith('image/')
     );
-    if (dropped.length === 0) return;
-
-    setNewPhotos((prev) => {
-      const existingKeys = new Set(prev.map((f) => `${f.name}-${f.size}`));
-      const deduped = dropped.filter((f) => !existingKeys.has(`${f.name}-${f.size}`));
-      return [...prev, ...deduped];
-    });
     
-    // Toast OUTSIDE the setter
-    toast.success(`Photo(s) ready to upload`);
-  };
+    if (dropped.length === 0) {
+      toast.error('Please drop valid image files');
+      return;
+    }
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    await uploadPhotos(dropped);
   };
 
   const moveExistingPhoto = (index: number, direction: 'left' | 'right') => {
@@ -419,7 +364,6 @@ const EditSpot = () => {
     try {
       setIsSavingOrder(true);
 
-      // Update sort_order for each photo
       for (let i = 0; i < existingPhotos.length; i++) {
         const photo = existingPhotos[i];
         await supabase
@@ -444,7 +388,6 @@ const EditSpot = () => {
     try {
       setIsDeleting(true);
 
-      // Check for future bookings
       const { data: futureBookings, error: bookingsError } = await supabase
         .from('bookings')
         .select('id')
@@ -460,19 +403,16 @@ const EditSpot = () => {
         return;
       }
 
-      // Delete spot photos first (if any)
       await supabase
         .from('spot_photos')
         .delete()
         .eq('spot_id', spotId);
 
-      // Delete availability rules
       await supabase
         .from('availability_rules')
         .delete()
         .eq('spot_id', spotId);
 
-      // Delete the spot
       const { error: deleteError } = await supabase
         .from('spots')
         .delete()
@@ -554,13 +494,9 @@ const EditSpot = () => {
     );
   }
 
-  // DEBUG: Log render state
-  console.log('[DEBUG] Render: newPhotos.length =', newPhotos.length);
-
   return (
     <div className="bg-background pb-20">
       <div className="p-4 space-y-6 max-w-2xl mx-auto">
-        {/* Header */}
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
@@ -574,7 +510,6 @@ const EditSpot = () => {
             <p className="text-sm text-muted-foreground">Update your listing</p>
           </div>
         </div>
-
 
         <form onSubmit={handleSubmit(onSubmit)}>
           <Card>
@@ -675,7 +610,6 @@ const EditSpot = () => {
                   </div>
                 </div>
 
-                {/* Photos Section */}
                 <div id="photos-section">
                   <div className="flex items-center justify-between mb-3">
                     <Label>Photos</Label>
@@ -683,11 +617,6 @@ const EditSpot = () => {
                       {existingPhotos.length > 0 && (
                         <Badge variant="secondary" className="text-xs">
                           {existingPhotos.length} Uploaded
-                        </Badge>
-                      )}
-                      {newPhotos.length > 0 && (
-                        <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400">
-                          {newPhotos.length} Pending
                         </Badge>
                       )}
                       {hasOrderChanged && (
@@ -705,7 +634,6 @@ const EditSpot = () => {
                     </div>
                   </div>
                   
-                  {/* Existing Photos */}
                   {existingPhotos.length > 0 && (
                     <div className="mb-6">
                       <div className="flex items-center gap-2 mb-3">
@@ -730,7 +658,6 @@ const EditSpot = () => {
                                     className="w-full h-full object-cover"
                                   />
                                   
-                                  {/* Order Badge */}
                                   <Badge 
                                     variant="secondary" 
                                     className="absolute top-2 left-2 text-xs font-semibold z-10"
@@ -738,7 +665,6 @@ const EditSpot = () => {
                                     #{index + 1}
                                   </Badge>
                                   
-                                  {/* Primary Badge */}
                                   {photo.is_primary && (
                                     <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-lg z-10">
                                       <Star className="h-3.5 w-3.5 fill-current" />
@@ -746,7 +672,6 @@ const EditSpot = () => {
                                     </div>
                                   )}
                                   
-                                  {/* Recently Uploaded Badge */}
                                   {isRecent && (
                                     <div className="absolute top-10 right-2 bg-green-500 text-white px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-lg animate-scale-in z-10">
                                       <CheckCircle2 className="h-3.5 w-3.5" />
@@ -754,7 +679,6 @@ const EditSpot = () => {
                                     </div>
                                   )}
                                   
-                                  {/* Hover Overlay */}
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col items-center justify-center gap-2">
                                     {!photo.is_primary && (
                                       <Tooltip>
@@ -828,36 +752,7 @@ const EditSpot = () => {
                       </div>
                     </div>
                   )}
-                  {/* Pending New Photos */}
-                  {newPhotos.length > 0 && (
-                    <div className="mb-6">
-                      <p className="text-sm font-medium mb-2">Pending Photos (not yet saved)</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        {newPhotos.map((file, index) => (
-                          <div key={index} className="relative group">
-                            <div className="relative aspect-video rounded-lg overflow-hidden border border-dashed border-primary/40 bg-muted">
-                              <img
-                                src={URL.createObjectURL(file)}
-                                alt={file.name}
-                                className="w-full h-full object-cover"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removeNewPhoto(index)}
-                                className="absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-background/80 text-foreground shadow-sm hover:bg-background"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </div>
-                            <p className="mt-1 text-xs text-muted-foreground truncate">{file.name}</p>
-                            <p className="text-[10px] text-muted-foreground">{formatFileSize(file.size)}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
-                  {/* Upload Progress */}
                   {isUploadingPhotos && (
                     <div className="mb-4 p-4 rounded-lg bg-primary/5 border border-primary/20">
                       <div className="flex items-center justify-between mb-2">
@@ -868,7 +763,6 @@ const EditSpot = () => {
                     </div>
                   )}
 
-                  {/* Drag & Drop Zone / Upload Buttons */}
                   <div
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
@@ -894,28 +788,16 @@ const EditSpot = () => {
                         </p>
                       </div>
                       
-                      <div className="flex gap-3">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="flex-1"
-                          onClick={() => document.getElementById('edit-photo-upload')?.click()}
-                        >
-                          <Upload className="h-4 w-4 mr-2" />
-                          Browse Files
-                        </Button>
-                        {newPhotos.length > 0 && (
-                          <Button
-                            type="button"
-                            onClick={uploadNewPhotos}
-                            disabled={isUploadingPhotos}
-                            className="flex-1"
-                          >
-                            <Upload className="h-4 w-4 mr-2" />
-                            {isUploadingPhotos ? 'Uploading...' : `Upload ${newPhotos.length} Photo${newPhotos.length > 1 ? 's' : ''}`}
-                          </Button>
-                        )}
-                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => document.getElementById('edit-photo-upload')?.click()}
+                        disabled={isUploadingPhotos}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {isUploadingPhotos ? 'Uploading...' : 'Add Photos'}
+                      </Button>
                     </div>
                   </div>
                   
@@ -930,7 +812,7 @@ const EditSpot = () => {
                   
                   <p className="text-xs text-muted-foreground mt-3">
                     <Star className="h-3 w-3 inline mr-1" />
-                    Tip: Set a primary photo to make it appear first in your listing. Images are automatically compressed for optimal loading.
+                    Photos upload automatically when selected. Set a primary photo to make it appear first. Images are automatically compressed.
                   </p>
                 </div>
               </div>
@@ -956,7 +838,6 @@ const EditSpot = () => {
           </Card>
         </form>
 
-        {/* Delete Listing Section */}
         <Card className="border-destructive">
           <CardContent className="p-6">
             <div className="space-y-3">
@@ -980,7 +861,6 @@ const EditSpot = () => {
         </Card>
       </div>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
