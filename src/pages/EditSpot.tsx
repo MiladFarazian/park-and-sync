@@ -62,10 +62,12 @@ const EditSpot = () => {
   const [recentlyUploaded, setRecentlyUploaded] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
-  const [hasOrderChanged, setHasOrderChanged] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [previewPhotos, setPreviewPhotos] = useState<string[]>([]);
-  const [photoRenderKey, setPhotoRenderKey] = useState(0);
+  const [pendingUploads, setPendingUploads] = useState<File[]>([]);
+  const [pendingUploadPreviews, setPendingUploadPreviews] = useState<string[]>([]);
+  const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set());
+  const [stagedPhotos, setStagedPhotos] = useState<SpotPhoto[]>([]);
+  const [stagedPrimaryId, setStagedPrimaryId] = useState<string | null>(null);
 
   const {
     register,
@@ -128,9 +130,12 @@ const EditSpot = () => {
           .eq('spot_id', spotId)
           .order('sort_order', { ascending: true });
 
-        if (!photosError && photosData) {
-          setExistingPhotos(photosData);
-        }
+      if (!photosError && photosData) {
+        setExistingPhotos(photosData);
+        setStagedPhotos(photosData);
+        const primary = photosData.find(p => p.is_primary);
+        if (primary) setStagedPrimaryId(primary.id);
+      }
       } catch (error) {
         console.error('Error fetching spot:', error);
         toast.error('Failed to load spot details');
@@ -165,12 +170,28 @@ const EditSpot = () => {
       return;
     }
 
-    // Show immediate local previews while upload + DB refresh happen
+    // Stage files for upload and create preview URLs
+    setPendingUploads(prev => [...prev, ...newFiles]);
     const newPreviews = newFiles.map((file) => URL.createObjectURL(file));
-    setPreviewPhotos((prev) => [...prev, ...newPreviews]);
-
+    setPendingUploadPreviews(prev => [...prev, ...newPreviews]);
+    
+    toast.info(`${newFiles.length} photo${newFiles.length > 1 ? 's' : ''} selected. Click Save to upload.`);
     e.target.value = '';
-    await uploadPhotos(newFiles);
+  };
+
+  const stagePhotoDelete = (photoId: string) => {
+    setPendingDeletes(prev => new Set(prev).add(photoId));
+    setStagedPhotos(prev => prev.filter(p => p.id !== photoId));
+    toast.info('Photo marked for deletion. Click Save to confirm.');
+  };
+
+  const stagePrimaryPhoto = (photoId: string) => {
+    setStagedPrimaryId(photoId);
+    setStagedPhotos(prev => prev.map(p => ({
+      ...p,
+      is_primary: p.id === photoId
+    })));
+    toast.info('Primary photo updated. Click Save to confirm.');
   };
 
   const deleteExistingPhoto = async (photoId: string, photoUrl: string) => {
@@ -366,22 +387,21 @@ const EditSpot = () => {
       return;
     }
 
-    // Immediate local previews for dropped files
+    // Stage files for upload and create preview URLs
+    setPendingUploads(prev => [...prev, ...dropped]);
     const newPreviews = dropped.map((file) => URL.createObjectURL(file));
-    setPreviewPhotos((prev) => [...prev, ...newPreviews]);
-
-    await uploadPhotos(dropped);
-  };
-  const moveExistingPhoto = (index: number, direction: 'left' | 'right') => {
-    const newPhotos = [...existingPhotos];
+    setPendingUploadPreviews(prev => [...prev, ...newPreviews]);
+    
+    toast.info(`${dropped.length} photo${dropped.length > 1 ? 's' : ''} selected. Click Save to upload.`);
+  const moveStagedPhoto = (index: number, direction: 'left' | 'right') => {
+    const newPhotos = [...stagedPhotos];
     const newIndex = direction === 'left' ? index - 1 : index + 1;
     
-    if (newIndex < 0 || newIndex >= existingPhotos.length) return;
+    if (newIndex < 0 || newIndex >= stagedPhotos.length) return;
     
     [newPhotos[index], newPhotos[newIndex]] = [newPhotos[newIndex], newPhotos[index]];
     
-    setExistingPhotos(newPhotos);
-    setHasOrderChanged(true);
+    setStagedPhotos(newPhotos);
   };
 
   const savePhotoOrder = async () => {
@@ -463,6 +483,85 @@ const EditSpot = () => {
     try {
       setIsSaving(true);
 
+      // Step 1: Delete photos marked for deletion
+      for (const photoId of pendingDeletes) {
+        const photo = existingPhotos.find(p => p.id === photoId);
+        if (photo) {
+          const urlParts = photo.url.split('/');
+          const filePath = urlParts.slice(urlParts.indexOf('spot-photos') + 1).join('/');
+          await supabase.storage.from('spot-photos').remove([filePath]);
+          await supabase.from('spot_photos').delete().eq('id', photoId);
+        }
+      }
+
+      // Step 2: Upload new photos
+      if (pendingUploads.length > 0) {
+        setIsUploadingPhotos(true);
+        toast.info(`Uploading ${pendingUploads.length} photo${pendingUploads.length > 1 ? 's' : ''}...`);
+        
+        for (let i = 0; i < pendingUploads.length; i++) {
+          const file = pendingUploads[i];
+          const compressedFile = await compressImage(file);
+          const extFromName = (compressedFile as File).name?.split('.').pop();
+          const extFromType = (compressedFile as File).type?.split('/').pop();
+          const safeExt = (extFromName || extFromType || 'jpg').toLowerCase().replace('jpeg', 'jpg');
+
+          const uid = (globalThis as any)?.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+          const filePath = `${spotId}/${uid}.${safeExt}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('spot-photos')
+            .upload(filePath, compressedFile);
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('spot-photos')
+            .getPublicUrl(filePath);
+
+          await supabase.from('spot_photos').insert({
+            spot_id: spotId,
+            url: publicUrl,
+            is_primary: false,
+            sort_order: stagedPhotos.length + i,
+          });
+
+          setUploadProgress(((i + 1) / pendingUploads.length) * 100);
+        }
+        setIsUploadingPhotos(false);
+        setUploadProgress(0);
+      }
+
+      // Step 3: Update photo order and primary status
+      const { data: allPhotos } = await supabase
+        .from('spot_photos')
+        .select('*')
+        .eq('spot_id', spotId);
+
+      if (allPhotos) {
+        // Update order
+        for (let i = 0; i < stagedPhotos.length; i++) {
+          await supabase
+            .from('spot_photos')
+            .update({ sort_order: i })
+            .eq('id', stagedPhotos[i].id);
+        }
+
+        // Update primary photo
+        if (stagedPrimaryId) {
+          await supabase
+            .from('spot_photos')
+            .update({ is_primary: false })
+            .eq('spot_id', spotId);
+          
+          await supabase
+            .from('spot_photos')
+            .update({ is_primary: true })
+            .eq('id', stagedPrimaryId);
+        }
+      }
+
+      // Step 4: Update spot details
       const updateData = {
         title: data.title,
         address: data.address,
@@ -639,40 +738,26 @@ const EditSpot = () => {
                 <div id="photos-section">
                   <div className="flex items-center justify-between mb-3">
                     <Label>Photos</Label>
-                    <div className="flex gap-2">
-                      {existingPhotos.length > 0 && (
-                        <Badge variant="secondary" className="text-xs">
-                          {existingPhotos.length} Uploaded
-                        </Badge>
-                      )}
-                      {hasOrderChanged && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={savePhotoOrder}
-                          disabled={isSavingOrder}
-                          className="h-7"
-                        >
-                          <Save className="h-3.5 w-3.5 mr-1.5" />
-                          Save Order
-                        </Button>
-                      )}
-                    </div>
+                    {stagedPhotos.length > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {stagedPhotos.length} Photo{stagedPhotos.length !== 1 ? 's' : ''}
+                      </Badge>
+                    )}
                   </div>
 
-                  {previewPhotos.length > 0 && (
+                  {pendingUploadPreviews.length > 0 && (
                     <div className="mb-4">
-                      <p className="text-xs text-muted-foreground mb-2">Just selected (preview)</p>
+                      <p className="text-xs text-muted-foreground mb-2">Selected for upload</p>
                       <div className="grid grid-cols-2 gap-3">
-                        {previewPhotos.map((url, idx) => (
+                        {pendingUploadPreviews.map((url, idx) => (
                           <div key={`${url}-${idx}`} className="relative aspect-video rounded-lg overflow-hidden border border-dashed border-primary/40 bg-muted">
                             <img
                               src={url}
-                              alt="Newly selected preview"
+                              alt="Pending upload"
                               className="w-full h-full object-cover opacity-80"
                             />
                             <Badge variant="secondary" className="absolute top-2 left-2 text-xs">
-                              Preview
+                              Pending
                             </Badge>
                           </div>
                         ))}
@@ -680,30 +765,28 @@ const EditSpot = () => {
                     </div>
                   )}
                   
-                  {existingPhotos.length > 0 && (
+                  {stagedPhotos.length > 0 && (
                     <div className="mb-6">
                       <div className="flex items-center gap-2 mb-3">
                         <p className="text-sm font-medium">Current Photos</p>
                       </div>
-                      <div key={photoRenderKey} className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-3">
                         <TooltipProvider>
-                          {existingPhotos.map((photo, index) => {
-                            const isRecent = recentlyUploaded.includes(photo.id);
+                          {stagedPhotos.map((photo, index) => {
+                            const isMarkedForDelete = pendingDeletes.has(photo.id);
                             return (
                               <div key={photo.id} className="relative group">
                                 <div className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all ${
-                                  photo.is_primary 
+                                  isMarkedForDelete
+                                    ? 'border-destructive opacity-50'
+                                    : photo.is_primary 
                                     ? 'border-primary ring-2 ring-primary/20' 
-                                    : isRecent
-                                    ? 'border-green-500 ring-2 ring-green-500/20 animate-fade-in'
                                     : 'border-border'
                                 }`}>
                                   <img
                                     src={photo.url}
                                     alt="Spot"
                                     className="w-full h-full object-cover"
-                                    onLoad={() => console.log('[IMG] Loaded:', photo.id)}
-                                    onError={(e) => console.error('[IMG] Failed to load:', photo.id, e)}
                                   />
                                   
                                   <Badge 
@@ -713,29 +796,28 @@ const EditSpot = () => {
                                     #{index + 1}
                                   </Badge>
                                   
-                                  {photo.is_primary && (
+                                  {isMarkedForDelete && (
+                                    <div className="absolute top-2 right-2 bg-destructive text-destructive-foreground px-2.5 py-1 rounded-md text-xs font-semibold shadow-lg z-10">
+                                      Will Delete
+                                    </div>
+                                  )}
+                                  
+                                  {photo.is_primary && !isMarkedForDelete && (
                                     <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-lg z-10">
                                       <Star className="h-3.5 w-3.5 fill-current" />
                                       Primary
                                     </div>
                                   )}
                                   
-                                  {isRecent && (
-                                    <div className="absolute top-10 right-2 bg-green-500 text-white px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-lg animate-scale-in z-10">
-                                      <CheckCircle2 className="h-3.5 w-3.5" />
-                                      Uploaded
-                                    </div>
-                                  )}
-                                  
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col items-center justify-center gap-2">
-                                    {!photo.is_primary && (
+                                    {!photo.is_primary && !isMarkedForDelete && (
                                       <Tooltip>
                                         <TooltipTrigger asChild>
                                           <Button
                                             type="button"
                                             size="sm"
                                             variant="secondary"
-                                            onClick={() => setPrimaryPhoto(photo.id)}
+                                            onClick={() => stagePrimaryPhoto(photo.id)}
                                             className="shadow-lg"
                                           >
                                             <Star className="h-4 w-4 mr-1.5" />
@@ -748,48 +830,66 @@ const EditSpot = () => {
                                       </Tooltip>
                                     )}
                                     
-                                    <div className="flex gap-2">
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="secondary"
-                                            onClick={() => moveExistingPhoto(index, 'left')}
-                                            disabled={index === 0}
-                                            className="shadow-lg h-8 w-8 p-0"
-                                          >
-                                            <ChevronLeft className="h-4 w-4" />
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>Move Left</TooltipContent>
-                                      </Tooltip>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="secondary"
-                                            onClick={() => moveExistingPhoto(index, 'right')}
-                                            disabled={index === existingPhotos.length - 1}
-                                            className="shadow-lg h-8 w-8 p-0"
-                                          >
-                                            <ChevronRight className="h-4 w-4" />
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>Move Right</TooltipContent>
-                                      </Tooltip>
-                                    </div>
+                                    {!isMarkedForDelete && (
+                                      <div className="flex gap-2">
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              type="button"
+                                              size="sm"
+                                              variant="secondary"
+                                              onClick={() => moveStagedPhoto(index, 'left')}
+                                              disabled={index === 0}
+                                              className="shadow-lg h-8 w-8 p-0"
+                                            >
+                                              <ChevronLeft className="h-4 w-4" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>Move Left</TooltipContent>
+                                        </Tooltip>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              type="button"
+                                              size="sm"
+                                              variant="secondary"
+                                              onClick={() => moveStagedPhoto(index, 'right')}
+                                              disabled={index === stagedPhotos.length - 1}
+                                              className="shadow-lg h-8 w-8 p-0"
+                                            >
+                                              <ChevronRight className="h-4 w-4" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>Move Right</TooltipContent>
+                                        </Tooltip>
+                                      </div>
+                                    )}
                                     
                                     <Button
                                       type="button"
                                       size="sm"
-                                      variant="destructive"
-                                      onClick={() => deleteExistingPhoto(photo.id, photo.url)}
+                                      variant={isMarkedForDelete ? "secondary" : "destructive"}
+                                      onClick={() => isMarkedForDelete 
+                                        ? setPendingDeletes(prev => {
+                                            const next = new Set(prev);
+                                            next.delete(photo.id);
+                                            return next;
+                                          })
+                                        : stagePhotoDelete(photo.id)
+                                      }
                                       className="shadow-lg"
                                     >
-                                      <Trash2 className="h-4 w-4 mr-1.5" />
-                                      Delete
+                                      {isMarkedForDelete ? (
+                                        <>
+                                          <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                                          Undo Delete
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Trash2 className="h-4 w-4 mr-1.5" />
+                                          Delete
+                                        </>
+                                      )}
                                     </Button>
                                   </div>
                                 </div>
@@ -860,7 +960,7 @@ const EditSpot = () => {
                   
                   <p className="text-xs text-muted-foreground mt-3">
                     <Star className="h-3 w-3 inline mr-1" />
-                    Photos upload automatically when selected. Set a primary photo to make it appear first. Images are automatically compressed.
+                    All changes save when you click "Save Changes" button below.
                   </p>
                 </div>
               </div>
