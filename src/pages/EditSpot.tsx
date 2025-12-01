@@ -64,6 +64,7 @@ const EditSpot = () => {
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [hasOrderChanged, setHasOrderChanged] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [previewPhotos, setPreviewPhotos] = useState<string[]>([]);
 
   const {
     register,
@@ -162,6 +163,10 @@ const EditSpot = () => {
       e.target.value = '';
       return;
     }
+
+    // Show immediate local previews while upload + DB refresh happen
+    const newPreviews = newFiles.map((file) => URL.createObjectURL(file));
+    setPreviewPhotos((prev) => [...prev, ...newPreviews]);
 
     e.target.value = '';
     await uploadPhotos(newFiles);
@@ -299,6 +304,9 @@ const EditSpot = () => {
         const recentIds = photosData.slice(-successCount).map(p => p.id);
         setRecentlyUploaded(recentIds);
         
+        // Clear local previews once we have the canonical DB-backed photos
+        setPreviewPhotos([]);
+        
         setTimeout(() => {
           setRecentlyUploaded([]);
         }, 3000);
@@ -326,7 +334,6 @@ const EditSpot = () => {
       setUploadProgress(0);
     }
   };
-
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -350,9 +357,12 @@ const EditSpot = () => {
       return;
     }
 
+    // Immediate local previews for dropped files
+    const newPreviews = dropped.map((file) => URL.createObjectURL(file));
+    setPreviewPhotos((prev) => [...prev, ...newPreviews]);
+
     await uploadPhotos(dropped);
   };
-
   const moveExistingPhoto = (index: number, direction: 'left' | 'right') => {
     const newPhotos = [...existingPhotos];
     const newIndex = direction === 'left' ? index - 1 : index + 1;
@@ -640,6 +650,26 @@ const EditSpot = () => {
                       )}
                     </div>
                   </div>
+
+                  {previewPhotos.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-xs text-muted-foreground mb-2">Just selected (preview)</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {previewPhotos.map((url, idx) => (
+                          <div key={`${url}-${idx}`} className="relative aspect-video rounded-lg overflow-hidden border border-dashed border-primary/40 bg-muted">
+                            <img
+                              src={url}
+                              alt="Newly selected preview"
+                              className="w-full h-full object-cover opacity-80"
+                            />
+                            <Badge variant="secondary" className="absolute top-2 left-2 text-xs">
+                              Preview
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   
                   {existingPhotos.length > 0 && (
                     <div className="mb-6">
