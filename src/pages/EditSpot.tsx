@@ -286,8 +286,11 @@ const EditSpot = () => {
 
       if (fetchError) {
         console.error('[UPLOAD] Error fetching updated photos:', fetchError);
+        toast.error('Failed to refresh photos. Please reload the page.');
       } else if (photosData) {
-        setExistingPhotos(photosData);
+        console.log('[UPLOAD] Fetched photos after upload:', photosData.length);
+        // Force a new array reference to ensure React re-renders
+        setExistingPhotos([...photosData]);
         
         const recentIds = photosData.slice(-successCount).map(p => p.id);
         setRecentlyUploaded(recentIds);
