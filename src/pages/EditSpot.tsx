@@ -81,6 +81,10 @@ const EditSpot = () => {
   }, []);
 
   useEffect(() => {
+    console.log('[PHOTOS] existingPhotos state changed:', existingPhotos.length, existingPhotos);
+  }, [existingPhotos]);
+
+  useEffect(() => {
     const fetchSpot = async () => {
       if (!spotId) return;
 
