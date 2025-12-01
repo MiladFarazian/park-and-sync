@@ -168,8 +168,21 @@ const EditSpot = () => {
       return;
     }
 
-    setNewPhotos([...newPhotos, ...newFiles]);
-    toast.success(`${newFiles.length} photo${newFiles.length > 1 ? 's' : ''} ready to upload`);
+    // Add to pending list so they show up in the UI
+    setNewPhotos((prev) => [...prev, ...newFiles]);
+
+    // Make it very clear these are pending and where to look
+    toast.success(
+      `${newFiles.length} photo${newFiles.length > 1 ? 's' : ''} added below  click "Upload" to save`,
+    );
+
+    // Scroll to the photos section so the pending cards + Upload button are visible
+    setTimeout(() => {
+      document.getElementById('photos-section')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }, 50);
 
     // Reset so selecting the same files again will trigger onChange
     e.target.value = '';
