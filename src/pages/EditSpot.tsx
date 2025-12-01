@@ -65,6 +65,7 @@ const EditSpot = () => {
   const [hasOrderChanged, setHasOrderChanged] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [previewPhotos, setPreviewPhotos] = useState<string[]>([]);
+  const [photoRenderKey, setPhotoRenderKey] = useState(0);
 
   const {
     register,
@@ -261,13 +262,15 @@ const EditSpot = () => {
             .from('spot-photos')
             .getPublicUrl(filePath);
 
-          console.log('[UPLOAD] Got public URL:', publicUrl);
+          // Add cache-busting timestamp to URL
+          const publicUrlWithCacheBust = `${publicUrl}?t=${Date.now()}`;
+          console.log('[UPLOAD] Got public URL with cache-bust:', publicUrlWithCacheBust);
 
           const { error: dbError } = await supabase
             .from('spot_photos')
             .insert({
               spot_id: spotId,
-              url: publicUrl,
+              url: publicUrlWithCacheBust,
               is_primary: existingPhotos.length === 0 && i === 0,
               sort_order: existingPhotos.length + i,
             });
@@ -287,6 +290,10 @@ const EditSpot = () => {
         }
       }
 
+      // Add small delay to ensure Supabase has fully committed the data
+      console.log('[UPLOAD] Waiting 200ms before fetching photos...');
+      await new Promise(resolve => setTimeout(resolve, 200));
+
       const { data: photosData, error: fetchError } = await supabase
         .from('spot_photos')
         .select('*')
@@ -298,8 +305,10 @@ const EditSpot = () => {
         toast.error('Failed to refresh photos. Please reload the page.');
       } else if (photosData) {
         console.log('[UPLOAD] Fetched photos after upload:', photosData.length);
-        // Force a new array reference to ensure React re-renders
-        setExistingPhotos([...photosData]);
+        // Use functional state update to ensure we're working with latest state
+        setExistingPhotos(() => [...photosData]);
+        // Increment render key to force React re-render
+        setPhotoRenderKey(prev => prev + 1);
         
         const recentIds = photosData.slice(-successCount).map(p => p.id);
         setRecentlyUploaded(recentIds);
@@ -676,7 +685,7 @@ const EditSpot = () => {
                       <div className="flex items-center gap-2 mb-3">
                         <p className="text-sm font-medium">Current Photos</p>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div key={photoRenderKey} className="grid grid-cols-2 gap-3">
                         <TooltipProvider>
                           {existingPhotos.map((photo, index) => {
                             const isRecent = recentlyUploaded.includes(photo.id);
@@ -693,6 +702,8 @@ const EditSpot = () => {
                                     src={photo.url}
                                     alt="Spot"
                                     className="w-full h-full object-cover"
+                                    onLoad={() => console.log('[IMG] Loaded:', photo.id)}
+                                    onError={(e) => console.error('[IMG] Failed to load:', photo.id, e)}
                                   />
                                   
                                   <Badge 
