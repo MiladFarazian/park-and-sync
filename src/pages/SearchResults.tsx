@@ -15,6 +15,8 @@ const SearchResults = () => {
   const [loading, setLoading] = useState(true);
   const [visibleSpotCount, setVisibleSpotCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [nearestSpotId, setNearestSpotId] = useState<string | null>(null);
+  const nearestSpotRef = React.useRef<HTMLDivElement>(null);
 
   const handleVisibleSpotsChange = (count: number) => {
     setVisibleSpotCount(count);
@@ -121,6 +123,21 @@ const SearchResults = () => {
       })) || [];
 
       setParkingSpots(transformedSpots);
+      
+      // Find the nearest spot
+      if (transformedSpots.length > 0) {
+        const nearest = transformedSpots.reduce((closest, current) => {
+          if (!closest.distance && !current.distance) return closest;
+          if (!closest.distance) return current;
+          if (!current.distance) return closest;
+          
+          const closestDist = parseFloat(closest.distance.split(' ')[0]);
+          const currentDist = parseFloat(current.distance.split(' ')[0]);
+          return currentDist < closestDist ? current : closest;
+        });
+        
+        setNearestSpotId(nearest.id);
+      }
     } catch (err) {
       console.error('Unexpected error:', err);
       setError('An unexpected error occurred');
@@ -129,9 +146,24 @@ const SearchResults = () => {
     }
   };
 
-  const SpotCard = ({ spot, isSelected = false }: { spot: any, isSelected?: boolean }) => (
+  // Auto-scroll to nearest spot when spots load or view mode changes to list
+  useEffect(() => {
+    if (nearestSpotId && viewMode === 'list' && nearestSpotRef.current) {
+      setTimeout(() => {
+        nearestSpotRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }, 300);
+    }
+  }, [nearestSpotId, viewMode]);
+
+  const SpotCard = ({ spot, isSelected = false, isNearest = false }: { spot: any, isSelected?: boolean, isNearest?: boolean }) => (
     <Card 
-      className={`p-4 cursor-pointer transition-all ${isSelected ? 'ring-2 ring-primary' : 'hover:shadow-md'}`}
+      ref={isNearest ? nearestSpotRef : null}
+      className={`p-4 cursor-pointer transition-all ${
+        isNearest ? 'ring-2 ring-primary shadow-lg' : isSelected ? 'ring-2 ring-primary' : 'hover:shadow-md'
+      }`}
       onClick={() => navigate(`/spot/${spot.id}?from=search&location=${encodeURIComponent(location)}&checkIn=${checkIn}&checkOut=${checkOut}`)}
     >
       <div className="flex gap-3">
@@ -162,7 +194,14 @@ const SearchResults = () => {
           </div>
           
           {spot.distance && (
-            <p className="text-sm text-muted-foreground">{spot.distance} • {spot.walkTime}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-muted-foreground">{spot.distance} • {spot.walkTime}</p>
+              {isNearest && (
+                <Badge className="bg-primary/10 text-primary border-primary/20 text-xs px-2 py-0.5">
+                  Nearest
+                </Badge>
+              )}
+            </div>
           )}
           
           <div className="flex items-center justify-between">
@@ -290,7 +329,7 @@ const SearchResults = () => {
                       <p className="text-sm text-muted-foreground">{nearbySpots.length} spot{nearbySpots.length !== 1 ? 's' : ''} within the area</p>
                     </div>
                     {nearbySpots.map((spot) => (
-                      <SpotCard key={spot.id} spot={spot} />
+                      <SpotCard key={spot.id} spot={spot} isNearest={spot.id === nearestSpotId} />
                     ))}
                   </div>
                 )}
@@ -304,7 +343,7 @@ const SearchResults = () => {
                       </p>
                     </div>
                     {otherSpots.map((spot) => (
-                      <SpotCard key={spot.id} spot={spot} />
+                      <SpotCard key={spot.id} spot={spot} isNearest={spot.id === nearestSpotId} />
                     ))}
                   </div>
                 )}
