@@ -66,6 +66,7 @@ const EditSpot = () => {
   const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set());
   const [stagedPhotos, setStagedPhotos] = useState<SpotPhoto[]>([]);
   const [stagedPrimaryId, setStagedPrimaryId] = useState<string | null>(null);
+  const [uploadStatuses, setUploadStatuses] = useState<{ fileName: string; status: 'pending' | 'uploading' | 'complete' | 'error'; progress: number }[]>([]);
 
   const {
     register,
@@ -319,39 +320,84 @@ const EditSpot = () => {
       // Step 2: Upload new photos
       if (pendingUploads.length > 0) {
         setIsUploadingPhotos(true);
+        
+        // Initialize upload statuses
+        const initialStatuses = pendingUploads.map(file => ({
+          fileName: file.name,
+          status: 'pending' as const,
+          progress: 0
+        }));
+        setUploadStatuses(initialStatuses);
+        
         toast.info(`Uploading ${pendingUploads.length} photo${pendingUploads.length > 1 ? 's' : ''}...`);
         
         for (let i = 0; i < pendingUploads.length; i++) {
           const file = pendingUploads[i];
-          const compressedFile = await compressImage(file);
-          const extFromName = (compressedFile as File).name?.split('.').pop();
-          const extFromType = (compressedFile as File).type?.split('/').pop();
-          const safeExt = (extFromName || extFromType || 'jpg').toLowerCase().replace('jpeg', 'jpg');
+          
+          try {
+            // Update status to uploading
+            setUploadStatuses(prev => prev.map((status, idx) => 
+              idx === i ? { ...status, status: 'uploading' as const, progress: 10 } : status
+            ));
+            
+            const compressedFile = await compressImage(file);
+            
+            // Update progress after compression
+            setUploadStatuses(prev => prev.map((status, idx) => 
+              idx === i ? { ...status, progress: 30 } : status
+            ));
+            
+            const extFromName = (compressedFile as File).name?.split('.').pop();
+            const extFromType = (compressedFile as File).type?.split('/').pop();
+            const safeExt = (extFromName || extFromType || 'jpg').toLowerCase().replace('jpeg', 'jpg');
 
-          const uid = (globalThis as any)?.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-          const filePath = `${spotId}/${uid}.${safeExt}`;
+            const uid = (globalThis as any)?.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+            const filePath = `${spotId}/${uid}.${safeExt}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from('spot-photos')
-            .upload(filePath, compressedFile);
+            // Update progress before storage upload
+            setUploadStatuses(prev => prev.map((status, idx) => 
+              idx === i ? { ...status, progress: 50 } : status
+            ));
 
-          if (uploadError) throw uploadError;
+            const { error: uploadError } = await supabase.storage
+              .from('spot-photos')
+              .upload(filePath, compressedFile);
 
-          const { data: { publicUrl } } = supabase.storage
-            .from('spot-photos')
-            .getPublicUrl(filePath);
+            if (uploadError) throw uploadError;
 
-          await supabase.from('spot_photos').insert({
-            spot_id: spotId,
-            url: publicUrl,
-            is_primary: false,
-            sort_order: stagedPhotos.length + i,
-          });
+            // Update progress after storage upload
+            setUploadStatuses(prev => prev.map((status, idx) => 
+              idx === i ? { ...status, progress: 80 } : status
+            ));
+
+            const { data: { publicUrl } } = supabase.storage
+              .from('spot-photos')
+              .getPublicUrl(filePath);
+
+            await supabase.from('spot_photos').insert({
+              spot_id: spotId,
+              url: publicUrl,
+              is_primary: false,
+              sort_order: stagedPhotos.length + i,
+            });
+
+            // Mark as complete
+            setUploadStatuses(prev => prev.map((status, idx) => 
+              idx === i ? { ...status, status: 'complete' as const, progress: 100 } : status
+            ));
+          } catch (error) {
+            console.error(`Error uploading ${file.name}:`, error);
+            setUploadStatuses(prev => prev.map((status, idx) => 
+              idx === i ? { ...status, status: 'error' as const } : status
+            ));
+            throw error;
+          }
 
           setUploadProgress(((i + 1) / pendingUploads.length) * 100);
         }
         setIsUploadingPhotos(false);
         setUploadProgress(0);
+        setUploadStatuses([]);
       }
 
       // Step 3: Update photo order and primary status
@@ -748,13 +794,54 @@ const EditSpot = () => {
                     </div>
                   )}
 
-                  {isUploadingPhotos && (
-                    <div className="mb-4 p-4 rounded-lg bg-primary/5 border border-primary/20">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-medium">Uploading photos...</p>
-                        <p className="text-sm text-muted-foreground">{Math.round(uploadProgress)}%</p>
+                  {isUploadingPhotos && uploadStatuses.length > 0 && (
+                    <div className="mb-4 p-4 rounded-lg bg-primary/5 border border-primary/20 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold">Uploading Photos</p>
+                        <p className="text-sm text-muted-foreground">{Math.round(uploadProgress)}% Overall</p>
                       </div>
-                      <Progress value={uploadProgress} className="h-2" />
+                      <Progress value={uploadProgress} className="h-2 mb-3" />
+                      
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {uploadStatuses.map((status, idx) => (
+                          <div key={idx} className="flex items-center gap-2 text-xs p-2 rounded bg-background/50">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{status.fileName}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                {status.status === 'pending' && (
+                                  <>
+                                    <div className="w-2 h-2 rounded-full bg-muted-foreground animate-pulse" />
+                                    <span className="text-muted-foreground">Waiting...</span>
+                                  </>
+                                )}
+                                {status.status === 'uploading' && (
+                                  <>
+                                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                    <span className="text-primary">Uploading {status.progress}%</span>
+                                  </>
+                                )}
+                                {status.status === 'complete' && (
+                                  <>
+                                    <CheckCircle2 className="w-3 h-3 text-green-500" />
+                                    <span className="text-green-500">Complete</span>
+                                  </>
+                                )}
+                                {status.status === 'error' && (
+                                  <>
+                                    <div className="w-2 h-2 rounded-full bg-destructive" />
+                                    <span className="text-destructive">Failed</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            {status.status === 'uploading' && (
+                              <div className="w-20">
+                                <Progress value={status.progress} className="h-1" />
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
