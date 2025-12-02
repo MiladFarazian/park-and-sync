@@ -6,10 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Combobox } from "@/components/ui/combobox";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { vehicleMakes, vehicleModels, vehicleColors } from "@/lib/vehicleData";
 
 const AddVehicle = () => {
   const navigate = useNavigate();
@@ -25,6 +27,17 @@ const AddVehicle = () => {
     is_ev: false,
     is_primary: false,
   });
+
+  // Filter models based on selected make
+  const availableModels = useMemo(() => {
+    if (!formData.make) return [];
+    return vehicleModels[formData.make] || [];
+  }, [formData.make]);
+
+  // Reset model when make changes
+  const handleMakeChange = (make: string) => {
+    setFormData({ ...formData, make, model: "" });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,20 +90,25 @@ const AddVehicle = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="make">Make</Label>
-                  <Input
-                    id="make"
+                  <Combobox
+                    options={vehicleMakes}
                     value={formData.make}
-                    onChange={(e) => setFormData({ ...formData, make: e.target.value })}
-                    placeholder="Toyota, Honda, etc."
+                    onChange={handleMakeChange}
+                    placeholder="Select make"
+                    searchPlaceholder="Search makes..."
+                    emptyText="No make found."
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="model">Model</Label>
-                  <Input
-                    id="model"
+                  <Combobox
+                    options={availableModels}
                     value={formData.model}
-                    onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                    placeholder="Camry, Civic, etc."
+                    onChange={(model) => setFormData({ ...formData, model })}
+                    placeholder="Select model"
+                    searchPlaceholder="Search models..."
+                    emptyText={formData.make ? "No model found." : "Select a make first"}
+                    disabled={!formData.make}
                   />
                 </div>
               </div>
@@ -109,11 +127,13 @@ const AddVehicle = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="color">Color</Label>
-                  <Input
-                    id="color"
+                  <Combobox
+                    options={vehicleColors}
                     value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    placeholder="Black, White, etc."
+                    onChange={(color) => setFormData({ ...formData, color })}
+                    placeholder="Select color"
+                    searchPlaceholder="Search colors..."
+                    emptyText="No color found."
                   />
                 </div>
               </div>
