@@ -11,10 +11,27 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Shield, Camera, MapPin, DollarSign, Trash2, Upload, Star, CheckCircle2, ChevronLeft, ChevronRight, Save, Zap } from 'lucide-react';
+import { ArrowLeft, Shield, Camera, MapPin, DollarSign, Trash2, Upload, Star, CheckCircle2, ChevronLeft, ChevronRight, Save, Zap, GripVertical } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { compressImage } from '@/lib/compressImage';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,6 +65,171 @@ interface SpotPhoto {
   sort_order: number;
 }
 
+interface SortablePhotoProps {
+  photo: SpotPhoto;
+  index: number;
+  isMarkedForDelete: boolean;
+  onSetPrimary: (photoId: string) => void;
+  onDelete: (photoId: string) => void;
+  onUndoDelete: (photoId: string) => void;
+  onMoveLeft: () => void;
+  onMoveRight: () => void;
+  isFirst: boolean;
+  isLast: boolean;
+}
+
+const SortablePhoto: React.FC<SortablePhotoProps> = ({
+  photo,
+  index,
+  isMarkedForDelete,
+  onSetPrimary,
+  onDelete,
+  onUndoDelete,
+  onMoveLeft,
+  onMoveRight,
+  isFirst,
+  isLast,
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: photo.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative group">
+      <div className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all ${
+        isMarkedForDelete
+          ? 'border-destructive opacity-50'
+          : photo.is_primary 
+          ? 'border-primary ring-2 ring-primary/20' 
+          : 'border-border'
+      }`}>
+        <img
+          src={photo.url}
+          alt="Spot"
+          className="w-full h-full object-cover"
+        />
+        
+        <Badge 
+          variant="secondary" 
+          className="absolute top-2 left-2 text-xs font-semibold z-10"
+        >
+          #{index + 1}
+        </Badge>
+        
+        <button
+          {...attributes}
+          {...listeners}
+          className="absolute top-2 left-12 bg-background/90 hover:bg-background text-foreground p-1.5 rounded-md cursor-grab active:cursor-grabbing z-10 transition-all hover:scale-110"
+          type="button"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        
+        {isMarkedForDelete && (
+          <div className="absolute top-2 right-2 bg-destructive text-destructive-foreground px-2.5 py-1 rounded-md text-xs font-semibold shadow-lg z-10">
+            Will Delete
+          </div>
+        )}
+        
+        {photo.is_primary && !isMarkedForDelete && (
+          <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-lg z-10">
+            <Star className="h-3.5 w-3.5 fill-current" />
+            Primary
+          </div>
+        )}
+        
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col items-center justify-center gap-2">
+          {!photo.is_primary && !isMarkedForDelete && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => onSetPrimary(photo.id)}
+                  className="shadow-lg"
+                >
+                  <Star className="h-4 w-4 mr-1.5" />
+                  Set Primary
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>This photo will appear first</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+          
+          {!isMarkedForDelete && (
+            <div className="flex gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={onMoveLeft}
+                    disabled={isFirst}
+                    className="shadow-lg h-8 w-8 p-0"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Move Left</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={onMoveRight}
+                    disabled={isLast}
+                    className="shadow-lg h-8 w-8 p-0"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Move Right</TooltipContent>
+              </Tooltip>
+            </div>
+          )}
+          
+          <Button
+            type="button"
+            size="sm"
+            variant={isMarkedForDelete ? "secondary" : "destructive"}
+            onClick={() => isMarkedForDelete ? onUndoDelete(photo.id) : onDelete(photo.id)}
+            className="shadow-lg"
+          >
+            {isMarkedForDelete ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                Undo Delete
+              </>
+            ) : (
+              <>
+                <Trash2 className="h-4 w-4 mr-1.5" />
+                Delete
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const EditSpot = () => {
   const navigate = useNavigate();
   const { spotId } = useParams<{ spotId: string }>();
@@ -67,6 +249,17 @@ const EditSpot = () => {
   const [stagedPhotos, setStagedPhotos] = useState<SpotPhoto[]>([]);
   const [stagedPrimaryId, setStagedPrimaryId] = useState<string | null>(null);
   const [uploadStatuses, setUploadStatuses] = useState<{ fileName: string; status: 'pending' | 'uploading' | 'complete' | 'error'; progress: number }[]>([]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const {
     register,
@@ -249,6 +442,20 @@ const EditSpot = () => {
     [newPhotos[index], newPhotos[newIndex]] = [newPhotos[newIndex], newPhotos[index]];
     
     setStagedPhotos(newPhotos);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setStagedPhotos((photos) => {
+        const oldIndex = photos.findIndex((p) => p.id === active.id);
+        const newIndex = photos.findIndex((p) => p.id === over.id);
+
+        return arrayMove(photos, oldIndex, newIndex);
+      });
+      toast.info('Photo order updated. Click Save Changes to confirm.');
+    }
   };
 
   const handleDelete = async () => {
@@ -662,135 +869,50 @@ const EditSpot = () => {
                     <div className="mb-6">
                       <div className="flex items-center gap-2 mb-3">
                         <p className="text-sm font-medium">Current Photos</p>
+                        <Badge variant="outline" className="text-xs">
+                          <GripVertical className="h-3 w-3 mr-1" />
+                          Drag to reorder
+                        </Badge>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <TooltipProvider>
-                          {stagedPhotos.map((photo, index) => {
-                            const isMarkedForDelete = pendingDeletes.has(photo.id);
-                            return (
-                              <div key={photo.id} className="relative group">
-                                <div className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all ${
-                                  isMarkedForDelete
-                                    ? 'border-destructive opacity-50'
-                                    : photo.is_primary 
-                                    ? 'border-primary ring-2 ring-primary/20' 
-                                    : 'border-border'
-                                }`}>
-                                  <img
-                                    src={photo.url}
-                                    alt="Spot"
-                                    className="w-full h-full object-cover"
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                      >
+                        <SortableContext
+                          items={stagedPhotos.map(p => p.id)}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          <div className="grid grid-cols-2 gap-3">
+                            <TooltipProvider>
+                              {stagedPhotos.map((photo, index) => {
+                                const isMarkedForDelete = pendingDeletes.has(photo.id);
+                                return (
+                                  <SortablePhoto
+                                    key={photo.id}
+                                    photo={photo}
+                                    index={index}
+                                    isMarkedForDelete={isMarkedForDelete}
+                                    onSetPrimary={stagePrimaryPhoto}
+                                    onDelete={stagePhotoDelete}
+                                    onUndoDelete={(photoId) => {
+                                      setPendingDeletes(prev => {
+                                        const next = new Set(prev);
+                                        next.delete(photoId);
+                                        return next;
+                                      });
+                                    }}
+                                    onMoveLeft={() => moveStagedPhoto(index, 'left')}
+                                    onMoveRight={() => moveStagedPhoto(index, 'right')}
+                                    isFirst={index === 0}
+                                    isLast={index === stagedPhotos.length - 1}
                                   />
-                                  
-                                  <Badge 
-                                    variant="secondary" 
-                                    className="absolute top-2 left-2 text-xs font-semibold z-10"
-                                  >
-                                    #{index + 1}
-                                  </Badge>
-                                  
-                                  {isMarkedForDelete && (
-                                    <div className="absolute top-2 right-2 bg-destructive text-destructive-foreground px-2.5 py-1 rounded-md text-xs font-semibold shadow-lg z-10">
-                                      Will Delete
-                                    </div>
-                                  )}
-                                  
-                                  {photo.is_primary && !isMarkedForDelete && (
-                                    <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-lg z-10">
-                                      <Star className="h-3.5 w-3.5 fill-current" />
-                                      Primary
-                                    </div>
-                                  )}
-                                  
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col items-center justify-center gap-2">
-                                    {!photo.is_primary && !isMarkedForDelete && (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="secondary"
-                                            onClick={() => stagePrimaryPhoto(photo.id)}
-                                            className="shadow-lg"
-                                          >
-                                            <Star className="h-4 w-4 mr-1.5" />
-                                            Set Primary
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                          <p>This photo will appear first</p>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    )}
-                                    
-                                    {!isMarkedForDelete && (
-                                      <div className="flex gap-2">
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              type="button"
-                                              size="sm"
-                                              variant="secondary"
-                                              onClick={() => moveStagedPhoto(index, 'left')}
-                                              disabled={index === 0}
-                                              className="shadow-lg h-8 w-8 p-0"
-                                            >
-                                              <ChevronLeft className="h-4 w-4" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>Move Left</TooltipContent>
-                                        </Tooltip>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              type="button"
-                                              size="sm"
-                                              variant="secondary"
-                                              onClick={() => moveStagedPhoto(index, 'right')}
-                                              disabled={index === stagedPhotos.length - 1}
-                                              className="shadow-lg h-8 w-8 p-0"
-                                            >
-                                              <ChevronRight className="h-4 w-4" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>Move Right</TooltipContent>
-                                        </Tooltip>
-                                      </div>
-                                    )}
-                                    
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant={isMarkedForDelete ? "secondary" : "destructive"}
-                                      onClick={() => isMarkedForDelete 
-                                        ? setPendingDeletes(prev => {
-                                            const next = new Set(prev);
-                                            next.delete(photo.id);
-                                            return next;
-                                          })
-                                        : stagePhotoDelete(photo.id)
-                                      }
-                                      className="shadow-lg"
-                                    >
-                                      {isMarkedForDelete ? (
-                                        <>
-                                          <CheckCircle2 className="h-4 w-4 mr-1.5" />
-                                          Undo Delete
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Trash2 className="h-4 w-4 mr-1.5" />
-                                          Delete
-                                        </>
-                                      )}
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </TooltipProvider>
-                      </div>
+                                );
+                              })}
+                            </TooltipProvider>
+                          </div>
+                        </SortableContext>
+                      </DndContext>
                     </div>
                   )}
 
