@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,6 +31,32 @@ const Dashboard = () => {
       setLoading(false);
     }
   }, [user]);
+
+  const handleToggleStatus = async (spotId: string, currentStatus: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    try {
+      // Determine new status based on current status
+      const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      
+      const { error } = await supabase
+        .from('spots')
+        .update({ status: newStatus })
+        .eq('id', spotId);
+
+      if (error) throw error;
+
+      toast.success(`Spot ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`);
+      
+      // Update local state
+      setListings(prev => prev.map(spot => 
+        spot.id === spotId ? { ...spot, status: newStatus } : spot
+      ));
+    } catch (error: any) {
+      console.error('Error toggling spot status:', error);
+      toast.error('Failed to update spot status');
+    }
+  };
 
   const fetchHostData = async () => {
     try {
@@ -116,12 +144,15 @@ const Dashboard = () => {
         />
         <div className="absolute top-3 right-3">
           <Badge 
-            className={listing.status === 'active' 
-              ? "bg-green-500 text-white hover:bg-green-600" 
-              : "bg-yellow-500 text-white hover:bg-yellow-600"
+            className={
+              listing.status === 'active' 
+                ? "bg-green-500 text-white hover:bg-green-600"
+                : listing.status === 'inactive'
+                ? "bg-gray-500 text-white hover:bg-gray-600"
+                : "bg-yellow-500 text-white hover:bg-yellow-600"
             }
           >
-            {listing.status === 'active' ? 'Active' : listing.status}
+            {listing.status === 'active' ? 'Active' : listing.status === 'inactive' ? 'Inactive' : listing.status}
           </Badge>
         </div>
         <div className="absolute bottom-3 left-3">
@@ -152,6 +183,22 @@ const Dashboard = () => {
               <p className="font-bold text-xl text-primary">${listing.earnings.toFixed(2)}</p>
             </div>
           </div>
+          
+          {(listing.status === 'active' || listing.status === 'inactive') && (
+            <div 
+              className="flex items-center justify-between p-3 mb-3 bg-muted rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Label htmlFor={`toggle-${listing.id}`} className="text-sm font-medium cursor-pointer">
+                {listing.status === 'active' ? 'Spot is Active' : 'Spot is Inactive'}
+              </Label>
+              <Switch
+                id={`toggle-${listing.id}`}
+                checked={listing.status === 'active'}
+                onCheckedChange={() => handleToggleStatus(listing.id, listing.status, { stopPropagation: () => {} } as React.MouseEvent)}
+              />
+            </div>
+          )}
           
           <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
             <Button 
