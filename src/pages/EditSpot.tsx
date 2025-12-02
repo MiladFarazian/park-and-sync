@@ -154,7 +154,7 @@ const EditSpot = () => {
     );
   };
 
-  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) {
       e.target.value = '';
@@ -168,12 +168,28 @@ const EditSpot = () => {
       return;
     }
 
-    // Stage files for upload and create preview URLs
-    setPendingUploads(prev => [...prev, ...newFiles]);
-    const newPreviews = newFiles.map((file) => URL.createObjectURL(file));
-    setPendingUploadPreviews(prev => [...prev, ...newPreviews]);
+    console.log('[PHOTO SELECT] Selected files:', newFiles.length);
     
-    toast.info(`${newFiles.length} photo${newFiles.length > 1 ? 's' : ''} selected. Click Save to upload.`);
+    // Create preview URLs
+    const newPreviews = newFiles.map((file) => {
+      const url = URL.createObjectURL(file);
+      console.log('[PHOTO SELECT] Created preview URL:', url);
+      return url;
+    });
+    
+    // Update state
+    setPendingUploads(prev => {
+      const updated = [...prev, ...newFiles];
+      console.log('[PHOTO SELECT] Updated pendingUploads:', updated.length);
+      return updated;
+    });
+    setPendingUploadPreviews(prev => {
+      const updated = [...prev, ...newPreviews];
+      console.log('[PHOTO SELECT] Updated previews:', updated.length);
+      return updated;
+    });
+    
+    toast.success(`${newFiles.length} photo${newFiles.length > 1 ? 's' : ''} ready to upload. Click Save Changes to confirm.`);
     e.target.value = '';
   };
 
@@ -552,19 +568,44 @@ const EditSpot = () => {
                   </div>
 
                   {pendingUploadPreviews.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-xs text-muted-foreground mb-2">Selected for upload</p>
+                    <div className="mb-6 p-4 rounded-lg border-2 border-primary/30 bg-primary/5">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className="text-sm font-semibold text-primary">New Photos Ready to Upload</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">These will be uploaded when you click "Save Changes"</p>
+                        </div>
+                        <Badge variant="default" className="text-xs">
+                          {pendingUploadPreviews.length} New
+                        </Badge>
+                      </div>
                       <div className="grid grid-cols-2 gap-3">
                         {pendingUploadPreviews.map((url, idx) => (
-                          <div key={`${url}-${idx}`} className="relative aspect-video rounded-lg overflow-hidden border border-dashed border-primary/40 bg-muted">
+                          <div key={`pending-${idx}`} className="relative aspect-video rounded-lg overflow-hidden border-2 border-primary/50 bg-background shadow-sm">
                             <img
                               src={url}
-                              alt="Pending upload"
-                              className="w-full h-full object-cover opacity-80"
+                              alt={`New photo ${idx + 1}`}
+                              className="w-full h-full object-cover"
                             />
-                            <Badge variant="secondary" className="absolute top-2 left-2 text-xs">
-                              Pending
-                            </Badge>
+                            <div className="absolute top-2 left-2 bg-primary text-primary-foreground px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 shadow-md">
+                              <Upload className="h-3 w-3" />
+                              New
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              className="absolute top-2 right-2 h-7 w-7 p-0 shadow-md"
+                              onClick={() => {
+                                setPendingUploads(prev => prev.filter((_, i) => i !== idx));
+                                setPendingUploadPreviews(prev => {
+                                  URL.revokeObjectURL(prev[idx]);
+                                  return prev.filter((_, i) => i !== idx);
+                                });
+                                toast.info('Photo removed from upload queue');
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
                         ))}
                       </div>
