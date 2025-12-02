@@ -88,6 +88,31 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     spotsRef.current = spots;
   }, [spots]);
 
+  // Auto-select nearest spot when spots load
+  useEffect(() => {
+    if (!spots.length || !searchCenter || !mapReady) return;
+
+    // Find the nearest spot to the search center
+    const nearestSpot = spots.reduce((closest, current) => {
+      const closestDist = calculateDistance(
+        searchCenter.lat,
+        searchCenter.lng,
+        Number(closest.lat),
+        Number(closest.lng)
+      );
+      const currentDist = calculateDistance(
+        searchCenter.lat,
+        searchCenter.lng,
+        Number(current.lat),
+        Number(current.lng)
+      );
+      return currentDist < closestDist ? current : closest;
+    });
+
+    // Auto-select the nearest spot
+    setSelectedSpot(nearestSpot);
+  }, [spots, searchCenter, mapReady]);
+
   // Fetch Mapbox token
   useEffect(() => {
     const fetchMapboxToken = async () => {
@@ -795,7 +820,12 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
               
               <div className="flex-1 space-y-2 min-w-0">
                 <div className="flex justify-between items-start gap-2">
-                  <h3 className="font-semibold text-base leading-tight">{selectedSpot.title}</h3>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-base leading-tight">{selectedSpot.title}</h3>
+                    <Badge className="bg-primary/10 text-primary border-primary/20 text-xs px-2 py-0.5 mt-1">
+                      Nearest
+                    </Badge>
+                  </div>
                   <div className="text-right flex-shrink-0">
                     <p className="font-bold text-primary text-lg">${selectedSpot.hourlyRate}/hr</p>
                   </div>
