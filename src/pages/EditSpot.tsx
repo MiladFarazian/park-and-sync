@@ -50,6 +50,9 @@ const formSchema = z.object({
     message: 'Hourly rate must be a positive number',
   }),
   description: z.string().min(20, 'Description must be at least 20 characters'),
+  accessNotes: z.string().optional(),
+  hostRules: z.string().optional(),
+  cancellationPolicy: z.string().optional(),
 });
 
 const amenitiesList = [
@@ -348,6 +351,9 @@ const EditSpot = () => {
         setValue('address', spotData.address);
         setValue('hourlyRate', spotData.hourly_rate.toString());
         setValue('description', spotData.description || '');
+        setValue('accessNotes', spotData.access_notes || '');
+        setValue('hostRules', spotData.host_rules || '');
+        setValue('cancellationPolicy', spotData.cancellation_policy || '');
 
         const amenities = [];
         if (spotData.is_covered) amenities.push('covered');
@@ -757,6 +763,9 @@ const EditSpot = () => {
         address: data.address,
         hourly_rate: parseFloat(data.hourlyRate),
         description: data.description,
+        access_notes: data.accessNotes || null,
+        host_rules: data.hostRules || null,
+        cancellation_policy: data.cancellationPolicy || null,
         is_covered: selectedAmenities.includes('covered'),
         is_secure: selectedAmenities.includes('security'),
         has_ev_charging: selectedAmenities.includes('ev'),
@@ -958,6 +967,39 @@ const EditSpot = () => {
                       );
                     })}
                   </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="accessNotes">Access Instructions</Label>
+                  <Textarea
+                    id="accessNotes"
+                    placeholder="How do guests access the parking spot? Include gate codes, parking instructions, etc."
+                    rows={4}
+                    {...register('accessNotes')}
+                    className="mt-1.5 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="hostRules">Parking Rules</Label>
+                  <Textarea
+                    id="hostRules"
+                    placeholder="Any specific rules for using this parking spot? (e.g., no idling, compact cars only, etc.)"
+                    rows={4}
+                    {...register('hostRules')}
+                    className="mt-1.5 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="cancellationPolicy">Cancellation Policy</Label>
+                  <Textarea
+                    id="cancellationPolicy"
+                    placeholder="Describe your cancellation policy (e.g., full refund if cancelled 24 hours before)"
+                    rows={4}
+                    {...register('cancellationPolicy')}
+                    className="mt-1.5 resize-none"
+                  />
                 </div>
 
                 <div id="photos-section">
