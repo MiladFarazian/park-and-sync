@@ -3,7 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Star, MapPin, Navigation, PersonStanding, Footprints } from 'lucide-react';
+import { Star, MapPin, Navigation, Footprints } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -79,6 +79,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
   const searchMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const spotsRef = useRef<Spot[]>([]); // Keep current spots for event handlers
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
+  const [nearestSpotId, setNearestSpotId] = useState<string | null>(null);
+  const [userSelectedSpot, setUserSelectedSpot] = useState(false);
   const [mapboxToken, setMapboxToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
@@ -88,9 +90,9 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     spotsRef.current = spots;
   }, [spots]);
 
-  // Auto-select nearest spot when spots load
+  // Auto-select nearest spot when spots load (only if user hasn't manually selected)
   useEffect(() => {
-    if (!spots.length || !searchCenter || !mapReady) return;
+    if (!spots.length || !searchCenter || !mapReady || userSelectedSpot) return;
 
     // Find the nearest spot to the search center
     const nearestSpot = spots.reduce((closest, current) => {
@@ -109,9 +111,10 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       return currentDist < closestDist ? current : closest;
     });
 
-    // Auto-select the nearest spot
+    // Track which spot is nearest and auto-select it
+    setNearestSpotId(nearestSpot.id);
     setSelectedSpot(nearestSpot);
-  }, [spots, searchCenter, mapReady]);
+  }, [spots, searchCenter, mapReady, userSelectedSpot]);
 
   // Fetch Mapbox token
   useEffect(() => {
@@ -695,6 +698,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         
         if (spot) {
           console.log('[MapView] Setting selected spot:', spot.id);
+          setUserSelectedSpot(true); // Mark that user manually selected a spot
           setSelectedSpot(spot);
         } else {
           console.error('[MapView] Spot not found in spots array for ID:', f.properties.id);
@@ -822,9 +826,11 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                 <div className="flex justify-between items-start gap-2">
                   <div className="flex-1">
                     <h3 className="font-semibold text-base leading-tight">{selectedSpot.title}</h3>
-                    <Badge className="bg-primary/10 text-primary border-primary/20 text-xs px-2 py-0.5 mt-1">
-                      Nearest
-                    </Badge>
+                    {selectedSpot.id === nearestSpotId && (
+                      <Badge className="bg-primary/10 text-primary border-primary/20 text-xs px-2 py-0.5 mt-1">
+                        Nearest
+                      </Badge>
+                    )}
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p className="font-bold text-primary text-lg">${selectedSpot.hourlyRate}/hr</p>
