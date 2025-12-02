@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -230,6 +230,13 @@ const SortablePhoto: React.FC<SortablePhotoProps> = ({
   );
 };
 
+interface AddressSuggestion {
+  name: string;
+  place_formatted: string;
+  full_address: string;
+  mapbox_id: string;
+}
+
 const EditSpot = () => {
   const navigate = useNavigate();
   const { spotId } = useParams<{ spotId: string }>();
@@ -249,6 +256,11 @@ const EditSpot = () => {
   const [stagedPhotos, setStagedPhotos] = useState<SpotPhoto[]>([]);
   const [stagedPrimaryId, setStagedPrimaryId] = useState<string | null>(null);
   const [uploadStatuses, setUploadStatuses] = useState<{ fileName: string; status: 'pending' | 'uploading' | 'complete' | 'error'; progress: number }[]>([]);
+  const [mapboxToken, setMapboxToken] = useState<string>('');
+  const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const sessionTokenRef = useRef<string>(crypto.randomUUID());
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -274,6 +286,33 @@ const EditSpot = () => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
     });
+  }, []);
+
+  useEffect(() => {
+    const fetchMapboxToken = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('get-mapbox-token');
+        if (error) throw error;
+        if (data?.token) {
+          setMapboxToken(data.token);
+        }
+      } catch (error) {
+        console.error('Error fetching Mapbox token:', error);
+      }
+    };
+    fetchMapboxToken();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('#address') && !target.closest('.suggestions-dropdown')) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -339,6 +378,82 @@ const EditSpot = () => {
 
     fetchSpot();
   }, [spotId, navigate, setValue]);
+
+  const searchAddresses = async (query: string) => {
+    if (!mapboxToken || query.length < 3) {
+      setAddressSuggestions([]);
+      return;
+    }
+
+    try {
+      setLoadingSuggestions(true);
+      
+      const socal_center = { lat: 34.0522, lng: -118.2437 };
+      
+      const url = `https://api.mapbox.com/search/searchbox/v1/suggest?` +
+        `q=${encodeURIComponent(query)}` +
+        `&access_token=${mapboxToken}` +
+        `&session_token=${sessionTokenRef.current}` +
+        `&limit=8` +
+        `&types=poi,address,place` +
+        `&proximity=${socal_center.lng},${socal_center.lat}` +
+        `&country=US` +
+        `&bbox=-119.5,32.5,-117.0,34.8`;
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) throw new Error('Address search failed');
+      
+      const data = await response.json();
+      
+      if (data.suggestions && data.suggestions.length > 0) {
+        setAddressSuggestions(data.suggestions);
+      } else {
+        setAddressSuggestions([]);
+      }
+    } catch (error) {
+      console.error('Error searching addresses:', error);
+      setAddressSuggestions([]);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  const handleAddressChange = (value: string) => {
+    setValue('address', value);
+    
+    if (value.length >= 3) {
+      setShowSuggestions(true);
+      searchAddresses(value);
+    } else {
+      setShowSuggestions(false);
+      setAddressSuggestions([]);
+    }
+  };
+
+  const handleSuggestionSelect = async (suggestion: AddressSuggestion) => {
+    if (!mapboxToken || !suggestion.mapbox_id) return;
+    
+    try {
+      const retrieveUrl = `https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(suggestion.mapbox_id)}?access_token=${mapboxToken}&session_token=${sessionTokenRef.current}`;
+      
+      const response = await fetch(retrieveUrl);
+      const data = await response.json();
+      
+      if (data?.features?.[0]?.geometry?.coordinates) {
+        const fullAddress = suggestion.full_address || suggestion.name || suggestion.place_formatted;
+        
+        setValue('address', fullAddress);
+        setShowSuggestions(false);
+        setAddressSuggestions([]);
+        
+        sessionTokenRef.current = crypto.randomUUID();
+      }
+    } catch (error) {
+      console.error('Error selecting address:', error);
+      toast.error('Failed to select address. Please try again.');
+    }
+  };
 
   const toggleAmenity = (amenityId: string) => {
     setSelectedAmenities((prev) =>
@@ -738,13 +853,48 @@ const EditSpot = () => {
                 <div>
                   <Label htmlFor="address">Address</Label>
                   <div className="relative mt-1.5">
-                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
                     <Input
                       id="address"
                       placeholder="Enter your address"
                       {...register('address')}
+                      onChange={(e) => handleAddressChange(e.target.value)}
+                      onFocus={() => {
+                        const value = (document.getElementById('address') as HTMLInputElement)?.value;
+                        if (value && value.length >= 3) {
+                          setShowSuggestions(true);
+                        }
+                      }}
                       className="pl-10"
+                      autoComplete="off"
                     />
+                    {loadingSuggestions && (
+                      <div className="absolute right-3 top-3">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      </div>
+                    )}
+                    {showSuggestions && addressSuggestions.length > 0 && (
+                      <div className="suggestions-dropdown absolute top-full mt-1 w-full bg-background border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+                        {addressSuggestions.map((suggestion, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() => handleSuggestionSelect(suggestion)}
+                            className="w-full px-4 py-3 text-left hover:bg-muted transition-colors border-b last:border-b-0 flex items-start gap-3"
+                          >
+                            <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {suggestion.name}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {suggestion.place_formatted}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   {errors.address && (
                     <p className="text-sm text-destructive mt-1">{String(errors.address.message)}</p>
