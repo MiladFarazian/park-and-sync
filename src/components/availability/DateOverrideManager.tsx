@@ -270,19 +270,19 @@ export const DateOverrideManager = ({
                       key={windowIndex}
                       className="flex items-center gap-2 p-3 rounded-lg bg-background border"
                     >
-                      <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <Clock className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
                       <Input
                         type="time"
                         value={window.start_time}
                         onChange={(e) => updateTime(dateStr, windowIndex, 'start_time', e.target.value)}
-                        className="w-[110px] text-center"
+                        className="flex-1 min-w-0 text-center"
                       />
-                      <span className="text-muted-foreground">to</span>
+                      <span className="text-muted-foreground text-sm shrink-0">to</span>
                       <Input
                         type="time"
                         value={window.end_time}
                         onChange={(e) => updateTime(dateStr, windowIndex, 'end_time', e.target.value)}
-                        className="w-[110px] text-center"
+                        className="flex-1 min-w-0 text-center"
                       />
                     </div>
                   ))}
