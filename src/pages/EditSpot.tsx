@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Shield, Camera, MapPin, DollarSign, Trash2, Upload, Star, CheckCircle2, ChevronLeft, ChevronRight, Save, Zap, GripVertical } from 'lucide-react';
+import { ArrowLeft, Shield, Camera, MapPin, DollarSign, Trash2, Upload, Star, CheckCircle2, ChevronLeft, ChevronRight, Save, Zap, GripVertical, Clock, Car, Lightbulb } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { compressImage } from '@/lib/compressImage';
@@ -41,10 +41,25 @@ const amenitiesList = [{
   icon: Camera,
   dbField: 'is_secure'
 }, {
+  id: '24-7',
+  label: '24/7 Access',
+  icon: Clock,
+  dbField: null
+}, {
   id: 'ev',
   label: 'EV Charging',
   icon: Zap,
   dbField: 'has_ev_charging'
+}, {
+  id: 'easy',
+  label: 'Easy Access',
+  icon: Car,
+  dbField: null
+}, {
+  id: 'lit',
+  label: 'Well Lit',
+  icon: Lightbulb,
+  dbField: null
 }];
 interface SpotPhoto {
   id: string;
