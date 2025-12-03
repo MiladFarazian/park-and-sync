@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, Plus, Trash2, Clock } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
+import { Plus, Trash2, Clock, Sun, Moon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -26,7 +25,15 @@ interface AvailabilityManagerProps {
   onChange?: (rules: AvailabilityRule[]) => void;
 }
 
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAYS = [
+  { name: 'Sunday', short: 'Sun' },
+  { name: 'Monday', short: 'Mon' },
+  { name: 'Tuesday', short: 'Tue' },
+  { name: 'Wednesday', short: 'Wed' },
+  { name: 'Thursday', short: 'Thu' },
+  { name: 'Friday', short: 'Fri' },
+  { name: 'Saturday', short: 'Sat' },
+];
 
 export const AvailabilityManager = ({ 
   initialRules = [], 
@@ -49,7 +56,6 @@ export const AvailabilityManager = ({
   };
 
   const [availabilityWindows, setAvailabilityWindows] = useState<Record<number, TimeRange[]>>(groupByDay(initialRules));
-  const [openDays, setOpenDays] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const rules: AvailabilityRule[] = [];
@@ -74,49 +80,45 @@ export const AvailabilityManager = ({
     }
   }, [availabilityWindows, onChange]);
 
-  const addAvailability = (dayIndex: number) => {
+  const toggleDay = (dayIndex: number) => {
     const windows = availabilityWindows[dayIndex];
-    
-    // Find a non-overlapping default time range
-    let newWindow: TimeRange = {
-      start_time: '09:00',
-      end_time: '17:00',
-    };
+    if (windows.length > 0) {
+      // Turn off - clear all windows
+      setAvailabilityWindows({
+        ...availabilityWindows,
+        [dayIndex]: []
+      });
+    } else {
+      // Turn on - add default 9-5
+      setAvailabilityWindows({
+        ...availabilityWindows,
+        [dayIndex]: [{ start_time: '09:00', end_time: '17:00' }]
+      });
+    }
+  };
 
-    // If there are existing windows, try to place the new one after the last one
+  const set24Hours = (dayIndex: number) => {
+    setAvailabilityWindows({
+      ...availabilityWindows,
+      [dayIndex]: [{ start_time: '00:00', end_time: '23:59' }]
+    });
+  };
+
+  const addTimeSlot = (dayIndex: number) => {
+    const windows = availabilityWindows[dayIndex];
+    const newWindow: TimeRange = { start_time: '09:00', end_time: '17:00' };
+    
+    // Find non-overlapping slot
     if (windows.length > 0) {
       const sortedWindows = [...windows].sort((a, b) => 
         timeToMinutes(a.start_time) - timeToMinutes(b.start_time)
       );
-      
       const lastWindow = sortedWindows[sortedWindows.length - 1];
       const lastEndMinutes = timeToMinutes(lastWindow.end_time);
       
-      // If there's room after the last window (before midnight)
-      if (lastEndMinutes < 1380) { // 23:00
-        const newStartMinutes = Math.min(lastEndMinutes, 1380);
-        const newEndMinutes = Math.min(newStartMinutes + 120, 1439); // 2 hours later or end of day
-        newWindow = {
-          start_time: minutesToTime(newStartMinutes),
-          end_time: minutesToTime(newEndMinutes),
-        };
-      } else {
-        // Try to find a gap between existing windows
-        for (let i = 0; i < sortedWindows.length - 1; i++) {
-          const currentEnd = timeToMinutes(sortedWindows[i].end_time);
-          const nextStart = timeToMinutes(sortedWindows[i + 1].start_time);
-          const gap = nextStart - currentEnd;
-          
-          if (gap >= 60) { // At least 1 hour gap
-            const newStartMinutes = currentEnd;
-            const newEndMinutes = Math.min(currentEnd + 120, nextStart); // 2 hours or fill gap
-            newWindow = {
-              start_time: minutesToTime(newStartMinutes),
-              end_time: minutesToTime(newEndMinutes),
-            };
-            break;
-          }
-        }
+      if (lastEndMinutes < 1380) {
+        newWindow.start_time = minutesToTime(lastEndMinutes);
+        newWindow.end_time = minutesToTime(Math.min(lastEndMinutes + 120, 1439));
       }
     }
 
@@ -125,24 +127,32 @@ export const AvailabilityManager = ({
       [dayIndex]: [...windows, newWindow].sort((a, b) => 
         timeToMinutes(a.start_time) - timeToMinutes(b.start_time))
     });
-    toast.success('Availability added');
   };
 
-  const removeAvailability = (dayIndex: number, windowIndex: number) => {
+  const removeTimeSlot = (dayIndex: number, windowIndex: number) => {
     setAvailabilityWindows({
       ...availabilityWindows,
       [dayIndex]: availabilityWindows[dayIndex].filter((_, i) => i !== windowIndex)
     });
-    toast.success('Availability removed');
   };
 
-  const updateAvailability = (dayIndex: number, windowIndex: number, start: string, end: string) => {
+  const updateTime = (dayIndex: number, windowIndex: number, field: 'start_time' | 'end_time', value: string) => {
     const windows = [...availabilityWindows[dayIndex]];
-    windows[windowIndex] = { start_time: start, end_time: end };
+    windows[windowIndex] = { ...windows[windowIndex], [field]: value };
+    
+    // Validate times
+    const start = timeToMinutes(windows[windowIndex].start_time);
+    const end = timeToMinutes(windows[windowIndex].end_time);
+    
+    if (start >= end) {
+      toast.error('Start time must be before end time');
+      return;
+    }
 
+    // Check overlap with other windows
     const otherWindows = windows.filter((_, i) => i !== windowIndex);
     if (hasOverlap(otherWindows, windows[windowIndex])) {
-      toast.error('Time range overlaps with another availability');
+      toast.error('Time overlaps with another slot');
       return;
     }
 
@@ -153,13 +163,6 @@ export const AvailabilityManager = ({
     });
   };
 
-  const set24Hours = (dayIndex: number) => {
-    setAvailabilityWindows({
-      ...availabilityWindows,
-      [dayIndex]: [{ start_time: '00:00', end_time: '23:59' }]
-    });
-  };
-
   const hasOverlap = (windows: TimeRange[], newWindow: TimeRange): boolean => {
     const newStart = timeToMinutes(newWindow.start_time);
     const newEnd = timeToMinutes(newWindow.end_time);
@@ -167,8 +170,7 @@ export const AvailabilityManager = ({
     return windows.some(window => {
       const start = timeToMinutes(window.start_time);
       const end = timeToMinutes(window.end_time);
-      // Check for actual overlap (not just touching at endpoints)
-      return (newStart < end && newEnd > start && !(newStart === end || newEnd === start));
+      return (newStart < end && newEnd > start);
     });
   };
 
@@ -183,7 +185,7 @@ export const AvailabilityManager = ({
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   };
 
-  const formatTime = (time: string): string => {
+  const formatTimeDisplay = (time: string): string => {
     const [hours, minutes] = time.split(':');
     const hour = parseInt(hours);
     const ampm = hour >= 12 ? 'PM' : 'AM';
@@ -191,123 +193,162 @@ export const AvailabilityManager = ({
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
-  const toggleDay = (dayIndex: number) => {
-    const newOpenDays = new Set(openDays);
-    if (newOpenDays.has(dayIndex)) {
-      newOpenDays.delete(dayIndex);
-    } else {
-      newOpenDays.add(dayIndex);
-    }
-    setOpenDays(newOpenDays);
+  const is24Hours = (windows: TimeRange[]) => {
+    return windows.length === 1 && windows[0].start_time === '00:00' && windows[0].end_time === '23:59';
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {DAYS.map((day, dayIndex) => {
         const windows = availabilityWindows[dayIndex];
-        const isOpen = openDays.has(dayIndex);
+        const isAvailable = windows.length > 0;
+        const isFullDay = is24Hours(windows);
 
         return (
-          <div key={dayIndex} className="space-y-2">
-            <Card className={cn(windows.length > 0 && "border-primary/20 bg-primary/5")}>
-              <div className="p-4">
-                <div
-                  className="flex items-center justify-between cursor-pointer"
-                  onClick={() => toggleDay(dayIndex)}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium">{day}</span>
-                    {windows.length > 0 ? (
-                      <Badge variant="secondary" className="text-xs">
-                        {windows.length} {windows.length === 1 ? 'availability' : 'availabilities'}
-                      </Badge>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">Unavailable</span>
-                    )}
-                  </div>
-                  <ChevronDown
-                    className={cn(
-                      "h-5 w-5 transition-transform",
-                      isOpen && "transform rotate-180"
-                    )}
-                  />
-                </div>
-
-                <Collapsible open={isOpen}>
-                  <CollapsibleContent className="mt-4 space-y-3">
-                    {windows.map((window, windowIndex) => {
-                      const startMinutes = timeToMinutes(window.start_time);
-                      const endMinutes = timeToMinutes(window.end_time);
-
-                      return (
-                        <div key={windowIndex} className="space-y-2 p-3 rounded-lg bg-background border">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span>Availability {windowIndex + 1}</span>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeAvailability(dayIndex, windowIndex)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-
-                          <Slider
-                            value={[startMinutes, endMinutes]}
-                            min={0}
-                            max={1439}
-                            step={15}
-                            onValueChange={([start, end]) => 
-                              updateAvailability(
-                                dayIndex, 
-                                windowIndex, 
-                                minutesToTime(start), 
-                                minutesToTime(end)
-                              )
-                            }
-                            className="my-4"
-                          />
-
-                          <div className="flex justify-between text-sm text-muted-foreground">
-                            <span>{formatTime(window.start_time)}</span>
-                            <span>{formatTime(window.end_time)}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => addAvailability(dayIndex)}
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Availability
-                      </Button>
-                      {windows.length !== 1 || windows[0].start_time !== '00:00' || windows[0].end_time !== '23:59' ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => set24Hours(dayIndex)}
-                        >
-                          24 Hours
-                        </Button>
-                      ) : null}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
+          <Card 
+            key={dayIndex} 
+            className={cn(
+              "p-4 transition-all",
+              isAvailable ? "border-primary/30 bg-primary/5" : "border-border"
+            )}
+          >
+            {/* Day Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Switch 
+                  checked={isAvailable}
+                  onCheckedChange={() => toggleDay(dayIndex)}
+                />
+                <span className={cn(
+                  "font-medium",
+                  !isAvailable && "text-muted-foreground"
+                )}>
+                  {day.name}
+                </span>
               </div>
-            </Card>
-          </div>
+              
+              <div className="flex items-center gap-2">
+                {isAvailable && (
+                  <>
+                    <Badge 
+                      variant={isFullDay ? "default" : "secondary"} 
+                      className="text-xs cursor-pointer"
+                      onClick={() => set24Hours(dayIndex)}
+                    >
+                      {isFullDay ? (
+                        <>
+                          <Clock className="h-3 w-3 mr-1" />
+                          24/7
+                        </>
+                      ) : (
+                        'Set 24h'
+                      )}
+                    </Badge>
+                  </>
+                )}
+                {!isAvailable && (
+                  <span className="text-sm text-muted-foreground">Closed</span>
+                )}
+              </div>
+            </div>
+
+            {/* Time Slots */}
+            {isAvailable && !isFullDay && (
+              <div className="mt-4 space-y-3">
+                {windows.map((window, windowIndex) => (
+                  <div 
+                    key={windowIndex} 
+                    className="flex items-center gap-2 p-3 rounded-lg bg-background border"
+                  >
+                    <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                    
+                    <div className="flex items-center gap-2 flex-1">
+                      <Input
+                        type="time"
+                        value={window.start_time}
+                        onChange={(e) => updateTime(dayIndex, windowIndex, 'start_time', e.target.value)}
+                        className="w-[110px] text-center"
+                      />
+                      <span className="text-muted-foreground">to</span>
+                      <Input
+                        type="time"
+                        value={window.end_time}
+                        onChange={(e) => updateTime(dayIndex, windowIndex, 'end_time', e.target.value)}
+                        className="w-[110px] text-center"
+                      />
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => removeTimeSlot(dayIndex, windowIndex)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => addTimeSlot(dayIndex)}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add time slot
+                </Button>
+              </div>
+            )}
+
+            {/* 24h display */}
+            {isAvailable && isFullDay && (
+              <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                <Sun className="h-4 w-4" />
+                <span>Available all day (12:00 AM - 11:59 PM)</span>
+              </div>
+            )}
+          </Card>
         );
       })}
+
+      {/* Quick Actions */}
+      <div className="flex gap-2 pt-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="flex-1"
+          onClick={() => {
+            const allDays: Record<number, TimeRange[]> = {};
+            for (let i = 0; i < 7; i++) {
+              allDays[i] = [{ start_time: '09:00', end_time: '17:00' }];
+            }
+            setAvailabilityWindows(allDays);
+            toast.success('Set weekdays 9 AM - 5 PM');
+          }}
+        >
+          Business Hours (9-5)
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="flex-1"
+          onClick={() => {
+            const allDays: Record<number, TimeRange[]> = {};
+            for (let i = 0; i < 7; i++) {
+              allDays[i] = [{ start_time: '00:00', end_time: '23:59' }];
+            }
+            setAvailabilityWindows(allDays);
+            toast.success('Set available 24/7');
+          }}
+        >
+          Available 24/7
+        </Button>
+      </div>
     </div>
   );
 };

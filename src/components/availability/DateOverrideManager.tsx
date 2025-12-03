@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Slider } from '@/components/ui/slider';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar as CalendarIcon, Plus, Trash2, Clock } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Calendar as CalendarIcon, Plus, Trash2, Clock, X, Ban, Check } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
@@ -57,9 +57,8 @@ export const DateOverrideManager = ({
     groupByDate(initialOverrides)
   );
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('17:00');
-  const [isUnavailable, setIsUnavailable] = useState(true);
+  const [isBlocking, setIsBlocking] = useState(true);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   useEffect(() => {
     const result: DateOverride[] = [];
@@ -99,101 +98,34 @@ export const DateOverrideManager = ({
     setOverrides({
       ...overrides,
       [dateStr]: {
-        is_available: !isUnavailable,
-        windows: [{ start_time: startTime, end_time: endTime }]
+        is_available: !isBlocking,
+        windows: isBlocking ? [] : [{ start_time: '09:00', end_time: '17:00' }]
       }
     });
     
     setSelectedDate(undefined);
-    setStartTime('09:00');
-    setEndTime('17:00');
-    setIsUnavailable(true);
-    toast.success('Date override added');
+    setCalendarOpen(false);
+    toast.success(isBlocking ? 'Date blocked' : 'Special hours added');
   };
 
   const removeOverride = (dateStr: string) => {
     const newOverrides = { ...overrides };
     delete newOverrides[dateStr];
     setOverrides(newOverrides);
-    toast.success('Date override removed');
+    toast.success('Override removed');
   };
 
-  const addAvailability = (dateStr: string) => {
-    const override = overrides[dateStr];
-    const newWindow: TimeRange = {
-      start_time: '09:00',
-      end_time: '17:00'
-    };
-
-    if (hasOverlap(override.windows, newWindow)) {
-      toast.error('Time range overlaps with existing availability');
-      return;
-    }
-
-    setOverrides({
-      ...overrides,
-      [dateStr]: {
-        ...override,
-        windows: [...override.windows, newWindow].sort((a, b) => 
-          timeToMinutes(a.start_time) - timeToMinutes(b.start_time)
-        )
-      }
-    });
-    toast.success('Availability added');
-  };
-
-  const removeAvailability = (dateStr: string, windowIndex: number) => {
-    const override = overrides[dateStr];
-    setOverrides({
-      ...overrides,
-      [dateStr]: {
-        ...override,
-        windows: override.windows.filter((_, i) => i !== windowIndex)
-      }
-    });
-    toast.success('Availability removed');
-  };
-
-  const updateAvailability = (dateStr: string, windowIndex: number, start: string, end: string) => {
+  const updateTime = (dateStr: string, windowIndex: number, field: 'start_time' | 'end_time', value: string) => {
     const override = overrides[dateStr];
     const windows = [...override.windows];
-    windows[windowIndex] = { start_time: start, end_time: end };
-
-    const otherWindows = windows.filter((_, i) => i !== windowIndex);
-    if (hasOverlap(otherWindows, windows[windowIndex])) {
-      toast.error('Time range overlaps with another availability');
-      return;
-    }
-
+    windows[windowIndex] = { ...windows[windowIndex], [field]: value };
+    
     setOverrides({
       ...overrides,
       [dateStr]: {
         ...override,
-        windows: windows.sort((a, b) => 
-          timeToMinutes(a.start_time) - timeToMinutes(b.start_time)
-        )
+        windows
       }
-    });
-  };
-
-  const toggleAvailability = (dateStr: string) => {
-    setOverrides({
-      ...overrides,
-      [dateStr]: {
-        ...overrides[dateStr],
-        is_available: !overrides[dateStr].is_available
-      }
-    });
-  };
-
-  const hasOverlap = (windows: TimeRange[], newWindow: TimeRange): boolean => {
-    const newStart = timeToMinutes(newWindow.start_time);
-    const newEnd = timeToMinutes(newWindow.end_time);
-
-    return windows.some(window => {
-      const start = timeToMinutes(window.start_time);
-      const end = timeToMinutes(window.end_time);
-      return (newStart < end && newEnd > start);
     });
   };
 
@@ -202,196 +134,174 @@ export const DateOverrideManager = ({
     return hours * 60 + minutes;
   };
 
-  const minutesToTime = (minutes: number): string => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
-  };
-
-  const formatTime = (time: string): string => {
-    const [hours, minutes] = time.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
-
   const sortedDates = Object.keys(overrides).sort();
-  const startMinutes = timeToMinutes(startTime);
-  const endMinutes = timeToMinutes(endTime);
+  const blockedDates = sortedDates.filter(d => !overrides[d].is_available);
+  const specialDates = sortedDates.filter(d => overrides[d].is_available);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Add Override Section */}
       <Card className="border-dashed">
         <CardContent className="p-4 space-y-4">
-          <div>
-            <Label htmlFor="date-picker">Select Date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  id="date-picker"
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal mt-2",
-                    !selectedDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+          <div className="text-sm font-medium">Add Date Override</div>
+          
+          {/* Toggle between blocking and special hours */}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={isBlocking ? "default" : "outline"}
+              size="sm"
+              className="flex-1"
+              onClick={() => setIsBlocking(true)}
+            >
+              <Ban className="h-4 w-4 mr-2" />
+              Block a Date
+            </Button>
+            <Button
+              type="button"
+              variant={!isBlocking ? "default" : "outline"}
+              size="sm"
+              className="flex-1"
+              onClick={() => setIsBlocking(false)}
+            >
+              <Clock className="h-4 w-4 mr-2" />
+              Special Hours
+            </Button>
           </div>
 
-          <div>
-            <Label htmlFor="time-range">Time Range</Label>
-            <div className="space-y-2 mt-2">
-              <Slider
-                id="time-range"
-                value={[startMinutes, endMinutes]}
-                min={0}
-                max={1439}
-                step={15}
-                onValueChange={([start, end]) => {
-                  setStartTime(minutesToTime(start));
-                  setEndTime(minutesToTime(end));
+          {/* Date Picker */}
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !selectedDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {selectedDate ? format(selectedDate, "EEEE, MMMM d, yyyy") : "Select a date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => {
+                  setSelectedDate(date);
                 }}
+                disabled={(date) => {
+                  const dateStr = format(date, 'yyyy-MM-dd');
+                  return date < new Date(new Date().setHours(0, 0, 0, 0)) || !!overrides[dateStr];
+                }}
+                initialFocus
+                className="pointer-events-auto"
               />
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>{formatTime(startTime)}</span>
-                <span>{formatTime(endTime)}</span>
-              </div>
-            </div>
-          </div>
+            </PopoverContent>
+          </Popover>
 
-          <div>
-            <Label htmlFor="status">Status</Label>
-            <Select value={isUnavailable ? "unavailable" : "available"} onValueChange={(value) => setIsUnavailable(value === "unavailable")}>
-              <SelectTrigger id="status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="unavailable">Mark as Unavailable</SelectItem>
-                <SelectItem value="available">Mark as Available</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Button onClick={addOverride} disabled={!selectedDate} className="w-full">
+          <Button 
+            onClick={addOverride} 
+            disabled={!selectedDate} 
+            className="w-full"
+          >
             <Plus className="h-4 w-4 mr-2" />
-            Add Override
+            {isBlocking ? 'Block This Date' : 'Add Special Hours'}
           </Button>
         </CardContent>
       </Card>
 
-      {sortedDates.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="p-6 text-center text-muted-foreground">
-            <CalendarIcon className="h-8 w-8 mx-auto mb-2" />
-            <p className="text-sm">No date overrides set</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {sortedDates.map((dateStr) => {
-            const override = overrides[dateStr];
+      {/* Blocked Dates */}
+      {blockedDates.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <Ban className="h-4 w-4" />
+            Blocked Dates ({blockedDates.length})
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {blockedDates.map((dateStr) => (
+              <Badge
+                key={dateStr}
+                variant="secondary"
+                className="px-3 py-1.5 text-sm flex items-center gap-2"
+              >
+                {format(new Date(dateStr + 'T00:00:00'), 'MMM d, yyyy')}
+                <button
+                  onClick={() => removeOverride(dateStr)}
+                  className="hover:text-destructive transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
 
+      {/* Special Hours */}
+      {specialDates.length > 0 && (
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Special Hours ({specialDates.length})
+          </div>
+          {specialDates.map((dateStr) => {
+            const override = overrides[dateStr];
             return (
-              <Card key={dateStr}>
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <div className="font-medium">
-                        {format(new Date(dateStr + 'T00:00:00'), 'EEEE, MMMM d, yyyy')}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={override.is_available ? "default" : "secondary"}>
-                          {override.is_available ? "Available" : "Unavailable"}
-                        </Badge>
-                        {override.windows.length > 0 && (
-                          <Badge variant="outline" className="text-xs">
-                            {override.windows.length} {override.windows.length === 1 ? 'availability' : 'availabilities'}
-                          </Badge>
-                        )}
-                      </div>
+              <Card key={dateStr} className="border-primary/20 bg-primary/5">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="font-medium">
+                      {format(new Date(dateStr + 'T00:00:00'), 'EEEE, MMM d, yyyy')}
                     </div>
                     <Button
                       type="button"
                       variant="ghost"
-                      size="sm"
+                      size="icon"
+                      className="h-8 w-8"
                       onClick={() => removeOverride(dateStr)}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
-
-                  {override.windows.map((window, windowIndex) => {
-                    const startMinutes = timeToMinutes(window.start_time);
-                    const endMinutes = timeToMinutes(window.end_time);
-
-                    return (
-                      <div key={windowIndex} className="space-y-2 p-3 rounded-lg bg-background border">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span>Availability {windowIndex + 1}</span>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeAvailability(dateStr, windowIndex)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-
-                        <Slider
-                          value={[startMinutes, endMinutes]}
-                          min={0}
-                          max={1439}
-                          step={15}
-                          onValueChange={([start, end]) => 
-                            updateAvailability(
-                              dateStr, 
-                              windowIndex, 
-                              minutesToTime(start), 
-                              minutesToTime(end)
-                            )
-                          }
-                          className="my-4"
-                        />
-
-                        <div className="flex justify-between text-sm text-muted-foreground">
-                          <span>{formatTime(window.start_time)}</span>
-                          <span>{formatTime(window.end_time)}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => addAvailability(dateStr)}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Availability
-                  </Button>
+                  
+                  {override.windows.map((window, windowIndex) => (
+                    <div 
+                      key={windowIndex}
+                      className="flex items-center gap-2 p-3 rounded-lg bg-background border"
+                    >
+                      <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <Input
+                        type="time"
+                        value={window.start_time}
+                        onChange={(e) => updateTime(dateStr, windowIndex, 'start_time', e.target.value)}
+                        className="w-[110px] text-center"
+                      />
+                      <span className="text-muted-foreground">to</span>
+                      <Input
+                        type="time"
+                        value={window.end_time}
+                        onChange={(e) => updateTime(dateStr, windowIndex, 'end_time', e.target.value)}
+                        className="w-[110px] text-center"
+                      />
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
             );
           })}
         </div>
+      )}
+
+      {/* Empty State */}
+      {sortedDates.length === 0 && (
+        <Card className="border-dashed">
+          <CardContent className="p-8 text-center text-muted-foreground">
+            <CalendarIcon className="h-10 w-10 mx-auto mb-3 opacity-50" />
+            <p className="font-medium">No date overrides</p>
+            <p className="text-sm mt-1">Block specific dates or set special hours for holidays</p>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
