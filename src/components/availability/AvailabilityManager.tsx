@@ -258,35 +258,39 @@ export const AvailabilityManager = ({
                 {windows.map((window, windowIndex) => (
                   <div 
                     key={windowIndex} 
-                    className="flex items-center gap-2 p-3 rounded-lg bg-background border"
+                    className="p-3 rounded-lg bg-background border"
                   >
-                    <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="flex items-center justify-between mb-2 sm:mb-0">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        <span className="sm:hidden">Time slot {windowIndex + 1}</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        onClick={() => removeTimeSlot(dayIndex, windowIndex)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                     
-                    <div className="flex items-center gap-2 flex-1">
+                    <div className="flex items-center gap-2">
                       <Input
                         type="time"
                         value={window.start_time}
                         onChange={(e) => updateTime(dayIndex, windowIndex, 'start_time', e.target.value)}
-                        className="w-[110px] text-center"
+                        className="flex-1 min-w-0 text-center"
                       />
-                      <span className="text-muted-foreground">to</span>
+                      <span className="text-muted-foreground text-sm shrink-0">to</span>
                       <Input
                         type="time"
                         value={window.end_time}
                         onChange={(e) => updateTime(dayIndex, windowIndex, 'end_time', e.target.value)}
-                        className="w-[110px] text-center"
+                        className="flex-1 min-w-0 text-center"
                       />
                     </div>
-
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0"
-                      onClick={() => removeTimeSlot(dayIndex, windowIndex)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
                   </div>
                 ))}
 
