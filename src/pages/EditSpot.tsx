@@ -30,6 +30,9 @@ const formSchema = z.object({
   hostRules: z.string().optional(),
   cancellationPolicy: z.string().optional()
 });
+
+// Module-level storage for pending uploads (survives component re-renders/remounts)
+let globalPendingUploads: File[] = [];
 const amenitiesList = [{
   id: 'covered',
   label: 'Covered',
@@ -206,8 +209,6 @@ const EditSpot = () => {
     progress: number;
   }[]>([]);
   
-  // Use ref to preserve uploads across re-renders (fixes state reset issue)
-  const pendingUploadsRef = useRef<File[]>([]);
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -231,11 +232,10 @@ const EditSpot = () => {
     resolver: zodResolver(formSchema)
   });
   
-  // Track component mount/unmount for debugging
+  // Clear global uploads when component unmounts (navigating away)
   useEffect(() => {
-    console.log('[EDITSPOT] Component MOUNTED, ref value:', pendingUploadsRef.current.length);
     return () => {
-      console.log('[EDITSPOT] Component UNMOUNTING, ref value:', pendingUploadsRef.current.length);
+      globalPendingUploads = [];
     };
   }, []);
   
@@ -275,9 +275,6 @@ const EditSpot = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-  useEffect(() => {
-    console.log('[PHOTOS] existingPhotos state changed:', existingPhotos.length, existingPhotos);
-  }, [existingPhotos]);
   useEffect(() => {
     const fetchSpot = async () => {
       if (!spotId) return;
@@ -405,30 +402,15 @@ const EditSpot = () => {
       e.target.value = '';
       return;
     }
-    console.log('[PHOTO SELECT] Selected files:', newFiles.length);
-
     // Create preview URLs
-    const newPreviews = newFiles.map(file => {
-      const url = URL.createObjectURL(file);
-      console.log('[PHOTO SELECT] Created preview URL:', url);
-      return url;
-    });
+    const newPreviews = newFiles.map(file => URL.createObjectURL(file));
 
-    // Update ref first (persists across re-renders)
-    pendingUploadsRef.current = [...pendingUploadsRef.current, ...newFiles];
-    console.log('[PHOTO SELECT] Updated ref:', pendingUploadsRef.current.length);
+    // Update global storage (survives component remounts)
+    globalPendingUploads = [...globalPendingUploads, ...newFiles];
 
     // Update state for UI
-    setPendingUploads(prev => {
-      const updated = [...prev, ...newFiles];
-      console.log('[PHOTO SELECT] Updated pendingUploads state:', updated.length);
-      return updated;
-    });
-    setPendingUploadPreviews(prev => {
-      const updated = [...prev, ...newPreviews];
-      console.log('[PHOTO SELECT] Updated previews:', updated.length);
-      return updated;
-    });
+    setPendingUploads(prev => [...prev, ...newFiles]);
+    setPendingUploadPreviews(prev => [...prev, ...newPreviews]);
     toast.success(`${newFiles.length} photo${newFiles.length > 1 ? 's' : ''} ready to upload. Click Save Changes to confirm.`);
     e.target.value = '';
   };
@@ -462,8 +444,8 @@ const EditSpot = () => {
       return;
     }
 
-    // Update ref first (persists across re-renders)
-    pendingUploadsRef.current = [...pendingUploadsRef.current, ...dropped];
+    // Update global storage (survives component remounts)
+    globalPendingUploads = [...globalPendingUploads, ...dropped];
 
     // Stage files for upload and create preview URLs
     setPendingUploads(prev => [...prev, ...dropped]);
@@ -523,9 +505,8 @@ const EditSpot = () => {
     }
   };
   const onSubmit = async (data: any) => {
-    // Use ref as source of truth (persists through re-renders)
-    const filesToUpload = pendingUploadsRef.current;
-    console.log('[SAVE] onSubmit called, filesToUpload from ref:', filesToUpload.length, filesToUpload);
+    // Use global storage as source of truth (survives component remounts)
+    const filesToUpload = [...globalPendingUploads];
     
     if (!spotId || isSaving) return;
     try {
@@ -622,8 +603,8 @@ const EditSpot = () => {
         setIsUploadingPhotos(false);
         setUploadProgress(0);
         setUploadStatuses([]);
-        // Clear the ref after successful upload
-        pendingUploadsRef.current = [];
+        // Clear the global storage after successful upload
+        globalPendingUploads = [];
       }
 
       // Step 3: Update photo order and primary status
