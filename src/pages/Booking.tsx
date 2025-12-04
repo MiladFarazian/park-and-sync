@@ -702,11 +702,6 @@ const Booking = () => {
                 <span>{spot.address}</span>
               </div>
               <div className="flex items-center gap-3 text-sm mb-3">
-                <div className="flex items-center gap-1">
-                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                  <span className="font-semibold">4.9</span>
-                  <span className="text-muted-foreground">(127)</span>
-                </div>
                 <span className="font-bold">${spot.hourly_rate}/hr</span>
               </div>
               <Separator className="my-3" />
@@ -717,10 +712,14 @@ const Booking = () => {
                 </Avatar>
                 <div>
                   <div className="text-sm font-medium">Hosted by {hostName}</div>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                    <span>{host?.rating || '4.8'}</span>
-                  </div>
+                  {host?.rating ? (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                      <span>{Number(host.rating).toFixed(1)}</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">New host</span>
+                  )}
                 </div>
               </div>
             </div>

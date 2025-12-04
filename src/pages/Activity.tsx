@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Calendar, XCircle, MessageCircle, Navigation, Edit, Plus } from 'lucide-react';
+import { MapPin, Clock, Calendar, XCircle, MessageCircle, Navigation, Edit, Plus, Star } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useMode } from '@/contexts/ModeContext';
 import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ReviewModal } from '@/components/booking/ReviewModal';
 const Activity = () => {
   const navigate = useNavigate();
   const {
@@ -25,6 +26,9 @@ const Activity = () => {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewBooking, setReviewBooking] = useState<any>(null);
+  const [userReviews, setUserReviews] = useState<Set<string>>(new Set());
   useEffect(() => {
     fetchBookings();
   }, [mode]);
@@ -36,6 +40,15 @@ const Activity = () => {
         }
       } = await supabase.auth.getUser();
       if (!user) return;
+      
+      // Fetch user's existing reviews
+      const { data: reviewsData } = await supabase
+        .from('reviews')
+        .select('booking_id')
+        .eq('reviewer_id', user.id);
+      
+      setUserReviews(new Set(reviewsData?.map(r => r.booking_id) || []));
+      
       let bookingsData: any[] = [];
       if (mode === 'driver') {
         // Driver mode: only show bookings where user is the renter
@@ -47,7 +60,11 @@ const Activity = () => {
             spots (
               title,
               address,
-              host_id
+              host_id,
+              profiles:host_id (
+                first_name,
+                last_name
+              )
             )
           `).eq('renter_id', user.id).order('start_at', {
           ascending: false
@@ -68,6 +85,10 @@ const Activity = () => {
               title,
               address,
               host_id
+            ),
+            renter:renter_id (
+              first_name,
+              last_name
             )
           `).eq('spots.host_id', user.id).order('start_at', {
           ascending: false
@@ -177,6 +198,32 @@ const Activity = () => {
     const isHost = booking.userRole === 'host';
     const otherPartyId = isHost ? booking.renter_id : booking.spots?.host_id;
     const canExtend = !isPast && booking.status !== 'canceled' && booking.userRole === 'renter';
+    
+    // Review-related logic
+    const canReview = (booking.status === 'completed' || (isPast && booking.status === 'paid')) && 
+                      booking.status !== 'canceled' && 
+                      !userReviews.has(booking.id);
+    const revieweeId = isHost ? booking.renter_id : booking.spots?.host_id;
+    const getRevieweeName = () => {
+      if (isHost) {
+        const renter = booking.renter;
+        return renter?.first_name ? `${renter.first_name} ${renter.last_name || ''}`.trim() : 'Guest';
+      } else {
+        const hostProfile = booking.spots?.profiles;
+        return hostProfile?.first_name ? `${hostProfile.first_name} ${hostProfile.last_name || ''}`.trim() : 'Host';
+      }
+    };
+    
+    const handleReview = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setReviewBooking({
+        ...booking,
+        revieweeId,
+        revieweeName: getRevieweeName(),
+        reviewerRole: isHost ? 'host' : 'driver'
+      });
+      setReviewModalOpen(true);
+    };
     
     const handleGetDirections = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -303,6 +350,16 @@ const Activity = () => {
               >
                 <MessageCircle className="h-4 w-4" />
               </Button>
+              {canReview && (
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  className="flex-1 hover:bg-yellow-50 hover:text-yellow-600 hover:border-yellow-300 transition-colors"
+                  onClick={handleReview}
+                >
+                  <Star className="h-4 w-4" />
+                </Button>
+              )}
               {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && (
                 <Button 
                   variant="destructive" 
@@ -426,6 +483,16 @@ const Activity = () => {
               >
                 <MessageCircle className="h-4 w-4" />
               </Button>
+              {canReview && (
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  className="shrink-0 hover:bg-yellow-50 hover:text-yellow-600 hover:border-yellow-300 transition-colors"
+                  onClick={handleReview}
+                >
+                  <Star className="h-4 w-4" />
+                </Button>
+              )}
               {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && (
                 <Button 
                   variant="destructive" 
@@ -550,6 +617,22 @@ const Activity = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Review Modal */}
+      {reviewBooking && (
+        <ReviewModal
+          open={reviewModalOpen}
+          onOpenChange={setReviewModalOpen}
+          bookingId={reviewBooking.id}
+          revieweeId={reviewBooking.revieweeId}
+          revieweeName={reviewBooking.revieweeName}
+          reviewerRole={reviewBooking.reviewerRole}
+          onReviewSubmitted={() => {
+            setUserReviews(prev => new Set([...prev, reviewBooking.id]));
+            setReviewBooking(null);
+          }}
+        />
+      )}
     </div>;
 };
 export default Activity;
