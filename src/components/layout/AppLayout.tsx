@@ -11,6 +11,7 @@ import ModeLoadingOverlay from './ModeLoadingOverlay';
 import { NotificationBell } from './NotificationBell';
 import NotificationPermissionBanner from './NotificationPermissionBanner';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useMode } from '@/contexts/ModeContext';
 interface AppLayoutProps {
   children: React.ReactNode;
 }
@@ -19,10 +20,18 @@ const AppLayout = ({
 }: AppLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { mode, setMode } = useMode();
   const isProfilePage = location.pathname === '/profile';
   
   // Initialize notifications hook to set up realtime listeners
   useNotifications();
+  
+  const handleLogoClick = () => {
+    if (mode === 'host') {
+      setMode('driver');
+    }
+    navigate('/');
+  };
   
   return <>
       <ModeLoadingOverlay />
@@ -41,7 +50,7 @@ const AppLayout = ({
                       src={parkzyLogo} 
                       alt="Parkzy" 
                       className="h-8 cursor-pointer" 
-                      onClick={() => navigate('/home')}
+                      onClick={handleLogoClick}
                     />
                     <ModeSwitcher />
                   </div>
@@ -71,7 +80,7 @@ const AppLayout = ({
                 src={parkzyLogo} 
                 alt="Parkzy" 
                 className="h-8 cursor-pointer" 
-                onClick={() => navigate('/home')}
+                onClick={handleLogoClick}
               />
               <ModeSwitcher />
             </div>
