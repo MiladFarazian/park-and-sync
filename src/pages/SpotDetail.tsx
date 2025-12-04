@@ -58,6 +58,8 @@ const SpotDetail = () => {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
 
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) => 
@@ -402,6 +404,11 @@ const SpotDetail = () => {
 
       setSpot(transformedData);
       
+      // Fetch reviews for the host
+      if (spotData.host_id) {
+        fetchHostReviews(spotData.host_id);
+      }
+      
       // Check if user owns this spot
       if (user && transformedData.host_id) {
         const isOwner = user.id === transformedData.host_id;
@@ -417,6 +424,49 @@ const SpotDetail = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchHostReviews = async (hostId: string) => {
+    setReviewsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('reviews')
+        .select(`
+          *,
+          reviewer:reviewer_id (
+            first_name,
+            last_name,
+            avatar_url
+          )
+        `)
+        .eq('reviewee_id', hostId)
+        .eq('is_public', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setReviews(data || []);
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  // Calculate rating distribution for histogram
+  const getRatingDistribution = () => {
+    const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    reviews.forEach(review => {
+      if (review.rating >= 1 && review.rating <= 5) {
+        distribution[review.rating as keyof typeof distribution]++;
+      }
+    });
+    return distribution;
+  };
+
+  const getAverageRating = () => {
+    if (reviews.length === 0) return 0;
+    const sum = reviews.reduce((acc, review) => acc + review.rating, 0);
+    return (sum / reviews.length).toFixed(1);
   };
 
   if (loading) {
@@ -651,6 +701,118 @@ const SpotDetail = () => {
               </Button>
             )}
           </div>
+        </div>
+
+        {/* Reviews Section */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Reviews</h2>
+          
+          {reviewsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : reviews.length === 0 ? (
+            <Card className="p-6 text-center">
+              <Star className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
+              <p className="text-muted-foreground">No reviews yet</p>
+              <p className="text-sm text-muted-foreground mt-1">Be the first to book and review this spot!</p>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              {/* Rating Summary with Histogram */}
+              <Card className="p-5">
+                <div className="flex items-start gap-6">
+                  {/* Average Rating */}
+                  <div className="text-center">
+                    <p className="text-4xl font-bold text-primary">{getAverageRating()}</p>
+                    <div className="flex justify-center gap-0.5 my-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          className={`h-4 w-4 ${
+                            star <= Math.round(Number(getAverageRating()))
+                              ? 'fill-primary text-primary'
+                              : 'text-muted-foreground/30'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{reviews.length} review{reviews.length !== 1 ? 's' : ''}</p>
+                  </div>
+                  
+                  {/* Histogram */}
+                  <div className="flex-1 space-y-1.5">
+                    {[5, 4, 3, 2, 1].map((rating) => {
+                      const count = getRatingDistribution()[rating as keyof ReturnType<typeof getRatingDistribution>];
+                      const percentage = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
+                      
+                      return (
+                        <div key={rating} className="flex items-center gap-2">
+                          <span className="text-xs font-medium w-3">{rating}</span>
+                          <Star className="h-3 w-3 fill-primary text-primary" />
+                          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-primary rounded-full transition-all duration-500"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground w-6 text-right">{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </Card>
+
+              {/* Review List */}
+              <div className="space-y-4">
+                {reviews.map((review) => (
+                  <Card key={review.id} className="p-4">
+                    <div className="flex items-start gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={review.reviewer?.avatar_url} />
+                        <AvatarFallback>
+                          {review.reviewer?.first_name?.[0] || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <p className="font-medium truncate">
+                            {review.reviewer?.first_name 
+                              ? `${review.reviewer.first_name} ${review.reviewer.last_name?.[0] || ''}.`
+                              : 'Anonymous'}
+                          </p>
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {new Date(review.created_at).toLocaleDateString('en-US', {
+                              month: 'short',
+                              year: 'numeric'
+                            })}
+                          </span>
+                        </div>
+                        <div className="flex gap-0.5 mb-2">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`h-3.5 w-3.5 ${
+                                star <= review.rating
+                                  ? 'fill-primary text-primary'
+                                  : 'text-muted-foreground/30'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        {review.comment && (
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {review.comment}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
