@@ -364,10 +364,14 @@ const BookingConfirmation = () => {
               </Avatar>
               <div>
                 <div className="font-semibold">{hostName}</div>
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                  <span>{host?.rating || '4.8'}</span>
-                </div>
+                {host?.rating ? (
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                    <span>{Number(host.rating).toFixed(1)}</span>
+                  </div>
+                ) : (
+                  <span className="text-sm text-muted-foreground">New host</span>
+                )}
               </div>
             </div>
             <Button variant="outline" size="sm" onClick={handleContactHost}>
