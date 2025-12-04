@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useMode } from '@/contexts/ModeContext';
 import { toast } from 'sonner';
 import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
+import EarningsAnalytics from '@/components/host/EarningsAnalytics';
 
 const HostHome = () => {
   const navigate = useNavigate();
@@ -173,6 +174,9 @@ const HostHome = () => {
           </div>
         </Card>
       </div>
+
+      {/* Earnings Analytics */}
+      <EarningsAnalytics />
 
       {/* Quick Actions */}
       <div className="space-y-3">
