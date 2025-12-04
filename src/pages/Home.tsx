@@ -18,7 +18,8 @@ const Home = () => {
   const { setMode } = useMode();
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userLocation, setUserLocation] = useState({ lat: 34.0224, lng: -118.2851 }); // Default to University Park
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationResolved, setLocationResolved] = useState(false); // Track if we've determined location
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -66,6 +67,7 @@ const Home = () => {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           setUserLocation({ lat, lng });
+          setLocationResolved(true);
           
           // Reverse geocode to get place name and autofill search
           if (mapboxToken) {
@@ -84,16 +86,28 @@ const Home = () => {
         },
         () => {
           console.log('Location access denied, using default location');
+          // Use default location when denied
+          setUserLocation({ lat: 34.0224, lng: -118.2851 });
+          setLocationResolved(true);
         }
       );
+    } else {
+      // No geolocation support, use default
+      setUserLocation({ lat: 34.0224, lng: -118.2851 });
+      setLocationResolved(true);
     }
   }, [mapboxToken]);
 
   useEffect(() => {
-    fetchNearbySpots();
-  }, [userLocation]);
+    // Only fetch spots once location is resolved
+    if (locationResolved && userLocation) {
+      fetchNearbySpots();
+    }
+  }, [locationResolved, userLocation]);
 
   const fetchNearbySpots = async () => {
+    if (!userLocation) return;
+    
     try {
       setLoading(true);
       const today = new Date().toISOString();
