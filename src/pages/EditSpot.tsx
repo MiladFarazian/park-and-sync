@@ -205,6 +205,9 @@ const EditSpot = () => {
     status: 'pending' | 'uploading' | 'complete' | 'error';
     progress: number;
   }[]>([]);
+  
+  // Use ref to preserve uploads across re-renders (fixes state reset issue)
+  const pendingUploadsRef = useRef<File[]>([]);
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -402,10 +405,14 @@ const EditSpot = () => {
       return url;
     });
 
-    // Update state
+    // Update ref first (persists across re-renders)
+    pendingUploadsRef.current = [...pendingUploadsRef.current, ...newFiles];
+    console.log('[PHOTO SELECT] Updated ref:', pendingUploadsRef.current.length);
+
+    // Update state for UI
     setPendingUploads(prev => {
       const updated = [...prev, ...newFiles];
-      console.log('[PHOTO SELECT] Updated pendingUploads:', updated.length);
+      console.log('[PHOTO SELECT] Updated pendingUploads state:', updated.length);
       return updated;
     });
     setPendingUploadPreviews(prev => {
@@ -445,6 +452,9 @@ const EditSpot = () => {
       toast.error('Please drop valid image files');
       return;
     }
+
+    // Update ref first (persists across re-renders)
+    pendingUploadsRef.current = [...pendingUploadsRef.current, ...dropped];
 
     // Stage files for upload and create preview URLs
     setPendingUploads(prev => [...prev, ...dropped]);
@@ -504,7 +514,10 @@ const EditSpot = () => {
     }
   };
   const onSubmit = async (data: any) => {
-    console.log('[SAVE] onSubmit called, pendingUploads:', pendingUploads.length, pendingUploads);
+    // Use ref as source of truth (persists through re-renders)
+    const filesToUpload = pendingUploadsRef.current;
+    console.log('[SAVE] onSubmit called, filesToUpload from ref:', filesToUpload.length, filesToUpload);
+    
     if (!spotId || isSaving) return;
     try {
       setIsSaving(true);
@@ -521,19 +534,19 @@ const EditSpot = () => {
       }
 
       // Step 2: Upload new photos
-      if (pendingUploads.length > 0) {
+      if (filesToUpload.length > 0) {
         setIsUploadingPhotos(true);
 
         // Initialize upload statuses
-        const initialStatuses = pendingUploads.map(file => ({
+        const initialStatuses = filesToUpload.map(file => ({
           fileName: file.name,
           status: 'pending' as const,
           progress: 0
         }));
         setUploadStatuses(initialStatuses);
-        toast.info(`Uploading ${pendingUploads.length} photo${pendingUploads.length > 1 ? 's' : ''}...`);
-        for (let i = 0; i < pendingUploads.length; i++) {
-          const file = pendingUploads[i];
+        toast.info(`Uploading ${filesToUpload.length} photo${filesToUpload.length > 1 ? 's' : ''}...`);
+        for (let i = 0; i < filesToUpload.length; i++) {
+          const file = filesToUpload[i];
           try {
             // Update status to uploading
             setUploadStatuses(prev => prev.map((status, idx) => idx === i ? {
@@ -595,11 +608,13 @@ const EditSpot = () => {
             } : status));
             throw error;
           }
-          setUploadProgress((i + 1) / pendingUploads.length * 100);
+          setUploadProgress((i + 1) / filesToUpload.length * 100);
         }
         setIsUploadingPhotos(false);
         setUploadProgress(0);
         setUploadStatuses([]);
+        // Clear the ref after successful upload
+        pendingUploadsRef.current = [];
       }
 
       // Step 3: Update photo order and primary status
