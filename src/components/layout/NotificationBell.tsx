@@ -83,7 +83,11 @@ export const NotificationBell = () => {
 
     // Handle navigation based on notification type
     if (notification.type === "booking") {
+      // Driver booking confirmation
       navigate(`/booking-confirmation/${notification.related_id}`);
+    } else if (notification.type === "booking_host") {
+      // Host booking confirmation
+      navigate(`/host-booking-confirmation/${notification.related_id}`);
     } else if (notification.type === "message") {
       navigate(`/messages`);
     } else if (
