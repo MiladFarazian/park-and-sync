@@ -484,7 +484,7 @@ const Messages = () => {
       if (userId === '00000000-0000-0000-0000-000000000001') {
         setNewUserProfile({
           user_id: userId,
-          first_name: 'Parkway',
+          first_name: 'Parkzy',
           last_name: 'Support',
           avatar_url: '/parkzy-logo.png',
         });
