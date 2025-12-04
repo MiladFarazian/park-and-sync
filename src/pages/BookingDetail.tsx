@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, Plus, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, Plus, AlertTriangle, CheckCircle2, Copy } from 'lucide-react';
 import { format, differenceInMinutes } from 'date-fns';
 import { toast } from 'sonner';
 import { loadStripe } from '@stripe/stripe-js';
@@ -521,9 +521,18 @@ const BookingDetail = () => {
         <Card className="p-4 space-y-4">
           <div>
             <h2 className="font-semibold text-lg mb-1">{booking.spots.title}</h2>
-            <div className="flex items-start gap-2 text-muted-foreground">
+          <div className="flex items-start gap-2 text-muted-foreground">
               <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <p className="text-sm">{booking.spots.address}</p>
+              <p className="text-sm flex-1">{booking.spots.address}</p>
+              <button 
+                onClick={() => {
+                  navigator.clipboard.writeText(booking.spots.address);
+                  toast.success("Address copied to clipboard");
+                }}
+                className="p-1 hover:bg-muted rounded flex-shrink-0"
+              >
+                <Copy className="h-4 w-4" />
+              </button>
             </div>
           </div>
 
