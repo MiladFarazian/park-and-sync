@@ -353,7 +353,8 @@ const Explore = () => {
         lng: parseFloat(spot.longitude),
         imageUrl: spot.spot_photos?.find((photo: any) => photo.is_primary)?.url || spot.spot_photos?.[0]?.url,
         distance: spot.distance ? `${(spot.distance / 1000).toFixed(1)} km` : undefined,
-        amenities: [...(spot.has_ev_charging ? ['EV Charging'] : []), ...(spot.is_covered ? ['Covered'] : []), ...(spot.is_secure ? ['Secure'] : [])]
+        amenities: [...(spot.has_ev_charging ? ['EV Charging'] : []), ...(spot.is_covered ? ['Covered'] : []), ...(spot.is_secure ? ['Secure'] : [])],
+        hostId: spot.host_id
       })) || [];
       setParkingSpots(transformedSpots);
     } catch (err) {
