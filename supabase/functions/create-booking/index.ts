@@ -289,18 +289,18 @@ serve(async (req) => {
     if (hostProfile && renterProfile) {
       const hostNotification = {
         user_id: spot.host_id,
-        type: 'booking',
-        title: 'New Booking Confirmed',
+        type: 'booking_host', // Different type so NotificationBell can route to host confirmation page
+        title: 'New Booking Received',
         message: `${renterProfile.first_name || 'A driver'} has booked your spot at ${spot.address}`,
-        related_id: `host-booking-confirmation/${booking.id}`, // Route hosts to host confirmation page
+        related_id: booking.id,
       };
 
       const renterNotification = {
         user_id: userData.user.id,
         type: 'booking',
-        title: 'Booking Created',
+        title: 'Booking Confirmed',
         message: `Your booking at ${spot.address} has been confirmed`,
-        related_id: booking.id, // Route drivers to standard booking detail
+        related_id: booking.id,
       };
 
       const { error: notificationError } = await supabaseAdmin
