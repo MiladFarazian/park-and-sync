@@ -78,7 +78,6 @@ const App = () => {
             <Route path="/embedded-checkout/:bookingId" element={<EmbeddedCheckout />} />
             <Route path="/search-results" element={<SearchResults />} />
             <Route path="/spot/:id" element={<div className="h-screen overflow-y-auto bg-background"><SpotDetail /></div>} />
-            <Route path="/host-booking-confirmation/:bookingId" element={<HostBookingConfirmation />} />
             <Route path="/personal-information" element={<PersonalInformation />} />
             <Route path="/my-vehicles" element={<MyVehicles />} />
             <Route path="/add-vehicle" element={<AddVehicle />} />
@@ -102,6 +101,7 @@ const App = () => {
                   <Route path="/book/:spotId" element={<Booking />} />
                   <Route path="/booking/:bookingId" element={<BookingDetail />} />
                   <Route path="/booking-confirmation/:bookingId" element={<BookingConfirmation />} />
+                  <Route path="/host-booking-confirmation/:bookingId" element={<HostBookingConfirmation />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
