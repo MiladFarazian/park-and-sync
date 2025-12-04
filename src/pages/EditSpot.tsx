@@ -20,14 +20,12 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from '@dnd-kit/utilities';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 const spotCategories = [
-  'Driveway',
+  'Residential Driveway',
+  'Apartment / Condo Lot',
+  'Commercial Lot',
   'Garage',
-  'Carport',
   'Street Parking',
-  'Parking Lot',
-  'Gated Parking',
-  'Underground Parking',
-  'Commercial Lot'
+  'Event / Venue Lot',
 ] as const;
 
 const formSchema = z.object({
