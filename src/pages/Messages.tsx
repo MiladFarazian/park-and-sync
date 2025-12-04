@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { Search, Send, Loader2, ArrowLeft, Paperclip, X, Check, CheckCheck } from 'lucide-react';
+import { Search, Send, Loader2, ArrowLeft, Paperclip, X, Check, CheckCheck, PenSquare } from 'lucide-react';
 import { useMessages, Message } from '@/hooks/useMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,6 +15,18 @@ import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 import { sendMessage as sendMessageLib } from '@/lib/sendMessage';
 import { compressImage } from '@/lib/compressImage';
 import { Virtuoso } from 'react-virtuoso';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from '@/components/ui/drawer';
 
 // Memoized message item component for performance
 const MessageItem = memo(({ message, isMe }: { message: Message; isMe: boolean }) => {
@@ -429,6 +441,15 @@ function ChatPane({
   );
 }
 
+interface BookingContact {
+  user_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  avatar_url: string | null;
+  spot_title: string;
+  booking_date: string;
+}
+
 const Messages = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -439,6 +460,9 @@ const Messages = () => {
   const isMobile = useIsMobile();
   const messagesCacheRef = useRef<Map<string, Message[]>>(new Map());
   const [tick, setTick] = useState(0);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [bookingContacts, setBookingContacts] = useState<BookingContact[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
   
   // Force re-render every 60 seconds to update relative timestamps
   useEffect(() => {
@@ -505,6 +529,99 @@ const Messages = () => {
     }
   };
 
+  const fetchBookingContacts = async () => {
+    if (!user?.id) return;
+    setLoadingContacts(true);
+    try {
+      // Get bookings where user is renter (to message hosts)
+      const { data: renterBookings } = await supabase
+        .from('bookings')
+        .select(`
+          spot_id,
+          start_at,
+          spots!inner(title, host_id)
+        `)
+        .eq('renter_id', user.id)
+        .in('status', ['paid', 'active', 'completed']);
+
+      // Get bookings where user is host (to message renters)
+      const { data: hostBookings } = await supabase
+        .from('bookings')
+        .select(`
+          renter_id,
+          start_at,
+          spots!inner(title, host_id)
+        `)
+        .eq('spots.host_id', user.id)
+        .in('status', ['paid', 'active', 'completed']);
+
+      const contactUserIds = new Set<string>();
+      const contactsMap = new Map<string, { spot_title: string; booking_date: string }>();
+
+      // Add hosts from renter bookings
+      renterBookings?.forEach((b: any) => {
+        const hostId = b.spots?.host_id;
+        if (hostId && hostId !== user.id) {
+          contactUserIds.add(hostId);
+          if (!contactsMap.has(hostId)) {
+            contactsMap.set(hostId, { spot_title: b.spots?.title || 'Parking Spot', booking_date: b.start_at });
+          }
+        }
+      });
+
+      // Add renters from host bookings
+      hostBookings?.forEach((b: any) => {
+        const renterId = b.renter_id;
+        if (renterId && renterId !== user.id) {
+          contactUserIds.add(renterId);
+          if (!contactsMap.has(renterId)) {
+            contactsMap.set(renterId, { spot_title: b.spots?.title || 'Parking Spot', booking_date: b.start_at });
+          }
+        }
+      });
+
+      if (contactUserIds.size === 0) {
+        setBookingContacts([]);
+        return;
+      }
+
+      // Fetch profiles for all contacts
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name, avatar_url')
+        .in('user_id', Array.from(contactUserIds));
+
+      const contacts: BookingContact[] = (profiles || []).map(p => ({
+        user_id: p.user_id,
+        first_name: p.first_name,
+        last_name: p.last_name,
+        avatar_url: p.avatar_url,
+        spot_title: contactsMap.get(p.user_id)?.spot_title || 'Parking Spot',
+        booking_date: contactsMap.get(p.user_id)?.booking_date || '',
+      }));
+
+      // Filter out existing conversations
+      const existingUserIds = new Set(conversations.map(c => c.user_id));
+      const newContacts = contacts.filter(c => !existingUserIds.has(c.user_id));
+      
+      setBookingContacts(newContacts);
+    } catch (error) {
+      console.error('Error fetching booking contacts:', error);
+    } finally {
+      setLoadingContacts(false);
+    }
+  };
+
+  const handleOpenCompose = () => {
+    setComposeOpen(true);
+    fetchBookingContacts();
+  };
+
+  const handleSelectContact = (userId: string) => {
+    setComposeOpen(false);
+    setSearchParams({ userId }, { replace: true });
+  };
+
   const filteredConversations = conversations.filter(conv =>
     conv.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -516,12 +633,53 @@ const Messages = () => {
     (newUserProfile ? `${newUserProfile.first_name || ''} ${newUserProfile.last_name || ''}`.trim() || 'User' : 'User');
   const displayAvatar = selectedConvData?.avatar_url || newUserProfile?.avatar_url;
 
+  const ComposeContent = () => (
+    <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+      {loadingContacts ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : bookingContacts.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">
+          <p className="text-sm">No new contacts from bookings</p>
+          <p className="text-xs mt-1">Complete a booking to message hosts or renters</p>
+        </div>
+      ) : (
+        bookingContacts.map((contact) => (
+          <button
+            key={contact.user_id}
+            onClick={() => handleSelectContact(contact.user_id)}
+            className="w-full p-3 rounded-lg text-left transition-colors hover:bg-accent flex items-center gap-3"
+          >
+            <Avatar>
+              <AvatarImage src={contact.avatar_url || undefined} />
+              <AvatarFallback>
+                {`${contact.first_name?.[0] || ''}${contact.last_name?.[0] || ''}`.toUpperCase() || 'U'}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm truncate">
+                {`${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'User'}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">{contact.spot_title}</p>
+            </div>
+          </button>
+        ))
+      )}
+    </div>
+  );
+
   return (
     <div className="flex h-full gap-0 md:gap-4">
       {/* Conversations List */}
       <Card className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col overflow-hidden rounded-none md:rounded-2xl`}>
         <div className="p-4 border-b flex-shrink-0">
-          <h1 className="text-2xl font-bold mb-4">Messages</h1>
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-2xl font-bold">Messages</h1>
+            <Button variant="ghost" size="icon" onClick={handleOpenCompose}>
+              <PenSquare className="h-5 w-5" />
+            </Button>
+          </div>
           
           {/* Contact Support Button */}
           <Button 
@@ -617,6 +775,29 @@ const Messages = () => {
           </div>
         )}
       </Card>
+
+      {/* Compose Message Modal */}
+      {isMobile ? (
+        <Drawer open={composeOpen} onOpenChange={setComposeOpen}>
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>New Message</DrawerTitle>
+            </DrawerHeader>
+            <div className="px-4 pb-6">
+              <ComposeContent />
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>New Message</DialogTitle>
+            </DialogHeader>
+            <ComposeContent />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
