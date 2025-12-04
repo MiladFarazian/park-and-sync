@@ -70,7 +70,7 @@ const AppLayout = ({
             </div>
           </header>}
         <main className="flex-1 overflow-hidden bg-background">
-          <div className="h-full overflow-y-auto pb-16">
+          <div className="h-full overflow-y-auto pb-20 pb-[calc(5rem+env(safe-area-inset-bottom))]">
             {children}
           </div>
         </main>
