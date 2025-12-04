@@ -486,7 +486,7 @@ const Messages = () => {
           user_id: userId,
           first_name: 'Parkzy',
           last_name: 'Support',
-          avatar_url: '/parkzy-logo.png',
+          avatar_url: '/parkzy-support-avatar.png',
         });
         return;
       }
