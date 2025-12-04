@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, TrendingUp, Calendar, MapPin } from 'lucide-react';
+import { Plus, TrendingUp, Calendar, MapPin, Car } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMode } from '@/contexts/ModeContext';
 import { toast } from 'sonner';
 import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
 
 const HostHome = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { setMode } = useMode();
   const [stats, setStats] = useState({
     totalEarnings: 0,
     totalBookings: 0,
@@ -189,6 +191,17 @@ const HostHome = () => {
         >
           <MapPin className="h-4 w-4 mr-2" />
           View All Listings
+        </Button>
+        <Button 
+          variant="outline"
+          className="w-full"
+          onClick={() => {
+            setMode('driver');
+            navigate('/');
+          }}
+        >
+          <Car className="h-4 w-4 mr-2" />
+          Find Parking
         </Button>
       </div>
     </div>
