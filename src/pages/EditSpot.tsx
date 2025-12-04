@@ -230,6 +230,15 @@ const EditSpot = () => {
   } = useForm({
     resolver: zodResolver(formSchema)
   });
+  
+  // Track component mount/unmount for debugging
+  useEffect(() => {
+    console.log('[EDITSPOT] Component MOUNTED, ref value:', pendingUploadsRef.current.length);
+    return () => {
+      console.log('[EDITSPOT] Component UNMOUNTING, ref value:', pendingUploadsRef.current.length);
+    };
+  }, []);
+  
   useEffect(() => {
     supabase.auth.getUser().then(({
       data: {
