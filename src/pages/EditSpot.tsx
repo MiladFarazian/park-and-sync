@@ -504,6 +504,7 @@ const EditSpot = () => {
     }
   };
   const onSubmit = async (data: any) => {
+    console.log('[SAVE] onSubmit called, pendingUploads:', pendingUploads.length, pendingUploads);
     if (!spotId || isSaving) return;
     try {
       setIsSaving(true);
