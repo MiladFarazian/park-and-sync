@@ -1,14 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Star, MapPin, Navigation, Footprints, Pencil } from 'lucide-react';
+import { Star, MapPin, Navigation, Footprints, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useMode } from '@/contexts/ModeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import useEmblaCarousel from 'embla-carousel-react';
 
 interface Spot {
   id: string;
@@ -90,37 +91,97 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
   const [mapboxToken, setMapboxToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
+  const [sortedSpots, setSortedSpots] = useState<Spot[]>([]);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  
+  // Embla carousel for swipeable spot cards
+  const [emblaRef, emblaApi] = useEmblaCarousel({ 
+    loop: false,
+    align: 'center',
+    containScroll: 'trimSnaps'
+  });
 
   // Update spots ref whenever spots change
   useEffect(() => {
     spotsRef.current = spots;
   }, [spots]);
 
-  // Auto-select nearest spot when spots load (only if user hasn't manually selected)
+  // Sort spots by distance when spots or searchCenter change
   useEffect(() => {
-    if (!spots.length || !searchCenter || !mapReady || userSelectedSpot) return;
+    if (!spots.length || !searchCenter) {
+      setSortedSpots([]);
+      return;
+    }
 
-    // Find the nearest spot to the search center
-    const nearestSpot = spots.reduce((closest, current) => {
-      const closestDist = calculateDistance(
-        searchCenter.lat,
-        searchCenter.lng,
-        Number(closest.lat),
-        Number(closest.lng)
-      );
-      const currentDist = calculateDistance(
-        searchCenter.lat,
-        searchCenter.lng,
-        Number(current.lat),
-        Number(current.lng)
-      );
-      return currentDist < closestDist ? current : closest;
+    const sorted = [...spots].sort((a, b) => {
+      const distA = calculateDistance(searchCenter.lat, searchCenter.lng, Number(a.lat), Number(a.lng));
+      const distB = calculateDistance(searchCenter.lat, searchCenter.lng, Number(b.lat), Number(b.lng));
+      return distA - distB;
     });
 
-    // Track which spot is nearest and auto-select it
-    setNearestSpotId(nearestSpot.id);
-    setSelectedSpot(nearestSpot);
-  }, [spots, searchCenter, mapReady, userSelectedSpot]);
+    setSortedSpots(sorted);
+    
+    // Set the nearest spot ID (first in sorted array)
+    if (sorted.length > 0) {
+      setNearestSpotId(sorted[0].id);
+    }
+  }, [spots, searchCenter]);
+
+  // Auto-select nearest spot when sorted spots are ready (only if user hasn't manually selected)
+  useEffect(() => {
+    if (!sortedSpots.length || !mapReady || userSelectedSpot) return;
+    
+    setSelectedSpot(sortedSpots[0]);
+    setCurrentSlideIndex(0);
+  }, [sortedSpots, mapReady, userSelectedSpot]);
+
+  // Sync carousel with embla on select
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return;
+    const index = emblaApi.selectedScrollSnap();
+    setCurrentSlideIndex(index);
+    if (sortedSpots[index]) {
+      setSelectedSpot(sortedSpots[index]);
+      setUserSelectedSpot(true);
+      
+      // Pan map to selected spot
+      if (map.current) {
+        map.current.flyTo({
+          center: [sortedSpots[index].lng, sortedSpots[index].lat],
+          zoom: Math.max(map.current.getZoom(), 14),
+          duration: 500
+        });
+      }
+    }
+  }, [emblaApi, sortedSpots]);
+
+  // Set up embla event listeners
+  useEffect(() => {
+    if (!emblaApi) return;
+    
+    emblaApi.on('select', onSelect);
+    return () => {
+      emblaApi.off('select', onSelect);
+    };
+  }, [emblaApi, onSelect]);
+
+  // Scroll carousel to spot when marker is clicked
+  const scrollToSpot = useCallback((spotId: string) => {
+    if (!emblaApi || !sortedSpots.length) return;
+    const index = sortedSpots.findIndex(s => s.id === spotId);
+    if (index !== -1) {
+      emblaApi.scrollTo(index);
+    }
+  }, [emblaApi, sortedSpots]);
+
+  // Navigation handlers
+  const scrollPrev = useCallback(() => {
+    if (emblaApi) emblaApi.scrollPrev();
+  }, [emblaApi]);
+
+  const scrollNext = useCallback(() => {
+    if (emblaApi) emblaApi.scrollNext();
+  }, [emblaApi]);
 
   // Fetch Mapbox token
   useEffect(() => {
@@ -706,6 +767,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           console.log('[MapView] Setting selected spot:', spot.id);
           setUserSelectedSpot(true); // Mark that user manually selected a spot
           setSelectedSpot(spot);
+          // Scroll carousel to this spot
+          scrollToSpot(spot.id);
         } else {
           console.error('[MapView] Spot not found in spots array for ID:', f.properties.id);
         }
@@ -815,93 +878,126 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         className="absolute inset-0"
       />
 
-      {/* Selected Spot Details Card */}
-      {selectedSpot && (
-        <div className="absolute bottom-4 left-4 right-4 z-10">
-          <Card className="p-4 bg-background/95 backdrop-blur-sm">
+      {/* Swipeable Spot Cards Carousel */}
+      {sortedSpots.length > 0 && (
+        <div className="absolute bottom-4 left-0 right-0 z-10">
+          {/* Navigation arrows and counter */}
+          <div className="flex items-center justify-between px-4 mb-2">
+            <button
+              onClick={scrollPrev}
+              disabled={currentSlideIndex === 0}
+              className="p-2 rounded-full bg-background/90 backdrop-blur-sm shadow-md disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <span className="text-sm font-medium bg-background/90 backdrop-blur-sm px-3 py-1 rounded-full shadow-md">
+              {currentSlideIndex + 1} / {sortedSpots.length}
+            </span>
+            <button
+              onClick={scrollNext}
+              disabled={currentSlideIndex === sortedSpots.length - 1}
+              className="p-2 rounded-full bg-background/90 backdrop-blur-sm shadow-md disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Carousel */}
+          <div ref={emblaRef} className="overflow-hidden px-4">
             <div className="flex gap-3">
-              <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0">
-                <img 
-                  src={selectedSpot.imageUrl || "/placeholder.svg"}
-                  alt="Parking spot"
-                  className="w-full h-full object-cover rounded-lg"
-                />
-              </div>
-              
-              <div className="flex-1 space-y-2 min-w-0">
-                <div className="flex justify-between items-start gap-2">
-                  <div className="flex-1 flex flex-wrap gap-1">
-                    {selectedSpot.category && (
-                      <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                        {selectedSpot.category}
-                      </Badge>
-                    )}
-                    {selectedSpot.id === nearestSpotId && (
-                      <Badge className="bg-primary/10 text-primary border-primary/20 text-xs px-2 py-0.5">
-                        Nearest
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="font-bold text-primary text-lg">${selectedSpot.hourlyRate}/hr</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-1 text-sm text-muted-foreground">
-                  <MapPin className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                  <span className="leading-tight">{selectedSpot.address}</span>
-                </div>
-                
-                {searchCenter && (
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>{calculateDistance(searchCenter.lat, searchCenter.lng, selectedSpot.lat, selectedSpot.lng).toFixed(1)} mi</span>
-                    <Footprints className="h-3 w-3" />
-                    <span>{calculateWalkTime(calculateDistance(searchCenter.lat, searchCenter.lng, selectedSpot.lat, selectedSpot.lng))} min walk</span>
-                  </div>
-                )}
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                    <span className="font-medium text-sm">{selectedSpot.rating || 'New'}</span>
-                    <span className="text-muted-foreground text-sm">({selectedSpot.reviews || 0})</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex gap-3 mt-4">
-              <Button 
-                variant="outline" 
-                className="flex-1 text-sm"
-                onClick={() => navigate(buildSpotUrl(selectedSpot.id))}
-              >
-                View Details
-              </Button>
-              {user && selectedSpot.hostId === user.id ? (
-                <Button 
-                  className="flex-1 text-sm"
-                  onClick={() => {
-                    if (mode !== 'host') {
-                      setMode('host');
-                    }
-                    navigate(`/edit-spot/${selectedSpot.id}`);
-                  }}
+              {sortedSpots.map((spot, index) => (
+                <div 
+                  key={spot.id} 
+                  className="flex-[0_0_100%] min-w-0"
                 >
-                  <Pencil className="h-4 w-4 mr-1" />
-                  Edit Spot
-                </Button>
-              ) : (
-                <Button 
-                  className="flex-1 text-sm"
-                  onClick={() => navigate(buildBookingUrl(selectedSpot.id))}
-                >
-                  <Navigation className="h-4 w-4 mr-1" />
-                  Book Now
-                </Button>
-              )}
+                  <Card className="p-4 bg-background/95 backdrop-blur-sm">
+                    <div className="flex gap-3">
+                      <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0">
+                        <img 
+                          src={spot.imageUrl || "/placeholder.svg"}
+                          alt="Parking spot"
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      </div>
+                      
+                      <div className="flex-1 space-y-2 min-w-0">
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="flex-1 flex flex-wrap gap-1">
+                            {spot.category && (
+                              <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                                {spot.category}
+                              </Badge>
+                            )}
+                            {index === 0 && (
+                              <Badge className="bg-primary/10 text-primary border-primary/20 text-xs px-2 py-0.5">
+                                Nearest
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="font-bold text-primary text-lg">${spot.hourlyRate}/hr</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start gap-1 text-sm text-muted-foreground">
+                          <MapPin className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                          <span className="leading-tight line-clamp-1">{spot.address}</span>
+                        </div>
+                        
+                        {searchCenter && (
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span>{calculateDistance(searchCenter.lat, searchCenter.lng, spot.lat, spot.lng).toFixed(1)} mi</span>
+                            <Footprints className="h-3 w-3" />
+                            <span>{calculateWalkTime(calculateDistance(searchCenter.lat, searchCenter.lng, spot.lat, spot.lng))} min walk</span>
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                            <span className="font-medium text-sm">{spot.rating || 'New'}</span>
+                            <span className="text-muted-foreground text-sm">({spot.reviews || 0})</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-3 mt-4">
+                      <Button 
+                        variant="outline" 
+                        className="flex-1 text-sm"
+                        onClick={() => navigate(buildSpotUrl(spot.id))}
+                      >
+                        View Details
+                      </Button>
+                      {user && spot.hostId === user.id ? (
+                        <Button 
+                          className="flex-1 text-sm"
+                          onClick={() => {
+                            if (mode !== 'host') {
+                              setMode('host');
+                            }
+                            navigate(`/edit-spot/${spot.id}`);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4 mr-1" />
+                          Edit Spot
+                        </Button>
+                      ) : (
+                        <Button 
+                          className="flex-1 text-sm"
+                          onClick={() => navigate(buildBookingUrl(spot.id))}
+                        >
+                          <Navigation className="h-4 w-4 mr-1" />
+                          Book Now
+                        </Button>
+                      )}
+                    </div>
+                  </Card>
+                </div>
+              ))}
             </div>
-          </Card>
+          </div>
         </div>
       )}
     </div>
