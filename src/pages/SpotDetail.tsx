@@ -405,10 +405,8 @@ const SpotDetail = () => {
 
       setSpot(transformedData);
       
-      // Fetch reviews for the host
-      if (spotData.host_id) {
-        fetchHostReviews(spotData.host_id);
-      }
+      // Fetch reviews for this specific spot
+      fetchSpotReviews(spotData.id);
       
       // Check if user owns this spot
       if (user && transformedData.host_id) {
@@ -427,9 +425,10 @@ const SpotDetail = () => {
     }
   };
 
-  const fetchHostReviews = async (hostId: string) => {
+  const fetchSpotReviews = async (spotId: string) => {
     setReviewsLoading(true);
     try {
+      // Get reviews for bookings of this specific spot
       const { data, error } = await supabase
         .from('reviews')
         .select(`
@@ -438,14 +437,22 @@ const SpotDetail = () => {
             first_name,
             last_name,
             avatar_url
+          ),
+          booking:booking_id (
+            spot_id
           )
         `)
-        .eq('reviewee_id', hostId)
         .eq('is_public', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setReviews(data || []);
+      
+      // Filter to only reviews for this spot
+      const spotReviews = (data || []).filter(
+        review => review.booking?.spot_id === spotId
+      );
+      
+      setReviews(spotReviews);
     } catch (error) {
       console.error('Error fetching reviews:', error);
     } finally {
