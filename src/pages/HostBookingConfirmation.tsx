@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, DollarSign, MapPin, Star, MessageCircle, Car, Calendar, Navigation, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, DollarSign, MapPin, Star, MessageCircle, Car, Calendar, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -86,18 +86,6 @@ const HostBookingConfirmation = () => {
         variant: "destructive",
       });
     }
-  };
-
-  const handleGetDirections = () => {
-    if (!spot?.address) return;
-    
-    const encodedAddress = encodeURIComponent(spot.address);
-    const coords = spot.latitude && spot.longitude ? `${spot.latitude},${spot.longitude}` : '';
-    const url = coords 
-      ? `https://www.google.com/maps/dir/?api=1&destination=${coords}`
-      : `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
-    
-    window.open(url, '_blank');
   };
 
   if (loading) {
@@ -215,14 +203,6 @@ const HostBookingConfirmation = () => {
               </div>
             </div>
           </div>
-          <Button 
-            variant="outline" 
-            className="w-full mt-4" 
-            onClick={handleGetDirections}
-          >
-            <Navigation className="h-4 w-4 mr-2" />
-            Get Directions to Spot
-          </Button>
         </Card>
 
         {/* Driver Info Card */}
@@ -242,6 +222,14 @@ const HostBookingConfirmation = () => {
                 </div>
               </div>
             </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleMessageDriver}
+            >
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Message
+            </Button>
           </div>
           
           {/* Vehicle Info */}
@@ -276,16 +264,7 @@ const HostBookingConfirmation = () => {
 
         {/* Action Buttons */}
         <div className="space-y-3 pt-2">
-          <Button 
-            className="w-full" 
-            size="lg"
-            onClick={handleMessageDriver}
-          >
-            <MessageCircle className="h-4 w-4 mr-2" />
-            Message Driver
-          </Button>
-          
-          <Button 
+          <Button
             variant="outline" 
             className="w-full" 
             size="lg"
