@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
+import { useMode } from "@/contexts/ModeContext";
 
 interface Notification {
   id: string;
@@ -27,6 +28,7 @@ export const NotificationBell = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const { mode, setMode } = useMode();
 
   const fetchNotifications = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -83,10 +85,16 @@ export const NotificationBell = () => {
 
     // Handle navigation based on notification type
     if (notification.type === "booking") {
-      // Driver booking confirmation
+      // Driver booking confirmation - switch to driver mode if needed
+      if (mode === 'host') {
+        setMode('driver');
+      }
       navigate(`/booking-confirmation/${notification.related_id}`);
     } else if (notification.type === "booking_host") {
-      // Host booking confirmation
+      // Host booking confirmation - switch to host mode if needed
+      if (mode === 'driver') {
+        setMode('host');
+      }
       navigate(`/host-booking-confirmation/${notification.related_id}`);
     } else if (notification.type === "message") {
       navigate(`/messages`);
