@@ -108,8 +108,15 @@ export const useMessages = () => {
 
         const convs: Conversation[] = [];
         for (const [partnerId, conv] of conversationMap) {
+          // Special handling for Parkzy Support
+          const isSupportUser = partnerId === '00000000-0000-0000-0000-000000000001';
           const profile = profiles?.find(p => p.user_id === partnerId);
-          const profileName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown User' : 'Unknown User';
+          const profileName = isSupportUser 
+            ? 'Parkzy Support' 
+            : (profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown User' : 'Unknown User');
+          const profileAvatar = isSupportUser
+            ? '/parkzy-support-avatar.png'
+            : profile?.avatar_url;
           
           // Find the last message for this conversation to get proper preview
           const lastMsg = conv.messages.sort((a: Message, b: Message) => 
@@ -121,7 +128,7 @@ export const useMessages = () => {
             id: partnerId,
             user_id: partnerId,
             name: profileName,
-            avatar_url: profile?.avatar_url,
+            avatar_url: profileAvatar,
             last_message: getMessagePreview(lastMsg, user.id, profileName),
             last_message_at: conv.last_message_at,
             unread_count: conv.unread_count
@@ -150,6 +157,16 @@ export const useMessages = () => {
   // Helpers for realtime incremental updates
   const ensureProfileLoaded = async (partnerId: string) => {
     if (profileCacheRef.current.has(partnerId)) return;
+    
+    // Special handling for Parkzy Support
+    if (partnerId === '00000000-0000-0000-0000-000000000001') {
+      profileCacheRef.current.set(partnerId, { name: 'Parkzy Support', avatar_url: '/parkzy-support-avatar.png' });
+      if (mountedRef.current) {
+        setConversations(prev => prev.map(c => c.user_id === partnerId ? { ...c, name: 'Parkzy Support', avatar_url: '/parkzy-support-avatar.png' } : c));
+      }
+      return;
+    }
+    
     try {
       profileCacheRef.current.set(partnerId, { name: 'Unknown User' });
       const { data } = await supabase
