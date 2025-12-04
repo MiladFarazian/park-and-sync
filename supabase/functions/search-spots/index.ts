@@ -70,6 +70,7 @@ serve(async (req) => {
         id,
         host_id,
         title,
+        category,
         description,
         address,
         latitude,

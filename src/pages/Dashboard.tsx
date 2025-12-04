@@ -68,6 +68,7 @@ const Dashboard = () => {
         .select(`
           id,
           title,
+          category,
           address,
           hourly_rate,
           status,
@@ -164,6 +165,11 @@ const Dashboard = () => {
       
       <div className="p-4 space-y-3">
         <div>
+          {listing.category && (
+            <Badge variant="secondary" className="text-xs px-2 py-0.5 mb-2">
+              {listing.category}
+            </Badge>
+          )}
           <div className="flex items-start gap-1.5 text-sm text-muted-foreground">
             <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
             <span className="line-clamp-1">{listing.address}</span>

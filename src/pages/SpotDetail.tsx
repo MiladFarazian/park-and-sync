@@ -579,6 +579,13 @@ const SpotDetail = () => {
       <div className="p-4 space-y-6">
         <div>
           <div className="flex justify-between items-start mb-2">
+            <div className="flex-1">
+              {spot.category && (
+                <Badge variant="secondary" className="text-sm px-3 py-1 mb-2">
+                  {spot.category}
+                </Badge>
+              )}
+            </div>
             <div className="text-right">
               <p className="text-2xl font-bold text-primary">${spot.hourlyRate}</p>
               <p className="text-sm text-muted-foreground">per hour</p>
