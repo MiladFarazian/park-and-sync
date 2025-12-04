@@ -68,6 +68,7 @@ serve(async (req) => {
       .from('spots')
       .select(`
         id,
+        host_id,
         title,
         description,
         address,
