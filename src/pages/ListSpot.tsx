@@ -16,11 +16,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { AvailabilityManager, AvailabilityRule } from '@/components/availability/AvailabilityManager';
 import { compressImage } from '@/lib/compressImage';
 
+const spotCategories = [
+  'Residential Driveway',
+  'Apartment / Condo Lot',
+  'Commercial Lot',
+  'Garage',
+  'Street Parking',
+  'Event / Venue Lot',
+] as const;
+
 const formSchema = z.object({
-  title: z.string()
-    .trim()
-    .min(3, 'Title must be at least 3 characters')
-    .max(100, 'Title must be less than 100 characters'),
+  category: z.enum(spotCategories, {
+    required_error: 'Please select a category',
+  }),
   address: z.string()
     .trim()
     .min(5, 'Address is required')
@@ -100,7 +108,7 @@ const ListSpot = () => {
   } = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      title: '',
+      category: undefined,
       address: '',
       hourlyRate: '',
       description: '',
@@ -311,7 +319,8 @@ const ListSpot = () => {
         .from('spots')
         .insert({
           host_id: user.id,
-          title: data.title,
+          title: data.category,
+          category: data.category,
           address: data.address,
           hourly_rate: parseFloat(data.hourlyRate),
           description: data.description,
@@ -409,12 +418,12 @@ const ListSpot = () => {
 
   const canProceed = () => {
     if (currentStep === 1) {
-      return formData.title && 
+      return formData.category && 
              formData.address && 
              formData.hourlyRate && 
              !!addressCoordinates &&
              addressConfirmedFromSuggestion &&
-             !errors.title && 
+             !errors.category && 
              !errors.address && 
              !errors.hourlyRate &&
              !addressValidationError &&
@@ -492,15 +501,19 @@ const ListSpot = () => {
 
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="title">Spot Title</Label>
-                    <Input
-                      id="title"
-                      placeholder="e.g., Downtown Covered Parking"
-                      {...register('title')}
-                      className="mt-1.5"
-                    />
-                    {errors.title && (
-                      <p className="text-sm text-destructive mt-1">{errors.title.message}</p>
+                    <Label htmlFor="category">Spot Type</Label>
+                    <select
+                      id="category"
+                      {...register('category')}
+                      className="mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="">Select a category...</option>
+                      {spotCategories.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                    {errors.category && (
+                      <p className="text-sm text-destructive mt-1">{errors.category.message}</p>
                     )}
                   </div>
 
@@ -939,8 +952,8 @@ const ListSpot = () => {
                     <h3 className="font-semibold text-sm mb-3">Basic Information</h3>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Title:</span>
-                        <span className="font-medium">{formData.title}</span>
+                        <span className="text-muted-foreground">Type:</span>
+                        <span className="font-medium">{formData.category}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Address:</span>

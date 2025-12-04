@@ -547,6 +547,7 @@ export type Database = {
           access_notes: string | null
           address: string
           cancellation_policy: string | null
+          category: string | null
           created_at: string
           daily_rate: number | null
           description: string | null
@@ -569,6 +570,7 @@ export type Database = {
           access_notes?: string | null
           address: string
           cancellation_policy?: string | null
+          category?: string | null
           created_at?: string
           daily_rate?: number | null
           description?: string | null
@@ -593,6 +595,7 @@ export type Database = {
           access_notes?: string | null
           address?: string
           cancellation_policy?: string | null
+          category?: string | null
           created_at?: string
           daily_rate?: number | null
           description?: string | null
