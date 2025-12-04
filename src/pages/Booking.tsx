@@ -696,7 +696,6 @@ const Booking = () => {
               />
             )}
             <div className="flex-1">
-              <h2 className="font-bold text-lg mb-1">{spot.title}</h2>
               <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
                 <MapPin className="h-3 w-3" />
                 <span>{spot.address}</span>

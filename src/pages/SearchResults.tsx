@@ -183,7 +183,6 @@ const SearchResults = () => {
         
         <div className="flex-1 space-y-2 min-w-0">
           <div className="flex justify-between items-start gap-2">
-            <h3 className="font-semibold text-base leading-tight">{spot.title}</h3>
             <div className="text-right flex-shrink-0">
               <p className="font-bold text-primary text-lg">${spot.hourlyRate}/hr</p>
             </div>

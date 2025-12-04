@@ -199,7 +199,7 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">Book Parking</DialogTitle>
-          <p className="text-sm text-muted-foreground">{spot.title}</p>
+          <p className="text-sm text-muted-foreground">{spot.address}</p>
         </DialogHeader>
 
         <div className="space-y-4 py-4">

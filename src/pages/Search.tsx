@@ -435,7 +435,6 @@ const Search = () => {
                   
                   <div className="flex-1 space-y-1">
                     <div className="flex justify-between items-start">
-                      <h3 className="font-semibold">{spot.title}</h3>
                       <div className="text-right">
                         <p className="font-bold text-primary">${spot.hourlyRate}/hr</p>
                       </div>

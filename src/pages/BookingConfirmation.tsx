@@ -269,7 +269,6 @@ const BookingConfirmation = () => {
           <div className="flex gap-4">
             {primaryPhoto && <img src={primaryPhoto} alt={spot.title} className="w-20 h-20 rounded-lg object-cover" />}
             <div className="flex-1">
-              <h4 className="font-semibold mb-1">{spot.title}</h4>
               <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
                 <MapPin className="h-3 w-3 flex-shrink-0" />
                 <span className="flex-1">{spot.address}</span>

@@ -822,7 +822,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
               <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0">
                 <img 
                   src={selectedSpot.imageUrl || "/placeholder.svg"}
-                  alt={selectedSpot.title}
+                  alt="Parking spot"
                   className="w-full h-full object-cover rounded-lg"
                 />
               </div>
@@ -830,9 +830,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
               <div className="flex-1 space-y-2 min-w-0">
                 <div className="flex justify-between items-start gap-2">
                   <div className="flex-1">
-                    <h3 className="font-semibold text-base leading-tight">{selectedSpot.title}</h3>
                     {selectedSpot.id === nearestSpotId && (
-                      <Badge className="bg-primary/10 text-primary border-primary/20 text-xs px-2 py-0.5 mt-1">
+                      <Badge className="bg-primary/10 text-primary border-primary/20 text-xs px-2 py-0.5">
                         Nearest
                       </Badge>
                     )}

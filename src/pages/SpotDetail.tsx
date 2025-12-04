@@ -579,7 +579,6 @@ const SpotDetail = () => {
       <div className="p-4 space-y-6">
         <div>
           <div className="flex justify-between items-start mb-2">
-            <h1 className="text-2xl font-bold">{spot.title}</h1>
             <div className="text-right">
               <p className="text-2xl font-bold text-primary">${spot.hourlyRate}</p>
               <p className="text-sm text-muted-foreground">per hour</p>
