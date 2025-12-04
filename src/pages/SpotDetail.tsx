@@ -60,6 +60,7 @@ const SpotDetail = () => {
   const [touchEnd, setTouchEnd] = useState(0);
   const [reviews, setReviews] = useState<any[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [ratingFilter, setRatingFilter] = useState<number | null>(null);
 
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) => 
@@ -764,52 +765,84 @@ const SpotDetail = () => {
                 </div>
               </Card>
 
+              {/* Filter Buttons */}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={ratingFilter === null ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setRatingFilter(null)}
+                  className="h-8"
+                >
+                  All
+                </Button>
+                {[5, 4, 3, 2, 1].map((rating) => (
+                  <Button
+                    key={rating}
+                    variant={ratingFilter === rating ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setRatingFilter(rating)}
+                    className="h-8 gap-1"
+                  >
+                    {rating}
+                    <Star className="h-3 w-3 fill-current" />
+                  </Button>
+                ))}
+              </div>
+
               {/* Review List */}
               <div className="space-y-4">
-                {reviews.map((review) => (
-                  <Card key={review.id} className="p-4">
-                    <div className="flex items-start gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={review.reviewer?.avatar_url} />
-                        <AvatarFallback>
-                          {review.reviewer?.first_name?.[0] || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <p className="font-medium truncate">
-                            {review.reviewer?.first_name 
-                              ? `${review.reviewer.first_name} ${review.reviewer.last_name?.[0] || ''}.`
-                              : 'Anonymous'}
-                          </p>
-                          <span className="text-xs text-muted-foreground shrink-0">
-                            {new Date(review.created_at).toLocaleDateString('en-US', {
-                              month: 'short',
-                              year: 'numeric'
-                            })}
-                          </span>
+                {reviews.filter((review) => ratingFilter === null || review.rating === ratingFilter).length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">
+                    No {ratingFilter}-star reviews yet
+                  </p>
+                ) : (
+                  reviews
+                    .filter((review) => ratingFilter === null || review.rating === ratingFilter)
+                    .map((review) => (
+                      <Card key={review.id} className="p-4">
+                        <div className="flex items-start gap-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={review.reviewer?.avatar_url} />
+                            <AvatarFallback>
+                              {review.reviewer?.first_name?.[0] || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <p className="font-medium truncate">
+                                {review.reviewer?.first_name 
+                                  ? `${review.reviewer.first_name} ${review.reviewer.last_name?.[0] || ''}.`
+                                  : 'Anonymous'}
+                              </p>
+                              <span className="text-xs text-muted-foreground shrink-0">
+                                {new Date(review.created_at).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  year: 'numeric'
+                                })}
+                              </span>
+                            </div>
+                            <div className="flex gap-0.5 mb-2">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`h-3.5 w-3.5 ${
+                                    star <= review.rating
+                                      ? 'fill-primary text-primary'
+                                      : 'text-muted-foreground/30'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            {review.comment && (
+                              <p className="text-sm text-muted-foreground leading-relaxed">
+                                {review.comment}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex gap-0.5 mb-2">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`h-3.5 w-3.5 ${
-                                star <= review.rating
-                                  ? 'fill-primary text-primary'
-                                  : 'text-muted-foreground/30'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        {review.comment && (
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            {review.comment}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                ))}
+                      </Card>
+                    ))
+                )}
               </div>
             </div>
           )}
