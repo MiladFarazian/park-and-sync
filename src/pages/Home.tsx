@@ -460,7 +460,14 @@ const Home = () => {
         </div>
 
         {/* Nearby Spots */}
-        {loading ? (
+        {!locationResolved ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center space-y-4">
+              <MapPin className="h-8 w-8 animate-pulse mx-auto text-primary" />
+              <p className="text-muted-foreground">Detecting your location...</p>
+            </div>
+          </div>
+        ) : loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center space-y-4">
               <Loader2 className="h-8 w-8 animate-spin mx-auto" />
