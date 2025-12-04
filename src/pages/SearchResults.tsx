@@ -119,7 +119,8 @@ const SearchResults = () => {
           ...(spot.has_ev_charging ? ['EV Charging'] : []),
           ...(spot.is_covered ? ['Covered'] : []),
           ...(spot.is_secure ? ['Secure'] : []),
-        ]
+        ],
+        hostId: spot.host_id
       })) || [];
 
       setParkingSpots(transformedSpots);

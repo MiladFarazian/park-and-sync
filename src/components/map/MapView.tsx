@@ -3,10 +3,12 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Star, MapPin, Navigation, Footprints } from 'lucide-react';
+import { Star, MapPin, Navigation, Footprints, Pencil } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useMode } from '@/contexts/ModeContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Spot {
   id: string;
@@ -18,6 +20,7 @@ interface Spot {
   rating?: number;
   reviews?: number;
   imageUrl?: string;
+  hostId?: string;
 }
 
 interface MapViewProps {
@@ -56,6 +59,8 @@ const calculateWalkTime = (distanceMiles: number): number => {
 
 const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, onMapMove, searchQuery, exploreParams }: MapViewProps) => {
   const navigate = useNavigate();
+  const { mode, setMode } = useMode();
+  const { user } = useAuth();
   
   const buildSpotUrl = (spotId: string) => {
     const params = new URLSearchParams({ from: 'explore' });
@@ -868,13 +873,28 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
               >
                 View Details
               </Button>
-              <Button 
-                className="flex-1 text-sm"
-                onClick={() => navigate(buildBookingUrl(selectedSpot.id))}
-              >
-                <Navigation className="h-4 w-4 mr-1" />
-                Book Now
-              </Button>
+              {user && selectedSpot.hostId === user.id ? (
+                <Button 
+                  className="flex-1 text-sm"
+                  onClick={() => {
+                    if (mode !== 'host') {
+                      setMode('host');
+                    }
+                    navigate(`/edit-spot/${selectedSpot.id}`);
+                  }}
+                >
+                  <Pencil className="h-4 w-4 mr-1" />
+                  Edit Spot
+                </Button>
+              ) : (
+                <Button 
+                  className="flex-1 text-sm"
+                  onClick={() => navigate(buildBookingUrl(selectedSpot.id))}
+                >
+                  <Navigation className="h-4 w-4 mr-1" />
+                  Book Now
+                </Button>
+              )}
             </div>
           </Card>
         </div>
