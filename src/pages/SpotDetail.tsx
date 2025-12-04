@@ -578,13 +578,23 @@ const SpotDetail = () => {
 
       <div className="p-4 space-y-6">
         <div>
+          {/* Category Header */}
+          {spot.category && (
+            <div className="mb-4">
+              <span className="inline-flex items-center gap-2 text-lg font-semibold text-foreground">
+                {spot.category === 'Residential Driveway' && <span className="text-xl">🏠</span>}
+                {spot.category === 'Apartment / Condo Lot' && <span className="text-xl">🏢</span>}
+                {spot.category === 'Commercial Lot' && <span className="text-xl">🅿️</span>}
+                {spot.category === 'Garage' && <span className="text-xl">🚗</span>}
+                {spot.category === 'Street Parking' && <span className="text-xl">🛣️</span>}
+                {spot.category === 'Event / Venue Lot' && <span className="text-xl">🎭</span>}
+                {spot.category}
+              </span>
+            </div>
+          )}
+          
           <div className="flex justify-between items-start mb-2">
             <div className="flex-1">
-              {spot.category && (
-                <Badge variant="secondary" className="text-sm px-3 py-1 mb-2">
-                  {spot.category}
-                </Badge>
-              )}
             </div>
             <div className="text-right">
               <p className="text-2xl font-bold text-primary">${spot.hourlyRate}</p>
