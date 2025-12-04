@@ -280,6 +280,23 @@ const BookingConfirmation = () => {
               </div>
             </div>
           </div>
+          
+          {/* Spot Description */}
+          {spot.description && (
+            <div className="mt-4 pt-4 border-t">
+              <h4 className="text-sm font-semibold mb-2">About This Spot</h4>
+              <p className="text-sm text-muted-foreground">{spot.description}</p>
+            </div>
+          )}
+          
+          {/* Access Information */}
+          {spot.access_notes && (
+            <div className="mt-4 pt-4 border-t">
+              <h4 className="text-sm font-semibold mb-2">Access Instructions</h4>
+              <p className="text-sm text-muted-foreground">{spot.access_notes}</p>
+            </div>
+          )}
+          
           <Button variant="outline" className="w-full mt-4" onClick={handleDirections}>
             <Navigation className="h-4 w-4 mr-2" />
             Get Directions

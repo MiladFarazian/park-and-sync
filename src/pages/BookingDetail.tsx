@@ -35,6 +35,8 @@ interface BookingDetails {
     title: string;
     address: string;
     host_id: string;
+    description: string | null;
+    access_notes: string | null;
   };
   profiles: {
     first_name: string;
@@ -91,7 +93,7 @@ const BookingDetail = () => {
           overstay_action,
           renter_id,
           cancellation_reason,
-          spots!inner(id, title, address, host_id),
+          spots!inner(id, title, address, host_id, description, access_notes),
           profiles!bookings_renter_id_fkey(first_name, last_name, avatar_url)
         `)
         .eq('id', bookingId)
@@ -524,6 +526,22 @@ const BookingDetail = () => {
               <p className="text-sm">{booking.spots.address}</p>
             </div>
           </div>
+
+          {/* Spot Description */}
+          {booking.spots.description && (
+            <div className="pt-2 border-t">
+              <h4 className="text-sm font-semibold mb-1">About This Spot</h4>
+              <p className="text-sm text-muted-foreground">{booking.spots.description}</p>
+            </div>
+          )}
+
+          {/* Access Information */}
+          {booking.spots.access_notes && (
+            <div className="pt-2 border-t">
+              <h4 className="text-sm font-semibold mb-1">Access Instructions</h4>
+              <p className="text-sm text-muted-foreground">{booking.spots.access_notes}</p>
+            </div>
+          )}
 
           <div className="flex gap-2">
             <Button variant="outline" className="flex-1" onClick={handleGetDirections}>
