@@ -83,9 +83,7 @@ serve(async (req) => {
         status,
         profiles!spots_host_id_fkey (
           first_name,
-          last_name,
-          rating,
-          review_count
+          last_name
         ),
         spot_photos (
           url,
@@ -150,7 +148,27 @@ serve(async (req) => {
           });
 
         if (isAvailable) {
-          availableSpots.push({ ...spot, distance });
+          // Get spot-specific reviews through bookings
+          const { data: spotReviews } = await supabase
+            .from('reviews')
+            .select('rating, booking:booking_id(spot_id)')
+            .eq('is_public', true);
+          
+          const spotSpecificReviews = (spotReviews || []).filter(
+            (r: any) => r.booking?.spot_id === spot.id
+          );
+          
+          const reviewCount = spotSpecificReviews.length;
+          const avgRating = reviewCount > 0 
+            ? spotSpecificReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviewCount 
+            : 0;
+
+          availableSpots.push({ 
+            ...spot, 
+            distance,
+            spot_rating: Number(avgRating.toFixed(2)),
+            spot_review_count: reviewCount
+          });
         }
       }
     }
