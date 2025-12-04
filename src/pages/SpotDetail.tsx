@@ -578,9 +578,9 @@ const SpotDetail = () => {
 
       <div className="p-4 space-y-6">
         <div>
-          {/* Category Header */}
-          {spot.category && (
-            <div className="mb-4">
+          {/* Category & Price Header */}
+          <div className="flex justify-between items-center mb-4">
+            {spot.category && (
               <span className="inline-flex items-center gap-2.5 px-4 py-2 bg-primary/10 text-primary rounded-full text-base font-semibold">
                 {spot.category === 'Residential Driveway' && <span className="text-lg">🏠</span>}
                 {spot.category === 'Apartment / Condo Lot' && <span className="text-lg">🏢</span>}
@@ -590,12 +590,7 @@ const SpotDetail = () => {
                 {spot.category === 'Event / Venue Lot' && <span className="text-lg">🎭</span>}
                 {spot.category}
               </span>
-            </div>
-          )}
-          
-          <div className="flex justify-between items-start mb-2">
-            <div className="flex-1">
-            </div>
+            )}
             <div className="text-right">
               <p className="text-2xl font-bold text-primary">${spot.hourlyRate}</p>
               <p className="text-sm text-muted-foreground">per hour</p>
