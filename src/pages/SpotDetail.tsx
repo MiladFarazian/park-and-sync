@@ -581,13 +581,13 @@ const SpotDetail = () => {
           {/* Category Header */}
           {spot.category && (
             <div className="mb-4">
-              <span className="inline-flex items-center gap-2 text-lg font-semibold text-foreground">
-                {spot.category === 'Residential Driveway' && <span className="text-xl">🏠</span>}
-                {spot.category === 'Apartment / Condo Lot' && <span className="text-xl">🏢</span>}
-                {spot.category === 'Commercial Lot' && <span className="text-xl">🅿️</span>}
-                {spot.category === 'Garage' && <span className="text-xl">🚗</span>}
-                {spot.category === 'Street Parking' && <span className="text-xl">🛣️</span>}
-                {spot.category === 'Event / Venue Lot' && <span className="text-xl">🎭</span>}
+              <span className="inline-flex items-center gap-2.5 px-4 py-2 bg-primary/10 text-primary rounded-full text-base font-semibold">
+                {spot.category === 'Residential Driveway' && <span className="text-lg">🏠</span>}
+                {spot.category === 'Apartment / Condo Lot' && <span className="text-lg">🏢</span>}
+                {spot.category === 'Commercial Lot' && <span className="text-lg">🅿️</span>}
+                {spot.category === 'Garage' && <span className="text-lg">🚗</span>}
+                {spot.category === 'Street Parking' && <span className="text-lg">🛣️</span>}
+                {spot.category === 'Event / Venue Lot' && <span className="text-lg">🎭</span>}
                 {spot.category}
               </span>
             </div>
