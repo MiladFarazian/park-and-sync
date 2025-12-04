@@ -21,7 +21,7 @@ const ModeSwitcher = () => {
       setOpen(false);
       // Navigate to the appropriate home page for the mode
       if (newMode === 'host') {
-        navigate('/dashboard');
+        navigate('/host-home');
       } else {
         navigate('/');
       }
