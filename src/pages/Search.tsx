@@ -435,6 +435,13 @@ const Search = () => {
                   
                   <div className="flex-1 space-y-1">
                     <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        {spot.category && (
+                          <Badge variant="secondary" className="text-xs px-2 py-0.5 mb-1">
+                            {spot.category}
+                          </Badge>
+                        )}
+                      </div>
                       <div className="text-right">
                         <p className="font-bold text-primary">${spot.hourlyRate}/hr</p>
                       </div>

@@ -107,6 +107,7 @@ const SearchResults = () => {
       const transformedSpots = data.spots?.map((spot: any) => ({
         id: spot.id,
         title: spot.title,
+        category: spot.category,
         address: spot.address,
         hourlyRate: parseFloat(spot.hourly_rate),
         rating: parseFloat(spot.profiles?.rating || 0),
@@ -183,6 +184,13 @@ const SearchResults = () => {
         
         <div className="flex-1 space-y-2 min-w-0">
           <div className="flex justify-between items-start gap-2">
+            <div className="flex-1">
+              {spot.category && (
+                <Badge variant="secondary" className="text-xs px-2 py-0.5 mb-1">
+                  {spot.category}
+                </Badge>
+              )}
+            </div>
             <div className="text-right flex-shrink-0">
               <p className="font-bold text-primary text-lg">${spot.hourlyRate}/hr</p>
             </div>

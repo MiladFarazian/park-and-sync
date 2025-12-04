@@ -345,6 +345,7 @@ const Explore = () => {
       const transformedSpots = data.spots?.map((spot: any) => ({
         id: spot.id,
         title: spot.title,
+        category: spot.category,
         address: spot.address,
         hourlyRate: parseFloat(spot.hourly_rate),
         rating: spot.spot_rating || 0,

@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 interface Spot {
   id: string;
   title: string;
+  category?: string;
   address: string;
   hourlyRate: number;
   lat: number;
@@ -829,7 +830,12 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
               
               <div className="flex-1 space-y-2 min-w-0">
                 <div className="flex justify-between items-start gap-2">
-                  <div className="flex-1">
+                  <div className="flex-1 flex flex-wrap gap-1">
+                    {selectedSpot.category && (
+                      <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                        {selectedSpot.category}
+                      </Badge>
+                    )}
                     {selectedSpot.id === nearestSpotId && (
                       <Badge className="bg-primary/10 text-primary border-primary/20 text-xs px-2 py-0.5">
                         Nearest
