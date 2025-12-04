@@ -37,7 +37,12 @@ const AppLayout = ({
               {!isProfilePage && <header className="flex-shrink-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
                   <div className="flex items-center gap-4">
                     <SidebarTrigger />
-                    <img src={parkzyLogo} alt="Parkzy" className="h-8" />
+                    <img 
+                      src={parkzyLogo} 
+                      alt="Parkzy" 
+                      className="h-8 cursor-pointer" 
+                      onClick={() => navigate('/home')}
+                    />
                     <ModeSwitcher />
                   </div>
                   <div className="flex items-center gap-2">
@@ -62,7 +67,12 @@ const AppLayout = ({
         <NotificationPermissionBanner />
         {!isProfilePage && <header className="flex-shrink-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
             <div className="flex items-center gap-3">
-              <img src={parkzyLogo} alt="Parkzy" className="h-8" />
+              <img 
+                src={parkzyLogo} 
+                alt="Parkzy" 
+                className="h-8 cursor-pointer" 
+                onClick={() => navigate('/home')}
+              />
               <ModeSwitcher />
             </div>
             <div className="flex items-center gap-2">
