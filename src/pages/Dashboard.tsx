@@ -164,7 +164,6 @@ const Dashboard = () => {
       
       <div className="p-4 space-y-3">
         <div>
-          <h3 className="font-semibold text-lg leading-tight mb-1">{listing.title}</h3>
           <div className="flex items-start gap-1.5 text-sm text-muted-foreground">
             <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
             <span className="line-clamp-1">{listing.address}</span>

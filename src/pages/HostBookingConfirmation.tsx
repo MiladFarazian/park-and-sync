@@ -190,7 +190,6 @@ const HostBookingConfirmation = () => {
               />
             )}
             <div className="flex-1">
-              <h4 className="font-semibold mb-1">{spot.title}</h4>
               <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
                 <MapPin className="h-3 w-3" />
                 <span>{spot.address}</span>

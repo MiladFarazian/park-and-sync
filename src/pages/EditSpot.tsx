@@ -20,7 +20,6 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from '@dnd-kit/utilities';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 const formSchema = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters'),
   address: z.string().min(5, 'Address is required'),
   hourlyRate: z.string().refine(val => !isNaN(Number(val)) && Number(val) > 0, {
     message: 'Hourly rate must be a positive number'
@@ -298,7 +297,6 @@ const EditSpot = () => {
           navigate('/dashboard');
           return;
         }
-        setValue('title', spotData.title);
         setValue('address', spotData.address);
         setValue('hourlyRate', spotData.hourly_rate.toString());
         setValue('description', spotData.description || '');
@@ -632,7 +630,6 @@ const EditSpot = () => {
 
       // Step 4: Update spot details
       const updateData = {
-        title: data.title,
         address: data.address,
         hourly_rate: parseFloat(data.hourlyRate),
         description: data.description,
@@ -700,12 +697,6 @@ const EditSpot = () => {
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <Label htmlFor="title">Spot Title</Label>
-                  <Input id="title" placeholder="e.g., Downtown Covered Parking" {...register('title')} className="mt-1.5" />
-                  {errors.title && <p className="text-sm text-destructive mt-1">{String(errors.title.message)}</p>}
-                </div>
-
                 <div>
                   <Label htmlFor="address">Address</Label>
                   <div className="relative mt-1.5">
