@@ -45,8 +45,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     const encodedAddress = encodeURIComponent(spotAddress);
     const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
-    const hostBookingUrl = `https://mqbupmusmciijsjmzbcu.supabase.co/host-booking-confirmation/${bookingId}`;
-    const driverBookingUrl = `https://mqbupmusmciijsjmzbcu.supabase.co/booking-confirmation/${bookingId}`;
+    const appUrl = Deno.env.get('APP_URL') || 'https://parkzy.lovable.app';
+    const hostBookingUrl = `${appUrl}/host-booking-confirmation/${bookingId}`;
+    const driverBookingUrl = `${appUrl}/booking-confirmation/${bookingId}`;
 
     const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'Parkzy <onboarding@resend.dev>';
     let hostEmailId: string | undefined;
