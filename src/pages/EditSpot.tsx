@@ -19,7 +19,19 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+const spotCategories = [
+  'Driveway',
+  'Garage',
+  'Carport',
+  'Street Parking',
+  'Parking Lot',
+  'Gated Parking',
+  'Underground Parking',
+  'Commercial Lot'
+] as const;
+
 const formSchema = z.object({
+  category: z.enum(spotCategories, { required_error: 'Please select a spot type' }),
   address: z.string().min(5, 'Address is required'),
   hourlyRate: z.string().refine(val => !isNaN(Number(val)) && Number(val) > 0, {
     message: 'Hourly rate must be a positive number'
@@ -188,6 +200,7 @@ const EditSpot = () => {
     spotId: string;
   }>();
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -303,6 +316,10 @@ const EditSpot = () => {
         setValue('accessNotes', spotData.access_notes || '');
         setValue('hostRules', spotData.host_rules || '');
         setValue('cancellationPolicy', spotData.cancellation_policy || '');
+        if (spotData.category) {
+          setValue('category', spotData.category as typeof spotCategories[number]);
+          setSelectedCategory(spotData.category);
+        }
         const amenities = [];
         if (spotData.is_covered) amenities.push('covered');
         if (spotData.is_secure) amenities.push('security');
@@ -630,6 +647,8 @@ const EditSpot = () => {
 
       // Step 4: Update spot details
       const updateData = {
+        category: data.category,
+        title: data.category,
         address: data.address,
         hourly_rate: parseFloat(data.hourlyRate),
         description: data.description,
@@ -697,6 +716,25 @@ const EditSpot = () => {
               </div>
 
               <div className="space-y-4">
+                <div>
+                  <Label htmlFor="category">Spot Type</Label>
+                  <select
+                    id="category"
+                    value={selectedCategory}
+                    onChange={(e) => {
+                      setSelectedCategory(e.target.value);
+                      setValue('category', e.target.value as typeof spotCategories[number]);
+                    }}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm mt-1.5"
+                  >
+                    <option value="">Select a spot type</option>
+                    {spotCategories.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                  {errors.category && <p className="text-sm text-destructive mt-1">{String(errors.category.message)}</p>}
+                </div>
+
                 <div>
                   <Label htmlFor="address">Address</Label>
                   <div className="relative mt-1.5">
