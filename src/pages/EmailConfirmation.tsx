@@ -67,7 +67,7 @@ const EmailConfirmation = () => {
           <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
             <Car className="h-6 w-6 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-primary">Parkway</h1>
+          <h1 className="text-2xl font-bold text-primary">Parkzy</h1>
         </div>
 
         <Card>
@@ -75,7 +75,7 @@ const EmailConfirmation = () => {
             <CardTitle>Email Confirmation</CardTitle>
             <CardDescription>
               {status === 'loading' && 'Verifying your email address...'}
-              {status === 'success' && 'Welcome to Parkway!'}
+              {status === 'success' && 'Welcome to Parkzy!'}
               {status === 'error' && 'Confirmation Failed'}
             </CardDescription>
           </CardHeader>

@@ -48,7 +48,7 @@ const handler = async (req: Request): Promise<Response> => {
     const hostBookingUrl = `https://mqbupmusmciijsjmzbcu.supabase.co/host-booking-confirmation/${bookingId}`;
     const driverBookingUrl = `https://mqbupmusmciijsjmzbcu.supabase.co/booking-confirmation/${bookingId}`;
 
-    const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'Parkway <onboarding@resend.dev>';
+    const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'Parkzy <onboarding@resend.dev>';
     let hostEmailId: string | undefined;
     let driverEmailId: string | undefined;
 
@@ -142,7 +142,7 @@ const handler = async (req: Request): Promise<Response> => {
                         </table>
                         
                         <p style="margin: 24px 0 0 0; color: #6b7280; font-size: 14px; line-height: 1.5;">
-                          Make sure your spot is ready for the driver's arrival. You can message them through the Parkway app if needed.
+                          Make sure your spot is ready for the driver's arrival. You can message them through the Parkzy app if needed.
                         </p>
                       </td>
                     </tr>
@@ -151,10 +151,10 @@ const handler = async (req: Request): Promise<Response> => {
                     <tr>
                       <td style="background-color: #f8f9fa; padding: 24px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
                         <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">
-                          Best regards,<br><strong style="color: #8B5CF6;">The Parkway Team</strong>
+                          Best regards,<br><strong style="color: #8B5CF6;">The Parkzy Team</strong>
                         </p>
                         <p style="margin: 8px 0 0 0; color: #9ca3af; font-size: 12px;">
-                          © 2025 Parkway. All rights reserved.
+                          © 2025 Parkzy. All rights reserved.
                         </p>
                       </td>
                     </tr>
@@ -277,7 +277,7 @@ const handler = async (req: Request): Promise<Response> => {
                         </table>
                         
                         <p style="margin: 24px 0 0 0; color: #6b7280; font-size: 14px; line-height: 1.5;">
-                          Need help? Reply to this email or contact your host <strong>${hostName}</strong> through the Parkway app.
+                          Need help? Reply to this email or contact your host <strong>${hostName}</strong> through the Parkzy app.
                         </p>
                       </td>
                     </tr>
@@ -286,10 +286,10 @@ const handler = async (req: Request): Promise<Response> => {
                     <tr>
                       <td style="background-color: #f8f9fa; padding: 24px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
                         <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">
-                          Happy parking!<br><strong style="color: #8B5CF6;">The Parkway Team</strong>
+                          Happy parking!<br><strong style="color: #8B5CF6;">The Parkzy Team</strong>
                         </p>
                         <p style="margin: 8px 0 0 0; color: #9ca3af; font-size: 12px;">
-                          © 2025 Parkway. All rights reserved.
+                          © 2025 Parkzy. All rights reserved.
                         </p>
                       </td>
                     </tr>
