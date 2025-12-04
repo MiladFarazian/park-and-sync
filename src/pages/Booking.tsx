@@ -1023,7 +1023,7 @@ const Booking = () => {
           )}
           {!(!isTimeValid && startDateTime && endDateTime && availabilityRules.length > 0) && (!selectedVehicle || !selectedPaymentMethod) === false && (
             <p className="text-center text-xs text-muted-foreground">
-              You won't be charged until your booking is confirmed
+              Your card will be charged immediately upon booking
             </p>
           )}
         </div>
