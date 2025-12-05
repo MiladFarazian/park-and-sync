@@ -23,7 +23,7 @@ const Skyscraper = ({ position, baseHeight, speed, phase }: SkyscraperProps) => 
 
   return (
     <mesh ref={meshRef} position={[position[0], position[1], position[2]]}>
-      <boxGeometry args={[1, 1, 1]} />
+      <boxGeometry args={[0.45, 1, 1]} />
       <meshStandardMaterial 
         color="#8b5cf6"
         roughness={0.5}
@@ -41,8 +41,8 @@ const Scene = () => {
     
     for (let x = 0; x < gridSize; x++) {
       for (let z = 0; z < gridSize; z++) {
-        // Position cubes edge-to-edge (no gaps)
-        const posX = x - gridSize / 2 + 0.5;
+        // Position rectangles edge-to-edge (parking spot proportions)
+        const posX = (x - gridSize / 2) * 0.45 + 0.225;
         const posZ = z - gridSize / 2 + 0.5;
         
         // Subtle height variation for cube-like shapes
