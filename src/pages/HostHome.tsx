@@ -191,7 +191,7 @@ const HostHome = () => {
       <ActiveBookingBanner />
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-4 animate-fade-in">
         <Card className="p-6 bg-primary text-primary-foreground">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -233,10 +233,12 @@ const HostHome = () => {
       </div>
 
       {/* Earnings Analytics */}
-      <EarningsAnalytics />
+      <div className="animate-fade-in" style={{ animationDelay: '100ms', animationFillMode: 'both' }}>
+        <EarningsAnalytics />
+      </div>
 
       {/* Quick Actions */}
-      <div className="space-y-3">
+      <div className="space-y-3 animate-fade-in" style={{ animationDelay: '200ms', animationFillMode: 'both' }}>
         <h2 className="text-lg font-semibold">Quick Actions</h2>
         <Button 
           className="w-full"
