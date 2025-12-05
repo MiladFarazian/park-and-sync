@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -230,12 +231,52 @@ const Dashboard = () => {
     </Card>
   );
 
+  const ListingCardSkeleton = () => (
+    <Card className="p-0 overflow-hidden">
+      <Skeleton className="h-48 w-full rounded-none" />
+      <div className="p-4 space-y-3">
+        <div>
+          <Skeleton className="h-5 w-24 mb-2" />
+          <div className="flex items-start gap-1.5">
+            <Skeleton className="h-4 w-4 rounded" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Skeleton className="h-4 w-4 rounded" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+        <div className="pt-2 border-t">
+          <div className="mb-3">
+            <Skeleton className="h-3 w-20 mb-1" />
+            <Skeleton className="h-7 w-24" />
+          </div>
+          <Skeleton className="h-10 w-full rounded-lg mb-3" />
+          <div className="flex gap-2">
+            <Skeleton className="h-9 flex-1 rounded" />
+            <Skeleton className="h-9 flex-1 rounded" />
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+
   if (loading) {
     return (
       <div className="p-4 space-y-6">
-        <div className="pt-4">
-          <h1 className="text-2xl font-bold">My Listings</h1>
-          <p className="text-muted-foreground">Loading...</p>
+        {/* Header Skeleton */}
+        <div className="pt-4 flex justify-between items-center">
+          <div>
+            <Skeleton className="h-8 w-32 mb-2" />
+            <Skeleton className="h-4 w-44" />
+          </div>
+          <Skeleton className="h-10 w-28 rounded" />
+        </div>
+
+        {/* Listing Cards Skeleton */}
+        <div className="grid gap-4">
+          <ListingCardSkeleton />
+          <ListingCardSkeleton />
         </div>
       </div>
     );

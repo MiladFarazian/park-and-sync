@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, TrendingUp, Calendar, MapPin, Car } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -114,10 +115,66 @@ const HostHome = () => {
 
   if (loading) {
     return (
-      <div className="p-4 space-y-6">
+      <div className="p-4 space-y-6 pb-4">
+        {/* Header Skeleton */}
         <div className="pt-4">
-          <h1 className="text-2xl font-bold">Host Dashboard</h1>
-          <p className="text-muted-foreground">Loading...</p>
+          <Skeleton className="h-8 w-48 mb-2" />
+          <Skeleton className="h-4 w-36" />
+        </div>
+
+        {/* Stats Cards Skeleton */}
+        <div className="grid grid-cols-1 gap-4">
+          <Card className="p-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-5 w-5 rounded" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+              <Skeleton className="h-9 w-32 mt-2" />
+              <Skeleton className="h-4 w-28" />
+            </div>
+          </Card>
+          
+          <Card className="p-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-5 w-5 rounded" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+              <Skeleton className="h-9 w-16 mt-2" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-5 w-5 rounded" />
+                <Skeleton className="h-4 w-28" />
+              </div>
+              <Skeleton className="h-9 w-12 mt-2" />
+              <Skeleton className="h-4 w-28" />
+            </div>
+          </Card>
+        </div>
+
+        {/* Earnings Analytics Skeleton */}
+        <Card className="p-6">
+          <Skeleton className="h-6 w-40 mb-4" />
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            <Skeleton className="h-16 rounded" />
+            <Skeleton className="h-16 rounded" />
+            <Skeleton className="h-16 rounded" />
+          </div>
+          <Skeleton className="h-48 w-full rounded" />
+        </Card>
+
+        {/* Quick Actions Skeleton */}
+        <div className="space-y-3">
+          <Skeleton className="h-6 w-28" />
+          <Skeleton className="h-10 w-full rounded" />
+          <Skeleton className="h-10 w-full rounded" />
+          <Skeleton className="h-10 w-full rounded" />
         </div>
       </div>
     );
