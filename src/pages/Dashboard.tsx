@@ -264,13 +264,19 @@ const Dashboard = () => {
   if (loading) {
     return (
       <div className="p-4 space-y-6">
-        {/* Header Skeleton */}
+        {/* Header */}
         <div className="pt-4 flex justify-between items-center">
           <div>
-            <Skeleton className="h-8 w-32 mb-2" />
-            <Skeleton className="h-4 w-44" />
+            <h1 className="text-2xl font-bold">My Listings</h1>
+            <p className="text-muted-foreground">Manage your parking spots</p>
           </div>
-          <Skeleton className="h-10 w-28 rounded" />
+          <Button 
+            className="bg-primary text-primary-foreground"
+            onClick={() => navigate('/list-spot')}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Spot
+          </Button>
         </div>
 
         {/* Listing Cards Skeleton */}
