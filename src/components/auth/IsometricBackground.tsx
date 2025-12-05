@@ -37,7 +37,7 @@ const Skyscraper = ({ position, baseHeight, speed, phase }: SkyscraperProps) => 
 const Scene = () => {
   const skyscrapers = useMemo(() => {
     const buildings: SkyscraperProps[] = [];
-    const gridSize = 12;
+    const gridSize = 16;
     
     for (let x = 0; x < gridSize; x++) {
       for (let z = 0; z < gridSize; z++) {
@@ -99,7 +99,7 @@ const IsometricBackground = () => {
       <div className="absolute inset-0 bg-gradient-to-br from-[#7c3aed] via-[#8b5cf6] to-[#a78bfa]" />
       <Canvas
         camera={{ 
-          position: [0, 0, 15], 
+          position: [0, 0, 8], 
           fov: 50,
           near: 0.1,
           far: 100
