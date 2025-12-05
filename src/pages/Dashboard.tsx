@@ -328,7 +328,7 @@ const Dashboard = () => {
 
       {/* Listings Grid */}
       {listings.length === 0 ? (
-        <Card className="p-6 text-center">
+        <Card className="p-6 text-center animate-fade-in">
           <MapPin className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
           <p className="text-muted-foreground mb-4">No listings yet</p>
           <Button onClick={() => navigate('/list-spot')}>
@@ -338,8 +338,14 @@ const Dashboard = () => {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {listings.map((listing) => (
-            <ListingCard key={listing.id} listing={listing} />
+          {listings.map((listing, index) => (
+            <div 
+              key={listing.id} 
+              className="animate-fade-in" 
+              style={{ animationDelay: `${index * 75}ms`, animationFillMode: 'both' }}
+            >
+              <ListingCard listing={listing} />
+            </div>
           ))}
         </div>
       )}
