@@ -2,36 +2,33 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useRef, useMemo } from 'react';
 import * as THREE from 'three';
 
-interface FloatingBoxProps {
+interface SkyscraperProps {
   position: [number, number, number];
-  size: [number, number, number];
+  baseHeight: number;
   color: string;
   speed: number;
-  rotationOffset: number;
+  phase: number;
 }
 
-const FloatingBox = ({ position, size, color, speed, rotationOffset }: FloatingBoxProps) => {
+const Skyscraper = ({ position, baseHeight, color, speed, phase }: SkyscraperProps) => {
   const meshRef = useRef<THREE.Mesh>(null);
-  const initialY = position[1];
   
   useFrame((state) => {
     if (meshRef.current) {
-      // Gentle floating animation
-      meshRef.current.position.y = initialY + Math.sin(state.clock.elapsedTime * speed + rotationOffset) * 0.3;
-      // Subtle rotation
-      meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.3 + rotationOffset) * 0.1 - 0.2;
-      meshRef.current.rotation.z = Math.sin(state.clock.elapsedTime * 0.2 + rotationOffset) * 0.05;
+      // Animate height oscillation for skyscraper effect
+      const heightOffset = Math.sin(state.clock.elapsedTime * speed + phase) * 1.5;
+      const currentHeight = baseHeight + heightOffset;
+      meshRef.current.scale.y = Math.max(0.5, currentHeight);
+      meshRef.current.position.y = (Math.max(0.5, currentHeight) / 2) - 2;
     }
   });
 
   return (
-    <mesh ref={meshRef} position={position} rotation={[-0.2, 0.5, 0]}>
-      <boxGeometry args={size} />
+    <mesh ref={meshRef} position={position}>
+      <boxGeometry args={[1, 1, 1]} />
       <meshStandardMaterial 
         color={color} 
-        transparent 
-        opacity={0.85}
-        roughness={0.3}
+        roughness={0.4}
         metalness={0.1}
       />
     </mesh>
@@ -39,38 +36,52 @@ const FloatingBox = ({ position, size, color, speed, rotationOffset }: FloatingB
 };
 
 const Scene = () => {
-  const boxes = useMemo(() => [
-    // Layer 1 - Back
-    { position: [-3, 2, -4] as [number, number, number], size: [4, 0.3, 3] as [number, number, number], color: '#8b7dd8', speed: 0.4, rotationOffset: 0 },
-    { position: [2, 2.5, -5] as [number, number, number], size: [3.5, 0.3, 2.5] as [number, number, number], color: '#9d8fe8', speed: 0.35, rotationOffset: 1 },
-    { position: [-1, 3.5, -6] as [number, number, number], size: [5, 0.3, 3] as [number, number, number], color: '#7c6dc8', speed: 0.45, rotationOffset: 2 },
+  const groupRef = useRef<THREE.Group>(null);
+  
+  const skyscrapers = useMemo(() => {
+    const buildings: SkyscraperProps[] = [];
+    const gridSize = 8;
+    const colors = ['#8b7dd8', '#9d8fe8', '#7c6dc8', '#a99df8', '#8070d0', '#9585e0', '#b5a9ff', '#7a6bc0'];
     
-    // Layer 2 - Middle
-    { position: [-2.5, 0.5, -2] as [number, number, number], size: [3.5, 0.3, 2.5] as [number, number, number], color: '#a99df8', speed: 0.5, rotationOffset: 0.5 },
-    { position: [1.5, 1, -3] as [number, number, number], size: [4, 0.3, 3] as [number, number, number], color: '#8070d0', speed: 0.4, rotationOffset: 1.5 },
-    { position: [-0.5, 0, -2.5] as [number, number, number], size: [3, 0.3, 2] as [number, number, number], color: '#9585e0', speed: 0.55, rotationOffset: 2.5 },
+    for (let x = 0; x < gridSize; x++) {
+      for (let z = 0; z < gridSize; z++) {
+        // No spacing - cubes are 1 unit wide, placed 1 unit apart
+        const posX = (x - gridSize / 2) * 1;
+        const posZ = (z - gridSize / 2) * 1;
+        
+        // Vary base heights for visual interest
+        const baseHeight = 2 + Math.random() * 3;
+        
+        // Different speeds and phases for wave effect
+        const speed = 0.3 + Math.random() * 0.4;
+        const phase = (x + z) * 0.5 + Math.random() * 2;
+        
+        // Pick color based on position for gradient effect
+        const colorIndex = Math.floor((x + z) % colors.length);
+        
+        buildings.push({
+          position: [posX, 0, posZ] as [number, number, number],
+          baseHeight,
+          color: colors[colorIndex],
+          speed,
+          phase,
+        });
+      }
+    }
     
-    // Layer 3 - Front
-    { position: [-3, -1.5, 0] as [number, number, number], size: [3.5, 0.3, 2.5] as [number, number, number], color: '#b5a9ff', speed: 0.45, rotationOffset: 0.8 },
-    { position: [2, -1, -1] as [number, number, number], size: [4, 0.3, 3] as [number, number, number], color: '#8b7dd8', speed: 0.5, rotationOffset: 1.8 },
-    { position: [0, -2, 1] as [number, number, number], size: [5, 0.3, 3.5] as [number, number, number], color: '#9d8fe8', speed: 0.4, rotationOffset: 2.8 },
-    
-    // Additional scattered boxes
-    { position: [3.5, 0, -4] as [number, number, number], size: [2.5, 0.25, 2] as [number, number, number], color: '#a99df8', speed: 0.35, rotationOffset: 3.2 },
-    { position: [-4, 1, -3] as [number, number, number], size: [3, 0.25, 2] as [number, number, number], color: '#7c6dc8', speed: 0.5, rotationOffset: 3.8 },
-    { position: [0.5, 3, -4.5] as [number, number, number], size: [3.5, 0.3, 2.5] as [number, number, number], color: '#8070d0', speed: 0.42, rotationOffset: 4.2 },
-  ], []);
+    return buildings;
+  }, []);
 
   return (
-    <>
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[5, 5, 5]} intensity={0.8} />
-      <directionalLight position={[-5, 3, -5]} intensity={0.4} color="#c4b5fd" />
+    <group ref={groupRef} rotation={[-0.6, 0.7, 0]}>
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[5, 10, 5]} intensity={0.8} />
+      <directionalLight position={[-5, 5, -5]} intensity={0.3} color="#c4b5fd" />
       
-      {boxes.map((box, index) => (
-        <FloatingBox key={index} {...box} />
+      {skyscrapers.map((building, index) => (
+        <Skyscraper key={index} {...building} />
       ))}
-    </>
+    </group>
   );
 };
 
@@ -79,7 +90,7 @@ const IsometricBackground = () => {
     <div className="absolute inset-0 -z-10">
       <div className="absolute inset-0 bg-gradient-to-br from-[#7c3aed] via-[#8b5cf6] to-[#a78bfa]" />
       <Canvas
-        camera={{ position: [0, 0, 8], fov: 50 }}
+        camera={{ position: [0, 8, 12], fov: 45 }}
         style={{ background: 'transparent' }}
       >
         <Scene />
