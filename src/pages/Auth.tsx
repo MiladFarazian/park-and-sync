@@ -9,7 +9,7 @@ import { ArrowLeft, Phone, Mail, Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import parkzyLogo from '@/assets/parkzy-logo.png';
+import parkzyLogo from '@/assets/parkzy-logo-white.png';
 import IsometricBackground from '@/components/auth/IsometricBackground';
 
 type AuthMethod = 'phone' | 'email';
