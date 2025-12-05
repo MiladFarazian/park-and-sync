@@ -83,8 +83,8 @@ const Scene = () => {
       {/* Ambient light with purple base */}
       <ambientLight intensity={0.4} color="#7c3aed" />
       
-      {/* Isometric view - rotated 45 degrees, tilted down */}
-      <group rotation={[-Math.PI / 6, Math.PI / 4, 0]} position={[0, -2, 0]}>
+      {/* Isometric view - rotated 45 degrees, viewed from above */}
+      <group rotation={[Math.PI / 6, -Math.PI / 4, 0]} position={[0, 0, 0]}>
         {skyscrapers.map((building, index) => (
           <Skyscraper key={index} {...building} />
         ))}
