@@ -14,8 +14,8 @@ const Skyscraper = ({ position, baseHeight, speed, phase }: SkyscraperProps) => 
   
   useFrame((state) => {
     if (meshRef.current) {
-      const heightOffset = Math.sin(state.clock.elapsedTime * speed + phase) * 1.5;
-      const currentHeight = Math.max(1, baseHeight + heightOffset);
+      const heightOffset = Math.sin(state.clock.elapsedTime * speed + phase) * 0.3;
+      const currentHeight = Math.max(0.8, baseHeight + heightOffset);
       meshRef.current.scale.y = currentHeight;
       meshRef.current.position.y = currentHeight / 2;
     }
@@ -45,8 +45,8 @@ const Scene = () => {
         const posX = x - gridSize / 2 + 0.5;
         const posZ = z - gridSize / 2 + 0.5;
         
-        // Varying base heights
-        const baseHeight = 2 + Math.random() * 4;
+        // Subtle height variation for cube-like shapes
+        const baseHeight = 1 + Math.random() * 0.5;
         
         // Wave animation parameters
         const speed = 0.2 + Math.random() * 0.15;
