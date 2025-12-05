@@ -234,7 +234,7 @@ const Dashboard = () => {
     return (
       <div className="p-4 space-y-6">
         <div className="pt-4">
-          <h1 className="text-2xl font-bold">Host Dashboard</h1>
+          <h1 className="text-2xl font-bold">My Listings</h1>
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
