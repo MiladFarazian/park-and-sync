@@ -105,6 +105,7 @@ const PaymentMethods = () => {
   const [loading, setLoading] = useState(true);
   const [showAddCard, setShowAddCard] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   const handleBack = () => {
     // Check if there's history to go back to
@@ -119,6 +120,11 @@ const PaymentMethods = () => {
   const fetchPaymentMethods = async () => {
     try {
       setLoading(true);
+      
+      // Check if user has email
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserEmail(user?.email || null);
+      
       const { data, error } = await supabase.functions.invoke('get-payment-methods');
       
       if (error) throw error;
@@ -152,6 +158,18 @@ const PaymentMethods = () => {
   useEffect(() => {
     fetchPaymentMethods();
   }, []);
+
+  const handleAddCardClick = () => {
+    if (!userEmail) {
+      toast({
+        title: "Email required",
+        description: "Please add an email address to your account first to add payment methods",
+      });
+      navigate('/manage-account');
+      return;
+    }
+    setShowAddCard(true);
+  };
 
   const handleAddSuccess = () => {
     setShowAddCard(false);
@@ -209,7 +227,7 @@ const PaymentMethods = () => {
             <h1 className="text-2xl font-bold">Payment Methods</h1>
             <p className="text-muted-foreground">Manage your cards and billing</p>
           </div>
-          <Button onClick={() => setShowAddCard(true)}>
+          <Button onClick={handleAddCardClick}>
             <Plus className="h-4 w-4 mr-2" />
             Add Card
           </Button>
@@ -226,7 +244,7 @@ const PaymentMethods = () => {
             <p className="text-muted-foreground mb-4">
               Add a payment method to complete bookings
             </p>
-            <Button onClick={() => setShowAddCard(true)}>
+            <Button onClick={handleAddCardClick}>
               <Plus className="h-4 w-4 mr-2" />
               Add Payment Method
             </Button>
