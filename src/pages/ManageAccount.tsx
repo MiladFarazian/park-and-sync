@@ -125,6 +125,22 @@ const ManageAccount = () => {
         }
       }
 
+      // If email is being added/changed, update auth.users first
+      const isAddingEmail = formData.email && formData.email !== profile?.email;
+      if (isAddingEmail) {
+        const { error: authError } = await supabase.auth.updateUser({
+          email: formData.email,
+        });
+        
+        if (authError) {
+          toast.error("Failed to update email: " + authError.message);
+          setIsUpdating(false);
+          return;
+        }
+        
+        toast.info("Please check your email to confirm the change");
+      }
+
       const { error } = await updateProfile({
         ...formData,
         avatar_url,
