@@ -5,14 +5,48 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeft, Phone, Mail, Loader2 } from 'lucide-react';
+import { ArrowLeft, Phone, Mail, Loader2, ChevronDown } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import parkzyLogo from '@/assets/parkzy-logo-white.png';
 import IsometricBackground from '@/components/auth/IsometricBackground';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 type AuthMethod = 'phone' | 'email';
+
+const COUNTRY_CODES = [
+  { code: '+1', country: 'US', flag: '🇺🇸' },
+  { code: '+1', country: 'CA', flag: '🇨🇦' },
+  { code: '+44', country: 'UK', flag: '🇬🇧' },
+  { code: '+61', country: 'AU', flag: '🇦🇺' },
+  { code: '+49', country: 'DE', flag: '🇩🇪' },
+  { code: '+33', country: 'FR', flag: '🇫🇷' },
+  { code: '+81', country: 'JP', flag: '🇯🇵' },
+  { code: '+52', country: 'MX', flag: '🇲🇽' },
+  { code: '+91', country: 'IN', flag: '🇮🇳' },
+];
+
+// Format phone number as user types: (555) 123-4567
+const formatPhoneNumber = (value: string): string => {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length === 0) return '';
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+};
+
+// Validate phone number has 10 digits
+const isValidPhoneNumber = (phone: string): boolean => {
+  const digits = phone.replace(/\D/g, '');
+  return digits.length === 10;
+};
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -21,6 +55,7 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [authMethod, setAuthMethod] = useState<AuthMethod>('phone');
   const [otpSent, setOtpSent] = useState(false);
+  const [countryCode, setCountryCode] = useState('+1');
   
   const [phoneData, setPhoneData] = useState({
     phone: '',
@@ -39,30 +74,55 @@ const Auth = () => {
     lastName: ''
   });
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneNumber(e.target.value);
+    setPhoneData({ ...phoneData, phone: formatted });
+  };
+
+  const getFullPhoneNumber = (): string => {
+    const digits = phoneData.phone.replace(/\D/g, '');
+    return `${countryCode}${digits}`;
+  };
+
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phoneData.phone) return;
     
+    if (!isValidPhoneNumber(phoneData.phone)) {
+      toast({
+        title: "Invalid Phone Number",
+        description: "Please enter a valid 10-digit phone number",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setLoading(true);
-    const formattedPhone = phoneData.phone.startsWith('+') 
-      ? phoneData.phone 
-      : `+1${phoneData.phone.replace(/\D/g, '')}`;
+    const formattedPhone = getFullPhoneNumber();
     
     const { error } = await supabase.auth.signInWithOtp({
       phone: formattedPhone
     });
     
     if (error) {
+      // Provide user-friendly error messages
+      let errorMessage = error.message;
+      if (error.message.includes('Invalid From')) {
+        errorMessage = 'Phone authentication is temporarily unavailable. Please try email sign-in or contact support.';
+      } else if (error.message.includes('rate limit')) {
+        errorMessage = 'Too many attempts. Please wait a few minutes and try again.';
+      }
+      
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive"
       });
     } else {
       setOtpSent(true);
       toast({
         title: "Code Sent",
-        description: "Check your phone for the verification code"
+        description: `Check your phone (${formattedPhone}) for the verification code`
       });
     }
     setLoading(false);
@@ -72,9 +132,7 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
     
-    const formattedPhone = phoneData.phone.startsWith('+') 
-      ? phoneData.phone 
-      : `+1${phoneData.phone.replace(/\D/g, '')}`;
+    const formattedPhone = getFullPhoneNumber();
     
     const { error } = await supabase.auth.verifyOtp({
       phone: formattedPhone,
@@ -83,9 +141,14 @@ const Auth = () => {
     });
     
     if (error) {
+      let errorMessage = error.message;
+      if (error.message.includes('invalid') || error.message.includes('expired')) {
+        errorMessage = 'Invalid or expired code. Please request a new one.';
+      }
+      
       toast({
         title: "Verification Failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive"
       });
     } else {
@@ -187,23 +250,42 @@ const Auth = () => {
                   <form onSubmit={handleSendOtp} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="phone" className="text-sm font-medium">Phone Number</Label>
-                      <div className="relative">
-                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                        <Input 
-                          id="phone" 
-                          type="tel" 
-                          placeholder="+1 (555) 000-0000"
-                          value={phoneData.phone}
-                          onChange={e => setPhoneData({ ...phoneData, phone: e.target.value })}
-                          className="pl-12 h-14 text-base rounded-xl border-2 focus:border-primary"
-                          required 
-                        />
+                      <div className="flex gap-2">
+                        <Select value={countryCode} onValueChange={setCountryCode}>
+                          <SelectTrigger className="w-[100px] h-14 rounded-xl border-2">
+                            <SelectValue>
+                              {COUNTRY_CODES.find(c => c.code === countryCode)?.flag} {countryCode}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {COUNTRY_CODES.map((country) => (
+                              <SelectItem key={`${country.country}-${country.code}`} value={country.code}>
+                                {country.flag} {country.country} ({country.code})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="relative flex-1">
+                          <Input 
+                            id="phone" 
+                            type="tel" 
+                            placeholder="(555) 123-4567"
+                            value={phoneData.phone}
+                            onChange={handlePhoneChange}
+                            className="h-14 text-base rounded-xl border-2 focus:border-primary"
+                            maxLength={14}
+                            required 
+                          />
+                        </div>
                       </div>
+                      {phoneData.phone && !isValidPhoneNumber(phoneData.phone) && (
+                        <p className="text-sm text-destructive">Please enter a valid 10-digit phone number</p>
+                      )}
                     </div>
                     <Button 
                       type="submit" 
                       className="w-full h-14 text-base font-semibold rounded-xl bg-primary hover:bg-primary/90" 
-                      disabled={loading}
+                      disabled={loading || (phoneData.phone !== '' && !isValidPhoneNumber(phoneData.phone))}
                     >
                       {loading ? (
                         <>
@@ -230,7 +312,7 @@ const Auth = () => {
                         required 
                       />
                       <p className="text-sm text-muted-foreground text-center">
-                        Code sent to {phoneData.phone}
+                        Code sent to {countryCode} {phoneData.phone}
                       </p>
                     </div>
                     <Button 
