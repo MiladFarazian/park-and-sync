@@ -53,6 +53,7 @@ const Profile = () => {
   const [profileAlertVisible, setProfileAlertVisible] = useState(false);
   const [isLoadingStripe, setIsLoadingStripe] = useState(false);
   const [hasListedSpots, setHasListedSpots] = useState(false);
+  const [isResendingEmail, setIsResendingEmail] = useState(false);
   const {
     register,
     handleSubmit,
@@ -466,7 +467,7 @@ const Profile = () => {
                 
                 {/* Email verification status */}
                 {profile?.email && (
-                  <div className="flex items-center gap-1.5 mt-2">
+                  <div className="flex items-center flex-wrap gap-1.5 mt-2">
                     <Mail className="h-3.5 w-3.5 text-primary-foreground/70" />
                     <span className="text-xs text-primary-foreground/70 truncate max-w-[140px]">{profile.email}</span>
                     {user?.email_confirmed_at ? (
@@ -475,10 +476,35 @@ const Profile = () => {
                         <span className="text-[10px] font-medium">Verified</span>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1 bg-yellow-500/20 text-yellow-200 px-1.5 py-0.5 rounded-full">
-                        <Clock className="h-3 w-3" />
-                        <span className="text-[10px] font-medium">Pending</span>
-                      </div>
+                      <>
+                        <div className="flex items-center gap-1 bg-yellow-500/20 text-yellow-200 px-1.5 py-0.5 rounded-full">
+                          <Clock className="h-3 w-3" />
+                          <span className="text-[10px] font-medium">Pending</span>
+                        </div>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (isResendingEmail) return;
+                            setIsResendingEmail(true);
+                            try {
+                              const { error } = await supabase.auth.resend({
+                                type: 'signup',
+                                email: profile.email!,
+                              });
+                              if (error) throw error;
+                              toast.success('Verification email sent! Check your inbox.');
+                            } catch (error: any) {
+                              toast.error('Failed to resend: ' + error.message);
+                            } finally {
+                              setIsResendingEmail(false);
+                            }
+                          }}
+                          disabled={isResendingEmail}
+                          className="text-[10px] text-primary-foreground/80 hover:text-primary-foreground underline underline-offset-2 disabled:opacity-50"
+                        >
+                          {isResendingEmail ? 'Sending...' : 'Resend'}
+                        </button>
+                      </>
                     )}
                   </div>
                 )}
