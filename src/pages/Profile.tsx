@@ -21,6 +21,7 @@ import { useMode } from '@/contexts/ModeContext';
 const profileSchema = z.object({
   first_name: z.string().trim().min(1, 'First name is required').max(50, 'First name must be less than 50 characters'),
   last_name: z.string().trim().min(1, 'Last name is required').max(50, 'Last name must be less than 50 characters'),
+  email: z.string().trim().email('Invalid email address').optional().or(z.literal('')),
   phone: z.string().trim().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number format').optional().or(z.literal(''))
 });
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -64,6 +65,7 @@ const Profile = () => {
     defaultValues: {
       first_name: profile?.first_name || '',
       last_name: profile?.last_name || '',
+      email: profile?.email || '',
       phone: profile?.phone || ''
     }
   });
@@ -96,6 +98,7 @@ const Profile = () => {
       reset({
         first_name: profile.first_name || '',
         last_name: profile.last_name || '',
+        email: profile.email || '',
         phone: profile.phone || ''
       });
       setAvatarPreview(profile.avatar_url || '');
@@ -233,6 +236,23 @@ const Profile = () => {
           avatar_url = uploadedUrl;
         }
       }
+
+      // If email is being added/changed, update auth.users first
+      const isAddingEmail = data.email && data.email !== profile?.email;
+      if (isAddingEmail) {
+        const { error: authError } = await supabase.auth.updateUser({
+          email: data.email,
+        });
+        
+        if (authError) {
+          toast.error("Failed to update email: " + authError.message);
+          setIsUpdating(false);
+          return;
+        }
+        
+        toast.info("Please check your email to confirm the change");
+      }
+
       const {
         error
       } = await updateProfile({
@@ -570,6 +590,15 @@ const Profile = () => {
                 {errors.last_name && <p className="text-sm text-destructive">{errors.last_name.message}</p>}
               </div>
               
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input id="email" type="email" {...register('email')} placeholder="john@example.com" />
+                {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+                {!profile?.email && (
+                  <p className="text-xs text-muted-foreground">Add an email to enable payment methods</p>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>
                 <Input id="phone" {...register('phone')} placeholder="+1234567890" />
