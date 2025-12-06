@@ -62,6 +62,7 @@ const Profile = () => {
   const [phoneOtp, setPhoneOtp] = useState('');
   const [phoneOtpSent, setPhoneOtpSent] = useState(false);
   const [phoneVerifyCooldown, setPhoneVerifyCooldown] = useState(0);
+  const [hostRating, setHostRating] = useState<{ average: number; count: number } | null>(null);
   const {
     register,
     handleSubmit,
@@ -133,12 +134,64 @@ const Profile = () => {
       // Check Stripe Connect status for hosts
       if (mode === 'host') {
         checkStripeConnectStatus();
+        fetchHostRating();
       }
 
       // Check if user has listed any spots
       checkUserSpots();
     }
   }, [profile, reset, mode]);
+
+  const fetchHostRating = async () => {
+    if (!user) return;
+    try {
+      // Get all spots owned by this host
+      const { data: spots, error: spotsError } = await supabase
+        .from('spots')
+        .select('id')
+        .eq('host_id', user.id);
+      
+      if (spotsError) throw spotsError;
+      if (!spots || spots.length === 0) {
+        setHostRating(null);
+        return;
+      }
+
+      const spotIds = spots.map(s => s.id);
+
+      // Get all bookings for these spots
+      const { data: bookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('id')
+        .in('spot_id', spotIds);
+      
+      if (bookingsError) throw bookingsError;
+      if (!bookings || bookings.length === 0) {
+        setHostRating(null);
+        return;
+      }
+
+      const bookingIds = bookings.map(b => b.id);
+
+      // Get all reviews for these bookings where the host is the reviewee
+      const { data: reviews, error: reviewsError } = await supabase
+        .from('reviews')
+        .select('rating')
+        .in('booking_id', bookingIds)
+        .eq('reviewee_id', user.id);
+      
+      if (reviewsError) throw reviewsError;
+      if (!reviews || reviews.length === 0) {
+        setHostRating(null);
+        return;
+      }
+
+      const average = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+      setHostRating({ average, count: reviews.length });
+    } catch (error) {
+      console.error('Error fetching host rating:', error);
+    }
+  };
   const checkUserSpots = async () => {
     if (!user) return;
     try {
@@ -483,11 +536,15 @@ const Profile = () => {
                   <div className="flex items-center gap-1 bg-white/20 px-2 py-1 rounded-full">
                     <Star className="h-3.5 w-3.5 fill-yellow-300 text-yellow-300" />
                     <span className="font-semibold text-xs">
-                      {profile?.rating ? profile.rating.toFixed(1) : 'New'}
+                      {mode === 'host' && hostRating 
+                        ? hostRating.average.toFixed(1) 
+                        : (profile?.rating ? profile.rating.toFixed(1) : 'New')}
                     </span>
                   </div>
                   <span className="text-primary-foreground/70 text-xs">
-                    {profile?.review_count ? `${profile.review_count} ${profile.review_count === 1 ? 'review' : 'reviews'}` : 'No reviews yet'}
+                    {mode === 'host' && hostRating 
+                      ? `${hostRating.count} ${hostRating.count === 1 ? 'review' : 'reviews'}`
+                      : (profile?.review_count ? `${profile.review_count} ${profile.review_count === 1 ? 'review' : 'reviews'}` : 'No reviews yet')}
                   </span>
                 </div>
                 
