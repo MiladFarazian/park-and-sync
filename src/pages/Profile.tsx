@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, Building2, ArrowRight, ExternalLink, X, Mail, CheckCircle2, Clock } from 'lucide-react';
+import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, Building2, ArrowRight, ExternalLink, X, Mail, CheckCircle2, Clock, Phone } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -516,6 +516,27 @@ const Profile = () => {
                           {isResendingEmail ? 'Sending...' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend'}
                         </button>
                       </>
+                    )}
+                  </div>
+                )}
+                
+                {/* Phone verification status */}
+                {(profile?.phone || user?.phone) && (
+                  <div className="flex items-center flex-wrap gap-1.5 mt-1">
+                    <Phone className="h-3.5 w-3.5 text-primary-foreground/70" />
+                    <span className="text-xs text-primary-foreground/70 truncate max-w-[140px]">
+                      {profile?.phone || user?.phone}
+                    </span>
+                    {user?.phone_confirmed_at ? (
+                      <div className="flex items-center gap-1 bg-green-500/20 text-green-200 px-1.5 py-0.5 rounded-full">
+                        <CheckCircle2 className="h-3 w-3" />
+                        <span className="text-[10px] font-medium">Verified</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 bg-yellow-500/20 text-yellow-200 px-1.5 py-0.5 rounded-full">
+                        <Clock className="h-3 w-3" />
+                        <span className="text-[10px] font-medium">Unverified</span>
+                      </div>
                     )}
                   </div>
                 )}
