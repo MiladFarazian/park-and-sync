@@ -64,6 +64,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    // Handle session-only mode (remember me unchecked)
+    const handleBeforeUnload = () => {
+      const sessionOnly = sessionStorage.getItem('parkzy_session_only');
+      if (sessionOnly === 'true') {
+        // Clear auth data on browser close
+        supabase.auth.signOut();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -100,7 +111,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, []);
 
   const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
