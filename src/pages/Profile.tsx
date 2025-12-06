@@ -795,12 +795,27 @@ const Profile = () => {
                   if (!phone || phoneOtp.length !== 6 || isVerifyingPhone) return;
                   setIsVerifyingPhone(true);
                   try {
-                    const { error } = await supabase.auth.verifyOtp({
+                    // Store current user ID to verify we stay on same account
+                    const currentUserId = user?.id;
+                    
+                    const { data, error } = await supabase.auth.verifyOtp({
                       phone: phone,
                       token: phoneOtp,
                       type: 'phone_change',
                     });
                     if (error) throw error;
+                    
+                    // Check if verification switched accounts (phone already on another account)
+                    if (data?.user?.id && data.user.id !== currentUserId) {
+                      // Sign back out and show error - phone belongs to different account
+                      await supabase.auth.signOut();
+                      toast.error('This phone number is already associated with another account. Please sign in again.');
+                      return;
+                    }
+                    
+                    // Refresh the current session to get updated phone_verified status
+                    await supabase.auth.refreshSession();
+                    
                     toast.success('Phone number verified!');
                     setIsPhoneVerifyDialogOpen(false);
                     setPhoneOtp('');
