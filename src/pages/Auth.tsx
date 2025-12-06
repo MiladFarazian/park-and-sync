@@ -1,4 +1,4 @@
-import React, { useState, Suspense } from 'react';
+import React, { useState, Suspense, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import parkzyLogo from '@/assets/parkzy-logo-white.png';
 import IsometricBackground from '@/components/auth/IsometricBackground';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -18,6 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+
+const REMEMBER_ME_KEY = 'parkzy_remember_me';
 
 type AuthMethod = 'phone' | 'email';
 
@@ -56,6 +59,7 @@ const Auth = () => {
   const [authMethod, setAuthMethod] = useState<AuthMethod>('phone');
   const [otpSent, setOtpSent] = useState(false);
   const [countryCode, setCountryCode] = useState('+1');
+  const [rememberMe, setRememberMe] = useState(true);
   
   const [phoneData, setPhoneData] = useState({
     phone: '',
@@ -198,6 +202,16 @@ const Auth = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    
+    // Store remember me preference
+    if (rememberMe) {
+      localStorage.setItem(REMEMBER_ME_KEY, 'true');
+    } else {
+      localStorage.removeItem(REMEMBER_ME_KEY);
+      // Set up session cleanup on browser close
+      sessionStorage.setItem('parkzy_session_only', 'true');
+    }
+    
     const { error } = await signIn(signInData.email, signInData.password);
     if (!error) {
       navigate('/');
@@ -374,6 +388,20 @@ const Auth = () => {
                         className="h-12 rounded-xl border-2"
                         required 
                       />
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="rememberMe" 
+                        checked={rememberMe}
+                        onCheckedChange={(checked) => setRememberMe(checked === true)}
+                      />
+                      <Label 
+                        htmlFor="rememberMe" 
+                        className="text-sm font-normal text-muted-foreground cursor-pointer"
+                      >
+                        Remember me
+                      </Label>
                     </div>
                     
                     <Button type="submit" className="w-full h-14 text-base font-semibold rounded-xl" disabled={loading}>
