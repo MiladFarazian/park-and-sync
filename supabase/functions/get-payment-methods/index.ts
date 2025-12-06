@@ -32,8 +32,19 @@ serve(async (req) => {
     // Authenticate user
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
-    if (userError || !user?.email) {
+    if (userError || !user) {
       throw new Error('User not authenticated');
+    }
+
+    // If user has no email, they can't have Stripe payment methods yet
+    if (!user.email) {
+      return new Response(
+        JSON.stringify({ paymentMethods: [] }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
     }
 
     const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
