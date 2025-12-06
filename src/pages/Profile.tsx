@@ -748,7 +748,8 @@ const Profile = () => {
                   if (!phone || isSendingPhoneOtp) return;
                   setIsSendingPhoneOtp(true);
                   try {
-                    const { error } = await supabase.auth.signInWithOtp({
+                    // Use updateUser to add/update phone - this sends an OTP
+                    const { error } = await supabase.auth.updateUser({
                       phone: phone,
                     });
                     if (error) throw error;
@@ -797,7 +798,7 @@ const Profile = () => {
                     const { error } = await supabase.auth.verifyOtp({
                       phone: phone,
                       token: phoneOtp,
-                      type: 'sms',
+                      type: 'phone_change',
                     });
                     if (error) throw error;
                     toast.success('Phone number verified!');
@@ -830,7 +831,8 @@ const Profile = () => {
                     if (!phone || isSendingPhoneOtp || phoneVerifyCooldown > 0) return;
                     setIsSendingPhoneOtp(true);
                     try {
-                      const { error } = await supabase.auth.signInWithOtp({
+                      // Use updateUser to resend OTP for phone verification
+                      const { error } = await supabase.auth.updateUser({
                         phone: phone,
                       });
                       if (error) throw error;
