@@ -54,6 +54,7 @@ const Profile = () => {
   const [isLoadingStripe, setIsLoadingStripe] = useState(false);
   const [hasListedSpots, setHasListedSpots] = useState(false);
   const [isResendingEmail, setIsResendingEmail] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const {
     register,
     handleSubmit,
@@ -86,6 +87,15 @@ const Profile = () => {
       return () => clearTimeout(timer);
     }
   }, []);
+
+  // Cooldown timer effect
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   const handleDismissProfileAlert = () => {
     setProfileAlertVisible(false);
@@ -484,7 +494,7 @@ const Profile = () => {
                         <button
                           onClick={async (e) => {
                             e.stopPropagation();
-                            if (isResendingEmail) return;
+                            if (isResendingEmail || resendCooldown > 0) return;
                             setIsResendingEmail(true);
                             try {
                               const { error } = await supabase.auth.resend({
@@ -493,16 +503,17 @@ const Profile = () => {
                               });
                               if (error) throw error;
                               toast.success('Verification email sent! Check your inbox.');
+                              setResendCooldown(60);
                             } catch (error: any) {
                               toast.error('Failed to resend: ' + error.message);
                             } finally {
                               setIsResendingEmail(false);
                             }
                           }}
-                          disabled={isResendingEmail}
-                          className="text-[10px] text-primary-foreground/80 hover:text-primary-foreground underline underline-offset-2 disabled:opacity-50"
+                          disabled={isResendingEmail || resendCooldown > 0}
+                          className="text-[10px] text-primary-foreground/80 hover:text-primary-foreground underline underline-offset-2 disabled:opacity-50 disabled:no-underline"
                         >
-                          {isResendingEmail ? 'Sending...' : 'Resend'}
+                          {isResendingEmail ? 'Sending...' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend'}
                         </button>
                       </>
                     )}
