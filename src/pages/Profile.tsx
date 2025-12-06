@@ -56,6 +56,12 @@ const Profile = () => {
   const [hasListedSpots, setHasListedSpots] = useState(false);
   const [isResendingEmail, setIsResendingEmail] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [isPhoneVerifyDialogOpen, setIsPhoneVerifyDialogOpen] = useState(false);
+  const [isSendingPhoneOtp, setIsSendingPhoneOtp] = useState(false);
+  const [isVerifyingPhone, setIsVerifyingPhone] = useState(false);
+  const [phoneOtp, setPhoneOtp] = useState('');
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [phoneVerifyCooldown, setPhoneVerifyCooldown] = useState(0);
   const {
     register,
     handleSubmit,
@@ -97,6 +103,15 @@ const Profile = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, [resendCooldown]);
+
+  // Phone verify cooldown timer
+  useEffect(() => {
+    if (phoneVerifyCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setPhoneVerifyCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [phoneVerifyCooldown]);
 
   const handleDismissProfileAlert = () => {
     setProfileAlertVisible(false);
@@ -534,10 +549,23 @@ const Profile = () => {
                         <span className="text-[10px] font-medium">Verified</span>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1 bg-yellow-500/20 text-yellow-200 px-1.5 py-0.5 rounded-full">
-                        <Clock className="h-3 w-3" />
-                        <span className="text-[10px] font-medium">Unverified</span>
-                      </div>
+                      <>
+                        <div className="flex items-center gap-1 bg-yellow-500/20 text-yellow-200 px-1.5 py-0.5 rounded-full">
+                          <Clock className="h-3 w-3" />
+                          <span className="text-[10px] font-medium">Unverified</span>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPhoneOtp('');
+                            setPhoneOtpSent(false);
+                            setIsPhoneVerifyDialogOpen(true);
+                          }}
+                          className="text-[10px] text-primary-foreground/80 hover:text-primary-foreground underline underline-offset-2"
+                        >
+                          Verify
+                        </button>
+                      </>
                     )}
                   </div>
                 )}
@@ -698,6 +726,137 @@ const Profile = () => {
 
       {/* Image Crop Dialog */}
       <ImageCropDialog open={isCropDialogOpen} imageSrc={tempImageSrc} onCropComplete={handleCropComplete} onCancel={handleCropCancel} />
+
+      {/* Phone Verification Dialog */}
+      <Dialog open={isPhoneVerifyDialogOpen} onOpenChange={setIsPhoneVerifyDialogOpen}>
+        <DialogContent className="sm:max-w-[380px]">
+          <DialogHeader>
+            <DialogTitle>Verify Phone Number</DialogTitle>
+            <DialogDescription>
+              {phoneOtpSent 
+                ? `Enter the 6-digit code sent to ${formatPhoneNumber(profile?.phone || user?.phone || '')}`
+                : `We'll send a verification code to ${formatPhoneNumber(profile?.phone || user?.phone || '')}`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          {!phoneOtpSent ? (
+            <div className="space-y-4 py-4">
+              <Button
+                onClick={async () => {
+                  const phone = profile?.phone || user?.phone;
+                  if (!phone || isSendingPhoneOtp) return;
+                  setIsSendingPhoneOtp(true);
+                  try {
+                    const { error } = await supabase.auth.signInWithOtp({
+                      phone: phone,
+                    });
+                    if (error) throw error;
+                    toast.success('Verification code sent!');
+                    setPhoneOtpSent(true);
+                    setPhoneVerifyCooldown(60);
+                  } catch (error: any) {
+                    toast.error('Failed to send code: ' + error.message);
+                  } finally {
+                    setIsSendingPhoneOtp(false);
+                  }
+                }}
+                disabled={isSendingPhoneOtp}
+                className="w-full"
+              >
+                {isSendingPhoneOtp ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  'Send Verification Code'
+                )}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone-otp">Verification Code</Label>
+                <Input
+                  id="phone-otp"
+                  value={phoneOtp}
+                  onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  className="text-center text-2xl tracking-widest"
+                  maxLength={6}
+                />
+              </div>
+              
+              <Button
+                onClick={async () => {
+                  const phone = profile?.phone || user?.phone;
+                  if (!phone || phoneOtp.length !== 6 || isVerifyingPhone) return;
+                  setIsVerifyingPhone(true);
+                  try {
+                    const { error } = await supabase.auth.verifyOtp({
+                      phone: phone,
+                      token: phoneOtp,
+                      type: 'sms',
+                    });
+                    if (error) throw error;
+                    toast.success('Phone number verified!');
+                    setIsPhoneVerifyDialogOpen(false);
+                    setPhoneOtp('');
+                    setPhoneOtpSent(false);
+                  } catch (error: any) {
+                    toast.error('Invalid code: ' + error.message);
+                  } finally {
+                    setIsVerifyingPhone(false);
+                  }
+                }}
+                disabled={phoneOtp.length !== 6 || isVerifyingPhone}
+                className="w-full"
+              >
+                {isVerifyingPhone ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  'Verify'
+                )}
+              </Button>
+              
+              <div className="text-center">
+                <button
+                  onClick={async () => {
+                    const phone = profile?.phone || user?.phone;
+                    if (!phone || isSendingPhoneOtp || phoneVerifyCooldown > 0) return;
+                    setIsSendingPhoneOtp(true);
+                    try {
+                      const { error } = await supabase.auth.signInWithOtp({
+                        phone: phone,
+                      });
+                      if (error) throw error;
+                      toast.success('New code sent!');
+                      setPhoneVerifyCooldown(60);
+                    } catch (error: any) {
+                      toast.error('Failed to resend: ' + error.message);
+                    } finally {
+                      setIsSendingPhoneOtp(false);
+                    }
+                  }}
+                  disabled={isSendingPhoneOtp || phoneVerifyCooldown > 0}
+                  className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-2 disabled:opacity-50 disabled:no-underline"
+                >
+                  {isSendingPhoneOtp 
+                    ? 'Sending...' 
+                    : phoneVerifyCooldown > 0 
+                      ? `Resend in ${phoneVerifyCooldown}s` 
+                      : "Didn't receive code? Resend"
+                  }
+                </button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>;
 };
 export default Profile;
