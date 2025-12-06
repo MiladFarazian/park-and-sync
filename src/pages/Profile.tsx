@@ -252,13 +252,28 @@ const Profile = () => {
     if (profile?.first_name && profile?.last_name) {
       return `${profile.first_name[0]}${profile.last_name[0]}`.toUpperCase();
     }
-    return user.email?.[0].toUpperCase() || 'U';
+    if (user.email) {
+      return user.email[0].toUpperCase();
+    }
+    if (profile?.phone || user.phone) {
+      return 'P';
+    }
+    return 'U';
   };
   const getDisplayName = () => {
     if (profile?.first_name && profile?.last_name) {
       return `${profile.first_name} ${profile.last_name}`;
     }
-    return user.email?.split('@')[0] || 'User';
+    if (user.email) {
+      return user.email.split('@')[0];
+    }
+    if (profile?.phone) {
+      return profile.phone;
+    }
+    if (user.phone) {
+      return user.phone;
+    }
+    return 'User';
   };
   const getMemberSince = () => {
     if (user.created_at) {

@@ -171,7 +171,13 @@ const ManageAccount = () => {
     if (profile?.first_name && profile?.last_name) {
       return `${profile.first_name[0]}${profile.last_name[0]}`.toUpperCase();
     }
-    return profile?.email?.[0].toUpperCase() || 'U';
+    if (profile?.email) {
+      return profile.email[0].toUpperCase();
+    }
+    if (profile?.phone) {
+      return 'P';
+    }
+    return 'U';
   };
 
   return (
