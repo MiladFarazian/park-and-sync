@@ -15,6 +15,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { formatPhoneNumber } from '@/lib/utils';
 import { ImageCropDialog } from '@/components/profile/ImageCropDialog';
 import ModeSwitcher from '@/components/layout/ModeSwitcher';
 import { useMode } from '@/contexts/ModeContext';
@@ -525,7 +526,7 @@ const Profile = () => {
                   <div className="flex items-center flex-wrap gap-1.5 mt-1">
                     <Phone className="h-3.5 w-3.5 text-primary-foreground/70" />
                     <span className="text-xs text-primary-foreground/70 truncate max-w-[140px]">
-                      {profile?.phone || user?.phone}
+                      {formatPhoneNumber(profile?.phone || user?.phone || '')}
                     </span>
                     {user?.phone_confirmed_at ? (
                       <div className="flex items-center gap-1 bg-green-500/20 text-green-200 px-1.5 py-0.5 rounded-full">
