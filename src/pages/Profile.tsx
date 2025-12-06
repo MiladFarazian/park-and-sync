@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, Building2, ArrowRight, ExternalLink, X } from 'lucide-react';
+import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, Building2, ArrowRight, ExternalLink, X, Mail, CheckCircle2, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -463,6 +463,25 @@ const Profile = () => {
                     {profile?.review_count ? `${profile.review_count} ${profile.review_count === 1 ? 'review' : 'reviews'}` : 'No reviews yet'}
                   </span>
                 </div>
+                
+                {/* Email verification status */}
+                {profile?.email && (
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <Mail className="h-3.5 w-3.5 text-primary-foreground/70" />
+                    <span className="text-xs text-primary-foreground/70 truncate max-w-[140px]">{profile.email}</span>
+                    {user?.email_confirmed_at ? (
+                      <div className="flex items-center gap-1 bg-green-500/20 text-green-200 px-1.5 py-0.5 rounded-full">
+                        <CheckCircle2 className="h-3 w-3" />
+                        <span className="text-[10px] font-medium">Verified</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 bg-yellow-500/20 text-yellow-200 px-1.5 py-0.5 rounded-full">
+                        <Clock className="h-3 w-3" />
+                        <span className="text-[10px] font-medium">Pending</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
