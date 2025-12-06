@@ -237,9 +237,14 @@ const SpotDetail = () => {
     setShowDirections(false);
   };
 
+  const handleSwitchToDriverMode = () => {
+    setMode('driver');
+    toast.success('Switched to Driver Mode');
+  };
+
   const handleBookNow = () => {
     if (mode === 'host') {
-      toast.error('Switch to Driver Mode to book parking spots');
+      handleSwitchToDriverMode();
       return;
     }
     if (isOwnSpot) {
