@@ -1,11 +1,12 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, CreditCard, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, CreditCard, Plus, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 
@@ -103,6 +104,7 @@ const PaymentMethods = () => {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddCard, setShowAddCard] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleBack = () => {
     // Check if there's history to go back to
@@ -154,6 +156,33 @@ const PaymentMethods = () => {
   const handleAddSuccess = () => {
     setShowAddCard(false);
     fetchPaymentMethods();
+  };
+
+  const handleDeletePaymentMethod = async (paymentMethodId: string) => {
+    try {
+      setDeletingId(paymentMethodId);
+      const { data, error } = await supabase.functions.invoke('delete-payment-method', {
+        body: { paymentMethodId }
+      });
+      
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Payment method removed successfully",
+      });
+      
+      fetchPaymentMethods();
+    } catch (error: any) {
+      console.error('Error deleting payment method:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove payment method",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const getCardBrandColor = (brand: string) => {
@@ -218,6 +247,39 @@ const PaymentMethods = () => {
                       </p>
                     </div>
                   </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        className="text-muted-foreground hover:text-destructive"
+                        disabled={deletingId === pm.id}
+                      >
+                        {deletingId === pm.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Remove payment method?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will remove your {pm.brand} card ending in {pm.last4} from your account.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={() => handleDeletePaymentMethod(pm.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Remove
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </Card>
             ))}
