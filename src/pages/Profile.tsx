@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, Building2, ArrowRight, ExternalLink } from 'lucide-react';
+import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, Building2, ArrowRight, ExternalLink, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -48,6 +48,8 @@ const Profile = () => {
     charges_enabled: boolean;
     details_submitted: boolean;
   } | null>(null);
+  const [profileAlertDismissed, setProfileAlertDismissed] = useState(false);
+  const [profileAlertVisible, setProfileAlertVisible] = useState(false);
   const [isLoadingStripe, setIsLoadingStripe] = useState(false);
   const [hasListedSpots, setHasListedSpots] = useState(false);
   const {
@@ -70,6 +72,25 @@ const Profile = () => {
       navigate('/auth');
     }
   }, [user, loading, navigate]);
+
+  // Show profile alert popup with delay
+  useEffect(() => {
+    const wasDismissed = localStorage.getItem('profileAlertDismissed');
+    if (wasDismissed) {
+      setProfileAlertDismissed(true);
+    } else {
+      const timer = setTimeout(() => setProfileAlertVisible(true), 500);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const handleDismissProfileAlert = () => {
+    setProfileAlertVisible(false);
+    setTimeout(() => {
+      setProfileAlertDismissed(true);
+      localStorage.setItem('profileAlertDismissed', 'true');
+    }, 300);
+  };
   useEffect(() => {
     if (profile) {
       reset({
@@ -334,18 +355,51 @@ const Profile = () => {
     onClick: () => navigate('/privacy-security')
   }];
   return <div className="space-y-6">
-      {/* Incomplete Profile Alert */}
-      {isProfileIncomplete && <div className="px-4 pt-4">
-          <Alert className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
-            <AlertCircle className="h-4 w-4 text-yellow-600" />
-            <AlertDescription className="text-yellow-800 dark:text-yellow-200">
-              Complete your profile to get the most out of Parkway.{' '}
-              <button onClick={handleEditClick} className="font-semibold underline hover:no-underline">
-                Add details now
+      {/* Incomplete Profile Overlay Popup */}
+      {isProfileIncomplete && !profileAlertDismissed && (
+        <div 
+          className={`fixed bottom-20 left-4 right-4 z-50 md:left-auto md:right-6 md:bottom-6 md:max-w-sm transition-all duration-500 ease-out ${
+            profileAlertVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8 pointer-events-none'
+          }`}
+        >
+          <div className="bg-card border border-border rounded-xl shadow-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-10 h-10 bg-yellow-500/10 rounded-full flex items-center justify-center">
+                <AlertCircle className="h-5 w-5 text-yellow-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-semibold text-foreground text-sm">Complete your profile</h4>
+                <p className="text-muted-foreground text-xs mt-0.5">
+                  Add your details to get the most out of Parkzy.
+                </p>
+                <div className="flex gap-2 mt-3">
+                  <Button 
+                    size="sm" 
+                    onClick={handleEditClick}
+                    className="text-xs h-8"
+                  >
+                    Add details
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={handleDismissProfileAlert}
+                    className="text-xs h-8"
+                  >
+                    Not now
+                  </Button>
+                </div>
+              </div>
+              <button 
+                onClick={handleDismissProfileAlert}
+                className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
               </button>
-            </AlertDescription>
-          </Alert>
-        </div>}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header with gradient background */}
       <div className="bg-gradient-to-br from-primary via-primary to-primary/90 text-primary-foreground p-6 rounded-b-3xl shadow-lg">
