@@ -7,7 +7,7 @@ import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { format, isToday, addHours } from 'date-fns';
 import { CalendarIcon, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Star, MapPin, Loader2, Search, Plus, Activity, Zap } from 'lucide-react';
+import { Star, MapPin, Loader2, Search, Plus, Activity, Zap, Navigation } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -254,6 +254,35 @@ const Home = () => {
     }
   };
 
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation || !mapboxToken) return;
+    
+    setShowSuggestions(false);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setUserLocation({ lat, lng });
+        
+        try {
+          const response = await fetch(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxToken}&limit=1`
+          );
+          const data = await response.json();
+          if (data.features && data.features.length > 0) {
+            setSearchQuery(data.features[0].place_name);
+          }
+        } catch (error) {
+          console.error('Error reverse geocoding:', error);
+        }
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        toast.error('Could not get your location');
+      }
+    );
+  };
+
   const SpotCard = ({ spot }: { spot: any }) => (
     <Card 
       className="p-4 cursor-pointer transition-all hover:shadow-md"
@@ -379,14 +408,32 @@ const Home = () => {
             <Input 
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
-              onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
               onKeyDown={handleKeyDown}
               placeholder="Where do you need parking?" 
               className="pl-10 h-12 text-base"
             />
 
-            {showSuggestions && suggestions.length > 0 && (
+            {showSuggestions && (
               <div className="absolute top-full left-0 right-0 z-50 mt-2 bg-background border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {/* Use Current Location Option */}
+                <button
+                  onMouseDown={(e) => { e.preventDefault(); handleUseCurrentLocation(); }}
+                  className="w-full text-left px-4 py-3 hover:bg-accent transition-colors border-b border-border"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Navigation className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-primary">Use current location</span>
+                      <span className="text-xs text-muted-foreground">Find parking near you</span>
+                    </div>
+                  </div>
+                </button>
+                
+                {/* Search Suggestions */}
                 {suggestions.map((s, idx) => (
                   <button
                     key={idx}
