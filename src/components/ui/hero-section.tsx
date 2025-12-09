@@ -314,7 +314,7 @@ for the people<span className="block text-foreground">wherever you go</span>
                   <Shield className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">10K+</p>
+                  <p className="text-2xl font-bold">10+</p>
                   <p className="text-sm text-muted-foreground">Secure bookings</p>
                 </div>
               </div>
