@@ -1,5 +1,4 @@
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MapPin, Clock, Shield, DollarSign, Smartphone, Users } from 'lucide-react';
 
 const FeaturesSection = () => {
@@ -37,32 +36,35 @@ const FeaturesSection = () => {
   ];
 
   return (
-    <section className="py-24 bg-muted/30">
+    <section className="py-20 lg:py-28 bg-muted/30">
       <div className="container mx-auto px-6">
         <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold mb-4">
-            Why Choose Our Platform?
+          <h2 className="text-3xl lg:text-4xl font-bold mb-4">
+            Why choose Parkzy?
           </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Experience the future of parking with features designed for both hosts and renters.
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Experience the future of parking with features designed for both drivers and hosts.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-12">
           {features.map((feature, index) => (
-            <Card key={index} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-              <CardHeader className="text-center pb-4">
-                <div className="mx-auto mb-4 p-3 bg-gradient-primary rounded-full w-fit">
-                  <feature.icon className="h-6 w-6 text-white" />
+            <div 
+              key={index} 
+              className="flex gap-4 p-6 rounded-2xl bg-background border hover:shadow-lg transition-all duration-300"
+            >
+              <div className="flex-shrink-0">
+                <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <feature.icon className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle className="text-xl">{feature.title}</CardTitle>
-              </CardHeader>
-              <CardContent className="text-center">
-                <CardDescription className="text-base">
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg mb-2">{feature.title}</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">
                   {feature.description}
-                </CardDescription>
-              </CardContent>
-            </Card>
+                </p>
+              </div>
+            </div>
           ))}
         </div>
       </div>
