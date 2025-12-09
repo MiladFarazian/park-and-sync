@@ -7,9 +7,56 @@ import { useNavigate } from 'react-router-dom';
 import { format, addHours } from 'date-fns';
 import heroImage from '@/assets/hero-parking.jpg';
 
+// LA neighborhoods for autofill
+const laNeighborhoods = [
+  'University Park, Los Angeles',
+  'Downtown Los Angeles',
+  'West Hollywood',
+  'Santa Monica',
+  'Beverly Hills',
+  'Venice',
+  'Manhattan Beach',
+  'Hermosa Beach',
+  'Redondo Beach',
+  'El Segundo',
+  'Culver City',
+  'Marina del Rey',
+  'Playa del Rey',
+  'Westwood',
+  'Brentwood',
+  'Pacific Palisades',
+  'Malibu',
+  'Hollywood',
+  'West Adams',
+  'Mid-City',
+  'Koreatown',
+  'Los Feliz',
+  'Silver Lake',
+  'Echo Park',
+  'East Los Angeles',
+  'Boyle Heights',
+  'South Park',
+  'Arts District',
+  'Little Tokyo',
+  'Chinatown',
+  'Griffith Park',
+  'Atwater Village',
+  'Glendale',
+  'Pasadena',
+  'Burbank',
+  'North Hollywood',
+  'Studio City',
+  'Sherman Oaks',
+  'Encino',
+  'Tarzana',
+  'Woodland Hills'
+];
+
 const HeroSection = () => {
   const navigate = useNavigate();
   const [searchLocation, setSearchLocation] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
   const [startTime, setStartTime] = useState<Date>(addHours(new Date(), 1));
   const [endTime, setEndTime] = useState<Date>(addHours(new Date(), 3));
   const [mobileStartPickerOpen, setMobileStartPickerOpen] = useState(false);
@@ -54,16 +101,62 @@ const HeroSection = () => {
 
             {/* Search Box - SpotHero Style */}
             <div className="bg-card border rounded-2xl p-6 space-y-4 shadow-lg">
-              {/* Location Input */}
+              {/* Location Input with Autofill */}
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none z-10" />
                 <Input
                   value={searchLocation}
-                  onChange={(e) => setSearchLocation(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSearchLocation(value);
+                    if (value.length > 0) {
+                      const filtered = laNeighborhoods.filter(neighborhood =>
+                        neighborhood.toLowerCase().includes(value.toLowerCase())
+                      );
+                      setFilteredSuggestions(filtered);
+                      setShowSuggestions(true);
+                    } else {
+                      setShowSuggestions(false);
+                    }
+                  }}
+                  onFocus={() => {
+                    if (searchLocation.length > 0) {
+                      const filtered = laNeighborhoods.filter(neighborhood =>
+                        neighborhood.toLowerCase().includes(searchLocation.toLowerCase())
+                      );
+                      setFilteredSuggestions(filtered);
+                      setShowSuggestions(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setShowSuggestions(false), 200);
+                  }}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                   placeholder="Where are you going?"
                   className="pl-12 h-14 text-base border-muted bg-muted/30 rounded-xl"
                 />
+                
+                {/* Suggestions Dropdown */}
+                {showSuggestions && filteredSuggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-background border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {filteredSuggestions.slice(0, 8).map((suggestion, index) => (
+                      <button
+                        key={index}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setSearchLocation(suggestion);
+                          setShowSuggestions(false);
+                        }}
+                        className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-b-0 focus:outline-none focus:bg-muted/50"
+                      >
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">{suggestion}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Time Selection */}
