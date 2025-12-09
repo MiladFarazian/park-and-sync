@@ -684,7 +684,31 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         }
       } as any);
 
-      // Add unclustered point layer (individual pins) with hover state
+      // Add highlight circle layer (shows on hover) - BEFORE the pin layer
+      (map.current as any).addLayer({
+        id: 'spots-highlight',
+        type: 'circle',
+        source: sourceId,
+        filter: ['!', ['has', 'point_count']],
+        paint: {
+          'circle-radius': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            22,
+            0
+          ],
+          'circle-color': 'hsl(250, 100%, 65%)',
+          'circle-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            0.25,
+            0
+          ],
+          'circle-translate': [0, -20] // Offset to align with pin head
+        }
+      } as any);
+
+      // Add unclustered point layer (individual pins)
       (map.current as any).addLayer({
         id: circleId,
         type: 'symbol',
@@ -692,22 +716,12 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         filter: ['!', ['has', 'point_count']],
         layout: {
           'icon-image': pinImageId,
-          'icon-size': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            1.8,
-            1.5
-          ],
+          'icon-size': 1.5,
           'icon-allow-overlap': true,
           'icon-anchor': 'bottom'
         },
         paint: {
-          'icon-opacity': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            1,
-            0.85
-          ]
+          'icon-opacity': 0.95
         }
       } as any);
 
@@ -719,23 +733,13 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         filter: ['!', ['has', 'point_count']],
         layout: {
           'text-field': ['get', 'price'],
-          'text-size': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            13,
-            11
-          ],
+          'text-size': 11,
           'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
           'text-allow-overlap': true,
           'text-offset': [0, -2.8]
         },
         paint: {
-          'text-color': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            'hsl(250, 100%, 50%)',
-            'hsl(250, 100%, 65%)'
-          ],
+          'text-color': 'hsl(250, 100%, 65%)',
           'text-halo-color': '#ffffff',
           'text-halo-width': 0.5,
           'text-opacity': 1
