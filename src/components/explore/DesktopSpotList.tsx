@@ -39,6 +39,7 @@ interface DesktopSpotListProps {
   spots: Spot[];
   searchCenter: { lat: number; lng: number };
   selectedSpotId?: string;
+  hoveredSpotId?: string | null;
   onSpotHover?: (spotId: string | null) => void;
   onSpotClick?: (spotId: string) => void;
   sortBy: string;
@@ -83,6 +84,7 @@ const DesktopSpotList = ({
   spots,
   searchCenter,
   selectedSpotId,
+  hoveredSpotId,
   onSpotHover,
   onSpotClick,
   sortBy,
@@ -276,13 +278,16 @@ const DesktopSpotList = ({
               const distance = calculateDistance(searchCenter.lat, searchCenter.lng, spot.lat, spot.lng);
               const walkTime = calculateWalkTime(distance);
               const isSelected = selectedSpotId === spot.id;
+              const isHovered = hoveredSpotId === spot.id;
               const isNearest = index === 0 && sortBy === 'distance';
 
               return (
                 <div
                   key={spot.id}
-                  className={`p-4 cursor-pointer transition-colors hover:bg-muted/50 ${
+                  className={`p-4 cursor-pointer transition-all duration-200 ${
                     isSelected ? 'bg-primary/5 border-l-4 border-l-primary' : ''
+                  } ${
+                    isHovered && !isSelected ? 'bg-muted/70 scale-[1.01]' : 'hover:bg-muted/50'
                   }`}
                   onMouseEnter={() => onSpotHover?.(spot.id)}
                   onMouseLeave={() => onSpotHover?.(null)}
