@@ -39,7 +39,8 @@ interface MapViewProps {
     end?: string;
     q?: string;
   };
-  highlightedSpotId?: string;
+  highlightedSpotId?: string | null;
+  onSpotHover?: (spotId: string | null) => void;
   hideCarousel?: boolean;
 }
 
@@ -61,7 +62,7 @@ const calculateWalkTime = (distanceMiles: number): number => {
   return Math.round((distanceMiles / 3) * 60);
 };
 
-const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, onMapMove, searchQuery, exploreParams, highlightedSpotId, hideCarousel }: MapViewProps) => {
+const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, onMapMove, searchQuery, exploreParams, highlightedSpotId, onSpotHover, hideCarousel }: MapViewProps) => {
   const navigate = useNavigate();
   const { mode, setMode } = useMode();
   const { user } = useAuth();
@@ -631,7 +632,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       cluster: true,
       clusterMaxZoom: 16, // Max zoom to cluster points on
       clusterRadius: 50, // Radius of each cluster when clustering points
-      generateId: false // Use the id we provide on each feature
+      promoteId: 'id' // Use the 'id' property for feature-state
     } as any);
 
     const pinImageId = 'pin-blue';
@@ -683,7 +684,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         }
       } as any);
 
-      // Add unclustered point layer (individual pins)
+      // Add unclustered point layer (individual pins) with hover state
       (map.current as any).addLayer({
         id: circleId,
         type: 'symbol',
@@ -691,12 +692,22 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         filter: ['!', ['has', 'point_count']],
         layout: {
           'icon-image': pinImageId,
-          'icon-size': 1.5,
+          'icon-size': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            1.8,
+            1.5
+          ],
           'icon-allow-overlap': true,
           'icon-anchor': 'bottom'
         },
         paint: {
-          'icon-opacity': 0.85
+          'icon-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            1,
+            0.85
+          ]
         }
       } as any);
 
@@ -708,16 +719,26 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         filter: ['!', ['has', 'point_count']],
         layout: {
           'text-field': ['get', 'price'],
-          'text-size': 11,
+          'text-size': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            13,
+            11
+          ],
           'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
           'text-allow-overlap': true,
           'text-offset': [0, -2.8]
         },
         paint: {
-          'text-color': 'hsl(250, 100%, 65%)',
+          'text-color': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            'hsl(250, 100%, 50%)',
+            'hsl(250, 100%, 65%)'
+          ],
           'text-halo-color': '#ffffff',
           'text-halo-width': 0.5,
-          'text-opacity': 0.9
+          'text-opacity': 1
         }
       } as any);
 
@@ -786,19 +807,29 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         (map.current as any).getCanvas().style.cursor = '';
       });
 
-      // Change cursor on hover for spots
-      (map.current as any).on('mouseenter', circleId, () => {
+      // Change cursor and notify on hover for spots
+      (map.current as any).on('mouseenter', circleId, (e: any) => {
         (map.current as any).getCanvas().style.cursor = 'pointer';
+        const f = e.features?.[0];
+        if (f?.properties?.id) {
+          onSpotHover?.(f.properties.id);
+        }
       });
       (map.current as any).on('mouseleave', circleId, () => {
         (map.current as any).getCanvas().style.cursor = '';
+        onSpotHover?.(null);
       });
 
-      (map.current as any).on('mouseenter', labelId, () => {
+      (map.current as any).on('mouseenter', labelId, (e: any) => {
         (map.current as any).getCanvas().style.cursor = 'pointer';
+        const f = e.features?.[0];
+        if (f?.properties?.id) {
+          onSpotHover?.(f.properties.id);
+        }
       });
       (map.current as any).on('mouseleave', labelId, () => {
         (map.current as any).getCanvas().style.cursor = '';
+        onSpotHover?.(null);
       });
 
       // Trigger visible spots count update after rendering
@@ -844,7 +875,35 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     } else {
       addLayers();
     }
-  }, [spots, mapReady]);
+  }, [spots, mapReady, onSpotHover]);
+
+  // Update feature-state when highlightedSpotId changes (from list hover)
+  const prevHighlightedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!map.current || !mapReady) return;
+    
+    const sourceId = 'spots-source';
+    const source = map.current.getSource(sourceId);
+    if (!source) return;
+
+    // Remove highlight from previous spot
+    if (prevHighlightedRef.current) {
+      map.current.setFeatureState(
+        { source: sourceId, id: prevHighlightedRef.current },
+        { hover: false }
+      );
+    }
+
+    // Add highlight to new spot
+    if (highlightedSpotId) {
+      map.current.setFeatureState(
+        { source: sourceId, id: highlightedSpotId },
+        { hover: true }
+      );
+    }
+
+    prevHighlightedRef.current = highlightedSpotId || null;
+  }, [highlightedSpotId, mapReady]);
 
   const handleSpotClick = (spot: Spot) => {
     setSelectedSpot(spot);

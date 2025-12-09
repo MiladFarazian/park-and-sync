@@ -442,6 +442,7 @@ const Explore = () => {
             spots={parkingSpots}
             searchCenter={searchLocation}
             selectedSpotId={selectedSpotId || undefined}
+            hoveredSpotId={hoveredSpotId}
             onSpotHover={setHoveredSpotId}
             onSpotClick={setSelectedSpotId}
             sortBy={sortBy}
@@ -565,6 +566,7 @@ const Explore = () => {
             searchQuery={searchQuery}
             exploreParams={exploreParams}
             highlightedSpotId={hoveredSpotId || selectedSpotId || undefined}
+            onSpotHover={setHoveredSpotId}
             hideCarousel={true}
           />
         </div>
