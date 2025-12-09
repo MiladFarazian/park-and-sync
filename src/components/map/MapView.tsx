@@ -880,7 +880,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
 
       {/* Swipeable Spot Cards Carousel */}
       {sortedSpots.length > 0 && (
-        <div className="absolute bottom-4 left-0 right-0 z-10">
+        <div className="absolute bottom-[calc(5rem+env(safe-area-inset-bottom)+1rem)] md:bottom-4 left-0 right-0 z-10">
           {/* Navigation arrows and counter */}
           <div className="flex items-center justify-between px-4 mb-2">
             <button
