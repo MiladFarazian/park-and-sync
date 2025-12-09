@@ -670,9 +670,9 @@ const Messages = () => {
   );
 
   return (
-    <div className="flex h-full gap-0 md:gap-4">
+    <div className="flex h-full">
       {/* Conversations List */}
-      <Card className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col overflow-hidden rounded-none md:rounded-2xl`}>
+      <div className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col overflow-hidden border-r bg-card`}>
         <div className="p-4 border-b flex-shrink-0">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold">Messages</h1>
@@ -751,10 +751,10 @@ const Messages = () => {
             )}
           </div>
         </div>
-      </Card>
+      </div>
 
       {/* Messages Area */}
-      <Card className={`${selectedConversation && isMobile ? 'flex' : 'hidden'} md:flex flex-1 flex-col overflow-hidden rounded-none md:rounded-2xl`}>
+      <div className={`${selectedConversation && isMobile ? 'flex' : 'hidden'} md:flex flex-1 flex-col overflow-hidden bg-card`}>
         {selectedConversation ? (
           <ChatPane
             key={selectedConversation}
@@ -774,7 +774,7 @@ const Messages = () => {
             </div>
           </div>
         )}
-      </Card>
+      </div>
 
       {/* Compose Message Modal */}
       {isMobile ? (
