@@ -39,6 +39,8 @@ interface MapViewProps {
     end?: string;
     q?: string;
   };
+  highlightedSpotId?: string;
+  hideCarousel?: boolean;
 }
 
 // Calculate distance between two coordinates using Haversine formula (returns miles)
@@ -59,7 +61,7 @@ const calculateWalkTime = (distanceMiles: number): number => {
   return Math.round((distanceMiles / 3) * 60);
 };
 
-const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, onMapMove, searchQuery, exploreParams }: MapViewProps) => {
+const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, onMapMove, searchQuery, exploreParams, highlightedSpotId, hideCarousel }: MapViewProps) => {
   const navigate = useNavigate();
   const { mode, setMode } = useMode();
   const { user } = useAuth();
@@ -878,8 +880,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         className="absolute inset-0"
       />
 
-      {/* Swipeable Spot Cards Carousel */}
-      {sortedSpots.length > 0 && (
+      {/* Swipeable Spot Cards Carousel - Hidden on desktop split view */}
+      {sortedSpots.length > 0 && !hideCarousel && (
         <div className="absolute bottom-[calc(5rem+env(safe-area-inset-bottom)+1rem)] md:bottom-4 left-0 right-0 z-10">
           {/* Navigation arrows and counter */}
           <div className="flex items-center justify-between px-4 mb-2">
