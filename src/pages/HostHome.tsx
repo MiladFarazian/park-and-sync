@@ -10,6 +10,7 @@ import { useMode } from '@/contexts/ModeContext';
 import { toast } from 'sonner';
 import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
 import EarningsAnalytics from '@/components/host/EarningsAnalytics';
+import RecentReviews from '@/components/host/RecentReviews';
 
 const HostHome = () => {
   const navigate = useNavigate();
@@ -235,6 +236,11 @@ const HostHome = () => {
       {/* Earnings Analytics */}
       <div className="animate-fade-in" style={{ animationDelay: '100ms', animationFillMode: 'both' }}>
         <EarningsAnalytics />
+      </div>
+
+      {/* Recent Reviews */}
+      <div className="animate-fade-in" style={{ animationDelay: '150ms', animationFillMode: 'both' }}>
+        <RecentReviews />
       </div>
 
       {/* Quick Actions */}
