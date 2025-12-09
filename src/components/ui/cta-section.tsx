@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Car, DollarSign } from 'lucide-react';
+import { ArrowRight, Car, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const CTASection = () => {
@@ -41,7 +41,7 @@ const CTASection = () => {
           <div className="relative overflow-hidden rounded-3xl bg-accent p-8 lg:p-12 text-accent-foreground">
             <div className="relative z-10">
               <div className="h-14 w-14 rounded-2xl bg-white/20 flex items-center justify-center mb-6">
-                <DollarSign className="h-7 w-7" />
+                <Home className="h-7 w-7" />
               </div>
               <h3 className="text-2xl lg:text-3xl font-bold mb-4">
                 Earn money with your space
@@ -60,7 +60,7 @@ const CTASection = () => {
               </Button>
             </div>
             <div className="absolute right-0 bottom-0 opacity-10">
-              <DollarSign className="h-64 w-64" />
+              <Home className="h-64 w-64" />
             </div>
           </div>
         </div>
