@@ -23,6 +23,9 @@ const AppLayout = ({
   const { mode, setMode } = useMode();
   const isProfilePage = location.pathname === '/profile';
   
+  // Pages that need full-width/height without container padding
+  const isFullScreenPage = location.pathname === '/explore' || location.pathname === '/messages';
+  
   // Initialize notifications hook to set up realtime listeners
   useNotifications();
   
@@ -62,7 +65,7 @@ const AppLayout = ({
                   </div>
                 </header>}
               <main className="flex-1 overflow-y-auto">
-                <div className="container mx-auto p-6 h-full">
+                <div className={isFullScreenPage ? "h-full" : "container mx-auto p-6 h-full"}>
                   {children}
                 </div>
               </main>
@@ -89,7 +92,7 @@ const AppLayout = ({
             </div>
           </header>}
         <main className="flex-1 overflow-hidden bg-background">
-          <div className="h-full overflow-y-auto pb-20 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+          <div className="h-full overflow-y-auto">
             {children}
           </div>
         </main>
