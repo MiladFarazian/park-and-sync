@@ -12,8 +12,11 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useMode } from '@/contexts/ModeContext';
+import { useIsMobile } from '@/hooks/use-mobile';
+import Index from './Index';
 
 const Home = () => {
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const { setMode } = useMode();
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
@@ -360,6 +363,11 @@ const Home = () => {
       onClick: () => navigate('/activity')
     },
   ];
+
+  // Show desktop landing page on non-mobile
+  if (!isMobile) {
+    return <Index />;
+  }
 
   return (
     <div className="bg-background">

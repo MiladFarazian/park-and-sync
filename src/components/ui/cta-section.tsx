@@ -1,38 +1,67 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Car, DollarSign } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const CTASection = () => {
+  const navigate = useNavigate();
+  
   return (
-    <section className="py-24 bg-gradient-hero">
-      <div className="container mx-auto px-6 text-center">
-        <div className="max-w-3xl mx-auto space-y-8">
-          <h2 className="text-4xl lg:text-5xl font-bold">
-            Ready to Transform Your
-            <span className="block bg-gradient-primary bg-clip-text text-transparent">
-              Parking Experience?
-            </span>
-          </h2>
-          
-          <p className="text-xl text-muted-foreground">
-            Join thousands of users who've discovered smarter, more affordable parking solutions.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button variant="hero" size="lg" className="text-lg">
-              Get Started Today
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-            <Button variant="outline" size="lg" className="text-lg">
-              Learn More
-            </Button>
+    <section className="py-20 lg:py-28">
+      <div className="container mx-auto px-6">
+        <div className="grid lg:grid-cols-2 gap-8">
+          {/* Driver CTA */}
+          <div className="relative overflow-hidden rounded-3xl bg-primary p-8 lg:p-12 text-primary-foreground">
+            <div className="relative z-10">
+              <div className="h-14 w-14 rounded-2xl bg-white/20 flex items-center justify-center mb-6">
+                <Car className="h-7 w-7" />
+              </div>
+              <h3 className="text-2xl lg:text-3xl font-bold mb-4">
+                Find your perfect spot
+              </h3>
+              <p className="text-primary-foreground/80 mb-8 max-w-md">
+                Search thousands of parking spots near your destination. Book in seconds and save money.
+              </p>
+              <Button 
+                variant="secondary" 
+                size="lg" 
+                className="font-semibold"
+                onClick={() => navigate('/explore')}
+              >
+                Search Parking
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </div>
+            <div className="absolute right-0 bottom-0 opacity-10">
+              <Car className="h-64 w-64" />
+            </div>
           </div>
 
-          <div className="pt-8 border-t border-border/20">
-            <p className="text-sm text-muted-foreground">
-              Connect to Supabase to enable full functionality including user accounts, 
-              real-time booking, payments, and more.
-            </p>
+          {/* Host CTA */}
+          <div className="relative overflow-hidden rounded-3xl bg-accent p-8 lg:p-12 text-accent-foreground">
+            <div className="relative z-10">
+              <div className="h-14 w-14 rounded-2xl bg-white/20 flex items-center justify-center mb-6">
+                <DollarSign className="h-7 w-7" />
+              </div>
+              <h3 className="text-2xl lg:text-3xl font-bold mb-4">
+                Earn money with your space
+              </h3>
+              <p className="text-accent-foreground/80 mb-8 max-w-md">
+                Turn your empty driveway or parking space into extra income. List for free and start earning.
+              </p>
+              <Button 
+                variant="secondary" 
+                size="lg" 
+                className="font-semibold"
+                onClick={() => navigate('/list-spot')}
+              >
+                List Your Spot
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </div>
+            <div className="absolute right-0 bottom-0 opacity-10">
+              <DollarSign className="h-64 w-64" />
+            </div>
           </div>
         </div>
       </div>
