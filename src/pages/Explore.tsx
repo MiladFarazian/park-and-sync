@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import MapView from '@/components/map/MapView';
-import DesktopSpotList from '@/components/explore/DesktopSpotList';
+import DesktopSpotList, { SpotFilters } from '@/components/explore/DesktopSpotList';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { format, isToday } from 'date-fns';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
@@ -42,6 +42,12 @@ const Explore = () => {
   const [sortBy, setSortBy] = useState('distance');
   const [hoveredSpotId, setHoveredSpotId] = useState<string | null>(null);
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
+  const [filters, setFilters] = useState<SpotFilters>({
+    covered: false,
+    evCharging: false,
+    secure: false,
+    vehicleSize: null,
+  });
 
   // Ensure end time is always after start time
   const validateAndSetTimes = (newStartTime: Date, newEndTime: Date | null) => {
@@ -364,7 +370,8 @@ const Explore = () => {
         imageUrl: spot.spot_photos?.find((photo: any) => photo.is_primary)?.url || spot.spot_photos?.[0]?.url,
         distance: spot.distance ? `${(spot.distance / 1000).toFixed(1)} km` : undefined,
         amenities: [...(spot.has_ev_charging ? ['EV Charging'] : []), ...(spot.is_covered ? ['Covered'] : []), ...(spot.is_secure ? ['Secure'] : [])],
-        hostId: spot.host_id
+        hostId: spot.host_id,
+        sizeConstraints: spot.size_constraints || []
       })) || [];
       setParkingSpots(transformedSpots);
     } catch (err) {
@@ -439,6 +446,8 @@ const Explore = () => {
             onSpotClick={setSelectedSpotId}
             sortBy={sortBy}
             onSortChange={setSortBy}
+            filters={filters}
+            onFiltersChange={setFilters}
             exploreParams={exploreParams}
           />
         </div>
