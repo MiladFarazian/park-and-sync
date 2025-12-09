@@ -246,11 +246,7 @@ const HeroSection = () => {
                 <Input
                   value={searchLocation}
                   onChange={handleSearchChange}
-                  onFocus={() => {
-                    if (suggestions.length > 0) {
-                      setShowSuggestions(true);
-                    }
-                  }}
+                  onFocus={() => setShowSuggestions(true)}
                   onBlur={() => {
                     setTimeout(() => setShowSuggestions(false), 200);
                   }}
@@ -271,8 +267,29 @@ const HeroSection = () => {
                 )}
                 
                 {/* Suggestions Dropdown */}
-                {showSuggestions && suggestions.length > 0 && (
+                {showSuggestions && (
                   <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-background border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {/* Use Current Location Option */}
+                    <button
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleUseCurrentLocation();
+                        setShowSuggestions(false);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 focus:outline-none focus:bg-muted/50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Navigation className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-primary">Use current location</p>
+                          <p className="text-xs text-muted-foreground">Find parking near you</p>
+                        </div>
+                      </div>
+                    </button>
+                    
+                    {/* Search Suggestions */}
                     {suggestions.map((suggestion, index) => (
                       <button
                         key={suggestion.mapbox_id || index}
