@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, MapPin, Footprints } from 'lucide-react';
+import { Star, MapPin, Footprints, Umbrella, Zap, Shield, Car, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -25,6 +25,14 @@ interface Spot {
   distance?: string;
   amenities?: string[];
   hostId?: string;
+  sizeConstraints?: string[];
+}
+
+export interface SpotFilters {
+  covered: boolean;
+  evCharging: boolean;
+  secure: boolean;
+  vehicleSize: string | null;
 }
 
 interface DesktopSpotListProps {
@@ -35,6 +43,8 @@ interface DesktopSpotListProps {
   onSpotClick?: (spotId: string) => void;
   sortBy: string;
   onSortChange: (value: string) => void;
+  filters: SpotFilters;
+  onFiltersChange: (filters: SpotFilters) => void;
   exploreParams?: {
     lat?: string;
     lng?: string;
@@ -62,6 +72,13 @@ const calculateWalkTime = (distanceMiles: number): number => {
   return Math.round((distanceMiles / 3) * 60);
 };
 
+const vehicleSizes = [
+  { value: 'compact', label: 'Compact' },
+  { value: 'midsize', label: 'Midsize' },
+  { value: 'suv', label: 'SUV' },
+  { value: 'truck', label: 'Truck' },
+];
+
 const DesktopSpotList = ({
   spots,
   searchCenter,
@@ -70,12 +87,47 @@ const DesktopSpotList = ({
   onSpotClick,
   sortBy,
   onSortChange,
+  filters,
+  onFiltersChange,
   exploreParams,
 }: DesktopSpotListProps) => {
   const navigate = useNavigate();
 
+  const toggleFilter = (key: keyof Omit<SpotFilters, 'vehicleSize'>) => {
+    onFiltersChange({ ...filters, [key]: !filters[key] });
+  };
+
+  const setVehicleSize = (size: string | null) => {
+    onFiltersChange({ ...filters, vehicleSize: size });
+  };
+
+  const activeFilterCount = [
+    filters.covered,
+    filters.evCharging,
+    filters.secure,
+    filters.vehicleSize !== null,
+  ].filter(Boolean).length;
+
+  const clearAllFilters = () => {
+    onFiltersChange({
+      covered: false,
+      evCharging: false,
+      secure: false,
+      vehicleSize: null,
+    });
+  };
+
+  // Filter spots based on selected filters
+  const filteredSpots = spots.filter((spot) => {
+    if (filters.covered && !spot.amenities?.includes('Covered')) return false;
+    if (filters.evCharging && !spot.amenities?.includes('EV Charging')) return false;
+    if (filters.secure && !spot.amenities?.includes('Secure')) return false;
+    if (filters.vehicleSize && spot.sizeConstraints && !spot.sizeConstraints.includes(filters.vehicleSize)) return false;
+    return true;
+  });
+
   // Sort spots based on selected option
-  const sortedSpots = [...spots].sort((a, b) => {
+  const sortedSpots = [...filteredSpots].sort((a, b) => {
     const distA = calculateDistance(searchCenter.lat, searchCenter.lng, a.lat, a.lng);
     const distB = calculateDistance(searchCenter.lat, searchCenter.lng, b.lat, b.lng);
     
@@ -113,10 +165,13 @@ const DesktopSpotList = ({
   return (
     <div className="h-full flex flex-col bg-background border-r">
       {/* Header */}
-      <div className="flex-shrink-0 p-4 border-b">
+      <div className="flex-shrink-0 p-4 border-b space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            {spots.length} spot{spots.length !== 1 ? 's' : ''} found
+            {filteredSpots.length} spot{filteredSpots.length !== 1 ? 's' : ''} found
+            {activeFilterCount > 0 && filteredSpots.length !== spots.length && (
+              <span className="text-muted-foreground/70"> (filtered from {spots.length})</span>
+            )}
           </p>
           <Select value={sortBy} onValueChange={onSortChange}>
             <SelectTrigger className="w-[160px] h-9">
@@ -129,6 +184,79 @@ const DesktopSpotList = ({
               <SelectItem value="rating">Top Rated</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        {/* Filter Chips */}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => toggleFilter('covered')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              filters.covered
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted hover:bg-muted/80 text-foreground'
+            }`}
+          >
+            <Umbrella className="h-3.5 w-3.5" />
+            Covered
+          </button>
+          <button
+            onClick={() => toggleFilter('evCharging')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              filters.evCharging
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted hover:bg-muted/80 text-foreground'
+            }`}
+          >
+            <Zap className="h-3.5 w-3.5" />
+            EV Charging
+          </button>
+          <button
+            onClick={() => toggleFilter('secure')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              filters.secure
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted hover:bg-muted/80 text-foreground'
+            }`}
+          >
+            <Shield className="h-3.5 w-3.5" />
+            Secure
+          </button>
+          
+          {/* Vehicle Size Dropdown */}
+          <Select
+            value={filters.vehicleSize || 'any'}
+            onValueChange={(value) => setVehicleSize(value === 'any' ? null : value)}
+          >
+            <SelectTrigger 
+              className={`h-8 w-auto gap-1.5 rounded-full border-0 ${
+                filters.vehicleSize
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'bg-muted hover:bg-muted/80'
+              }`}
+            >
+              <Car className="h-3.5 w-3.5" />
+              <SelectValue placeholder="Vehicle Size" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">Any Size</SelectItem>
+              {vehicleSizes.map((size) => (
+                <SelectItem key={size.value} value={size.value}>
+                  {size.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Clear Filters */}
+          {activeFilterCount > 0 && (
+            <button
+              onClick={clearAllFilters}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear all
+            </button>
+          )}
         </div>
       </div>
 
