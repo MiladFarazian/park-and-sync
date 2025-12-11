@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -19,6 +20,47 @@ interface BookingConfirmationRequest {
   endAt: string;
   totalAmount: number;
   bookingId: string;
+}
+
+// Generate a magic link for the user
+async function generateMagicLink(email: string, redirectTo: string): Promise<string | null> {
+  try {
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
+    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: email,
+      options: {
+        redirectTo: redirectTo,
+      }
+    });
+
+    if (error) {
+      console.error('Error generating magic link:', error);
+      return null;
+    }
+
+    // The generated link contains the token - we need to use the hashed_token
+    // to construct a proper verification URL
+    if (data?.properties?.hashed_token) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      return `${supabaseUrl}/auth/v1/verify?token=${data.properties.hashed_token}&type=magiclink&redirect_to=${encodeURIComponent(redirectTo)}`;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error in generateMagicLink:', error);
+    return null;
+  }
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -46,12 +88,35 @@ const handler = async (req: Request): Promise<Response> => {
     const encodedAddress = encodeURIComponent(spotAddress);
     const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
     const appUrl = Deno.env.get('APP_URL') || 'https://parkzy.lovable.app';
-    const hostBookingUrl = `${appUrl}/host-booking-confirmation/${bookingId}`;
-    const driverBookingUrl = `${appUrl}/booking-confirmation/${bookingId}`;
+    
+    // Base URLs for booking pages (with magic login flag)
+    const hostBookingPath = `${appUrl}/host-booking-confirmation/${bookingId}?magic_login=true`;
+    const driverBookingPath = `${appUrl}/booking-confirmation/${bookingId}?magic_login=true`;
 
     const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'Parkzy <onboarding@resend.dev>';
     let hostEmailId: string | undefined;
     let driverEmailId: string | undefined;
+
+    // Generate magic links for authenticated access
+    let hostBookingUrl = `${appUrl}/host-booking-confirmation/${bookingId}`;
+    let driverBookingUrl = `${appUrl}/booking-confirmation/${bookingId}`;
+
+    // Try to generate magic links for email users
+    if (hostEmail && hostEmail.includes('@')) {
+      const magicLink = await generateMagicLink(hostEmail, hostBookingPath);
+      if (magicLink) {
+        hostBookingUrl = magicLink;
+        console.log('Generated magic link for host');
+      }
+    }
+
+    if (driverEmail && driverEmail.includes('@')) {
+      const magicLink = await generateMagicLink(driverEmail, driverBookingPath);
+      if (magicLink) {
+        driverBookingUrl = magicLink;
+        console.log('Generated magic link for driver');
+      }
+    }
 
     // Send email to host only if valid email exists
     if (hostEmail && hostEmail.includes('@')) {

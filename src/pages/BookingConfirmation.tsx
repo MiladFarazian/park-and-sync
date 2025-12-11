@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Clock, MapPin, Star, MessageCircle, Car, Calendar, XCircle, Navigation, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { differenceInHours, format } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { useAuth } from '@/contexts/AuthContext';
+
 const BookingConfirmation = () => {
   const {
     bookingId
@@ -20,6 +22,7 @@ const BookingConfirmation = () => {
   const {
     toast
   } = useToast();
+  const { user, profile } = useAuth();
   const [booking, setBooking] = useState<any>(null);
   const [spot, setSpot] = useState<any>(null);
   const [host, setHost] = useState<any>(null);
@@ -28,6 +31,24 @@ const BookingConfirmation = () => {
   const [cancelling, setCancelling] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [directionsDialogOpen, setDirectionsDialogOpen] = useState(false);
+  const magicLoginToastShown = useRef(false);
+
+  // Show magic login toast if user arrived via magic link
+  useEffect(() => {
+    const isMagicLogin = searchParams.get('magic_login') === 'true';
+    if (isMagicLogin && user && !magicLoginToastShown.current) {
+      magicLoginToastShown.current = true;
+      const displayName = profile?.email || user.email || profile?.phone || 'your account';
+      toast({
+        title: "Logged in successfully",
+        description: `Signed in as ${displayName}`,
+      });
+      // Clean up URL
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [searchParams, user, profile, toast]);
+
   useEffect(() => {
     const fetchBookingDetails = async () => {
       if (!bookingId) return;
