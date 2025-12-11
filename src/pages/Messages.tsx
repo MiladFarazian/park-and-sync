@@ -725,18 +725,29 @@ const Messages = () => {
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    <Avatar>
-                      <AvatarImage src={conversation.avatar_url} />
-                      <AvatarFallback>{conversation.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                    </Avatar>
+                    <div className="relative">
+                      <Avatar>
+                        <AvatarImage src={conversation.avatar_url} />
+                        <AvatarFallback>{conversation.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                      </Avatar>
+                      {/* Unread indicator dot with pulse animation */}
+                      {conversation.unread_count > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                        </span>
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <p className="font-semibold text-sm truncate">{conversation.name}</p>
-                        <span className="text-xs text-muted-foreground">
+                        <p className={`font-semibold text-sm truncate ${conversation.unread_count > 0 ? 'text-foreground' : ''}`}>
+                          {conversation.name}
+                        </p>
+                        <span className={`text-xs ${conversation.unread_count > 0 ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
                           {formatDistanceToNow(new Date(conversation.last_message_at), { addSuffix: true })}
                         </span>
                       </div>
-                      <p className={`text-sm truncate ${conversation.unread_count > 0 ? 'font-medium' : 'text-muted-foreground'}`}>
+                      <p className={`text-sm truncate ${conversation.unread_count > 0 ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
                         {conversation.last_message}
                       </p>
                     </div>

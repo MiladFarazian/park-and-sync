@@ -186,14 +186,16 @@ export const useMessages = () => {
     }
   };
 
-  const scheduleSoftReload = () => {
+  const scheduleSoftReload = (immediate = false) => {
     try {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      // Use shorter delay for faster updates, or immediate for critical updates
+      const delay = immediate ? 100 : 500;
       debounceTimerRef.current = setTimeout(() => {
         if (mountedRef.current) {
           loadConversations();
         }
-      }, 3000);
+      }, delay);
     } catch (e) {
       console.error('[useMessages] scheduleSoftReload error:', e);
     }
