@@ -22,17 +22,27 @@ const ModeSwitcher = () => {
   return (
     <div
       className={cn(
-        "flex items-center h-9 p-1 bg-muted rounded-full",
+        "relative flex items-center h-9 p-1 bg-muted rounded-full",
         isLoading && "opacity-50 pointer-events-none"
       )}
     >
+      {/* Animated sliding indicator */}
+      <div
+        className={cn(
+          "absolute h-7 rounded-full bg-background shadow-sm transition-all duration-300 ease-out",
+          mode === 'driver' 
+            ? "left-1 w-[calc(50%-2px)]" 
+            : "left-[calc(50%+1px)] w-[calc(50%-2px)]"
+        )}
+      />
+      
       <button
         onClick={() => handleModeSwitch('driver')}
         disabled={isLoading}
         className={cn(
-          "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200",
+          "relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors duration-300",
           mode === 'driver'
-            ? "bg-background text-foreground shadow-sm"
+            ? "text-foreground"
             : "text-muted-foreground hover:text-foreground"
         )}
       >
@@ -43,9 +53,9 @@ const ModeSwitcher = () => {
         onClick={() => handleModeSwitch('host')}
         disabled={isLoading}
         className={cn(
-          "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200",
+          "relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors duration-300",
           mode === 'host'
-            ? "bg-background text-foreground shadow-sm"
+            ? "text-foreground"
             : "text-muted-foreground hover:text-foreground"
         )}
       >
