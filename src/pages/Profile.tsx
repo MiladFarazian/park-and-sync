@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, Building2, ArrowRight, ExternalLink, X, Mail, CheckCircle2, Clock, Phone } from 'lucide-react';
+import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, Building2, ArrowRight, ExternalLink, X, Mail, CheckCircle2, Clock, Phone, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -715,7 +715,14 @@ const Profile = () => {
         {/* Support Contact Section */}
         <div className="pt-4 pb-8">
           <p className="text-sm text-muted-foreground text-center mb-3">Need help? Contact support</p>
-          <div className="flex justify-center gap-4">
+          <div className="flex justify-center gap-3 flex-wrap">
+            <button 
+              onClick={() => navigate('/messages?userId=00000000-0000-0000-0000-000000000001')}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border hover:bg-muted transition-colors text-sm"
+            >
+              <MessageCircle className="h-4 w-4 text-primary" />
+              Chat
+            </button>
             <a 
               href="mailto:support@useparkzy.com" 
               className="flex items-center gap-2 px-4 py-2 rounded-lg border hover:bg-muted transition-colors text-sm"
