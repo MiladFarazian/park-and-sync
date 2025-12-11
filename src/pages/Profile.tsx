@@ -707,10 +707,31 @@ const Profile = () => {
         </div>
 
         {/* Logout Button */}
-        <Button variant="outline" onClick={handleSignOut} className="w-full mb-8">
+        <Button variant="outline" onClick={handleSignOut} className="w-full">
           <LogOut className="h-4 w-4 mr-2" />
           Logout
         </Button>
+
+        {/* Support Contact Section */}
+        <div className="pt-4 pb-8">
+          <p className="text-sm text-muted-foreground text-center mb-3">Need help? Contact support</p>
+          <div className="flex justify-center gap-4">
+            <a 
+              href="mailto:support@useparkzy.com" 
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border hover:bg-muted transition-colors text-sm"
+            >
+              <Mail className="h-4 w-4 text-primary" />
+              Email
+            </a>
+            <a 
+              href="tel:+19495606839" 
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border hover:bg-muted transition-colors text-sm"
+            >
+              <Phone className="h-4 w-4 text-primary" />
+              Call
+            </a>
+          </div>
+        </div>
       </div>
 
       {/* Edit Profile Dialog */}
