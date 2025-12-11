@@ -400,7 +400,7 @@ function ChatPane({
           )
         )}
       </div>
-      <div className="p-4 border-t flex-shrink-0">
+      <div className="p-4 border-t flex-shrink-0 pb-20 md:pb-4">
         {mediaPreview && (
           <div className="mb-2 relative inline-block">
             <div className="relative">
