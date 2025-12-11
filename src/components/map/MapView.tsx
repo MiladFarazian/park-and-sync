@@ -11,6 +11,13 @@ import { useMode } from '@/contexts/ModeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import useEmblaCarousel from 'embla-carousel-react';
 
+interface UserBooking {
+  id: string;
+  start_at: string;
+  end_at: string;
+  status: string;
+}
+
 interface Spot {
   id: string;
   title: string;
@@ -23,6 +30,7 @@ interface Spot {
   reviews?: number;
   imageUrl?: string;
   hostId?: string;
+  userBooking?: UserBooking | null;
 }
 
 interface MapViewProps {
@@ -993,7 +1001,12 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                                 {spot.category}
                               </Badge>
                             )}
-                            {index === 0 && (
+                            {spot.userBooking && (
+                              <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-xs px-2 py-0.5">
+                                Your Booking
+                              </Badge>
+                            )}
+                            {index === 0 && !spot.userBooking && (
                               <Badge className="bg-primary/10 text-primary border-primary/20 text-xs px-2 py-0.5">
                                 Nearest
                               </Badge>
@@ -1047,6 +1060,14 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                         >
                           <Pencil className="h-4 w-4 mr-1" />
                           Edit Spot
+                        </Button>
+                      ) : spot.userBooking ? (
+                        <Button 
+                          className="flex-1 text-sm"
+                          variant="secondary"
+                          onClick={() => navigate(`/booking/${spot.userBooking!.id}`)}
+                        >
+                          View Booking
                         </Button>
                       ) : (
                         <Button 

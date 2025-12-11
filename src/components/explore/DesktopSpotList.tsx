@@ -11,6 +11,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+interface UserBooking {
+  id: string;
+  start_at: string;
+  end_at: string;
+  status: string;
+}
+
 interface Spot {
   id: string;
   title: string;
@@ -26,6 +33,7 @@ interface Spot {
   amenities?: string[];
   hostId?: string;
   sizeConstraints?: string[];
+  userBooking?: UserBooking | null;
 }
 
 export interface SpotFilters {
@@ -316,7 +324,12 @@ const DesktopSpotList = ({
                           <h3 className="font-semibold text-sm truncate">
                             {spot.category || spot.title}
                           </h3>
-                          {isNearest && (
+                          {spot.userBooking && (
+                            <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                              Your Booking
+                            </Badge>
+                          )}
+                          {isNearest && !spot.userBooking && (
                             <Badge variant="secondary" className="text-xs bg-primary/10 text-primary">
                               Nearest
                             </Badge>
@@ -372,16 +385,30 @@ const DesktopSpotList = ({
                         >
                           Details
                         </Button>
-                        <Button
-                          size="sm"
-                          className="flex-1"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleBookNow(spot.id);
-                          }}
-                        >
-                          Book Now
-                        </Button>
+                        {spot.userBooking ? (
+                          <Button
+                            size="sm"
+                            className="flex-1"
+                            variant="secondary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/booking/${spot.userBooking!.id}`);
+                            }}
+                          >
+                            View Booking
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="flex-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleBookNow(spot.id);
+                            }}
+                          >
+                            Book Now
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>

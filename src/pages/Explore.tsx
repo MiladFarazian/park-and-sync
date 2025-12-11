@@ -371,7 +371,8 @@ const Explore = () => {
         distance: spot.distance ? `${(spot.distance / 1000).toFixed(1)} km` : undefined,
         amenities: [...(spot.has_ev_charging ? ['EV Charging'] : []), ...(spot.is_covered ? ['Covered'] : []), ...(spot.is_secure ? ['Secure'] : [])],
         hostId: spot.host_id,
-        sizeConstraints: spot.size_constraints || []
+        sizeConstraints: spot.size_constraints || [],
+        userBooking: spot.user_booking || null
       })) || [];
       setParkingSpots(transformedSpots);
     } catch (err) {
