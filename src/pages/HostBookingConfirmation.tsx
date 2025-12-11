@@ -16,7 +16,7 @@ const HostBookingConfirmation = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   
   const [booking, setBooking] = useState<any>(null);
   const [spot, setSpot] = useState<any>(null);
@@ -43,6 +43,8 @@ const HostBookingConfirmation = () => {
 
   useEffect(() => {
     const fetchBookingDetails = async () => {
+      // Wait for auth to be resolved before fetching
+      if (authLoading) return;
       if (!bookingId) return;
       
       try {
@@ -91,7 +93,7 @@ const HostBookingConfirmation = () => {
     };
 
     fetchBookingDetails();
-  }, [bookingId, navigate, toast]);
+  }, [bookingId, navigate, toast, authLoading]);
 
   const handleMessageDriver = async () => {
     if (!driver) return;
