@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import type { Message } from './useMessages';
@@ -9,8 +9,6 @@ export function useRealtimeMessages(
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
 ) {
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const pendingUpdatesRef = useRef<Array<() => void>>([]);
-  const batchTimeoutRef = useRef<number | null>(null);
   const setMessagesRef = useRef(setMessages);
   const activeConversationRef = useRef(conversationUserId);
 
@@ -20,29 +18,27 @@ export function useRealtimeMessages(
     activeConversationRef.current = conversationUserId;
   });
 
+  // Fetch latest messages from database
+  const fetchLatestMessages = useCallback(async () => {
+    if (!conversationUserId || !currentUserId) return;
+    
+    console.log('[realtime] Fetching latest messages');
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .or(`and(sender_id.eq.${currentUserId},recipient_id.eq.${conversationUserId}),and(sender_id.eq.${conversationUserId},recipient_id.eq.${currentUserId})`)
+      .order('created_at', { ascending: true });
+
+    if (!error && data) {
+      setMessagesRef.current(data as Message[]);
+    }
+  }, [conversationUserId, currentUserId]);
+
   useEffect(() => {
     if (!conversationUserId || !currentUserId) return;
     
     let cancelled = false;
-    const thisConversationId = conversationUserId; // Capture for closure
-
-    // Batch multiple Realtime events into single state update (60fps = ~16ms batching)
-    const batchUpdate = (updateFn: () => void) => {
-      pendingUpdatesRef.current.push(updateFn);
-      
-      if (!batchTimeoutRef.current) {
-        batchTimeoutRef.current = window.requestAnimationFrame(() => {
-          if (cancelled) return;
-          
-          const updates = pendingUpdatesRef.current;
-          pendingUpdatesRef.current = [];
-          batchTimeoutRef.current = null;
-          
-          // Apply all pending updates in one batch
-          updates.forEach(fn => fn());
-        });
-      }
-    };
+    const thisConversationId = conversationUserId;
 
     async function setupChannel() {
       const { data: { session } } = await supabase.auth.getSession();
@@ -50,7 +46,7 @@ export function useRealtimeMessages(
 
       // Ensure socket has valid auth token
       supabase.realtime.setAuth(session.access_token);
-      console.log('[realtime] Setting up channel for:', conversationUserId);
+      console.log('[realtime] Setting up broadcast channel for:', conversationUserId);
 
       // Remove old channel
       if (channelRef.current) {
@@ -58,179 +54,114 @@ export function useRealtimeMessages(
         channelRef.current = null;
       }
 
-      // Handler for broadcast (instant echo for cross-client)
+      // Handler for broadcast messages (instant cross-client)
       const handleBroadcast = (payload: any) => {
         if (cancelled || activeConversationRef.current !== thisConversationId) return;
         const msg = payload.payload as Message & { client_id?: string };
+        
+        console.log('[realtime] Broadcast received:', msg.client_id);
 
-        batchUpdate(() => {
-          setMessagesRef.current(prev => {
-            // Dedupe by client_id
-            if (prev.some(m => m.client_id === msg.client_id || m.id === msg.id)) return prev;
-            
-            const ephemeral = {
-              ...msg,
-              id: `temp-${msg.client_id}`,
-              status: 'sending' as const,
-            };
-            
-            const next = [...prev, ephemeral];
-            next.sort((a, b) => {
-              const ta = new Date(a.created_at).getTime();
-              const tb = new Date(b.created_at).getTime();
-              return ta === tb ? String(a.id).localeCompare(String(b.id)) : ta - tb;
-            });
-            return next;
-          });
+        setMessagesRef.current(prev => {
+          // Check if already exists
+          if (prev.some(m => m.client_id === msg.client_id || m.id === msg.id)) {
+            return prev;
+          }
+          
+          const ephemeral: Message = {
+            ...msg,
+            id: `temp-${msg.client_id}`,
+          };
+          
+          const next = [...prev, ephemeral];
+          next.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          return next;
         });
+
+        // Fetch from DB to reconcile with real IDs after a short delay
+        setTimeout(() => {
+          if (!cancelled && activeConversationRef.current === thisConversationId) {
+            fetchLatestMessages();
+          }
+        }, 500);
       };
 
-      // Handler for postgres_changes (reconcile with canonical row)
-      const handleNewMessage = (payload: any) => {
-        if (cancelled || activeConversationRef.current !== thisConversationId) return;
-        const realtimeLatency = performance.now();
-        const msg = payload.new as Message & { client_id?: string };
-        console.log('[PERF] realtime:postgres-insert-latency-ms', realtimeLatency - new Date(msg.created_at).getTime());
-
-        batchUpdate(() => {
-          setMessagesRef.current(prev => {
-            // Dedupe by id OR client_id (handles optimistic reconciliation)
-            const existingIndex = prev.findIndex(m => 
-              m.id === msg.id || 
-              (msg.client_id && m.id === `temp-${msg.client_id}`) ||
-              (msg.client_id && m.id === `error-${msg.client_id}`)
-            );
-
-            if (existingIndex !== -1) {
-              // Replace optimistic message with real one
-              const next = [...prev];
-              next[existingIndex] = msg;
-              return next;
-            }
-
-            // New message - add and sort
-            const next = [...prev, msg];
-            
-            // Sort by created_at, then by id for timestamp collisions
-            next.sort((a, b) => {
-              const ta = new Date(a.created_at).getTime();
-              const tb = new Date(b.created_at).getTime();
-              return ta === tb ? String(a.id).localeCompare(String(b.id)) : ta - tb;
-            });
-
-            return next;
-          });
-        });
-      };
-
-      // Subscribe to messages in this conversation
-      // Use single-column filters only (Supabase realtime doesn't support multi-column filters)
+      // Create channel for both directions of the conversation
+      // Channel names need to be consistent for both parties
+      const channelKey1 = `messages:${currentUserId}:${conversationUserId}`;
+      const channelKey2 = `messages:${conversationUserId}:${currentUserId}`;
+      
       const channel = supabase
-        .channel(`messages:${currentUserId}:${conversationUserId}`, {
+        .channel(`chat:${thisConversationId}:${currentUserId}`, {
           config: { broadcast: { ack: false } }
         })
-        // Listen for instant broadcast (cross-client echo)
+        // Listen on both possible channel directions
         .on('broadcast', { event: 'pending_message' }, handleBroadcast)
-        // Listen for messages where current user is recipient (from conversation partner)
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `recipient_id=eq.${currentUserId}`
-        }, (payload) => {
-          const msg = payload.new as Message;
-          // Only process if from our conversation partner
-          if (msg.sender_id === conversationUserId) {
-            handleNewMessage(payload);
-          }
-        })
-        // Listen for messages where current user is sender (our own messages)
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `sender_id=eq.${currentUserId}`
-        }, (payload) => {
-          const msg = payload.new as Message;
-          // Only process if to our conversation partner
-          if (msg.recipient_id === conversationUserId) {
-            handleNewMessage(payload);
-          }
-        })
-        // Listen for updates on messages we receive
-        .on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages',
-          filter: `recipient_id=eq.${currentUserId}`
-        }, (payload) => {
-          if (cancelled || activeConversationRef.current !== thisConversationId) return;
-          const updatedMsg = payload.new as Message;
-          if (updatedMsg.sender_id === conversationUserId) {
-            batchUpdate(() => {
-              setMessagesRef.current(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
-            });
+        .on('broadcast', { event: 'new_message' }, () => {
+          console.log('[realtime] new_message broadcast received');
+          if (!cancelled && activeConversationRef.current === thisConversationId) {
+            fetchLatestMessages();
           }
         })
         .subscribe((status, err) => {
-          console.log('[realtime] Subscription status:', status, err || '', `${currentUserId}:${conversationUserId}`);
+          console.log('[realtime] Channel status:', status, err || '');
         });
 
       channelRef.current = channel;
+
+      // Also subscribe to the reverse channel to catch messages from the other user
+      const reverseChannel = supabase
+        .channel(channelKey2, { config: { broadcast: { ack: false } } })
+        .on('broadcast', { event: 'pending_message' }, handleBroadcast)
+        .subscribe();
+
+      // Store for cleanup
+      const cleanup = channelRef.current;
+      channelRef.current = channel;
+      
+      // Return cleanup for reverse channel
+      return () => {
+        supabase.removeChannel(reverseChannel);
+      };
     }
 
-    setupChannel();
+    let reverseCleanup: (() => void) | undefined;
+    setupChannel().then(cleanup => {
+      reverseCleanup = cleanup;
+    });
 
-    // Safety net: refetch on focus/online (handles network drops/tab sleep)
-    const refetchMessages = async () => {
-      if (cancelled || activeConversationRef.current !== thisConversationId) return;
-      
-      console.log('[realtime] Refetching messages (focus/online event)');
-      
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`and(sender_id.eq.${currentUserId},recipient_id.eq.${thisConversationId}),and(sender_id.eq.${thisConversationId},recipient_id.eq.${currentUserId})`)
-        .order('created_at', { ascending: true });
+    // Poll for new messages periodically as fallback (every 3 seconds)
+    const pollInterval = setInterval(() => {
+      if (!cancelled && activeConversationRef.current === thisConversationId) {
+        fetchLatestMessages();
+      }
+    }, 3000);
 
-      if (!error && data) {
-        setMessagesRef.current(prev => {
-          const seen = new Set(prev.map(m => m.id));
-          const merged = [...prev];
-          
-          for (const m of data) {
-            if (!seen.has(m.id)) {
-              merged.push(m as Message);
-            }
-          }
-          
-          merged.sort((a, b) => {
-            const ta = new Date(a.created_at).getTime();
-            const tb = new Date(b.created_at).getTime();
-            return ta === tb ? String(a.id).localeCompare(String(b.id)) : ta - tb;
-          });
-          
-          return merged;
-        });
+    // Safety net: refetch on focus/online
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && !cancelled) {
+        fetchLatestMessages();
       }
     };
+    
+    const handleOnline = () => {
+      if (!cancelled) fetchLatestMessages();
+    };
 
-    window.addEventListener('focus', refetchMessages);
-    window.addEventListener('online', refetchMessages);
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', fetchLatestMessages);
+    window.addEventListener('online', handleOnline);
 
     return () => {
       cancelled = true;
-      if (batchTimeoutRef.current) {
-        cancelAnimationFrame(batchTimeoutRef.current);
-        batchTimeoutRef.current = null;
-      }
-      pendingUpdatesRef.current = [];
+      clearInterval(pollInterval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', fetchLatestMessages);
+      window.removeEventListener('online', handleOnline);
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
-      window.removeEventListener('focus', refetchMessages);
-      window.removeEventListener('online', refetchMessages);
+      reverseCleanup?.();
     };
-  }, [conversationUserId, currentUserId]);
+  }, [conversationUserId, currentUserId, fetchLatestMessages]);
 }
