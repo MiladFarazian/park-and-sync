@@ -300,82 +300,35 @@ export const useMessages = () => {
     window.addEventListener('focus', handleFocus);
     window.addEventListener('online', handleOnline);
 
-    // Subscribe to postgres_changes for messages table
-    // Use two separate subscriptions with filters to avoid binding mismatches
-    const channelName = `messages-realtime-${user.id}-${Date.now()}`;
+    // Use broadcast channels for instant updates (no postgres_changes to avoid binding issues)
+    const channelName = `messages-broadcast-${user.id}`;
     const channel = supabase.channel(channelName);
 
-    // Subscribe to messages where user is the recipient
     channel
-      .on(
-        'postgres_changes',
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'messages',
-          filter: `recipient_id=eq.${user.id}`
-        },
-        (payload) => {
-          const msg = payload.new as Message;
-          console.log('[useMessages] Real-time INSERT (recipient) received:', msg.id);
-          upsertConversationFromMessage(msg);
-        }
-      )
-      .on(
-        'postgres_changes',
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'messages',
-          filter: `sender_id=eq.${user.id}`
-        },
-        (payload) => {
-          const msg = payload.new as Message;
-          console.log('[useMessages] Real-time INSERT (sender) received:', msg.id);
-          upsertConversationFromMessage(msg);
-        }
-      )
-      .on(
-        'postgres_changes',
-        { 
-          event: 'UPDATE', 
-          schema: 'public', 
-          table: 'messages',
-          filter: `recipient_id=eq.${user.id}`
-        },
-        (payload) => {
-          console.log('[useMessages] Real-time UPDATE received');
-          scheduleSoftReload();
-        }
-      )
+      .on('broadcast', { event: 'new_message' }, (payload) => {
+        console.log('[useMessages] Broadcast new_message received', payload);
+        // Immediately refresh conversations
+        loadConversations();
+      })
       .subscribe((status, err) => {
-        console.log('[useMessages] Subscription status:', status, err || '');
-        if (status === 'SUBSCRIBED') {
-          console.log('[useMessages] Successfully subscribed to messages');
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[useMessages] Subscription error, will retry on focus/visibility');
-        }
+        console.log('[useMessages] Broadcast channel status:', status, err || '');
       });
 
-    // Also listen to broadcast channel for cross-tab sync
-    const broadcastChannel = supabase.channel(`messages-broadcast-${user.id}`);
-    broadcastChannel
-      .on('broadcast', { event: 'new_message' }, (payload) => {
-        console.log('[useMessages] Broadcast received', payload);
-        if (mountedRef.current) {
-          scheduleSoftReload(true);
-        }
-      })
-      .subscribe();
+    // Poll for updates every 3 seconds as a reliable fallback
+    const pollInterval = setInterval(() => {
+      if (mountedRef.current) {
+        loadConversations();
+      }
+    }, 3000);
 
     return () => {
       mountedRef.current = false;
+      clearInterval(pollInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('online', handleOnline);
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       supabase.removeChannel(channel);
-      supabase.removeChannel(broadcastChannel);
     };
   }, [user]);
 
