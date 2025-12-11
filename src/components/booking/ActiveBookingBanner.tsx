@@ -394,6 +394,9 @@ export const ActiveBookingBanner = () => {
   const now = new Date();
   const endTime = format(new Date(activeBooking.end_at), 'h:mm a');
   const endTimeDate = new Date(activeBooking.end_at);
+  const timeLeftMs = endTimeDate.getTime() - now.getTime();
+  const minutesLeft = Math.floor(timeLeftMs / (1000 * 60));
+  const isEndingSoon = !isHost && minutesLeft > 0 && minutesLeft <= 15;
   const isActuallyOverstayed = now > endTimeDate; // Driver has exceeded their booking time
   const isOverstayed = activeBooking.overstay_detected_at !== null && isActuallyOverstayed;
   const inGracePeriod = isOverstayed && activeBooking.overstay_grace_end && new Date(activeBooking.overstay_grace_end) > now;
@@ -402,6 +405,33 @@ export const ActiveBookingBanner = () => {
 
   return (
     <>
+      {/* Ending Soon Notification Banner */}
+      {isEndingSoon && (
+        <div 
+          onClick={() => setShowExtendDialog(true)}
+          className="mb-2 bg-amber-500 text-white rounded-xl p-4 cursor-pointer hover:bg-amber-600 transition-colors animate-pulse-subtle shadow-lg"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                <Clock className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-semibold">
+                  {minutesLeft} minute{minutesLeft !== 1 ? 's' : ''} left
+                </p>
+                <p className="text-sm text-white/90">
+                  Tap here to extend your parking
+                </p>
+              </div>
+            </div>
+            <div className="bg-white/20 rounded-lg px-3 py-1.5">
+              <Plus className="h-5 w-5" />
+            </div>
+          </div>
+        </div>
+      )}
+
       <Card 
         className="border-l-4 border-l-primary shadow-md bg-card animate-fade-in cursor-pointer hover:shadow-lg transition-shadow"
         onClick={() => navigate(`/booking/${activeBooking.id}`)}
