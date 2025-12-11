@@ -6,6 +6,58 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to send push notifications
+async function sendPushNotification(
+  supabaseClient: any,
+  userId: string,
+  title: string,
+  body: string,
+  tag: string,
+  url: string,
+  requireInteraction: boolean = false
+) {
+  try {
+    // Fetch push subscriptions for the user
+    const { data: subscriptions } = await supabaseClient
+      .from('push_subscriptions')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (!subscriptions || subscriptions.length === 0) {
+      console.log(`No push subscriptions for user ${userId}`);
+      return;
+    }
+
+    // Call the send-push-notification function
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({
+        userId,
+        title,
+        body,
+        tag,
+        url,
+        requireInteraction,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to send push notification: ${response.status}`);
+    } else {
+      console.log(`Push notification sent to user ${userId}: "${title}"`);
+    }
+  } catch (error) {
+    console.error('Error sending push notification:', error);
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -62,26 +114,54 @@ serve(async (req) => {
       }
 
       // Send notification to renter (warning)
+      const renterTitle = '⏰ Grace Period Started';
+      const renterMessage = `Your parking at ${booking.spots.title} has expired. You have a 10-minute grace period to vacate or extend your booking. After that, overtime charges of $25/hour may apply.`;
+      
       await supabaseClient
         .from('notifications')
         .insert({
           user_id: booking.renter_id,
           type: 'overstay_warning',
-          title: 'Parking Time Expired',
-          message: `Your parking at ${booking.spots.title} has expired. You have a 10-minute grace period to vacate or extend your booking. After that, overtime charges of $25/hour may apply.`,
+          title: renterTitle,
+          message: renterMessage,
           related_id: booking.id,
         });
 
+      // Send PUSH notification to renter (works even when app is closed)
+      await sendPushNotification(
+        supabaseClient,
+        booking.renter_id,
+        renterTitle,
+        renterMessage,
+        `grace-period-${booking.id}`,
+        `/booking/${booking.id}`,
+        true // requireInteraction - critical notification
+      );
+
       // Send notification to host
+      const hostTitle = 'Guest Overstay Detected';
+      const hostMessage = `Guest at ${booking.spots.title} has exceeded their booking time. 10-minute grace period started.`;
+      
       await supabaseClient
         .from('notifications')
         .insert({
           user_id: booking.spots.host_id,
           type: 'overstay_detected',
-          title: 'Guest Overstay Detected',
-          message: `Guest at ${booking.spots.title} has exceeded their booking time. 10-minute grace period started.`,
+          title: hostTitle,
+          message: hostMessage,
           related_id: booking.id,
         });
+
+      // Send PUSH notification to host
+      await sendPushNotification(
+        supabaseClient,
+        booking.spots.host_id,
+        hostTitle,
+        hostMessage,
+        `overstay-host-${booking.id}`,
+        `/booking/${booking.id}`,
+        true
+      );
     }
 
     // Check for bookings past grace period that need charging or escalation

@@ -15,31 +15,110 @@ interface NotificationPayload {
 export const useNotifications = () => {
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [isSupported, setIsSupported] = useState(false);
+  const [isPushSubscribed, setIsPushSubscribed] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const channelsRef = useRef<any[]>([]);
 
   useEffect(() => {
     // Check if notifications are supported
-    const supported = 'Notification' in window && 'serviceWorker' in navigator;
+    const supported = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
     setIsSupported(supported);
 
     if (supported) {
       setPermission(Notification.permission);
-
-      // Register service worker
       registerServiceWorker();
     }
   }, []);
+
+  // Check push subscription status when user changes
+  useEffect(() => {
+    if (user && permission === 'granted') {
+      checkPushSubscription();
+    }
+  }, [user, permission]);
 
   const registerServiceWorker = async () => {
     try {
       const registration = await navigator.serviceWorker.register('/service-worker.js');
       console.log('[Notifications] Service Worker registered:', registration);
+      return registration;
     } catch (error) {
       console.error('[Notifications] Service Worker registration failed:', error);
+      return null;
     }
   };
+
+  const checkPushSubscription = async () => {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      setIsPushSubscribed(!!subscription);
+    } catch (error) {
+      console.error('[Notifications] Error checking push subscription:', error);
+    }
+  };
+
+  const subscribeToPush = useCallback(async () => {
+    if (!user) {
+      console.log('[Notifications] No user, skipping push subscription');
+      return false;
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      
+      // Check for existing subscription
+      let subscription = await registration.pushManager.getSubscription();
+      
+      if (!subscription) {
+        // Get VAPID public key from edge function
+        const { data: vapidData, error: vapidError } = await supabase.functions.invoke('get-vapid-public-key');
+        
+        if (vapidError || !vapidData?.publicKey) {
+          console.error('[Notifications] Failed to get VAPID key:', vapidError);
+          return false;
+        }
+
+        // Convert VAPID key to Uint8Array
+        const vapidPublicKey = urlBase64ToUint8Array(vapidData.publicKey);
+
+        // Create new subscription
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: vapidPublicKey as BufferSource,
+        });
+
+        console.log('[Notifications] Created new push subscription');
+      }
+
+      // Save subscription to database
+      const subscriptionJson = subscription.toJSON();
+      const { error: saveError } = await supabase
+        .from('push_subscriptions')
+        .upsert({
+          user_id: user.id,
+          endpoint: subscription.endpoint,
+          p256dh: subscriptionJson.keys?.p256dh || '',
+          auth: subscriptionJson.keys?.auth || '',
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id,endpoint',
+        });
+
+      if (saveError) {
+        console.error('[Notifications] Error saving subscription:', saveError);
+        return false;
+      }
+
+      setIsPushSubscribed(true);
+      console.log('[Notifications] Push subscription saved successfully');
+      return true;
+    } catch (error) {
+      console.error('[Notifications] Error subscribing to push:', error);
+      return false;
+    }
+  }, [user]);
 
   const requestPermission = useCallback(async () => {
     if (!isSupported) {
@@ -56,9 +135,14 @@ export const useNotifications = () => {
       setPermission(result);
       
       if (result === 'granted') {
+        // Subscribe to push notifications after permission granted
+        const pushResult = await subscribeToPush();
+        
         toast({
           title: "Notifications enabled",
-          description: "You'll receive alerts for bookings, messages, and updates",
+          description: pushResult 
+            ? "You'll receive alerts even when the app is closed" 
+            : "You'll receive in-app notifications",
         });
         return true;
       } else {
@@ -73,7 +157,7 @@ export const useNotifications = () => {
       console.error('[Notifications] Permission request failed:', error);
       return false;
     }
-  }, [isSupported, toast]);
+  }, [isSupported, toast, subscribeToPush]);
 
   const showNotification = useCallback(async (payload: NotificationPayload) => {
     if (!isSupported || permission !== 'granted') {
@@ -184,7 +268,7 @@ export const useNotifications = () => {
                 title: isHost ? '⚠️ Overstay Detected' : '⏰ Grace Period Started',
                 body: isHost 
                   ? 'A driver has entered the grace period on your spot'
-                  : 'You have 15 minutes to leave before overstay charges apply',
+                  : 'You have 10 minutes to leave before overstay charges apply',
                 tag: `overstay-${payload.new.id}`,
                 url: `/booking/${payload.new.id}`,
                 requireInteraction: true,
@@ -288,6 +372,10 @@ export const useNotifications = () => {
   useEffect(() => {
     if (user && permission === 'granted') {
       setupRealtimeListeners();
+      // Also try to subscribe to push if not already subscribed
+      if (!isPushSubscribed) {
+        subscribeToPush();
+      }
     }
 
     return () => {
@@ -297,12 +385,30 @@ export const useNotifications = () => {
       });
       channelsRef.current = [];
     };
-  }, [user, permission, setupRealtimeListeners]);
+  }, [user, permission, setupRealtimeListeners, isPushSubscribed, subscribeToPush]);
 
   return {
     permission,
     isSupported,
+    isPushSubscribed,
     requestPermission,
     showNotification,
+    subscribeToPush,
   };
 };
+
+// Helper function to convert VAPID key
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
