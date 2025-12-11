@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, DollarSign, MapPin, Star, MessageCircle, Car, Calendar, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -9,17 +9,37 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { differenceInHours, format } from 'date-fns';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useAuth } from '@/contexts/AuthContext';
 
 const HostBookingConfirmation = () => {
   const { bookingId } = useParams<{ bookingId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, profile } = useAuth();
   
   const [booking, setBooking] = useState<any>(null);
   const [spot, setSpot] = useState<any>(null);
   const [driver, setDriver] = useState<any>(null);
   const [vehicle, setVehicle] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const magicLoginToastShown = useRef(false);
+
+  // Show magic login toast if user arrived via magic link
+  useEffect(() => {
+    const isMagicLogin = searchParams.get('magic_login') === 'true';
+    if (isMagicLogin && user && !magicLoginToastShown.current) {
+      magicLoginToastShown.current = true;
+      const displayName = profile?.email || user.email || profile?.phone || 'your account';
+      toast({
+        title: "Logged in successfully",
+        description: `Signed in as ${displayName}`,
+      });
+      // Clean up URL
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [searchParams, user, profile, toast]);
 
   useEffect(() => {
     const fetchBookingDetails = async () => {
