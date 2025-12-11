@@ -301,31 +301,51 @@ export const useMessages = () => {
     window.addEventListener('online', handleOnline);
 
     // Subscribe to postgres_changes for messages table
+    // Use two separate subscriptions with filters to avoid binding mismatches
     const channelName = `messages-realtime-${user.id}-${Date.now()}`;
     const channel = supabase.channel(channelName);
 
+    // Subscribe to messages where user is the recipient
     channel
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages',
+          filter: `recipient_id=eq.${user.id}`
+        },
         (payload) => {
           const msg = payload.new as Message;
-          // Only process if this message involves the current user
-          if (msg.recipient_id === user.id || msg.sender_id === user.id) {
-            console.log('[useMessages] Real-time INSERT received:', msg.id);
-            upsertConversationFromMessage(msg);
-          }
+          console.log('[useMessages] Real-time INSERT (recipient) received:', msg.id);
+          upsertConversationFromMessage(msg);
         }
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'messages' },
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages',
+          filter: `sender_id=eq.${user.id}`
+        },
         (payload) => {
           const msg = payload.new as Message;
-          if (msg.recipient_id === user.id || msg.sender_id === user.id) {
-            console.log('[useMessages] Real-time UPDATE received');
-            scheduleSoftReload();
-          }
+          console.log('[useMessages] Real-time INSERT (sender) received:', msg.id);
+          upsertConversationFromMessage(msg);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'messages',
+          filter: `recipient_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('[useMessages] Real-time UPDATE received');
+          scheduleSoftReload();
         }
       )
       .subscribe((status, err) => {
