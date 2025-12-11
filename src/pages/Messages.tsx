@@ -12,6 +12,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
+import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import { sendMessage as sendMessageLib } from '@/lib/sendMessage';
 import { compressImage } from '@/lib/compressImage';
 import { Virtuoso } from 'react-virtuoso';
@@ -125,6 +126,10 @@ function ChatPane({
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [showNewMessageButton, setShowNewMessageButton] = useState(false);
+
+  // Typing indicator
+  const { isPartnerTyping, broadcastTyping, broadcastStoppedTyping } = useTypingIndicator(conversationId, userId);
+  const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const virtuosoRef = useRef<any>(null);
@@ -334,7 +339,16 @@ function ChatPane({
               )}
             </p>
             <p className="text-sm text-muted-foreground">
-              {conversationId === '00000000-0000-0000-0000-000000000001' 
+              {isPartnerTyping ? (
+                <span className="flex items-center gap-1 text-primary">
+                  <span className="flex gap-0.5">
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                  </span>
+                  typing...
+                </span>
+              ) : conversationId === '00000000-0000-0000-0000-000000000001' 
                 ? "We'll respond within 24 hours" 
                 : "Active"}
             </p>
@@ -429,8 +443,26 @@ function ChatPane({
           <Input
             placeholder="Type a message..."
             value={messageInput}
-            onChange={(e) => setMessageInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+            onChange={(e) => {
+              setMessageInput(e.target.value);
+              // Broadcast typing indicator
+              if (e.target.value.trim()) {
+                broadcastTyping();
+                // Clear previous timeout and set new one to broadcast stopped typing
+                if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+                typingDebounceRef.current = setTimeout(() => {
+                  broadcastStoppedTyping();
+                }, 2000);
+              } else {
+                broadcastStoppedTyping();
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                broadcastStoppedTyping();
+                handleSendMessage();
+              }
+            }}
           />
           <Button onClick={handleSendMessage} size="icon" disabled={uploadingMedia || (!messageInput.trim() && !selectedMedia)}>
             {uploadingMedia ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
