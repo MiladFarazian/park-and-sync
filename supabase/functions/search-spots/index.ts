@@ -164,11 +164,30 @@ serve(async (req) => {
             ? spotSpecificReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviewCount 
             : 0;
 
+          // Check if user has an active/paid booking for this spot that overlaps with search time
+          let userBooking = null;
+          if (userId) {
+            const { data: existingBooking } = await supabase
+              .from('bookings')
+              .select('id, start_at, end_at, status')
+              .eq('spot_id', spot.id)
+              .eq('renter_id', userId)
+              .in('status', ['paid', 'active'])
+              .gte('end_at', start_time)
+              .lte('start_at', end_time)
+              .maybeSingle();
+            
+            if (existingBooking) {
+              userBooking = existingBooking;
+            }
+          }
+
           availableSpots.push({ 
             ...spot, 
             distance,
             spot_rating: Number(avgRating.toFixed(2)),
-            spot_review_count: reviewCount
+            spot_review_count: reviewCount,
+            user_booking: userBooking
           });
         }
       }

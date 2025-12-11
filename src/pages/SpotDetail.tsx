@@ -67,6 +67,7 @@ const SpotDetail = () => {
   const [reportReason, setReportReason] = useState('');
   const [reportDetails, setReportDetails] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
+  const [userBooking, setUserBooking] = useState<{ id: string; start_at: string; end_at: string; status: string } | null>(null);
 
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) => 
@@ -472,6 +473,28 @@ const SpotDetail = () => {
           isOwner
         });
         setIsOwnSpot(isOwner);
+        
+        // Check if user has an existing booking for this spot within the search time range
+        if (!isOwner) {
+          const start = searchParams.get('start');
+          const end = searchParams.get('end');
+          
+          if (start && end) {
+            const { data: existingBooking } = await supabase
+              .from('bookings')
+              .select('id, start_at, end_at, status')
+              .eq('spot_id', spotData.id)
+              .eq('renter_id', user.id)
+              .in('status', ['paid', 'active'])
+              .gte('end_at', start)
+              .lte('start_at', end)
+              .maybeSingle();
+            
+            if (existingBooking) {
+              setUserBooking(existingBooking);
+            }
+          }
+        }
       }
     } catch (err) {
       setError('An unexpected error occurred');
@@ -667,6 +690,11 @@ const SpotDetail = () => {
               <Button className="flex-1" onClick={handleEditSpot}>
                 <Pencil className="h-4 w-4 mr-2" />
                 Edit Spot
+              </Button>
+            ) : userBooking ? (
+              <Button className="flex-1" variant="secondary" onClick={() => navigate(`/booking/${userBooking.id}`)}>
+                <Calendar className="h-4 w-4 mr-2" />
+                View Booking
               </Button>
             ) : mode === 'host' ? (
               <Button className="flex-1" variant="outline" onClick={handleBookNow}>
@@ -939,6 +967,10 @@ const SpotDetail = () => {
           {isOwnSpot ? (
             <Button size="lg" variant="outline" disabled>
               You're the host
+            </Button>
+          ) : userBooking ? (
+            <Button size="lg" variant="secondary" onClick={() => navigate(`/booking/${userBooking.id}`)}>
+              View Booking
             </Button>
           ) : mode === 'host' ? (
             <Button size="lg" variant="outline" onClick={handleBookNow}>
