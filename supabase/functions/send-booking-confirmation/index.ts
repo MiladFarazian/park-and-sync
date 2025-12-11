@@ -22,7 +22,7 @@ interface BookingConfirmationRequest {
   bookingId: string;
 }
 
-// Generate a magic link for the user
+// Generate a magic link for the user using recovery type (more reliable for email links)
 async function generateMagicLink(email: string, redirectTo: string): Promise<string | null> {
   try {
     const supabaseAdmin = createClient(
@@ -36,8 +36,9 @@ async function generateMagicLink(email: string, redirectTo: string): Promise<str
       }
     );
 
+    // Use recovery type which is more reliable for email login links
     const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink',
+      type: 'recovery',
       email: email,
       options: {
         redirectTo: redirectTo,
@@ -49,11 +50,10 @@ async function generateMagicLink(email: string, redirectTo: string): Promise<str
       return null;
     }
 
-    // The generated link contains the token - we need to use the hashed_token
-    // to construct a proper verification URL
-    if (data?.properties?.hashed_token) {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL');
-      return `${supabaseUrl}/auth/v1/verify?token=${data.properties.hashed_token}&type=magiclink&redirect_to=${encodeURIComponent(redirectTo)}`;
+    // Use the action_link directly - it's a complete, working URL
+    if (data?.properties?.action_link) {
+      console.log('Generated action_link for:', email);
+      return data.properties.action_link;
     }
 
     return null;
