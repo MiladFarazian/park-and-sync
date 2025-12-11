@@ -123,52 +123,57 @@ export function useRealtimeMessages(
         });
       };
 
-      // Subscribe to messages in this conversation (both directions)
+      // Subscribe to messages in this conversation
+      // Use single-column filters only (Supabase realtime doesn't support multi-column filters)
       const channel = supabase
         .channel(`messages:${currentUserId}:${conversationUserId}`, {
           config: { broadcast: { ack: false } }
         })
         // Listen for instant broadcast (cross-client echo)
         .on('broadcast', { event: 'pending_message' }, handleBroadcast)
-        // Listen for postgres inserts (reconcile)
+        // Listen for messages where current user is recipient (from conversation partner)
         .on('postgres_changes', {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: `sender_id=eq.${currentUserId},recipient_id=eq.${conversationUserId}`
-        }, handleNewMessage)
+          filter: `recipient_id=eq.${currentUserId}`
+        }, (payload) => {
+          const msg = payload.new as Message;
+          // Only process if from our conversation partner
+          if (msg.sender_id === conversationUserId) {
+            handleNewMessage(payload);
+          }
+        })
+        // Listen for messages where current user is sender (our own messages)
         .on('postgres_changes', {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: `sender_id=eq.${conversationUserId},recipient_id=eq.${currentUserId}`
-        }, handleNewMessage)
+          filter: `sender_id=eq.${currentUserId}`
+        }, (payload) => {
+          const msg = payload.new as Message;
+          // Only process if to our conversation partner
+          if (msg.recipient_id === conversationUserId) {
+            handleNewMessage(payload);
+          }
+        })
+        // Listen for updates on messages we receive
         .on('postgres_changes', {
           event: 'UPDATE',
           schema: 'public',
           table: 'messages',
-          filter: `sender_id=eq.${currentUserId},recipient_id=eq.${conversationUserId}`
+          filter: `recipient_id=eq.${currentUserId}`
         }, (payload) => {
           if (cancelled || activeConversationRef.current !== thisConversationId) return;
           const updatedMsg = payload.new as Message;
-          batchUpdate(() => {
-            setMessagesRef.current(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
-          });
+          if (updatedMsg.sender_id === conversationUserId) {
+            batchUpdate(() => {
+              setMessagesRef.current(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
+            });
+          }
         })
-        .on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages',
-          filter: `sender_id=eq.${conversationUserId},recipient_id=eq.${currentUserId}`
-        }, (payload) => {
-          if (cancelled || activeConversationRef.current !== thisConversationId) return;
-          const updatedMsg = payload.new as Message;
-          batchUpdate(() => {
-            setMessagesRef.current(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
-          });
-        })
-        .subscribe((status) => {
-          console.log('[realtime] Subscription status:', status, `${currentUserId}:${conversationUserId}`);
+        .subscribe((status, err) => {
+          console.log('[realtime] Subscription status:', status, err || '', `${currentUserId}:${conversationUserId}`);
         });
 
       channelRef.current = channel;
