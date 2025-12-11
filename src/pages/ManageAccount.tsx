@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Upload, Trash2 } from "lucide-react";
+import { ArrowLeft, Upload, Trash2, Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -287,6 +287,36 @@ const ManageAccount = () => {
             </Button>
           </Card>
         </form>
+
+        {/* Support Contact Section */}
+        <Card className="p-6">
+          <h3 className="font-semibold text-lg mb-2">Contact Support</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Need help? Reach out to our support team.
+          </p>
+          <div className="space-y-3">
+            <a 
+              href="mailto:support@useparkzy.com" 
+              className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted transition-colors"
+            >
+              <Mail className="h-5 w-5 text-primary" />
+              <div>
+                <p className="text-sm font-medium">Email</p>
+                <p className="text-sm text-muted-foreground">support@useparkzy.com</p>
+              </div>
+            </a>
+            <a 
+              href="tel:+19495606839" 
+              className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted transition-colors"
+            >
+              <Phone className="h-5 w-5 text-primary" />
+              <div>
+                <p className="text-sm font-medium">Phone</p>
+                <p className="text-sm text-muted-foreground">+1 (949) 560-6839</p>
+              </div>
+            </a>
+          </div>
+        </Card>
 
         {/* Delete Account Section */}
         <Card className="p-6">
