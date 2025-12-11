@@ -762,12 +762,9 @@ const Messages = () => {
                         <AvatarImage src={conversation.avatar_url} />
                         <AvatarFallback>{conversation.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
                       </Avatar>
-                      {/* Unread indicator dot with pulse animation */}
+                      {/* Unread indicator dot - static */}
                       {conversation.unread_count > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
-                        </span>
+                        <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-primary border-2 border-background"></span>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">

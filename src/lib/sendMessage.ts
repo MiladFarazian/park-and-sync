@@ -88,7 +88,28 @@ export function sendMessage({
         );
         onError?.(error);
       } else {
-        // Success - Realtime will reconcile the optimistic message
+        // Success - Broadcast to update conversation lists
+        const notifyChannel = supabase.channel(`messages-broadcast-${recipientId}`);
+        notifyChannel.send({
+          type: 'broadcast',
+          event: 'new_message',
+          payload: { sender_id: senderId, recipient_id: recipientId }
+        });
+        setTimeout(() => {
+          try { supabase.removeChannel(notifyChannel); } catch {}
+        }, 100);
+        
+        // Also notify sender's conversation list
+        const senderNotifyChannel = supabase.channel(`messages-broadcast-${senderId}`);
+        senderNotifyChannel.send({
+          type: 'broadcast',
+          event: 'new_message',
+          payload: { sender_id: senderId, recipient_id: recipientId }
+        });
+        setTimeout(() => {
+          try { supabase.removeChannel(senderNotifyChannel); } catch {}
+        }, 100);
+        
         onSuccess?.();
       }
     });

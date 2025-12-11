@@ -282,43 +282,65 @@ export const useMessages = () => {
       }
     });
 
-    const channel = supabase.channel('conversations-updates');
+    // Use a simpler channel name and subscribe to all message changes for this user
+    const channelName = `conversations-${user.id}`;
+    const channel = supabase.channel(channelName, {
+      config: { broadcast: { self: true } }
+    });
 
     channel
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `recipient_id=eq.${user.id}` },
+        { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
           const msg = payload.new as Message;
-          console.log('[useMessages] INSERT incoming', msg);
-          upsertConversationFromMessage(msg);
-          scheduleSoftReload();
+          // Only process if this message involves the current user
+          if (msg.recipient_id === user.id || msg.sender_id === user.id) {
+            console.log('[useMessages] INSERT message received', msg.id);
+            upsertConversationFromMessage(msg);
+            scheduleSoftReload(true); // immediate reload for reliability
+          }
         }
       )
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${user.id}` },
+        { event: 'UPDATE', schema: 'public', table: 'messages' },
         (payload) => {
           const msg = payload.new as Message;
-          console.log('[useMessages] INSERT outgoing', msg);
-          upsertConversationFromMessage(msg);
-          scheduleSoftReload();
+          if (msg.recipient_id === user.id || msg.sender_id === user.id) {
+            // Soft reconcile for read receipts, etc.
+            scheduleSoftReload();
+          }
         }
       )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'messages', filter: `recipient_id=eq.${user.id}` },
-        () => {
-          // Soft reconcile in case of missed events (e.g., read receipts)
-          scheduleSoftReload();
+      .subscribe((status) => {
+        console.log('[useMessages] Subscription status:', status);
+        if (status === 'CHANNEL_ERROR') {
+          // Retry connection after a delay
+          setTimeout(() => {
+            if (mountedRef.current) {
+              loadConversations();
+            }
+          }, 2000);
         }
-      )
+      });
+
+    // Also listen to broadcast channel for cross-tab sync
+    const broadcastChannel = supabase.channel(`messages-broadcast-${user.id}`);
+    broadcastChannel
+      .on('broadcast', { event: 'new_message' }, (payload) => {
+        console.log('[useMessages] Broadcast received', payload);
+        if (mountedRef.current) {
+          scheduleSoftReload(true);
+        }
+      })
       .subscribe();
 
     return () => {
       mountedRef.current = false;
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       supabase.removeChannel(channel);
+      supabase.removeChannel(broadcastChannel);
     };
   }, [user]);
 
