@@ -432,6 +432,36 @@ export const ActiveBookingBanner = () => {
         </div>
       )}
 
+      {/* Grace Period Warning Banner */}
+      {inGracePeriod && !isHost && (
+        <div className="mb-2 bg-destructive text-destructive-foreground rounded-xl p-4 shadow-lg animate-pulse-subtle">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold">
+                Grace Period - Leave Now!
+              </p>
+              <p className="text-sm opacity-90">
+                You'll be charged $25/hr and may be towed if you don't leave
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 flex gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="flex-1 bg-white/20 hover:bg-white/30 text-white border-0"
+              onClick={() => handleConfirmDeparture()}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              I've Left
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Card 
         className="border-l-4 border-l-primary shadow-md bg-card animate-fade-in cursor-pointer hover:shadow-lg transition-shadow"
         onClick={() => navigate(`/booking/${activeBooking.id}`)}
