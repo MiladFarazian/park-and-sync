@@ -272,21 +272,37 @@ export const useMessages = () => {
 
     loadConversations();
 
-    // Ensure Realtime has the latest auth token
-    supabase.auth.getSession().then(({ data }) => {
-      const access = data.session?.access_token;
-      try {
-        (supabase as any).realtime?.setAuth?.(access);
-      } catch (e) {
-        // no-op if setAuth not available
+    // Visibility change handler - refresh when user returns to tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && mountedRef.current) {
+        console.log('[useMessages] Tab became visible, refreshing conversations');
+        loadConversations();
       }
-    });
+    };
 
-    // Use a simpler channel name and subscribe to all message changes for this user
-    const channelName = `conversations-${user.id}`;
-    const channel = supabase.channel(channelName, {
-      config: { broadcast: { self: true } }
-    });
+    // Focus handler - refresh when window gains focus
+    const handleFocus = () => {
+      if (mountedRef.current) {
+        console.log('[useMessages] Window focused, refreshing conversations');
+        loadConversations();
+      }
+    };
+
+    // Online handler - refresh when coming back online
+    const handleOnline = () => {
+      if (mountedRef.current) {
+        console.log('[useMessages] Back online, refreshing conversations');
+        loadConversations();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('online', handleOnline);
+
+    // Subscribe to postgres_changes for messages table
+    const channelName = `messages-realtime-${user.id}-${Date.now()}`;
+    const channel = supabase.channel(channelName);
 
     channel
       .on(
@@ -296,9 +312,8 @@ export const useMessages = () => {
           const msg = payload.new as Message;
           // Only process if this message involves the current user
           if (msg.recipient_id === user.id || msg.sender_id === user.id) {
-            console.log('[useMessages] INSERT message received', msg.id);
+            console.log('[useMessages] Real-time INSERT received:', msg.id);
             upsertConversationFromMessage(msg);
-            scheduleSoftReload(true); // immediate reload for reliability
           }
         }
       )
@@ -308,20 +323,17 @@ export const useMessages = () => {
         (payload) => {
           const msg = payload.new as Message;
           if (msg.recipient_id === user.id || msg.sender_id === user.id) {
-            // Soft reconcile for read receipts, etc.
+            console.log('[useMessages] Real-time UPDATE received');
             scheduleSoftReload();
           }
         }
       )
-      .subscribe((status) => {
-        console.log('[useMessages] Subscription status:', status);
-        if (status === 'CHANNEL_ERROR') {
-          // Retry connection after a delay
-          setTimeout(() => {
-            if (mountedRef.current) {
-              loadConversations();
-            }
-          }, 2000);
+      .subscribe((status, err) => {
+        console.log('[useMessages] Subscription status:', status, err || '');
+        if (status === 'SUBSCRIBED') {
+          console.log('[useMessages] Successfully subscribed to messages');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[useMessages] Subscription error, will retry on focus/visibility');
         }
       });
 
@@ -338,6 +350,9 @@ export const useMessages = () => {
 
     return () => {
       mountedRef.current = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('online', handleOnline);
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       supabase.removeChannel(channel);
       supabase.removeChannel(broadcastChannel);
