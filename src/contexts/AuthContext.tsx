@@ -75,7 +75,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    // Set up auth state listener
+    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.id);
@@ -83,7 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          // Fetch user profile
+          // Fetch user profile - use setTimeout to avoid deadlock
           setTimeout(async () => {
             const profileData = await fetchProfile(session.user.id);
             setProfile(profileData);
@@ -96,20 +96,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchProfile(session.user.id).then((profileData) => {
-          setProfile(profileData);
+    // Check for magic link tokens in URL hash (from email redirects)
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    const refreshToken = hashParams.get('refresh_token');
+    
+    if (accessToken && refreshToken) {
+      // Magic link tokens detected - set the session
+      console.log('Magic link tokens detected, setting session...');
+      supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      }).then(({ data, error }) => {
+        if (error) {
+          console.error('Error setting session from magic link:', error);
           setLoading(false);
-        });
-      } else {
-        setLoading(false);
-      }
-    });
+        } else {
+          console.log('Session set from magic link successfully');
+          // Clean up the URL hash
+          window.history.replaceState({}, '', window.location.pathname + window.location.search);
+        }
+      });
+    } else {
+      // No magic link tokens, get existing session
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          fetchProfile(session.user.id).then((profileData) => {
+            setProfile(profileData);
+            setLoading(false);
+          });
+        } else {
+          setLoading(false);
+        }
+      });
+    }
 
     return () => {
       subscription.unsubscribe();

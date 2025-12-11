@@ -22,7 +22,7 @@ const BookingConfirmation = () => {
   const {
     toast
   } = useToast();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [booking, setBooking] = useState<any>(null);
   const [spot, setSpot] = useState<any>(null);
   const [host, setHost] = useState<any>(null);
@@ -51,6 +51,8 @@ const BookingConfirmation = () => {
 
   useEffect(() => {
     const fetchBookingDetails = async () => {
+      // Wait for auth to be resolved before fetching
+      if (authLoading) return;
       if (!bookingId) return;
       try {
         // Fetch booking with related data
@@ -93,7 +95,7 @@ const BookingConfirmation = () => {
       }
     };
     fetchBookingDetails();
-  }, [bookingId, navigate, toast]);
+  }, [bookingId, navigate, toast, authLoading]);
   const handleContactHost = async () => {
     if (!host) return;
     try {
