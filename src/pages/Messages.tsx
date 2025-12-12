@@ -180,8 +180,12 @@ function ChatPane({
 
       setMessages((data || []) as Message[]);
       messagesCacheRef.current.set(convId, (data || []) as Message[]);
-      await markAsRead(convId);
       setLoadingMessages(false);
+      
+      // Delay markAsRead to let unread indicators show briefly on conversation list
+      setTimeout(() => {
+        if (alive) markAsRead(convId);
+      }, 1000);
 
       // Scroll to bottom on initial load only
       setTimeout(() => {
@@ -380,12 +384,8 @@ function ChatPane({
                   atBottomRef.current = isAtBottom;
                   if (isAtBottom) {
                     setShowNewMessageButton(false);
-                    if (sortedMessages.length > 0) {
-                      const latestMsg = sortedMessages[sortedMessages.length - 1];
-                      if (latestMsg.sender_id === conversationId && !latestMsg.read_at) {
-                        markAsRead(conversationId);
-                      }
-                    }
+                    // Don't auto-mark as read here - let the initial load handle it
+                    // This prevents instant marking before unread indicators can show
                   } else {
                     if (!initialLoadRef.current && sortedMessages.length > 0) {
                       const latestMsg = sortedMessages[sortedMessages.length - 1];
