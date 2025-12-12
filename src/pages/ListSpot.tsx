@@ -10,11 +10,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Star, ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Star, ChevronLeft, ChevronRight, X, Loader2, CreditCard, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { AvailabilityManager, AvailabilityRule } from '@/components/availability/AvailabilityManager';
 import { compressImage } from '@/lib/compressImage';
+import { useAuth } from '@/contexts/AuthContext';
 
 const spotCategories = [
   'Residential Driveway',
@@ -68,6 +69,7 @@ const amenitiesList = [
 
 const ListSpot = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [photos, setPhotos] = useState<File[]>([]);
@@ -83,6 +85,35 @@ const ListSpot = () => {
   const [addressValidationError, setAddressValidationError] = useState<string>('');
   const [addressConfirmedFromSuggestion, setAddressConfirmedFromSuggestion] = useState(false);
   const sessionTokenRef = useRef<string>(crypto.randomUUID());
+  
+  // Stripe Connect state
+  const [isCheckingStripe, setIsCheckingStripe] = useState(true);
+  const [stripeConnected, setStripeConnected] = useState(false);
+  const [isConnectingStripe, setIsConnectingStripe] = useState(false);
+
+  // Check Stripe Connect status on mount
+  useEffect(() => {
+    const checkStripeStatus = async () => {
+      if (!user) {
+        setIsCheckingStripe(false);
+        return;
+      }
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('check-stripe-connect-status');
+        if (error) throw error;
+        
+        setStripeConnected(data?.connected && data?.charges_enabled);
+      } catch (error) {
+        console.error('Error checking Stripe status:', error);
+        setStripeConnected(false);
+      } finally {
+        setIsCheckingStripe(false);
+      }
+    };
+    
+    checkStripeStatus();
+  }, [user]);
 
   useEffect(() => {
     const fetchMapboxToken = async () => {
@@ -460,6 +491,106 @@ const ListSpot = () => {
       });
     }
   };
+
+  const handleStripeConnect = async () => {
+    setIsConnectingStripe(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-stripe-connect-link');
+      if (error) throw error;
+      
+      if (data?.url) {
+        window.open(data.url, '_blank');
+        toast.info('Complete Stripe setup in the new tab, then return here');
+      }
+    } catch (error) {
+      console.error('Error creating Stripe connect link:', error);
+      toast.error('Failed to start Stripe setup');
+    } finally {
+      setIsConnectingStripe(false);
+    }
+  };
+
+  // Show loading state while checking Stripe
+  if (isCheckingStripe) {
+    return (
+      <div className="bg-background min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Show Stripe Connect requirement if not set up
+  if (!stripeConnected) {
+    return (
+      <div className="bg-background min-h-screen">
+        <div className="p-4 space-y-6 max-w-2xl mx-auto">
+          {/* Header */}
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/dashboard')}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">List Your Spot</h1>
+              <p className="text-sm text-muted-foreground">
+                Set up payments first
+              </p>
+            </div>
+          </div>
+
+          <Card>
+            <CardContent className="p-6 space-y-6 text-center">
+              <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
+                <CreditCard className="h-8 w-8 text-primary" />
+              </div>
+              
+              <div className="space-y-2">
+                <h2 className="text-xl font-semibold">Set Up Payment Account</h2>
+                <p className="text-muted-foreground">
+                  Before you can list a parking spot, you need to connect your Stripe account to receive payments from drivers.
+                </p>
+              </div>
+
+              <div className="bg-muted/50 rounded-lg p-4 text-left space-y-2">
+                <p className="text-sm font-medium">What you'll need:</p>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• Bank account details for payouts</li>
+                  <li>• Government-issued ID for verification</li>
+                  <li>• Takes about 5 minutes to complete</li>
+                </ul>
+              </div>
+
+              <Button 
+                onClick={handleStripeConnect} 
+                disabled={isConnectingStripe}
+                className="w-full"
+                size="lg"
+              >
+                {isConnectingStripe ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Set Up Stripe Account
+                  </>
+                )}
+              </Button>
+
+              <p className="text-xs text-muted-foreground">
+                After completing Stripe setup, return here to list your spot.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background">
