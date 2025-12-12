@@ -355,8 +355,23 @@ export const useMessages = () => {
     channel
       .on('broadcast', { event: 'new_message' }, (payload) => {
         console.log('[useMessages] Broadcast new_message received', payload);
-        // Silent refresh - no loading indicator
-        silentRefresh();
+        // If payload contains message data, use it for instant update
+        if (payload.payload?.sender_id && payload.payload?.recipient_id) {
+          const msg: Message = {
+            id: payload.payload.id || `temp-${Date.now()}`,
+            sender_id: payload.payload.sender_id,
+            recipient_id: payload.payload.recipient_id,
+            message: payload.payload.message || '',
+            created_at: payload.payload.created_at || new Date().toISOString(),
+            read_at: null, // New messages are unread
+            delivered_at: null,
+            media_url: null,
+            media_type: null,
+          };
+          upsertConversationFromMessage(msg);
+        }
+        // Also refresh from DB after a short delay to get accurate data
+        setTimeout(() => silentRefresh(), 300);
       })
       .subscribe((status, err) => {
         console.log('[useMessages] Broadcast channel status:', status, err || '');
