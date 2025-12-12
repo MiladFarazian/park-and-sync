@@ -317,41 +317,91 @@ export const DateOverrideManager = ({
               const isAvailable = availableDateSet.has(dateStr);
               const isPast = isBefore(date, startOfDay(new Date()));
               const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+              const hasOverride = isBlocked || isAvailable;
+              const isClickable = isCurrentMonth && !isPast;
+              
+              const handleDateClick = () => {
+                if (!isClickable) return;
+                
+                if (hasOverride) {
+                  // Remove existing override
+                  const newOverrides = { ...overrides };
+                  delete newOverrides[dateStr];
+                  setOverrides(newOverrides);
+                  toast.success('Override removed');
+                } else {
+                  // Add new override based on current mode
+                  const isAvailableMode = overrideMode !== 'block';
+                  const hasCustomHours = overrideMode === 'custom_hours' || overrideMode === 'make_available';
+                  
+                  setOverrides({
+                    ...overrides,
+                    [dateStr]: {
+                      is_available: isAvailableMode,
+                      windows: hasCustomHours ? [{ start_time: '09:00', end_time: '17:00' }] : []
+                    }
+                  });
+                  
+                  const messages: Record<OverrideMode, string> = {
+                    block: 'Date blocked',
+                    make_available: 'Date marked as available',
+                    custom_hours: 'Custom hours added'
+                  };
+                  toast.success(messages[overrideMode]);
+                }
+              };
               
               return (
-                <div
+                <button
                   key={index}
+                  type="button"
+                  disabled={!isClickable}
+                  onClick={handleDateClick}
                   className={cn(
                     "aspect-square flex items-center justify-center text-sm rounded-md transition-all duration-200",
                     !isCurrentMonth && "opacity-30",
-                    isPast && "opacity-40",
+                    isPast && "opacity-40 cursor-not-allowed",
                     isToday && "ring-1 ring-primary ring-offset-1 ring-offset-background",
                     isBlocked && "bg-destructive/20 text-destructive-foreground dark:bg-destructive/30",
                     isAvailable && "bg-green-500/20 text-green-700 dark:text-green-400",
-                    !isBlocked && !isAvailable && isCurrentMonth && "hover:bg-muted/50"
+                    isClickable && !hasOverride && "hover:bg-muted cursor-pointer",
+                    isClickable && hasOverride && "hover:opacity-70 cursor-pointer"
                   )}
+                  title={
+                    !isClickable ? undefined :
+                    hasOverride ? 'Click to remove override' :
+                    overrideMode === 'block' ? 'Click to block this date' :
+                    overrideMode === 'make_available' ? 'Click to make available' :
+                    'Click to add custom hours'
+                  }
                 >
                   <span className={cn(
-                    "w-7 h-7 flex items-center justify-center rounded-full text-xs",
+                    "w-7 h-7 flex items-center justify-center rounded-full text-xs transition-transform",
                     isBlocked && "bg-destructive text-destructive-foreground font-medium",
-                    isAvailable && "bg-green-500 text-white font-medium"
+                    isAvailable && "bg-green-500 text-white font-medium",
+                    isClickable && "hover:scale-110"
                   )}>
                     {format(date, 'd')}
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>
           
+          {/* Mode indicator for clicking */}
+          <div className="text-xs text-muted-foreground text-center py-2 bg-muted/30 rounded-lg">
+            Click dates to {overrideMode === 'block' ? 'block' : overrideMode === 'make_available' ? 'make available' : 'add custom hours'} • Click existing overrides to remove
+          </div>
+          
           {/* Legend */}
-          <div className="flex items-center gap-4 mt-4 pt-3 border-t">
+          <div className="flex items-center justify-center gap-4 pt-2">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="w-3 h-3 rounded-full bg-destructive" />
               Blocked
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="w-3 h-3 rounded-full bg-green-500" />
-              Available Override
+              Available
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="w-3 h-3 rounded-full ring-1 ring-primary" />
