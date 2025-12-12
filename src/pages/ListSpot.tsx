@@ -499,8 +499,9 @@ const ListSpot = () => {
       if (error) throw error;
       
       if (data?.url) {
-        window.open(data.url, '_blank');
-        toast.info('Complete Stripe setup in the new tab, then return here');
+        window.location.href = data.url;
+      } else {
+        throw new Error('No Stripe onboarding URL returned');
       }
     } catch (error) {
       console.error('Error creating Stripe connect link:', error);
