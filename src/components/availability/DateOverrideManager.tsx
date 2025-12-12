@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Calendar as CalendarIcon, Plus, Trash2, Clock, X, Ban, CalendarPlus, CalendarRange } from 'lucide-react';
+import { Calendar as CalendarIcon, Plus, Trash2, Clock, X, Ban, CalendarPlus, CalendarRange, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format, eachDayOfInterval, isBefore, startOfDay, addDays } from 'date-fns';
+import { format, eachDayOfInterval, isBefore, startOfDay, addMonths, startOfMonth, endOfMonth, getDay, addDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { DateRange } from 'react-day-picker';
@@ -60,6 +60,58 @@ export const DateOverrideManager = ({
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [overrideMode, setOverrideMode] = useState<OverrideMode>('block');
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [previewMonth, setPreviewMonth] = useState<Date>(new Date());
+
+  // Get dates for calendar preview
+  const { blockedDateSet, availableDateSet } = useMemo(() => {
+    const blocked = new Set<string>();
+    const available = new Set<string>();
+    
+    Object.entries(overrides).forEach(([date, data]) => {
+      if (data.is_available) {
+        available.add(date);
+      } else {
+        blocked.add(date);
+      }
+    });
+    
+    return { blockedDateSet: blocked, availableDateSet: available };
+  }, [overrides]);
+
+  // Generate calendar grid for preview
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(previewMonth);
+    const monthEnd = endOfMonth(previewMonth);
+    const startDay = getDay(monthStart);
+    
+    const days: { date: Date; isCurrentMonth: boolean }[] = [];
+    
+    // Add days from previous month to fill the first week
+    for (let i = startDay - 1; i >= 0; i--) {
+      days.push({
+        date: addDays(monthStart, -i - 1),
+        isCurrentMonth: false
+      });
+    }
+    days.reverse();
+    
+    // Add all days of current month
+    const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    daysInMonth.forEach(date => {
+      days.push({ date, isCurrentMonth: true });
+    });
+    
+    // Add days from next month to complete the grid (6 rows = 42 days)
+    const remainingDays = 42 - days.length;
+    for (let i = 1; i <= remainingDays; i++) {
+      days.push({
+        date: addDays(monthEnd, i),
+        isCurrentMonth: false
+      });
+    }
+    
+    return days;
+  }, [previewMonth]);
 
   useEffect(() => {
     const result: DateOverride[] = [];
@@ -215,6 +267,100 @@ export const DateOverrideManager = ({
 
   return (
     <div className="space-y-6">
+      {/* Calendar Preview */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4" />
+              Availability Overview
+            </h3>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setPreviewMonth(addMonths(previewMonth, -1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium min-w-[120px] text-center">
+                {format(previewMonth, 'MMMM yyyy')}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setPreviewMonth(addMonths(previewMonth, 1))}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          
+          {/* Day headers */}
+          <div className="grid grid-cols-7 gap-1 mb-2">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+              <div key={day} className="text-xs text-muted-foreground text-center font-medium py-1">
+                {day}
+              </div>
+            ))}
+          </div>
+          
+          {/* Calendar grid */}
+          <div className="grid grid-cols-7 gap-1">
+            {calendarDays.map(({ date, isCurrentMonth }, index) => {
+              const dateStr = format(date, 'yyyy-MM-dd');
+              const isBlocked = blockedDateSet.has(dateStr);
+              const isAvailable = availableDateSet.has(dateStr);
+              const isPast = isBefore(date, startOfDay(new Date()));
+              const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+              
+              return (
+                <div
+                  key={index}
+                  className={cn(
+                    "aspect-square flex items-center justify-center text-sm rounded-md transition-all duration-200",
+                    !isCurrentMonth && "opacity-30",
+                    isPast && "opacity-40",
+                    isToday && "ring-1 ring-primary ring-offset-1 ring-offset-background",
+                    isBlocked && "bg-destructive/20 text-destructive-foreground dark:bg-destructive/30",
+                    isAvailable && "bg-green-500/20 text-green-700 dark:text-green-400",
+                    !isBlocked && !isAvailable && isCurrentMonth && "hover:bg-muted/50"
+                  )}
+                >
+                  <span className={cn(
+                    "w-7 h-7 flex items-center justify-center rounded-full text-xs",
+                    isBlocked && "bg-destructive text-destructive-foreground font-medium",
+                    isAvailable && "bg-green-500 text-white font-medium"
+                  )}>
+                    {format(date, 'd')}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          
+          {/* Legend */}
+          <div className="flex items-center gap-4 mt-4 pt-3 border-t">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="w-3 h-3 rounded-full bg-destructive" />
+              Blocked
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="w-3 h-3 rounded-full bg-green-500" />
+              Available Override
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="w-3 h-3 rounded-full ring-1 ring-primary" />
+              Today
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Add Override Section */}
       <Card className="border-dashed">
         <CardContent className="p-4 space-y-4">
