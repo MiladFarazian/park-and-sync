@@ -950,7 +950,7 @@ const EditSpot = () => {
                     type="button"
                     variant="outline"
                     className="w-full"
-                    onClick={() => navigate(`/edit-spot-availability/${spotId}`)}
+                    onClick={() => navigate(`/edit-availability/${spotId}`)}
                   >
                     <CalendarDays className="h-4 w-4 mr-2" />
                     Edit Availability
