@@ -3,12 +3,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Calendar as CalendarIcon, Plus, Trash2, Clock, X, Ban, CalendarPlus } from 'lucide-react';
+import { Calendar as CalendarIcon, Plus, Trash2, Clock, X, Ban, CalendarPlus, CalendarRange } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format } from 'date-fns';
+import { format, eachDayOfInterval, isBefore, startOfDay, addDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { DateRange } from 'react-day-picker';
 
 type OverrideMode = 'block' | 'make_available' | 'custom_hours';
 
@@ -56,7 +57,7 @@ export const DateOverrideManager = ({
   const [overrides, setOverrides] = useState<Record<string, { is_available: boolean; windows: TimeRange[] }>>(
     groupByDate(initialOverrides)
   );
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [overrideMode, setOverrideMode] = useState<OverrideMode>('block');
   const [calendarOpen, setCalendarOpen] = useState(false);
 
@@ -83,36 +84,56 @@ export const DateOverrideManager = ({
   }, [overrides, onChange]);
 
   const addOverride = () => {
-    if (!selectedDate) {
-      toast.error('Please select a date');
+    if (!dateRange?.from) {
+      toast.error('Please select a date or date range');
       return;
     }
 
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    const startDate = dateRange.from;
+    const endDate = dateRange.to || dateRange.from;
     
-    if (overrides[dateStr]) {
-      toast.error('Override already exists for this date');
-      return;
+    // Get all dates in the range
+    const datesToAdd = eachDayOfInterval({ start: startDate, end: endDate });
+    
+    // Check for existing overrides
+    const existingDates = datesToAdd.filter(date => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      return overrides[dateStr];
+    });
+
+    if (existingDates.length > 0) {
+      if (existingDates.length === datesToAdd.length) {
+        toast.error('All selected dates already have overrides');
+        return;
+      }
+      toast.warning(`${existingDates.length} date(s) skipped (already have overrides)`);
     }
 
     const isAvailable = overrideMode !== 'block';
     const hasCustomHours = overrideMode === 'custom_hours' || overrideMode === 'make_available';
 
-    setOverrides({
-      ...overrides,
-      [dateStr]: {
-        is_available: isAvailable,
-        windows: hasCustomHours ? [{ start_time: '09:00', end_time: '17:00' }] : []
+    const newOverrides = { ...overrides };
+    let addedCount = 0;
+
+    datesToAdd.forEach(date => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      if (!overrides[dateStr]) {
+        newOverrides[dateStr] = {
+          is_available: isAvailable,
+          windows: hasCustomHours ? [{ start_time: '09:00', end_time: '17:00' }] : []
+        };
+        addedCount++;
       }
     });
-    
-    setSelectedDate(undefined);
+
+    setOverrides(newOverrides);
+    setDateRange(undefined);
     setCalendarOpen(false);
     
     const messages: Record<OverrideMode, string> = {
-      block: 'Date blocked',
-      make_available: 'Date marked as available',
-      custom_hours: 'Custom hours added'
+      block: addedCount === 1 ? 'Date blocked' : `${addedCount} dates blocked`,
+      make_available: addedCount === 1 ? 'Date marked as available' : `${addedCount} dates marked as available`,
+      custom_hours: addedCount === 1 ? 'Custom hours added' : `Custom hours added for ${addedCount} dates`
     };
     toast.success(messages[overrideMode]);
   };
@@ -138,21 +159,69 @@ export const DateOverrideManager = ({
     });
   };
 
-  const timeToMinutes = (time: string): number => {
-    const [hours, minutes] = time.split(':').map(Number);
-    return hours * 60 + minutes;
+  const getDisplayDateRange = () => {
+    if (!dateRange?.from) return 'Select date(s)';
+    if (!dateRange.to || format(dateRange.from, 'yyyy-MM-dd') === format(dateRange.to, 'yyyy-MM-dd')) {
+      return format(dateRange.from, 'EEEE, MMM d, yyyy');
+    }
+    return `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`;
   };
 
   const sortedDates = Object.keys(overrides).sort();
   const blockedDates = sortedDates.filter(d => !overrides[d].is_available);
   const specialDates = sortedDates.filter(d => overrides[d].is_available);
 
+  // Group consecutive blocked dates for display
+  const groupConsecutiveDates = (dates: string[]) => {
+    if (dates.length === 0) return [];
+    
+    const groups: { start: string; end: string }[] = [];
+    let currentGroup = { start: dates[0], end: dates[0] };
+    
+    for (let i = 1; i < dates.length; i++) {
+      const prevDate = new Date(dates[i - 1] + 'T00:00:00');
+      const currDate = new Date(dates[i] + 'T00:00:00');
+      const diffDays = Math.round((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) {
+        currentGroup.end = dates[i];
+      } else {
+        groups.push(currentGroup);
+        currentGroup = { start: dates[i], end: dates[i] };
+      }
+    }
+    groups.push(currentGroup);
+    
+    return groups;
+  };
+
+  const blockedGroups = groupConsecutiveDates(blockedDates);
+
+  const removeOverrideRange = (start: string, end: string) => {
+    const newOverrides = { ...overrides };
+    const startDate = new Date(start + 'T00:00:00');
+    const endDate = new Date(end + 'T00:00:00');
+    const datesToRemove = eachDayOfInterval({ start: startDate, end: endDate });
+    
+    datesToRemove.forEach(date => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      delete newOverrides[dateStr];
+    });
+    
+    setOverrides(newOverrides);
+    const count = datesToRemove.length;
+    toast.success(count === 1 ? 'Override removed' : `${count} overrides removed`);
+  };
+
   return (
     <div className="space-y-6">
       {/* Add Override Section */}
       <Card className="border-dashed">
         <CardContent className="p-4 space-y-4">
-          <div className="text-sm font-medium">Add Date Override</div>
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <CalendarRange className="h-4 w-4" />
+            Add Date Override
+          </div>
           
           {/* Toggle between override modes */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -164,7 +233,7 @@ export const DateOverrideManager = ({
               onClick={() => setOverrideMode('block')}
             >
               <Ban className="h-4 w-4 mr-2" />
-              Block Date
+              Block Dates
             </Button>
             <Button
               type="button"
@@ -190,78 +259,105 @@ export const DateOverrideManager = ({
 
           {/* Helper text based on mode */}
           <p className="text-xs text-muted-foreground">
-            {overrideMode === 'block' && "Block this date so no one can book during regular hours."}
-            {overrideMode === 'make_available' && "Make a normally unavailable day available for booking."}
+            {overrideMode === 'block' && "Block dates so no one can book (e.g., vacation Dec 20-31)."}
+            {overrideMode === 'make_available' && "Make normally unavailable dates available for booking."}
             {overrideMode === 'custom_hours' && "Set different hours than your regular schedule."}
           </p>
 
-          {/* Date Picker */}
+          {/* Date Range Picker */}
           <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 className={cn(
-                  "w-full justify-start text-left font-normal",
-                  !selectedDate && "text-muted-foreground"
+                  "w-full justify-start text-left font-normal h-12",
+                  !dateRange?.from && "text-muted-foreground"
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {selectedDate ? format(selectedDate, "EEEE, MMMM d, yyyy") : "Select a date"}
+                {getDisplayDateRange()}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
+              <div className="p-3 border-b">
+                <p className="text-sm font-medium">Select a date or range</p>
+                <p className="text-xs text-muted-foreground">Click a date, or click and drag to select multiple days</p>
+              </div>
               <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => {
-                  setSelectedDate(date);
-                }}
+                mode="range"
+                selected={dateRange}
+                onSelect={setDateRange}
+                numberOfMonths={1}
                 disabled={(date) => {
                   const dateStr = format(date, 'yyyy-MM-dd');
-                  return date < new Date(new Date().setHours(0, 0, 0, 0)) || !!overrides[dateStr];
+                  return isBefore(date, startOfDay(new Date()));
                 }}
                 initialFocus
-                className="pointer-events-auto"
+                className="pointer-events-auto p-3"
               />
+              {dateRange?.from && (
+                <div className="p-3 border-t flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">
+                    {dateRange.to && format(dateRange.from, 'yyyy-MM-dd') !== format(dateRange.to, 'yyyy-MM-dd')
+                      ? `${eachDayOfInterval({ start: dateRange.from, end: dateRange.to }).length} days selected`
+                      : '1 day selected'}
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      addOverride();
+                    }}
+                  >
+                    {overrideMode === 'block' ? 'Block' : overrideMode === 'make_available' ? 'Make Available' : 'Add Hours'}
+                  </Button>
+                </div>
+              )}
             </PopoverContent>
           </Popover>
 
           <Button 
             onClick={addOverride} 
-            disabled={!selectedDate} 
+            disabled={!dateRange?.from} 
             className="w-full"
           >
             <Plus className="h-4 w-4 mr-2" />
-            {overrideMode === 'block' && 'Block This Date'}
-            {overrideMode === 'make_available' && 'Make This Date Available'}
+            {overrideMode === 'block' && 'Block Selected Dates'}
+            {overrideMode === 'make_available' && 'Make Selected Dates Available'}
             {overrideMode === 'custom_hours' && 'Add Custom Hours'}
           </Button>
         </CardContent>
       </Card>
 
-      {/* Blocked Dates */}
-      {blockedDates.length > 0 && (
+      {/* Blocked Dates - Grouped */}
+      {blockedGroups.length > 0 && (
         <div className="space-y-2">
           <div className="text-sm font-medium text-muted-foreground flex items-center gap-2">
             <Ban className="h-4 w-4" />
             Blocked Dates ({blockedDates.length})
           </div>
           <div className="flex flex-wrap gap-2">
-            {blockedDates.map((dateStr) => (
-              <Badge
-                key={dateStr}
-                variant="secondary"
-                className="px-3 py-1.5 text-sm flex items-center gap-2"
-              >
-                {format(new Date(dateStr + 'T00:00:00'), 'MMM d, yyyy')}
-                <button
-                  onClick={() => removeOverride(dateStr)}
-                  className="hover:text-destructive transition-colors"
+            {blockedGroups.map((group) => {
+              const isSingleDay = group.start === group.end;
+              const displayText = isSingleDay 
+                ? format(new Date(group.start + 'T00:00:00'), 'MMM d, yyyy')
+                : `${format(new Date(group.start + 'T00:00:00'), 'MMM d')} - ${format(new Date(group.end + 'T00:00:00'), 'MMM d, yyyy')}`;
+              
+              return (
+                <Badge
+                  key={group.start}
+                  variant="secondary"
+                  className="px-3 py-1.5 text-sm flex items-center gap-2"
                 >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            ))}
+                  {displayText}
+                  <button
+                    onClick={() => removeOverrideRange(group.start, group.end)}
+                    className="hover:text-destructive transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              );
+            })}
           </div>
         </div>
       )}
@@ -330,9 +426,9 @@ export const DateOverrideManager = ({
       {sortedDates.length === 0 && (
         <Card className="border-dashed">
           <CardContent className="p-8 text-center text-muted-foreground">
-            <CalendarIcon className="h-10 w-10 mx-auto mb-3 opacity-50" />
+            <CalendarRange className="h-10 w-10 mx-auto mb-3 opacity-50" />
             <p className="font-medium">No date overrides</p>
-            <p className="text-sm mt-1">Block specific dates or set special hours for holidays</p>
+            <p className="text-sm mt-1">Block date ranges or set special hours for vacations & holidays</p>
           </CardContent>
         </Card>
       )}
