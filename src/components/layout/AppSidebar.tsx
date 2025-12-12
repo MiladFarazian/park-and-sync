@@ -12,7 +12,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { useMode } from '@/contexts/ModeContext';
-import { useMessages } from '@/hooks/useMessages';
+import { useMessages } from '@/contexts/MessagesContext';
 import { Badge } from '@/components/ui/badge';
 
 export function AppSidebar() {
