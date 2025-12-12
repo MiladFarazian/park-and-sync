@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Search, Send, Loader2, ArrowLeft, Paperclip, X, Check, CheckCheck, PenSquare } from 'lucide-react';
-import { useMessages, Message } from '@/hooks/useMessages';
+import { useMessages, Message } from '@/contexts/MessagesContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';

@@ -37,6 +37,7 @@ import EditSpotAvailability from "./pages/EditSpotAvailability";
 import EditSpot from "./pages/EditSpot";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ModeProvider } from "./contexts/ModeContext";
+import { MessagesProvider } from "./contexts/MessagesContext";
 
 const queryClient = new QueryClient();
 
@@ -67,7 +68,8 @@ const App = () => {
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <ModeProvider>
-        <TooltipProvider>
+        <MessagesProvider>
+          <TooltipProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -109,9 +111,10 @@ const App = () => {
             } />
           </Routes>
     </BrowserRouter>
-  </TooltipProvider>
-  </ModeProvider>
-  </AuthProvider>
+          </TooltipProvider>
+        </MessagesProvider>
+      </ModeProvider>
+    </AuthProvider>
   </QueryClientProvider>
   );
 };

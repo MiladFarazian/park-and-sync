@@ -3,7 +3,7 @@ import { Home, Calendar, MessageCircle, User, List } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useMode } from '@/contexts/ModeContext';
-import { useMessages } from '@/hooks/useMessages';
+import { useMessages } from '@/contexts/MessagesContext';
 import { Badge } from '@/components/ui/badge';
 
 const BottomNavigation = () => {
