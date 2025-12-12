@@ -120,6 +120,7 @@ export const useMessages = () => {
   };
 
   // Silent refresh - only updates state if data changed (no loading indicator)
+  // Preserves higher unread counts from optimistic updates
   const silentRefresh = async () => {
     if (!user || !mountedRef.current) return;
 
@@ -146,13 +147,25 @@ export const useMessages = () => {
       }
 
       const newConvs = await buildConversations(allMessages || [], profiles);
-      const newHash = hashConversations(newConvs);
       
-      // Only update if data actually changed
-      if (newHash !== lastDataHashRef.current && mountedRef.current) {
-        lastDataHashRef.current = newHash;
-        setConversations(newConvs);
-      }
+      // Merge with existing conversations, preserving higher unread counts from optimistic updates
+      setConversations(prev => {
+        const merged = newConvs.map(newConv => {
+          const existing = prev.find(c => c.user_id === newConv.user_id);
+          // Keep the higher unread count (optimistic update may be ahead of DB)
+          if (existing && existing.unread_count > newConv.unread_count) {
+            return { ...newConv, unread_count: existing.unread_count };
+          }
+          return newConv;
+        });
+        
+        const newHash = hashConversations(merged);
+        if (newHash !== lastDataHashRef.current) {
+          lastDataHashRef.current = newHash;
+          return merged;
+        }
+        return prev;
+      });
     } catch (error) {
       // Silent fail for background refresh
     }
