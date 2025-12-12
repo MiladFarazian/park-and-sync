@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Shield, Camera, MapPin, DollarSign, Trash2, Upload, Star, CheckCircle2, ChevronLeft, ChevronRight, Save, Zap, GripVertical, Clock, Car, Lightbulb } from 'lucide-react';
+import { ArrowLeft, Shield, Camera, MapPin, DollarSign, Trash2, Upload, Star, CheckCircle2, ChevronLeft, ChevronRight, Save, Zap, GripVertical, Clock, Car, Lightbulb, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { compressImage } from '@/lib/compressImage';
@@ -934,6 +934,27 @@ const EditSpot = () => {
                     <Star className="h-3 w-3 inline mr-1" />
                     All changes save when you click "Save Changes" button below.
                   </p>
+                </div>
+
+                {/* Availability Section */}
+                <div className="pt-4 border-t">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <Label className="text-base">Availability Schedule</Label>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Set weekly hours and special date overrides
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate(`/edit-spot-availability/${spotId}`)}
+                  >
+                    <CalendarDays className="h-4 w-4 mr-2" />
+                    Edit Availability
+                  </Button>
                 </div>
               </div>
 
