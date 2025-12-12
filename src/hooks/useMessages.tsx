@@ -47,14 +47,126 @@ export const useMessages = () => {
   const mountedRef = useRef(true);
   const profileCacheRef = useRef<Map<string, { name: string; avatar_url?: string }>>(new Map());
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastDataHashRef = useRef<string>('');
 
+  // Build conversations from messages (shared logic)
+  const buildConversations = async (allMessages: any[], profiles: any[]): Promise<Conversation[]> => {
+    if (!user) return [];
+    
+    const conversationMap = new Map<string, any>();
+    
+    for (const msg of allMessages || []) {
+      const partnerId = msg.sender_id === user.id ? msg.recipient_id : msg.sender_id;
+      
+      if (!conversationMap.has(partnerId)) {
+        conversationMap.set(partnerId, {
+          user_id: partnerId,
+          last_message: getMessagePreview(msg, user.id),
+          last_message_at: msg.created_at,
+          unread_count: 0,
+          messages: []
+        });
+      } else {
+        const conv = conversationMap.get(partnerId);
+        const existingTime = new Date(conv.last_message_at).getTime();
+        const msgTime = new Date(msg.created_at).getTime();
+        if (msgTime > existingTime) {
+          conv.last_message = getMessagePreview(msg, user.id);
+          conv.last_message_at = msg.created_at;
+        }
+      }
+      
+      const conv = conversationMap.get(partnerId);
+      conv.messages.push(msg);
+      
+      if (msg.recipient_id === user.id && !msg.read_at) {
+        conv.unread_count++;
+      }
+    }
 
-  // Load conversations
+    const convs: Conversation[] = [];
+    for (const [partnerId, conv] of conversationMap) {
+      const isSupportUser = partnerId === '00000000-0000-0000-0000-000000000001';
+      const profile = profiles?.find(p => p.user_id === partnerId);
+      const profileName = isSupportUser 
+        ? 'Parkzy Support' 
+        : (profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown User' : 'Unknown User');
+      const profileAvatar = isSupportUser
+        ? '/parkzy-support-avatar.png'
+        : profile?.avatar_url;
+      
+      const lastMsg = conv.messages.sort((a: Message, b: Message) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0];
+      
+      convs.push({
+        id: partnerId,
+        user_id: partnerId,
+        name: profileName,
+        avatar_url: profileAvatar,
+        last_message: getMessagePreview(lastMsg, user.id, profileName),
+        last_message_at: conv.last_message_at,
+        unread_count: conv.unread_count
+      });
+    }
+
+    convs.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
+    return convs;
+  };
+
+  // Create a hash of conversations for comparison
+  const hashConversations = (convs: Conversation[]): string => {
+    return convs.map(c => `${c.user_id}:${c.last_message_at}:${c.unread_count}:${c.last_message}`).join('|');
+  };
+
+  // Silent refresh - only updates state if data changed (no loading indicator)
+  const silentRefresh = async () => {
+    if (!user || !mountedRef.current) return;
+
+    try {
+      const { data: allMessages, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
+        .order('created_at', { ascending: false });
+
+      if (error || !mountedRef.current) return;
+
+      const partnerIds = [...new Set((allMessages || []).map(m => 
+        m.sender_id === user.id ? m.recipient_id : m.sender_id
+      ))];
+
+      let profiles: any[] = [];
+      if (partnerIds.length > 0) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('user_id, first_name, last_name, avatar_url')
+          .in('user_id', partnerIds);
+        profiles = data || [];
+      }
+
+      const newConvs = await buildConversations(allMessages || [], profiles);
+      const newHash = hashConversations(newConvs);
+      
+      // Only update if data actually changed
+      if (newHash !== lastDataHashRef.current && mountedRef.current) {
+        lastDataHashRef.current = newHash;
+        setConversations(newConvs);
+      }
+    } catch (error) {
+      // Silent fail for background refresh
+    }
+  };
+
+  // Initial load with loading indicator
   const loadConversations = async () => {
     if (!user) return;
 
     try {
-      setLoading(true);
+      // Only show loading on initial load
+      if (conversations.length === 0) {
+        setLoading(true);
+      }
       
       const { data: allMessages, error } = await supabase
         .from('messages')
@@ -65,85 +177,24 @@ export const useMessages = () => {
       if (error) throw error;
       if (!mountedRef.current) return;
 
-      console.log('[useMessages] Processing', allMessages?.length || 0, 'messages');
-      
-      const conversationMap = new Map<string, any>();
-      
-      for (const msg of allMessages || []) {
-        const partnerId = msg.sender_id === user.id ? msg.recipient_id : msg.sender_id;
-        
-        if (!conversationMap.has(partnerId)) {
-          conversationMap.set(partnerId, {
-            user_id: partnerId,
-            last_message: getMessagePreview(msg, user.id),
-            last_message_at: msg.created_at,
-            unread_count: 0,
-            messages: []
-          });
-        } else {
-          // Update last_message if this message is newer
-          const conv = conversationMap.get(partnerId);
-          const existingTime = new Date(conv.last_message_at).getTime();
-          const msgTime = new Date(msg.created_at).getTime();
-          if (msgTime > existingTime) {
-            conv.last_message = getMessagePreview(msg, user.id);
-            conv.last_message_at = msg.created_at;
-          }
-        }
-        
-        const conv = conversationMap.get(partnerId);
-        conv.messages.push(msg);
-        
-        if (msg.recipient_id === user.id && !msg.read_at) {
-          conv.unread_count++;
-        }
-      }
+      const partnerIds = [...new Set((allMessages || []).map(m => 
+        m.sender_id === user.id ? m.recipient_id : m.sender_id
+      ))];
 
-      const partnerIds = Array.from(conversationMap.keys());
+      let profiles: any[] = [];
       if (partnerIds.length > 0) {
-        const { data: profiles } = await supabase
+        const { data } = await supabase
           .from('profiles')
           .select('user_id, first_name, last_name, avatar_url')
           .in('user_id', partnerIds);
+        profiles = data || [];
+      }
 
-        const convs: Conversation[] = [];
-        for (const [partnerId, conv] of conversationMap) {
-          // Special handling for Parkzy Support
-          const isSupportUser = partnerId === '00000000-0000-0000-0000-000000000001';
-          const profile = profiles?.find(p => p.user_id === partnerId);
-          const profileName = isSupportUser 
-            ? 'Parkzy Support' 
-            : (profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown User' : 'Unknown User');
-          const profileAvatar = isSupportUser
-            ? '/parkzy-support-avatar.png'
-            : profile?.avatar_url;
-          
-          // Find the last message for this conversation to get proper preview
-          const lastMsg = conv.messages.sort((a: Message, b: Message) => 
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          )[0];
-          
-          // Create completely new object to force React re-render
-          convs.push({
-            id: partnerId,
-            user_id: partnerId,
-            name: profileName,
-            avatar_url: profileAvatar,
-            last_message: getMessagePreview(lastMsg, user.id, profileName),
-            last_message_at: conv.last_message_at,
-            unread_count: conv.unread_count
-          });
-        }
-
-        convs.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
-        console.log('[useMessages] Setting', convs.length, 'conversations, newest:', convs[0]?.last_message);
-        if (mountedRef.current) {
-          setConversations(convs);
-        }
-      } else {
-        if (mountedRef.current) {
-          setConversations([]);
-        }
+      const convs = await buildConversations(allMessages || [], profiles);
+      lastDataHashRef.current = hashConversations(convs);
+      
+      if (mountedRef.current) {
+        setConversations(convs);
       }
     } catch (error) {
       console.error('Error loading conversations:', error);
@@ -272,27 +323,24 @@ export const useMessages = () => {
 
     loadConversations();
 
-    // Visibility change handler - refresh when user returns to tab
+    // Visibility change handler - silent refresh when user returns to tab
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && mountedRef.current) {
-        console.log('[useMessages] Tab became visible, refreshing conversations');
-        loadConversations();
+        silentRefresh();
       }
     };
 
-    // Focus handler - refresh when window gains focus
+    // Focus handler - silent refresh when window gains focus
     const handleFocus = () => {
       if (mountedRef.current) {
-        console.log('[useMessages] Window focused, refreshing conversations');
-        loadConversations();
+        silentRefresh();
       }
     };
 
-    // Online handler - refresh when coming back online
+    // Online handler - silent refresh when coming back online
     const handleOnline = () => {
       if (mountedRef.current) {
-        console.log('[useMessages] Back online, refreshing conversations');
-        loadConversations();
+        silentRefresh();
       }
     };
 
@@ -307,19 +355,19 @@ export const useMessages = () => {
     channel
       .on('broadcast', { event: 'new_message' }, (payload) => {
         console.log('[useMessages] Broadcast new_message received', payload);
-        // Immediately refresh conversations
-        loadConversations();
+        // Silent refresh - no loading indicator
+        silentRefresh();
       })
       .subscribe((status, err) => {
         console.log('[useMessages] Broadcast channel status:', status, err || '');
       });
 
-    // Poll for updates every 3 seconds as a reliable fallback
+    // Poll for updates every 5 seconds as a reliable fallback (silent)
     const pollInterval = setInterval(() => {
       if (mountedRef.current) {
-        loadConversations();
+        silentRefresh();
       }
-    }, 3000);
+    }, 5000);
 
     return () => {
       mountedRef.current = false;
