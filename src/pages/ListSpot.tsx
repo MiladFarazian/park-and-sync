@@ -337,6 +337,12 @@ const ListSpot = () => {
         return;
       }
 
+      // Check Stripe status before final submission
+      if (!stripeConnected) {
+        setIsSubmitting(false);
+        return; // The UI will show the Stripe setup screen
+      }
+
       // Validate and geocode the address to get coordinates
       const coordinates = await validateAddressBeforeSubmit(data.address);
       
@@ -528,87 +534,22 @@ const ListSpot = () => {
     }
   };
 
-  // Show loading state while checking Stripe
-  if (isCheckingStripe) {
-    return (
-      <div className="bg-background min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  // Helper to refresh Stripe status
+  const refreshStripeStatus = async () => {
+    setIsCheckingStripe(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('check-stripe-connect-status');
+      if (error) throw error;
+      setStripeConnected(data?.connected && data?.charges_enabled);
+    } catch (error) {
+      console.error('Error checking Stripe status:', error);
+    } finally {
+      setIsCheckingStripe(false);
+    }
+  };
 
-  // Show Stripe Connect requirement if not set up
-  if (!stripeConnected) {
-    return (
-      <div className="bg-background min-h-screen">
-        <div className="p-4 space-y-6 max-w-2xl mx-auto">
-          {/* Header */}
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/dashboard')}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold">List Your Spot</h1>
-              <p className="text-sm text-muted-foreground">
-                Set up payments first
-              </p>
-            </div>
-          </div>
-
-          <Card>
-            <CardContent className="p-6 space-y-6 text-center">
-              <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
-                <CreditCard className="h-8 w-8 text-primary" />
-              </div>
-              
-              <div className="space-y-2">
-                <h2 className="text-xl font-semibold">Set Up Payment Account</h2>
-                <p className="text-muted-foreground">
-                  Before you can list a parking spot, you need to connect your Stripe account to receive payments from drivers.
-                </p>
-              </div>
-
-              <div className="bg-muted/50 rounded-lg p-4 text-left space-y-2">
-                <p className="text-sm font-medium">What you'll need:</p>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• Bank account details for payouts</li>
-                  <li>• Government-issued ID for verification</li>
-                  <li>• Takes about 5 minutes to complete</li>
-                </ul>
-              </div>
-
-              <Button 
-                onClick={handleStripeConnect} 
-                disabled={isConnectingStripe}
-                className="w-full"
-                size="lg"
-              >
-                {isConnectingStripe ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Connecting...
-                  </>
-                ) : (
-                  <>
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    Set Up Stripe Account
-                  </>
-                )}
-              </Button>
-
-              <p className="text-xs text-muted-foreground">
-                After completing Stripe setup, return here to list your spot.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
+  // Show Stripe Connect requirement on final step (step 6) if not set up
+  const showStripeSetup = currentStep === 6 && !stripeConnected && !isCheckingStripe;
 
   return (
     <div className="bg-background">
@@ -1187,19 +1128,96 @@ const ListSpot = () => {
                   </div>
                 </div>
 
-                <div className="flex gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setCurrentStep(5)}
-                  >
-                    Back
-                  </Button>
-                  <Button type="submit" className="flex-1" disabled={isSubmitting}>
-                    {isSubmitting ? 'Submitting...' : 'Submit Listing'}
-                  </Button>
-                </div>
+                {/* Show Stripe Setup or Submit Button */}
+                {showStripeSetup ? (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-lg border border-amber-500/50 bg-amber-500/10">
+                      <div className="flex items-start gap-3">
+                        <CreditCard className="h-5 w-5 text-amber-500 mt-0.5" />
+                        <div className="space-y-2">
+                          <h3 className="font-semibold text-sm">Payment Setup Required</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Before you can submit your listing, you need to connect your Stripe account to receive payments from drivers.
+                          </p>
+                          <div className="text-xs text-muted-foreground space-y-1 mt-2">
+                            <p>• Bank account details for payouts</p>
+                            <p>• Government-issued ID for verification</p>
+                            <p>• Takes about 5 minutes to complete</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => setCurrentStep(5)}
+                      >
+                        Back
+                      </Button>
+                      <Button 
+                        type="button"
+                        onClick={handleStripeConnect} 
+                        disabled={isConnectingStripe}
+                        className="flex-1"
+                      >
+                        {isConnectingStripe ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Connecting...
+                          </>
+                        ) : (
+                          <>
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Set Up Stripe
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      className="w-full text-sm"
+                      onClick={refreshStripeStatus}
+                      disabled={isCheckingStripe}
+                    >
+                      {isCheckingStripe ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Checking...
+                        </>
+                      ) : (
+                        'I\'ve completed Stripe setup'
+                      )}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setCurrentStep(5)}
+                    >
+                      Back
+                    </Button>
+                    <Button type="submit" className="flex-1" disabled={isSubmitting || isCheckingStripe}>
+                      {isCheckingStripe ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Checking...
+                        </>
+                      ) : isSubmitting ? (
+                        'Submitting...'
+                      ) : (
+                        'Submit Listing'
+                      )}
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
