@@ -3,14 +3,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Calendar as CalendarIcon, Plus, Trash2, Clock, X, Ban, Check } from 'lucide-react';
+import { Calendar as CalendarIcon, Plus, Trash2, Clock, X, Ban, CalendarPlus } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+
+type OverrideMode = 'block' | 'make_available' | 'custom_hours';
 
 export interface DateOverride {
   id?: string;
@@ -57,7 +57,7 @@ export const DateOverrideManager = ({
     groupByDate(initialOverrides)
   );
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
-  const [isBlocking, setIsBlocking] = useState(true);
+  const [overrideMode, setOverrideMode] = useState<OverrideMode>('block');
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   useEffect(() => {
@@ -95,17 +95,26 @@ export const DateOverrideManager = ({
       return;
     }
 
+    const isAvailable = overrideMode !== 'block';
+    const hasCustomHours = overrideMode === 'custom_hours' || overrideMode === 'make_available';
+
     setOverrides({
       ...overrides,
       [dateStr]: {
-        is_available: !isBlocking,
-        windows: isBlocking ? [] : [{ start_time: '09:00', end_time: '17:00' }]
+        is_available: isAvailable,
+        windows: hasCustomHours ? [{ start_time: '09:00', end_time: '17:00' }] : []
       }
     });
     
     setSelectedDate(undefined);
     setCalendarOpen(false);
-    toast.success(isBlocking ? 'Date blocked' : 'Special hours added');
+    
+    const messages: Record<OverrideMode, string> = {
+      block: 'Date blocked',
+      make_available: 'Date marked as available',
+      custom_hours: 'Custom hours added'
+    };
+    toast.success(messages[overrideMode]);
   };
 
   const removeOverride = (dateStr: string) => {
@@ -145,29 +154,46 @@ export const DateOverrideManager = ({
         <CardContent className="p-4 space-y-4">
           <div className="text-sm font-medium">Add Date Override</div>
           
-          {/* Toggle between blocking and special hours */}
-          <div className="flex gap-2">
+          {/* Toggle between override modes */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <Button
               type="button"
-              variant={isBlocking ? "default" : "outline"}
+              variant={overrideMode === 'block' ? "default" : "outline"}
               size="sm"
-              className="flex-1"
-              onClick={() => setIsBlocking(true)}
+              className="w-full"
+              onClick={() => setOverrideMode('block')}
             >
               <Ban className="h-4 w-4 mr-2" />
-              Block a Date
+              Block Date
             </Button>
             <Button
               type="button"
-              variant={!isBlocking ? "default" : "outline"}
+              variant={overrideMode === 'make_available' ? "default" : "outline"}
               size="sm"
-              className="flex-1"
-              onClick={() => setIsBlocking(false)}
+              className="w-full"
+              onClick={() => setOverrideMode('make_available')}
+            >
+              <CalendarPlus className="h-4 w-4 mr-2" />
+              Make Available
+            </Button>
+            <Button
+              type="button"
+              variant={overrideMode === 'custom_hours' ? "default" : "outline"}
+              size="sm"
+              className="w-full"
+              onClick={() => setOverrideMode('custom_hours')}
             >
               <Clock className="h-4 w-4 mr-2" />
-              Special Hours
+              Custom Hours
             </Button>
           </div>
+
+          {/* Helper text based on mode */}
+          <p className="text-xs text-muted-foreground">
+            {overrideMode === 'block' && "Block this date so no one can book during regular hours."}
+            {overrideMode === 'make_available' && "Make a normally unavailable day available for booking."}
+            {overrideMode === 'custom_hours' && "Set different hours than your regular schedule."}
+          </p>
 
           {/* Date Picker */}
           <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
@@ -206,7 +232,9 @@ export const DateOverrideManager = ({
             className="w-full"
           >
             <Plus className="h-4 w-4 mr-2" />
-            {isBlocking ? 'Block This Date' : 'Add Special Hours'}
+            {overrideMode === 'block' && 'Block This Date'}
+            {overrideMode === 'make_available' && 'Make This Date Available'}
+            {overrideMode === 'custom_hours' && 'Add Custom Hours'}
           </Button>
         </CardContent>
       </Card>
@@ -238,21 +266,26 @@ export const DateOverrideManager = ({
         </div>
       )}
 
-      {/* Special Hours */}
+      {/* Available Dates / Custom Hours */}
       {specialDates.length > 0 && (
         <div className="space-y-3">
           <div className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Special Hours ({specialDates.length})
+            <CalendarPlus className="h-4 w-4" />
+            Available / Custom Hours ({specialDates.length})
           </div>
           {specialDates.map((dateStr) => {
             const override = overrides[dateStr];
             return (
-              <Card key={dateStr} className="border-primary/20 bg-primary/5">
+              <Card key={dateStr} className="border-green-500/20 bg-green-500/5">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <div className="font-medium">
-                      {format(new Date(dateStr + 'T00:00:00'), 'EEEE, MMM d, yyyy')}
+                    <div>
+                      <div className="font-medium">
+                        {format(new Date(dateStr + 'T00:00:00'), 'EEEE, MMM d, yyyy')}
+                      </div>
+                      <div className="text-xs text-green-600 dark:text-green-400">
+                        Available (overrides weekly schedule)
+                      </div>
                     </div>
                     <Button
                       type="button"
