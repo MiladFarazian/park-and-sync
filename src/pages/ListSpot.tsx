@@ -499,7 +499,24 @@ const ListSpot = () => {
       if (error) throw error;
       
       if (data?.url) {
-        window.location.href = data.url;
+        // Check if running as PWA/standalone mode
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                            (window.navigator as any).standalone === true;
+        
+        if (isStandalone) {
+          // PWA mode: open in system browser
+          const link = document.createElement('a');
+          link.href = data.url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          toast.info('Complete Stripe setup in your browser, then return to the app');
+        } else {
+          // Regular browser: direct redirect
+          window.location.href = data.url;
+        }
       } else {
         throw new Error('No Stripe onboarding URL returned');
       }
