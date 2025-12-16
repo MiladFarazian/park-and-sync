@@ -337,6 +337,13 @@ const ListSpot = () => {
         return;
       }
 
+      // Fetch profile for email notification
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email, first_name')
+        .eq('user_id', user.id)
+        .single();
+
       // Check Stripe status before final submission
       if (!stripeConnected) {
         setIsSubmitting(false);
@@ -443,7 +450,21 @@ const ListSpot = () => {
         }
       }
       
-      toast.success('Parking spot submitted for review!');
+      // Send listing confirmation email (non-blocking)
+      if (spotData && profile?.email) {
+        supabase.functions.invoke('send-listing-confirmation', {
+          body: {
+            hostEmail: profile.email,
+            hostName: profile.first_name || '',
+            spotCategory: data.category,
+            spotAddress: data.address,
+            hourlyRate: parseFloat(data.hourlyRate),
+            spotId: spotData.id,
+          }
+        }).catch((err) => console.error('Failed to send listing confirmation email:', err));
+      }
+      
+      toast.success('Your parking spot is now live!');
       navigate('/dashboard');
     } catch (error) {
       console.error('Error submitting spot:', error);
