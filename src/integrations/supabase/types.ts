@@ -17,6 +17,7 @@ export type Database = {
       availability_rules: {
         Row: {
           created_at: string
+          custom_rate: number | null
           day_of_week: number
           end_time: string
           id: string
@@ -26,6 +27,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          custom_rate?: number | null
           day_of_week: number
           end_time: string
           id?: string
@@ -35,6 +37,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          custom_rate?: number | null
           day_of_week?: number
           end_time?: string
           id?: string
@@ -218,6 +221,7 @@ export type Database = {
       calendar_overrides: {
         Row: {
           created_at: string
+          custom_rate: number | null
           end_time: string | null
           id: string
           is_available: boolean
@@ -228,6 +232,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          custom_rate?: number | null
           end_time?: string | null
           id?: string
           is_available: boolean
@@ -238,6 +243,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          custom_rate?: number | null
           end_time?: string | null
           id?: string
           is_available?: boolean

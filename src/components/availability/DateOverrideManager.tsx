@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Calendar as CalendarIcon, Plus, Trash2, Clock, X, Ban, CalendarPlus, CalendarRange, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar as CalendarIcon, Plus, Trash2, Clock, X, Ban, CalendarPlus, CalendarRange, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format, eachDayOfInterval, isBefore, startOfDay, addMonths, startOfMonth, endOfMonth, getDay, addDays } from 'date-fns';
@@ -19,6 +19,7 @@ export interface DateOverride {
   start_time?: string;
   end_time?: string;
   is_available: boolean;
+  custom_rate?: number | null;
 }
 
 interface TimeRange {
@@ -26,22 +27,31 @@ interface TimeRange {
   end_time: string;
 }
 
+interface DateData {
+  is_available: boolean;
+  windows: TimeRange[];
+  custom_rate?: number | null;
+}
+
 interface DateOverrideManagerProps {
   initialOverrides?: DateOverride[];
   onChange?: (overrides: DateOverride[]) => void;
+  baseRate?: number;
 }
 
 export const DateOverrideManager = ({ 
   initialOverrides = [], 
-  onChange 
+  onChange,
+  baseRate = 0
 }: DateOverrideManagerProps) => {
   const groupByDate = (overrides: DateOverride[]) => {
-    const grouped: Record<string, { is_available: boolean; windows: TimeRange[] }> = {};
+    const grouped: Record<string, DateData> = {};
     overrides.forEach(override => {
       if (!grouped[override.override_date]) {
         grouped[override.override_date] = {
           is_available: override.is_available,
-          windows: []
+          windows: [],
+          custom_rate: override.custom_rate
         };
       }
       if (override.start_time && override.end_time) {
@@ -50,17 +60,22 @@ export const DateOverrideManager = ({
           end_time: override.end_time
         });
       }
+      // Preserve custom_rate from any override for that date
+      if (override.custom_rate !== undefined && override.custom_rate !== null) {
+        grouped[override.override_date].custom_rate = override.custom_rate;
+      }
     });
     return grouped;
   };
 
-  const [overrides, setOverrides] = useState<Record<string, { is_available: boolean; windows: TimeRange[] }>>(
+  const [overrides, setOverrides] = useState<Record<string, DateData>>(
     groupByDate(initialOverrides)
   );
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [overrideMode, setOverrideMode] = useState<OverrideMode>('block');
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [previewMonth, setPreviewMonth] = useState<Date>(new Date());
+  const [customRateForNew, setCustomRateForNew] = useState<number | null>(null);
   
   // Drag selection state
   const [isDragging, setIsDragging] = useState(false);
@@ -152,7 +167,8 @@ export const DateOverrideManager = ({
       if (!overrides[dateStr]) {
         newOverrides[dateStr] = {
           is_available: isAvailable,
-          windows: hasCustomHours ? [{ start_time: '09:00', end_time: '17:00' }] : []
+          windows: hasCustomHours ? [{ start_time: '09:00', end_time: '17:00' }] : [],
+          custom_rate: customRateForNew
         };
         addedCount++;
       }
@@ -178,13 +194,15 @@ export const DateOverrideManager = ({
             override_date: date,
             start_time: window.start_time,
             end_time: window.end_time,
-            is_available: data.is_available
+            is_available: data.is_available,
+            custom_rate: data.custom_rate
           });
         });
       } else {
         result.push({
           override_date: date,
-          is_available: data.is_available
+          is_available: data.is_available,
+          custom_rate: data.custom_rate
         });
       }
     });
@@ -228,7 +246,8 @@ export const DateOverrideManager = ({
       if (!overrides[dateStr]) {
         newOverrides[dateStr] = {
           is_available: isAvailable,
-          windows: hasCustomHours ? [{ start_time: '09:00', end_time: '17:00' }] : []
+          windows: hasCustomHours ? [{ start_time: '09:00', end_time: '17:00' }] : [],
+          custom_rate: customRateForNew
         };
         addedCount++;
       }
@@ -263,6 +282,16 @@ export const DateOverrideManager = ({
       [dateStr]: {
         ...override,
         windows
+      }
+    });
+  };
+
+  const updateCustomRate = (dateStr: string, rate: number | null) => {
+    setOverrides({
+      ...overrides,
+      [dateStr]: {
+        ...overrides[dateStr],
+        custom_rate: rate
       }
     });
   };
@@ -536,6 +565,61 @@ export const DateOverrideManager = ({
             {overrideMode === 'custom_hours' && "Set different hours than your regular schedule."}
           </p>
 
+          {/* Custom Rate for New Override */}
+          {overrideMode !== 'block' && (
+            <div className="p-3 rounded-lg bg-muted/50 border border-dashed">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Custom rate for selected dates</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {customRateForNew !== null ? (
+                    <>
+                      <div className="relative">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          value={customRateForNew || ''}
+                          onChange={(e) => setCustomRateForNew(e.target.value ? parseFloat(e.target.value) : null)}
+                          className="w-20 pl-5 h-8 text-sm"
+                          placeholder="0"
+                        />
+                      </div>
+                      <span className="text-xs text-muted-foreground">/hr</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs"
+                        onClick={() => setCustomRateForNew(null)}
+                      >
+                        Clear
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => setCustomRateForNew(baseRate || 5)}
+                    >
+                      Set custom rate
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {customRateForNew === null && baseRate > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Will use base rate: ${baseRate}/hr
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Date Range Picker */}
           <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
             <PopoverTrigger asChild>
@@ -621,6 +705,11 @@ export const DateOverrideManager = ({
                   className="px-3 py-1.5 text-sm flex items-center gap-2"
                 >
                   {displayText}
+                  {overrides[group.start]?.custom_rate && (
+                    <span className="text-green-600 dark:text-green-400 font-medium">
+                      ${overrides[group.start].custom_rate}/hr
+                    </span>
+                  )}
                   <button
                     onClick={() => removeOverrideRange(group.start, group.end)}
                     className="hover:text-destructive transition-colors"
@@ -643,13 +732,20 @@ export const DateOverrideManager = ({
           </div>
           {specialDates.map((dateStr) => {
             const override = overrides[dateStr];
+            const hasCustomRate = override.custom_rate !== null && override.custom_rate !== undefined;
             return (
               <Card key={dateStr} className="border-green-500/20 bg-green-500/5">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <div className="font-medium">
+                      <div className="font-medium flex items-center gap-2">
                         {format(new Date(dateStr + 'T00:00:00'), 'EEEE, MMM d, yyyy')}
+                        {hasCustomRate && (
+                          <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-700 dark:text-green-400">
+                            <DollarSign className="h-3 w-3 mr-0.5" />
+                            ${override.custom_rate}/hr
+                          </Badge>
+                        )}
                       </div>
                       <div className="text-xs text-green-600 dark:text-green-400">
                         Available (overrides weekly schedule)
@@ -669,7 +765,7 @@ export const DateOverrideManager = ({
                   {override.windows.map((window, windowIndex) => (
                     <div 
                       key={windowIndex}
-                      className="flex items-center gap-2 p-3 rounded-lg bg-background border"
+                      className="flex items-center gap-2 p-3 rounded-lg bg-background border mb-3"
                     >
                       <Clock className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
                       <Input
@@ -687,6 +783,59 @@ export const DateOverrideManager = ({
                       />
                     </div>
                   ))}
+
+                  {/* Custom Rate Editor */}
+                  <div className="p-3 rounded-lg bg-muted/30 border border-dashed">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-sm">
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Custom rate</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {hasCustomRate ? (
+                          <>
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.5"
+                                value={override.custom_rate || ''}
+                                onChange={(e) => updateCustomRate(dateStr, e.target.value ? parseFloat(e.target.value) : null)}
+                                className="w-20 pl-5 h-8 text-sm"
+                                placeholder="0"
+                              />
+                            </div>
+                            <span className="text-xs text-muted-foreground">/hr</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2 text-xs"
+                              onClick={() => updateCustomRate(dateStr, null)}
+                            >
+                              Reset
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs"
+                            onClick={() => updateCustomRate(dateStr, baseRate || 5)}
+                          >
+                            Set custom rate
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {!hasCustomRate && baseRate > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Using base rate: ${baseRate}/hr
+                      </p>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             );

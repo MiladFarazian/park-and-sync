@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { Plus, Trash2, Clock, Sun, Moon } from 'lucide-react';
+import { Plus, Trash2, Clock, Sun, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -13,6 +13,7 @@ export interface AvailabilityRule {
   start_time: string;
   end_time: string;
   is_available: boolean;
+  custom_rate?: number | null;
 }
 
 interface TimeRange {
@@ -20,9 +21,15 @@ interface TimeRange {
   end_time: string;
 }
 
+interface DayData {
+  windows: TimeRange[];
+  custom_rate?: number | null;
+}
+
 interface AvailabilityManagerProps {
   initialRules?: AvailabilityRule[];
   onChange?: (rules: AvailabilityRule[]) => void;
+  baseRate?: number;
 }
 
 const DAYS = [
@@ -37,39 +44,45 @@ const DAYS = [
 
 export const AvailabilityManager = ({ 
   initialRules = [], 
-  onChange 
+  onChange,
+  baseRate = 0
 }: AvailabilityManagerProps) => {
   const groupByDay = (rules: AvailabilityRule[]) => {
-    const grouped: Record<number, TimeRange[]> = {};
+    const grouped: Record<number, DayData> = {};
     for (let i = 0; i < 7; i++) {
-      grouped[i] = [];
+      grouped[i] = { windows: [], custom_rate: null };
     }
     
     rules.forEach(rule => {
-      grouped[rule.day_of_week].push({
+      grouped[rule.day_of_week].windows.push({
         start_time: rule.start_time,
         end_time: rule.end_time,
       });
+      // Use the custom_rate from any rule for that day (they should all be the same)
+      if (rule.custom_rate !== undefined && rule.custom_rate !== null) {
+        grouped[rule.day_of_week].custom_rate = rule.custom_rate;
+      }
     });
     
     return grouped;
   };
 
-  const [availabilityWindows, setAvailabilityWindows] = useState<Record<number, TimeRange[]>>(groupByDay(initialRules));
+  const [availabilityWindows, setAvailabilityWindows] = useState<Record<number, DayData>>(groupByDay(initialRules));
 
   useEffect(() => {
     const rules: AvailabilityRule[] = [];
     
-    Object.entries(availabilityWindows).forEach(([day, windows]) => {
+    Object.entries(availabilityWindows).forEach(([day, dayData]) => {
       const dayIndex = Number(day);
       
-      if (windows.length > 0) {
-        windows.forEach(window => {
+      if (dayData.windows.length > 0) {
+        dayData.windows.forEach(window => {
           rules.push({
             day_of_week: dayIndex,
             start_time: window.start_time,
             end_time: window.end_time,
             is_available: true,
+            custom_rate: dayData.custom_rate,
           });
         });
       }
@@ -81,18 +94,18 @@ export const AvailabilityManager = ({
   }, [availabilityWindows, onChange]);
 
   const toggleDay = (dayIndex: number) => {
-    const windows = availabilityWindows[dayIndex];
-    if (windows.length > 0) {
-      // Turn off - clear all windows
+    const dayData = availabilityWindows[dayIndex];
+    if (dayData.windows.length > 0) {
+      // Turn off - clear all windows but preserve custom_rate
       setAvailabilityWindows({
         ...availabilityWindows,
-        [dayIndex]: []
+        [dayIndex]: { windows: [], custom_rate: null }
       });
     } else {
-      // Turn on - add default 9-5
+      // Turn on - add default 9-5, preserve custom_rate
       setAvailabilityWindows({
         ...availabilityWindows,
-        [dayIndex]: [{ start_time: '09:00', end_time: '17:00' }]
+        [dayIndex]: { ...dayData, windows: [{ start_time: '09:00', end_time: '17:00' }] }
       });
     }
   };
@@ -100,17 +113,24 @@ export const AvailabilityManager = ({
   const set24Hours = (dayIndex: number) => {
     setAvailabilityWindows({
       ...availabilityWindows,
-      [dayIndex]: [{ start_time: '00:00', end_time: '23:59' }]
+      [dayIndex]: { ...availabilityWindows[dayIndex], windows: [{ start_time: '00:00', end_time: '23:59' }] }
+    });
+  };
+
+  const setCustomRate = (dayIndex: number, rate: number | null) => {
+    setAvailabilityWindows({
+      ...availabilityWindows,
+      [dayIndex]: { ...availabilityWindows[dayIndex], custom_rate: rate }
     });
   };
 
   const addTimeSlot = (dayIndex: number) => {
-    const windows = availabilityWindows[dayIndex];
+    const dayData = availabilityWindows[dayIndex];
     const newWindow: TimeRange = { start_time: '09:00', end_time: '17:00' };
     
     // Find non-overlapping slot
-    if (windows.length > 0) {
-      const sortedWindows = [...windows].sort((a, b) => 
+    if (dayData.windows.length > 0) {
+      const sortedWindows = [...dayData.windows].sort((a, b) => 
         timeToMinutes(a.start_time) - timeToMinutes(b.start_time)
       );
       const lastWindow = sortedWindows[sortedWindows.length - 1];
@@ -124,20 +144,25 @@ export const AvailabilityManager = ({
 
     setAvailabilityWindows({
       ...availabilityWindows,
-      [dayIndex]: [...windows, newWindow].sort((a, b) => 
-        timeToMinutes(a.start_time) - timeToMinutes(b.start_time))
+      [dayIndex]: { 
+        ...dayData, 
+        windows: [...dayData.windows, newWindow].sort((a, b) => 
+          timeToMinutes(a.start_time) - timeToMinutes(b.start_time))
+      }
     });
   };
 
   const removeTimeSlot = (dayIndex: number, windowIndex: number) => {
+    const dayData = availabilityWindows[dayIndex];
     setAvailabilityWindows({
       ...availabilityWindows,
-      [dayIndex]: availabilityWindows[dayIndex].filter((_, i) => i !== windowIndex)
+      [dayIndex]: { ...dayData, windows: dayData.windows.filter((_, i) => i !== windowIndex) }
     });
   };
 
   const updateTime = (dayIndex: number, windowIndex: number, field: 'start_time' | 'end_time', value: string) => {
-    const windows = [...availabilityWindows[dayIndex]];
+    const dayData = availabilityWindows[dayIndex];
+    const windows = [...dayData.windows];
     windows[windowIndex] = { ...windows[windowIndex], [field]: value };
     
     // Validate times
@@ -158,8 +183,11 @@ export const AvailabilityManager = ({
 
     setAvailabilityWindows({
       ...availabilityWindows,
-      [dayIndex]: windows.sort((a, b) => 
-        timeToMinutes(a.start_time) - timeToMinutes(b.start_time))
+      [dayIndex]: { 
+        ...dayData, 
+        windows: windows.sort((a, b) => 
+          timeToMinutes(a.start_time) - timeToMinutes(b.start_time))
+      }
     });
   };
 
@@ -200,9 +228,11 @@ export const AvailabilityManager = ({
   return (
     <div className="space-y-3">
       {DAYS.map((day, dayIndex) => {
-        const windows = availabilityWindows[dayIndex];
+        const dayData = availabilityWindows[dayIndex];
+        const windows = dayData.windows;
         const isAvailable = windows.length > 0;
         const isFullDay = is24Hours(windows);
+        const hasCustomRate = dayData.custom_rate !== null && dayData.custom_rate !== undefined;
 
         return (
           <Card 
@@ -228,29 +258,88 @@ export const AvailabilityManager = ({
               </div>
               
               <div className="flex items-center gap-2">
+                {isAvailable && hasCustomRate && (
+                  <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-700 dark:text-green-400">
+                    <DollarSign className="h-3 w-3 mr-0.5" />
+                    ${dayData.custom_rate}/hr
+                  </Badge>
+                )}
                 {isAvailable && (
-                  <>
-                    <Badge 
-                      variant={isFullDay ? "default" : "secondary"} 
-                      className="text-xs cursor-pointer"
-                      onClick={() => set24Hours(dayIndex)}
-                    >
-                      {isFullDay ? (
-                        <>
-                          <Clock className="h-3 w-3 mr-1" />
-                          24/7
-                        </>
-                      ) : (
-                        'Set 24h'
-                      )}
-                    </Badge>
-                  </>
+                  <Badge 
+                    variant={isFullDay ? "default" : "secondary"} 
+                    className="text-xs cursor-pointer"
+                    onClick={() => set24Hours(dayIndex)}
+                  >
+                    {isFullDay ? (
+                      <>
+                        <Clock className="h-3 w-3 mr-1" />
+                        24/7
+                      </>
+                    ) : (
+                      'Set 24h'
+                    )}
+                  </Badge>
                 )}
                 {!isAvailable && (
                   <span className="text-sm text-muted-foreground">Closed</span>
                 )}
               </div>
             </div>
+
+            {/* Custom Rate for Day */}
+            {isAvailable && (
+              <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-dashed">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Custom rate for {day.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {hasCustomRate ? (
+                      <>
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            value={dayData.custom_rate || ''}
+                            onChange={(e) => setCustomRate(dayIndex, e.target.value ? parseFloat(e.target.value) : null)}
+                            className="w-20 pl-5 h-8 text-sm"
+                            placeholder="0"
+                          />
+                        </div>
+                        <span className="text-xs text-muted-foreground">/hr</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-xs"
+                          onClick={() => setCustomRate(dayIndex, null)}
+                        >
+                          Reset
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => setCustomRate(dayIndex, baseRate || 5)}
+                      >
+                        Set custom rate
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                {!hasCustomRate && baseRate > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Using base rate: ${baseRate}/hr
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Time Slots */}
             {isAvailable && !isFullDay && (
@@ -319,16 +408,16 @@ export const AvailabilityManager = ({
       })}
 
       {/* Quick Actions */}
-      <div className="flex gap-2 pt-2">
+      <div className="flex flex-wrap gap-2 pt-2">
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="flex-1"
+          className="flex-1 min-w-[120px]"
           onClick={() => {
-            const allDays: Record<number, TimeRange[]> = {};
+            const allDays: Record<number, DayData> = {};
             for (let i = 0; i < 7; i++) {
-              allDays[i] = [{ start_time: '09:00', end_time: '17:00' }];
+              allDays[i] = { windows: [{ start_time: '09:00', end_time: '17:00' }], custom_rate: null };
             }
             setAvailabilityWindows(allDays);
             toast.success('Set weekdays 9 AM - 5 PM');
@@ -340,11 +429,11 @@ export const AvailabilityManager = ({
           type="button"
           variant="outline"
           size="sm"
-          className="flex-1"
+          className="flex-1 min-w-[120px]"
           onClick={() => {
-            const allDays: Record<number, TimeRange[]> = {};
+            const allDays: Record<number, DayData> = {};
             for (let i = 0; i < 7; i++) {
-              allDays[i] = [{ start_time: '00:00', end_time: '23:59' }];
+              allDays[i] = { windows: [{ start_time: '00:00', end_time: '23:59' }], custom_rate: null };
             }
             setAvailabilityWindows(allDays);
             toast.success('Set available 24/7');
@@ -352,6 +441,26 @@ export const AvailabilityManager = ({
         >
           Available 24/7
         </Button>
+        {baseRate > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="flex-1 min-w-[120px]"
+            onClick={() => {
+              // Set weekend premium (Sat/Sun at 1.5x)
+              const weekendRate = Math.round(baseRate * 1.5 * 100) / 100;
+              const updatedDays = { ...availabilityWindows };
+              updatedDays[0] = { ...updatedDays[0], custom_rate: weekendRate }; // Sunday
+              updatedDays[6] = { ...updatedDays[6], custom_rate: weekendRate }; // Saturday
+              setAvailabilityWindows(updatedDays);
+              toast.success(`Weekend rate set to $${weekendRate}/hr`);
+            }}
+          >
+            <DollarSign className="h-3 w-3 mr-1" />
+            Weekend Premium
+          </Button>
+        )}
       </div>
     </div>
   );
