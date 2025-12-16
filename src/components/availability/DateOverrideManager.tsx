@@ -61,6 +61,11 @@ export const DateOverrideManager = ({
   const [overrideMode, setOverrideMode] = useState<OverrideMode>('block');
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [previewMonth, setPreviewMonth] = useState<Date>(new Date());
+  
+  // Drag selection state
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<string | null>(null);
+  const [dragEnd, setDragEnd] = useState<string | null>(null);
 
   // Get dates for calendar preview
   const { blockedDateSet, availableDateSet } = useMemo(() => {
@@ -112,6 +117,57 @@ export const DateOverrideManager = ({
     
     return days;
   }, [previewMonth]);
+
+  // Get dates in drag range
+  const dragRangeDates = useMemo(() => {
+    if (!dragStart || !dragEnd) return new Set<string>();
+    
+    const start = new Date(dragStart + 'T00:00:00');
+    const end = new Date(dragEnd + 'T00:00:00');
+    const [from, to] = start <= end ? [start, end] : [end, start];
+    
+    const dates = eachDayOfInterval({ start: from, end: to });
+    return new Set(dates.map(d => format(d, 'yyyy-MM-dd')));
+  }, [dragStart, dragEnd]);
+
+  // Handle drag selection completion
+  const applyDragSelection = () => {
+    if (!dragStart || !dragEnd) return;
+    
+    const start = new Date(dragStart + 'T00:00:00');
+    const end = new Date(dragEnd + 'T00:00:00');
+    const [from, to] = start <= end ? [start, end] : [end, start];
+    
+    const datesToAdd = eachDayOfInterval({ start: from, end: to });
+    const isAvailable = overrideMode !== 'block';
+    const hasCustomHours = overrideMode === 'custom_hours' || overrideMode === 'make_available';
+
+    const newOverrides = { ...overrides };
+    let addedCount = 0;
+
+    datesToAdd.forEach(date => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      if (isBefore(date, startOfDay(new Date()))) return; // Skip past dates
+      
+      if (!overrides[dateStr]) {
+        newOverrides[dateStr] = {
+          is_available: isAvailable,
+          windows: hasCustomHours ? [{ start_time: '09:00', end_time: '17:00' }] : []
+        };
+        addedCount++;
+      }
+    });
+
+    if (addedCount > 0) {
+      setOverrides(newOverrides);
+      const messages: Record<OverrideMode, string> = {
+        block: addedCount === 1 ? 'Date blocked' : `${addedCount} dates blocked`,
+        make_available: addedCount === 1 ? 'Date marked as available' : `${addedCount} dates marked as available`,
+        custom_hours: addedCount === 1 ? 'Custom hours added' : `Custom hours added for ${addedCount} dates`
+      };
+      toast.success(messages[overrideMode]);
+    }
+  };
 
   useEffect(() => {
     const result: DateOverride[] = [];
@@ -310,7 +366,17 @@ export const DateOverrideManager = ({
           </div>
           
           {/* Calendar grid */}
-          <div className="grid grid-cols-7 gap-1">
+          <div 
+            className="grid grid-cols-7 gap-1 select-none"
+            onMouseLeave={() => {
+              if (isDragging) {
+                applyDragSelection();
+                setIsDragging(false);
+                setDragStart(null);
+                setDragEnd(null);
+              }
+            }}
+          >
             {calendarDays.map(({ date, isCurrentMonth }, index) => {
               const dateStr = format(date, 'yyyy-MM-dd');
               const isBlocked = blockedDateSet.has(dateStr);
@@ -319,35 +385,39 @@ export const DateOverrideManager = ({
               const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
               const hasOverride = isBlocked || isAvailable;
               const isClickable = isCurrentMonth && !isPast;
+              const isInDragRange = dragRangeDates.has(dateStr) && !isPast && isCurrentMonth;
               
-              const handleDateClick = () => {
+              const handleMouseDown = (e: React.MouseEvent) => {
+                e.preventDefault();
                 if (!isClickable) return;
                 
-                if (hasOverride) {
-                  // Remove existing override
+                // If clicking on existing override, remove it (single click behavior)
+                if (hasOverride && !isDragging) {
                   const newOverrides = { ...overrides };
                   delete newOverrides[dateStr];
                   setOverrides(newOverrides);
                   toast.success('Override removed');
-                } else {
-                  // Add new override based on current mode
-                  const isAvailableMode = overrideMode !== 'block';
-                  const hasCustomHours = overrideMode === 'custom_hours' || overrideMode === 'make_available';
-                  
-                  setOverrides({
-                    ...overrides,
-                    [dateStr]: {
-                      is_available: isAvailableMode,
-                      windows: hasCustomHours ? [{ start_time: '09:00', end_time: '17:00' }] : []
-                    }
-                  });
-                  
-                  const messages: Record<OverrideMode, string> = {
-                    block: 'Date blocked',
-                    make_available: 'Date marked as available',
-                    custom_hours: 'Custom hours added'
-                  };
-                  toast.success(messages[overrideMode]);
+                  return;
+                }
+                
+                // Start drag selection
+                setIsDragging(true);
+                setDragStart(dateStr);
+                setDragEnd(dateStr);
+              };
+              
+              const handleMouseEnter = () => {
+                if (isDragging && isClickable && !hasOverride) {
+                  setDragEnd(dateStr);
+                }
+              };
+              
+              const handleMouseUp = () => {
+                if (isDragging) {
+                  applyDragSelection();
+                  setIsDragging(false);
+                  setDragStart(null);
+                  setDragEnd(null);
                 }
               };
               
@@ -356,7 +426,9 @@ export const DateOverrideManager = ({
                   key={index}
                   type="button"
                   disabled={!isClickable}
-                  onClick={handleDateClick}
+                  onMouseDown={handleMouseDown}
+                  onMouseEnter={handleMouseEnter}
+                  onMouseUp={handleMouseUp}
                   className={cn(
                     "aspect-square flex items-center justify-center text-sm rounded-md transition-all duration-200",
                     !isCurrentMonth && "opacity-30",
@@ -364,21 +436,23 @@ export const DateOverrideManager = ({
                     isToday && "ring-1 ring-primary ring-offset-1 ring-offset-background",
                     isBlocked && "bg-destructive/20 text-destructive-foreground dark:bg-destructive/30",
                     isAvailable && "bg-green-500/20 text-green-700 dark:text-green-400",
-                    isClickable && !hasOverride && "hover:bg-muted cursor-pointer",
+                    isInDragRange && !hasOverride && overrideMode === 'block' && "bg-destructive/40",
+                    isInDragRange && !hasOverride && overrideMode !== 'block' && "bg-green-500/40",
+                    isClickable && !hasOverride && !isInDragRange && "hover:bg-muted cursor-pointer",
                     isClickable && hasOverride && "hover:opacity-70 cursor-pointer"
                   )}
                   title={
                     !isClickable ? undefined :
                     hasOverride ? 'Click to remove override' :
-                    overrideMode === 'block' ? 'Click to block this date' :
-                    overrideMode === 'make_available' ? 'Click to make available' :
-                    'Click to add custom hours'
+                    'Click or drag to select dates'
                   }
                 >
                   <span className={cn(
                     "w-7 h-7 flex items-center justify-center rounded-full text-xs transition-transform",
                     isBlocked && "bg-destructive text-destructive-foreground font-medium",
                     isAvailable && "bg-green-500 text-white font-medium",
+                    isInDragRange && !hasOverride && overrideMode === 'block' && "bg-destructive text-destructive-foreground font-medium",
+                    isInDragRange && !hasOverride && overrideMode !== 'block' && "bg-green-500 text-white font-medium",
                     isClickable && "hover:scale-110"
                   )}>
                     {format(date, 'd')}
@@ -390,7 +464,9 @@ export const DateOverrideManager = ({
           
           {/* Mode indicator for clicking */}
           <div className="text-xs text-muted-foreground text-center py-2 bg-muted/30 rounded-lg">
-            Click dates to {overrideMode === 'block' ? 'block' : overrideMode === 'make_available' ? 'make available' : 'add custom hours'} • Click existing overrides to remove
+            {isDragging 
+              ? `Drag to select ${dragRangeDates.size} date${dragRangeDates.size !== 1 ? 's' : ''} • Release to apply`
+              : `Click or drag dates to ${overrideMode === 'block' ? 'block' : overrideMode === 'make_available' ? 'make available' : 'add custom hours'}`}
           </div>
           
           {/* Legend */}
