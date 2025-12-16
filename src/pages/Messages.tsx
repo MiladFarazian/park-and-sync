@@ -28,6 +28,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from '@/components/ui/drawer';
+import RequireAuth from '@/components/auth/RequireAuth';
 
 // Memoized message item component for performance
 const MessageItem = memo(({ message, isMe }: { message: Message; isMe: boolean }) => {
@@ -482,7 +483,7 @@ interface BookingContact {
   booking_date: string;
 }
 
-const Messages = () => {
+const MessagesContent = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const { conversations, loading, markAsRead } = useMessages();
@@ -839,6 +840,14 @@ const Messages = () => {
         </Dialog>
       )}
     </div>
+  );
+};
+
+const Messages = () => {
+  return (
+    <RequireAuth>
+      <MessagesContent />
+    </RequireAuth>
   );
 };
 
