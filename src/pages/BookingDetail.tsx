@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, Plus, AlertTriangle, CheckCircle2, Copy } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, Plus, AlertTriangle, CheckCircle2, Copy, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { format, differenceInMinutes } from 'date-fns';
 import { toast } from 'sonner';
 import { loadStripe } from '@stripe/stripe-js';
@@ -619,7 +620,19 @@ const BookingDetail = () => {
               <span className="font-medium">${booking.subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Platform Fee</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-muted-foreground flex items-center gap-1 cursor-help">
+                      Service Fee
+                      <Info className="h-3.5 w-3.5" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[200px]">
+                    <p className="text-xs">20% service fee (minimum $1) helps cover platform operations and support.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <span className="font-medium">${booking.platform_fee.toFixed(2)}</span>
             </div>
             {booking.overstay_charge_amount > 0 && (
@@ -870,7 +883,19 @@ const BookingDetail = () => {
                     <span className="font-medium">${extensionCost.subtotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Platform Fee (15%)</span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-muted-foreground flex items-center gap-1 cursor-help">
+                            Service Fee
+                            <Info className="h-3.5 w-3.5" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[200px]">
+                          <p className="text-xs">20% service fee (minimum $1) helps cover platform operations and support.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     <span className="font-medium">${extensionCost.platformFee.toFixed(2)}</span>
                   </div>
                   <Separator />
