@@ -17,6 +17,7 @@ const EditSpotAvailability = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [spotTitle, setSpotTitle] = useState('');
+  const [spotBaseRate, setSpotBaseRate] = useState(0);
   const [activeTab, setActiveTab] = useState('weekly');
 
   const [user, setUser] = useState<any>(null);
@@ -42,7 +43,7 @@ const EditSpotAvailability = () => {
         // Fetch spot details
         const { data: spotData, error: spotError } = await supabase
           .from('spots')
-          .select('title, host_id')
+          .select('title, host_id, hourly_rate')
           .eq('id', spotId)
           .single();
 
@@ -56,6 +57,7 @@ const EditSpotAvailability = () => {
         }
 
         setSpotTitle(spotData.title);
+        setSpotBaseRate(spotData.hourly_rate || 0);
 
         // Fetch existing availability rules
         const { data: rulesData, error: rulesError } = await supabase
@@ -71,6 +73,7 @@ const EditSpotAvailability = () => {
             start_time: rule.start_time,
             end_time: rule.end_time,
             is_available: rule.is_available ?? true,
+            custom_rate: rule.custom_rate,
           })));
         }
 
@@ -90,6 +93,7 @@ const EditSpotAvailability = () => {
             start_time: override.start_time || undefined,
             end_time: override.end_time || undefined,
             is_available: override.is_available,
+            custom_rate: override.custom_rate,
           })));
         }
       } catch (error) {
@@ -126,6 +130,7 @@ const EditSpotAvailability = () => {
           start_time: rule.start_time,
           end_time: rule.end_time,
           is_available: rule.is_available,
+          custom_rate: rule.custom_rate || null,
         }));
 
         const { error: insertRulesError } = await supabase
@@ -152,6 +157,7 @@ const EditSpotAvailability = () => {
           end_time: override.end_time || null,
           is_available: override.is_available,
           reason: null,
+          custom_rate: override.custom_rate || null,
         }));
 
         const { error: insertOverridesError } = await supabase
@@ -236,12 +242,13 @@ const EditSpotAvailability = () => {
                 <div className="mb-4">
                   <h3 className="font-semibold mb-1">Recurring Weekly Schedule</h3>
                   <p className="text-sm text-muted-foreground">
-                    Set your availability windows for each day. Drag sliders to adjust hours.
+                    Set your availability windows and custom pricing for each day.
                   </p>
                 </div>
                 <AvailabilityManager
                   initialRules={availabilityRules}
                   onChange={setAvailabilityRules}
+                  baseRate={spotBaseRate}
                 />
               </TabsContent>
 
@@ -249,12 +256,13 @@ const EditSpotAvailability = () => {
                 <div className="mb-4">
                   <h3 className="font-semibold mb-1">Date Override</h3>
                   <p className="text-sm text-muted-foreground">
-                    Override your weekly schedule for specific dates
+                    Override your weekly schedule and pricing for specific dates
                   </p>
                 </div>
                 <DateOverrideManager
                   initialOverrides={dateOverrides}
                   onChange={setDateOverrides}
+                  baseRate={spotBaseRate}
                 />
               </TabsContent>
             </Tabs>
