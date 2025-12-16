@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { Plus, Trash2, Clock, Sun, DollarSign } from 'lucide-react';
+import { Plus, Trash2, Clock, Sun, DollarSign, Briefcase, CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { AvailabilityTimePicker } from './AvailabilityTimePicker';
 
 export interface AvailabilityRule {
   day_of_week: number;
@@ -213,14 +214,6 @@ export const AvailabilityManager = ({
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   };
 
-  const formatTimeDisplay = (time: string): string => {
-    const [hours, minutes] = time.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
-
   const is24Hours = (windows: TimeRange[]) => {
     return windows.length === 1 && windows[0].start_time === '00:00' && windows[0].end_time === '23:59';
   };
@@ -238,66 +231,70 @@ export const AvailabilityManager = ({
           <Card 
             key={dayIndex} 
             className={cn(
-              "p-4 transition-all",
+              "p-3 sm:p-4 transition-all",
               isAvailable ? "border-primary/30 bg-primary/5" : "border-border"
             )}
           >
             {/* Day Header */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <Switch 
                   checked={isAvailable}
                   onCheckedChange={() => toggleDay(dayIndex)}
                 />
                 <span className={cn(
-                  "font-medium",
+                  "font-medium text-sm sm:text-base",
                   !isAvailable && "text-muted-foreground"
                 )}>
-                  {day.name}
+                  <span className="sm:hidden">{day.short}</span>
+                  <span className="hidden sm:inline">{day.name}</span>
                 </span>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 {isAvailable && hasCustomRate && (
-                  <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-700 dark:text-green-400">
+                  <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-700 dark:text-green-400 px-1.5 sm:px-2">
                     <DollarSign className="h-3 w-3 mr-0.5" />
-                    ${dayData.custom_rate}/hr
+                    ${dayData.custom_rate}
                   </Badge>
                 )}
                 {isAvailable && (
                   <Badge 
                     variant={isFullDay ? "default" : "secondary"} 
-                    className="text-xs cursor-pointer"
+                    className="text-xs cursor-pointer px-1.5 sm:px-2"
                     onClick={() => set24Hours(dayIndex)}
                   >
                     {isFullDay ? (
                       <>
-                        <Clock className="h-3 w-3 mr-1" />
-                        24/7
+                        <Clock className="h-3 w-3 sm:mr-1" />
+                        <span className="hidden sm:inline">24/7</span>
                       </>
                     ) : (
-                      'Set 24h'
+                      <span className="text-xs">24h</span>
                     )}
                   </Badge>
                 )}
                 {!isAvailable && (
-                  <span className="text-sm text-muted-foreground">Closed</span>
+                  <span className="text-xs sm:text-sm text-muted-foreground">Closed</span>
                 )}
               </div>
             </div>
 
-            {/* Custom Rate for Day */}
+            {/* Custom Rate for Day - Mobile Optimized */}
             {isAvailable && (
-              <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-dashed">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-sm">
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Custom rate for {day.name}</span>
+              <div className="mt-3 p-2.5 sm:p-3 rounded-lg bg-muted/50 border border-dashed">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm">
+                    <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground">
+                      <span className="sm:hidden">Custom rate</span>
+                      <span className="hidden sm:inline">Custom rate for {day.name}</span>
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     {hasCustomRate ? (
-                      <>
-                        <div className="relative">
+                      <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                        <div className="relative flex-1 sm:flex-none">
                           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                           <Input
                             type="number"
@@ -305,27 +302,27 @@ export const AvailabilityManager = ({
                             step="0.5"
                             value={dayData.custom_rate || ''}
                             onChange={(e) => setCustomRate(dayIndex, e.target.value ? parseFloat(e.target.value) : null)}
-                            className="w-20 pl-5 h-8 text-sm"
+                            className="w-full sm:w-20 pl-5 h-8 text-sm"
                             placeholder="0"
                           />
                         </div>
-                        <span className="text-xs text-muted-foreground">/hr</span>
+                        <span className="text-xs text-muted-foreground shrink-0">/hr</span>
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="h-8 px-2 text-xs"
+                          className="h-8 px-2 text-xs shrink-0"
                           onClick={() => setCustomRate(dayIndex, null)}
                         >
                           Reset
                         </Button>
-                      </>
+                      </div>
                     ) : (
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="h-8 text-xs"
+                        className="h-8 text-xs w-full sm:w-auto"
                         onClick={() => setCustomRate(dayIndex, baseRate || 5)}
                       >
                         Set custom rate
@@ -334,7 +331,7 @@ export const AvailabilityManager = ({
                   </div>
                 </div>
                 {!hasCustomRate && baseRate > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground mt-1.5">
                     Using base rate: ${baseRate}/hr
                   </p>
                 )}
@@ -343,17 +340,24 @@ export const AvailabilityManager = ({
 
             {/* Time Slots */}
             {isAvailable && !isFullDay && (
-              <div className="mt-4 space-y-3">
+              <div className="mt-3 sm:mt-4 space-y-2 sm:space-y-3">
                 {windows.map((window, windowIndex) => (
                   <div 
                     key={windowIndex} 
-                    className="p-3 rounded-lg bg-background border"
+                    className="p-2.5 sm:p-3 rounded-lg bg-background border"
                   >
-                    <div className="flex items-center justify-between mb-2 sm:mb-0">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        <span className="sm:hidden">Time slot {windowIndex + 1}</span>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <AvailabilityTimePicker
+                        value={window.start_time}
+                        onChange={(value) => updateTime(dayIndex, windowIndex, 'start_time', value)}
+                        label="Start Time"
+                      />
+                      <span className="text-muted-foreground text-xs sm:text-sm shrink-0">to</span>
+                      <AvailabilityTimePicker
+                        value={window.end_time}
+                        onChange={(value) => updateTime(dayIndex, windowIndex, 'end_time', value)}
+                        label="End Time"
+                      />
                       <Button
                         type="button"
                         variant="ghost"
@@ -363,22 +367,6 @@ export const AvailabilityManager = ({
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="time"
-                        value={window.start_time}
-                        onChange={(e) => updateTime(dayIndex, windowIndex, 'start_time', e.target.value)}
-                        className="flex-1 min-w-0 text-center"
-                      />
-                      <span className="text-muted-foreground text-sm shrink-0">to</span>
-                      <Input
-                        type="time"
-                        value={window.end_time}
-                        onChange={(e) => updateTime(dayIndex, windowIndex, 'end_time', e.target.value)}
-                        className="flex-1 min-w-0 text-center"
-                      />
                     </div>
                   </div>
                 ))}
@@ -398,7 +386,7 @@ export const AvailabilityManager = ({
 
             {/* 24h display */}
             {isAvailable && isFullDay && (
-              <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="mt-3 flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                 <Sun className="h-4 w-4" />
                 <span>Available all day (12:00 AM - 11:59 PM)</span>
               </div>
@@ -407,13 +395,13 @@ export const AvailabilityManager = ({
         );
       })}
 
-      {/* Quick Actions */}
-      <div className="flex flex-wrap gap-2 pt-2">
+      {/* Quick Actions - Mobile Optimized */}
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 pt-2">
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="flex-1 min-w-[120px]"
+          className="h-10 sm:h-9 sm:flex-1 sm:min-w-[140px]"
           onClick={() => {
             const allDays: Record<number, DayData> = {};
             for (let i = 0; i < 7; i++) {
@@ -423,13 +411,14 @@ export const AvailabilityManager = ({
             toast.success('Set weekdays 9 AM - 5 PM');
           }}
         >
-          Business Hours (9-5)
+          <Briefcase className="h-4 w-4 mr-1.5 shrink-0" />
+          <span className="text-xs sm:text-sm truncate">9-5</span>
         </Button>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="flex-1 min-w-[120px]"
+          className="h-10 sm:h-9 sm:flex-1 sm:min-w-[140px]"
           onClick={() => {
             const allDays: Record<number, DayData> = {};
             for (let i = 0; i < 7; i++) {
@@ -439,14 +428,15 @@ export const AvailabilityManager = ({
             toast.success('Set available 24/7');
           }}
         >
-          Available 24/7
+          <CalendarClock className="h-4 w-4 mr-1.5 shrink-0" />
+          <span className="text-xs sm:text-sm truncate">24/7</span>
         </Button>
         {baseRate > 0 && (
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="flex-1 min-w-[120px]"
+            className="h-10 sm:h-9 col-span-2 sm:col-span-1 sm:flex-1 sm:min-w-[140px]"
             onClick={() => {
               // Set weekend premium (Sat/Sun at 1.5x)
               const weekendRate = Math.round(baseRate * 1.5 * 100) / 100;
@@ -457,8 +447,8 @@ export const AvailabilityManager = ({
               toast.success(`Weekend rate set to $${weekendRate}/hr`);
             }}
           >
-            <DollarSign className="h-3 w-3 mr-1" />
-            Weekend Premium
+            <DollarSign className="h-4 w-4 mr-1.5 shrink-0" />
+            <span className="text-xs sm:text-sm truncate">Weekend +50%</span>
           </Button>
         )}
       </div>
