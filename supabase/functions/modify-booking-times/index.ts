@@ -89,12 +89,13 @@ Deno.serve(async (req) => {
       throw new Error('Spot is not available for the requested times');
     }
 
-    // Calculate new costs
+    // Calculate new costs - host earns their rate, platform adds 20% or $1 min
     const durationMs = newEnd.getTime() - newStart.getTime();
     const newTotalHours = durationMs / (1000 * 60 * 60);
-    const newSubtotal = booking.spots.hourly_rate * newTotalHours;
-    const newPlatformFee = newSubtotal * 0.15;
-    const newTotalAmount = newSubtotal + newPlatformFee;
+    const hostEarnings = booking.spots.hourly_rate * newTotalHours;
+    const newPlatformFee = Math.max(hostEarnings * 0.20, 1.00);
+    const newSubtotal = hostEarnings;
+    const newTotalAmount = Math.round((hostEarnings + newPlatformFee) * 100) / 100;
 
     const priceDifference = newTotalAmount - booking.total_amount;
     const absoluteDifference = Math.abs(priceDifference);

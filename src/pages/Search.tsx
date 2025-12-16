@@ -12,6 +12,7 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { TimePicker } from '@/components/ui/time-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
+import { calculateDriverPrice } from '@/lib/pricing';
 
 const Search = () => {
   const navigate = useNavigate();
@@ -153,7 +154,7 @@ const Search = () => {
         id: spot.id,
         title: spot.title,
         address: spot.address,
-        hourlyRate: parseFloat(spot.hourly_rate),
+        hourlyRate: calculateDriverPrice(parseFloat(spot.hourly_rate)),
         rating: parseFloat(spot.profiles?.rating || 4.5),
         reviews: spot.profiles?.review_count || 0,
         status: 'Available Now',

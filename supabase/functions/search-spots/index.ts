@@ -182,12 +182,18 @@ serve(async (req) => {
             }
           }
 
+          // Calculate driver-facing price (host rate + 20% or $1 min)
+          const hostRate = parseFloat(spot.hourly_rate);
+          const platformFee = Math.max(hostRate * 0.20, 1.00);
+          const driverPrice = Math.round((hostRate + platformFee) * 100) / 100;
+
           availableSpots.push({ 
             ...spot, 
             distance,
             spot_rating: Number(avgRating.toFixed(2)),
             spot_review_count: reviewCount,
-            user_booking: userBooking
+            user_booking: userBooking,
+            driver_hourly_rate: driverPrice
           });
         }
       }
