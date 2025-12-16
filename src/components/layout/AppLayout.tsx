@@ -22,8 +22,10 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   const isHomePage = location.pathname === '/';
   
   // Pages that need full-width/height without container padding
-  const isFullScreenPage = location.pathname === '/explore' || location.pathname === '/messages';
-  
+  const isFullScreenPage =
+    location.pathname === '/explore' ||
+    location.pathname === '/messages' ||
+    location.pathname === '/reviews';
   // Initialize notifications hook to set up realtime listeners
   useNotifications();
   
