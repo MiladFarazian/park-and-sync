@@ -111,10 +111,9 @@ export const AvailabilityTimePicker = ({ value, onChange, label }: AvailabilityT
       <Button
         type="button"
         variant="outline"
-        className="flex-1 min-w-0 justify-center text-sm h-10"
+        className="flex-1 min-w-0 justify-center text-xs sm:text-sm h-10 px-2"
         onClick={() => setIsOpen(true)}
       >
-        <Clock className="h-3.5 w-3.5 mr-1.5 shrink-0" />
         <span className="truncate">{formatDisplay(value)}</span>
       </Button>
 
