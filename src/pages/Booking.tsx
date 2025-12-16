@@ -1,13 +1,14 @@
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle, Loader2, Info } from 'lucide-react';
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Calendar } from '@/components/ui/calendar';
 import { TimePicker } from '@/components/ui/time-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -956,7 +957,19 @@ const BookingContent = () => {
                 <span className="font-medium">${pricing.subtotal}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Service fee</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-muted-foreground flex items-center gap-1 cursor-help">
+                        Service fee
+                        <Info className="h-3 w-3" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs max-w-[200px]">This fee helps cover platform costs and ensures secure payments.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <span className="font-medium">${pricing.serviceFee}</span>
               </div>
               <Separator />
@@ -969,7 +982,7 @@ const BookingContent = () => {
         )}
 
         {/* Book Now Button */}
-        <div className="space-y-2 pb-24">
+        <div className="space-y-2 pb-6">
           {!serverAvailable.ok && startDateTime && endDateTime && (
             <div className="mb-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
               <p className="text-sm text-destructive font-medium">
