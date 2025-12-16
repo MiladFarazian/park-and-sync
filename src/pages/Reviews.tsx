@@ -228,7 +228,7 @@ const Reviews = () => {
   }
 
   return (
-    <div className="h-screen bg-background flex flex-col">
+    <div className="h-full min-h-0 bg-background flex flex-col">
       <header className="shrink-0 bg-background border-b">
         <div className="flex items-center gap-3 p-4">
           <Button variant="ghost" size="icon" onClick={() => navigate('/profile')}>
