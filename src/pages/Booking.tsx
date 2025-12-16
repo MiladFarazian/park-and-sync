@@ -703,7 +703,7 @@ const Booking = () => {
                 <span>{spot.address}</span>
               </div>
               <div className="flex items-center gap-3 text-sm mb-3">
-                <span className="font-bold">${calculateDriverPrice(spot.hourly_rate).toFixed(2)}/hr</span>
+                <span className="font-bold">${spot.hourly_rate.toFixed(2)}/hr</span>
               </div>
               <Separator className="my-3" />
               <div className="flex items-center gap-3">
