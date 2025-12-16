@@ -317,12 +317,3 @@ serve(async (req) => {
     });
   }
 });
-  } catch (error) {
-    console.error('Search error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    return new Response(JSON.stringify({ error: errorMessage }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-});
