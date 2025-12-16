@@ -365,7 +365,7 @@ const ListSpot = () => {
           latitude: coordinates.lat,
           longitude: coordinates.lng,
           location: `POINT(${coordinates.lng} ${coordinates.lat})`,
-          status: 'pending_approval',
+          status: 'active',
           is_covered: selectedAmenities.includes('covered'),
           is_secure: selectedAmenities.includes('security'),
           has_ev_charging: selectedAmenities.includes('ev'),
