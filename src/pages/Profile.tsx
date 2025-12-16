@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, Building2, ArrowRight, ExternalLink, X, Mail, CheckCircle2, Clock, Phone, MessageCircle } from 'lucide-react';
+import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, Building2, ArrowRight, ExternalLink, X, Mail, CheckCircle2, Clock, Phone, MessageCircle, Quote } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -63,6 +63,14 @@ const Profile = () => {
   const [phoneOtpSent, setPhoneOtpSent] = useState(false);
   const [phoneVerifyCooldown, setPhoneVerifyCooldown] = useState(0);
   const [hostRating, setHostRating] = useState<{ average: number; count: number } | null>(null);
+  const [userReviews, setUserReviews] = useState<Array<{
+    id: string;
+    rating: number;
+    comment: string | null;
+    created_at: string;
+    reviewer_name: string;
+    spot_category?: string;
+  }>>([]);
   const {
     register,
     handleSubmit,
@@ -137,6 +145,9 @@ const Profile = () => {
         fetchHostRating();
       }
 
+      // Fetch reviews based on mode
+      fetchUserReviews();
+
       // Check if user has listed any spots
       checkUserSpots();
     }
@@ -190,6 +201,127 @@ const Profile = () => {
       setHostRating({ average, count: reviews.length });
     } catch (error) {
       console.error('Error fetching host rating:', error);
+    }
+  };
+
+  const fetchUserReviews = async () => {
+    if (!user) return;
+    try {
+      setUserReviews([]);
+      
+      if (mode === 'driver') {
+        // Get reviews where user was the renter (driver reviews)
+        const { data: bookings, error: bookingsError } = await supabase
+          .from('bookings')
+          .select('id, spot_id, spots(category)')
+          .eq('renter_id', user.id);
+        
+        if (bookingsError) throw bookingsError;
+        if (!bookings || bookings.length === 0) return;
+
+        const bookingIds = bookings.map(b => b.id);
+        const bookingMap = new Map(bookings.map(b => [b.id, b]));
+
+        const { data: reviews, error: reviewsError } = await supabase
+          .from('reviews')
+          .select('id, rating, comment, created_at, reviewer_id, booking_id')
+          .in('booking_id', bookingIds)
+          .eq('reviewee_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        
+        if (reviewsError) throw reviewsError;
+        if (!reviews || reviews.length === 0) return;
+
+        // Get reviewer profiles
+        const reviewerIds = [...new Set(reviews.map(r => r.reviewer_id))];
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, first_name, last_name')
+          .in('user_id', reviewerIds);
+        
+        const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+
+        const formattedReviews = reviews.map(r => {
+          const reviewer = profileMap.get(r.reviewer_id);
+          const booking = bookingMap.get(r.booking_id);
+          return {
+            id: r.id,
+            rating: r.rating,
+            comment: r.comment,
+            created_at: r.created_at,
+            reviewer_name: reviewer?.first_name && reviewer?.last_name 
+              ? `${reviewer.first_name} ${reviewer.last_name.charAt(0)}.`
+              : 'Host',
+            spot_category: (booking?.spots as any)?.category || undefined
+          };
+        });
+
+        setUserReviews(formattedReviews);
+      } else {
+        // Host mode: Get reviews for spots owned by this user
+        const { data: spots, error: spotsError } = await supabase
+          .from('spots')
+          .select('id, category')
+          .eq('host_id', user.id);
+        
+        if (spotsError) throw spotsError;
+        if (!spots || spots.length === 0) return;
+
+        const spotIds = spots.map(s => s.id);
+        const spotMap = new Map(spots.map(s => [s.id, s]));
+
+        const { data: bookings, error: bookingsError } = await supabase
+          .from('bookings')
+          .select('id, spot_id')
+          .in('spot_id', spotIds);
+        
+        if (bookingsError) throw bookingsError;
+        if (!bookings || bookings.length === 0) return;
+
+        const bookingIds = bookings.map(b => b.id);
+        const bookingSpotMap = new Map(bookings.map(b => [b.id, b.spot_id]));
+
+        const { data: reviews, error: reviewsError } = await supabase
+          .from('reviews')
+          .select('id, rating, comment, created_at, reviewer_id, booking_id')
+          .in('booking_id', bookingIds)
+          .eq('reviewee_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        
+        if (reviewsError) throw reviewsError;
+        if (!reviews || reviews.length === 0) return;
+
+        // Get reviewer profiles
+        const reviewerIds = [...new Set(reviews.map(r => r.reviewer_id))];
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, first_name, last_name')
+          .in('user_id', reviewerIds);
+        
+        const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+
+        const formattedReviews = reviews.map(r => {
+          const reviewer = profileMap.get(r.reviewer_id);
+          const spotId = bookingSpotMap.get(r.booking_id);
+          const spot = spotId ? spotMap.get(spotId) : undefined;
+          return {
+            id: r.id,
+            rating: r.rating,
+            comment: r.comment,
+            created_at: r.created_at,
+            reviewer_name: reviewer?.first_name && reviewer?.last_name 
+              ? `${reviewer.first_name} ${reviewer.last_name.charAt(0)}.`
+              : 'Driver',
+            spot_category: spot?.category || undefined
+          };
+        });
+
+        setUserReviews(formattedReviews);
+      }
+    } catch (error) {
+      console.error('Error fetching user reviews:', error);
     }
   };
   const checkUserSpots = async () => {
@@ -686,6 +818,64 @@ const Profile = () => {
               </div>
             </div>
           </Card>}
+
+        {/* My Reviews Section */}
+        {userReviews.length > 0 && (
+          <Card className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Star className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg">My Reviews</h3>
+                <p className="text-sm text-muted-foreground">
+                  {mode === 'driver' ? 'Reviews from hosts' : 'Reviews from drivers'}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              {userReviews.map((review) => (
+                <div key={review.id} className="border-l-2 border-primary/30 pl-4 py-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-0.5">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`h-3.5 w-3.5 ${
+                              star <= review.rating
+                                ? 'fill-yellow-400 text-yellow-400'
+                                : 'text-muted-foreground/30'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-sm font-medium">{review.reviewer_name}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(review.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                  {review.comment && (
+                    <p className="text-sm text-muted-foreground flex items-start gap-2">
+                      <Quote className="h-3.5 w-3.5 text-primary/50 mt-0.5 flex-shrink-0" />
+                      <span className="italic">{review.comment}</span>
+                    </p>
+                  )}
+                  {review.spot_category && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {review.spot_category}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {/* Settings Menu */}
         <div className="space-y-3">
