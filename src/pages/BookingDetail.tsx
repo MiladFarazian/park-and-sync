@@ -336,16 +336,16 @@ const BookingDetail = () => {
   };
 
   const calculateExtensionCost = () => {
-    if (!booking || !newEndTime) return { subtotal: 0, platformFee: 0, total: 0, hours: 0 };
+    if (!booking || !newEndTime) return { subtotal: 0, serviceFee: 0, total: 0, hours: 0, driverHourlyRate: 0 };
     
     const extensionMinutes = differenceInMinutes(newEndTime, new Date(booking.end_at));
     const hours = extensionMinutes / 60;
     
-    if (hours <= 0) return { subtotal: 0, platformFee: 0, total: 0, hours: 0 };
+    if (hours <= 0) return { subtotal: 0, serviceFee: 0, total: 0, hours: 0, driverHourlyRate: 0 };
     
-    // Use new pricing: host earns their rate, platform adds 20% or $1 min
-    const { hostEarnings, platformFee, driverTotal } = calculateBookingTotal(booking.hourly_rate, hours);
-    return { subtotal: hostEarnings, platformFee, total: driverTotal, hours };
+    // Use new pricing: driver sees upcharged rate + service fee
+    const { driverHourlyRate, driverSubtotal, serviceFee, driverTotal } = calculateBookingTotal(booking.hourly_rate, hours);
+    return { subtotal: driverSubtotal, serviceFee, total: driverTotal, hours, driverHourlyRate };
   };
 
   const handleModifyTimes = async () => {
@@ -392,18 +392,18 @@ const BookingDetail = () => {
   };
 
   const calculateModifyCost = () => {
-    if (!booking || !modifyStartTime || !modifyEndTime) return { subtotal: 0, platformFee: 0, total: 0, hours: 0, difference: 0 };
+    if (!booking || !modifyStartTime || !modifyEndTime) return { subtotal: 0, serviceFee: 0, total: 0, hours: 0, difference: 0, driverHourlyRate: 0 };
     
     const durationMs = modifyEndTime.getTime() - modifyStartTime.getTime();
     const hours = durationMs / (1000 * 60 * 60);
     
-    if (hours <= 0) return { subtotal: 0, platformFee: 0, total: 0, hours: 0, difference: 0 };
+    if (hours <= 0) return { subtotal: 0, serviceFee: 0, total: 0, hours: 0, difference: 0, driverHourlyRate: 0 };
     
-    // Use new pricing: host earns their rate, platform adds 20% or $1 min
-    const { hostEarnings, platformFee, driverTotal } = calculateBookingTotal(booking.hourly_rate, hours);
+    // Use new pricing: driver sees upcharged rate + service fee
+    const { driverHourlyRate, driverSubtotal, serviceFee, driverTotal } = calculateBookingTotal(booking.hourly_rate, hours);
     const difference = driverTotal - booking.total_amount;
     
-    return { subtotal: hostEarnings, platformFee, total: driverTotal, hours, difference };
+    return { subtotal: driverSubtotal, serviceFee, total: driverTotal, hours, difference, driverHourlyRate };
   };
 
   if (loading) {
@@ -616,7 +616,11 @@ const BookingDetail = () => {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">{booking.total_hours}h × ${calculateDriverPrice(booking.hourly_rate).toFixed(2)}/hr</span>
-              <span className="font-medium">${booking.total_amount.toFixed(2)}</span>
+              <span className="font-medium">${booking.subtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Service fee</span>
+              <span className="font-medium">${booking.platform_fee.toFixed(2)}</span>
             </div>
             {booking.overstay_charge_amount > 0 && (
               <div className="flex justify-between text-sm">
@@ -862,8 +866,12 @@ const BookingDetail = () => {
                 <Separator />
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Extension ({extensionCost.hours.toFixed(1)}h × ${booking ? calculateDriverPrice(booking.hourly_rate).toFixed(2) : '0.00'}/hr)</span>
-                    <span className="font-medium">${extensionCost.total.toFixed(2)}</span>
+                    <span className="text-muted-foreground">Extension ({extensionCost.hours.toFixed(1)}h × ${extensionCost.driverHourlyRate.toFixed(2)}/hr)</span>
+                    <span className="font-medium">${extensionCost.subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Service fee</span>
+                    <span className="font-medium">${extensionCost.serviceFee.toFixed(2)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-base font-semibold">
