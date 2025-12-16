@@ -23,7 +23,7 @@ const ModeSwitcher = () => {
     <div
       className={cn(
         "relative flex items-center h-9 p-1 bg-muted rounded-full",
-        isLoading && "opacity-50 pointer-events-none"
+        isLoading && "pointer-events-none"
       )}
     >
       {/* Animated sliding indicator */}
