@@ -10,6 +10,7 @@ import { format, eachDayOfInterval, isBefore, startOfDay, addMonths, startOfMont
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { DateRange } from 'react-day-picker';
+import { AvailabilityTimePicker } from './AvailabilityTimePicker';
 
 type OverrideMode = 'block' | 'make_available' | 'custom_hours';
 
@@ -567,16 +568,16 @@ export const DateOverrideManager = ({
 
           {/* Custom Rate for New Override */}
           {overrideMode !== 'block' && (
-            <div className="p-3 rounded-lg bg-muted/50 border border-dashed">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Custom rate for selected dates</span>
+            <div className="p-2.5 sm:p-3 rounded-lg bg-muted/50 border border-dashed">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+                <div className="flex items-center gap-2 text-xs sm:text-sm">
+                  <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Custom rate for dates</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {customRateForNew !== null ? (
-                    <>
-                      <div className="relative">
+                    <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                      <div className="relative flex-1 sm:flex-none">
                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                         <Input
                           type="number"
@@ -584,27 +585,27 @@ export const DateOverrideManager = ({
                           step="0.5"
                           value={customRateForNew || ''}
                           onChange={(e) => setCustomRateForNew(e.target.value ? parseFloat(e.target.value) : null)}
-                          className="w-20 pl-5 h-8 text-sm"
+                          className="w-full sm:w-20 pl-5 h-8 text-sm"
                           placeholder="0"
                         />
                       </div>
-                      <span className="text-xs text-muted-foreground">/hr</span>
+                      <span className="text-xs text-muted-foreground shrink-0">/hr</span>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-8 px-2 text-xs"
+                        className="h-8 px-2 text-xs shrink-0"
                         onClick={() => setCustomRateForNew(null)}
                       >
                         Clear
                       </Button>
-                    </>
+                    </div>
                   ) : (
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-8 text-xs"
+                      className="h-8 text-xs w-full sm:w-auto"
                       onClick={() => setCustomRateForNew(baseRate || 5)}
                     >
                       Set custom rate
@@ -613,7 +614,7 @@ export const DateOverrideManager = ({
                 </div>
               </div>
               {customRateForNew === null && baseRate > 0 && (
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-1.5">
                   Will use base rate: ${baseRate}/hr
                 </p>
               )}
@@ -765,36 +766,33 @@ export const DateOverrideManager = ({
                   {override.windows.map((window, windowIndex) => (
                     <div 
                       key={windowIndex}
-                      className="flex items-center gap-2 p-3 rounded-lg bg-background border mb-3"
+                      className="flex items-center gap-2 p-2.5 sm:p-3 rounded-lg bg-background border mb-3"
                     >
-                      <Clock className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
-                      <Input
-                        type="time"
+                      <AvailabilityTimePicker
                         value={window.start_time}
-                        onChange={(e) => updateTime(dateStr, windowIndex, 'start_time', e.target.value)}
-                        className="flex-1 min-w-0 text-center"
+                        onChange={(value) => updateTime(dateStr, windowIndex, 'start_time', value)}
+                        label="Start Time"
                       />
-                      <span className="text-muted-foreground text-sm shrink-0">to</span>
-                      <Input
-                        type="time"
+                      <span className="text-muted-foreground text-xs sm:text-sm shrink-0">to</span>
+                      <AvailabilityTimePicker
                         value={window.end_time}
-                        onChange={(e) => updateTime(dateStr, windowIndex, 'end_time', e.target.value)}
-                        className="flex-1 min-w-0 text-center"
+                        onChange={(value) => updateTime(dateStr, windowIndex, 'end_time', value)}
+                        label="End Time"
                       />
                     </div>
                   ))}
 
                   {/* Custom Rate Editor */}
-                  <div className="p-3 rounded-lg bg-muted/30 border border-dashed">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 text-sm">
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  <div className="p-2.5 sm:p-3 rounded-lg bg-muted/30 border border-dashed">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+                      <div className="flex items-center gap-2 text-xs sm:text-sm">
+                        <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
                         <span className="text-muted-foreground">Custom rate</span>
                       </div>
                       <div className="flex items-center gap-2">
                         {hasCustomRate ? (
-                          <>
-                            <div className="relative">
+                          <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                            <div className="relative flex-1 sm:flex-none">
                               <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                               <Input
                                 type="number"
@@ -802,27 +800,27 @@ export const DateOverrideManager = ({
                                 step="0.5"
                                 value={override.custom_rate || ''}
                                 onChange={(e) => updateCustomRate(dateStr, e.target.value ? parseFloat(e.target.value) : null)}
-                                className="w-20 pl-5 h-8 text-sm"
+                                className="w-full sm:w-20 pl-5 h-8 text-sm"
                                 placeholder="0"
                               />
                             </div>
-                            <span className="text-xs text-muted-foreground">/hr</span>
+                            <span className="text-xs text-muted-foreground shrink-0">/hr</span>
                             <Button
                               type="button"
                               variant="ghost"
                               size="sm"
-                              className="h-8 px-2 text-xs"
+                              className="h-8 px-2 text-xs shrink-0"
                               onClick={() => updateCustomRate(dateStr, null)}
                             >
                               Reset
                             </Button>
-                          </>
+                          </div>
                         ) : (
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="h-8 text-xs"
+                            className="h-8 text-xs w-full sm:w-auto"
                             onClick={() => updateCustomRate(dateStr, baseRate || 5)}
                           >
                             Set custom rate
@@ -831,7 +829,7 @@ export const DateOverrideManager = ({
                       </div>
                     </div>
                     {!hasCustomRate && baseRate > 0 && (
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs text-muted-foreground mt-1.5">
                         Using base rate: ${baseRate}/hr
                       </p>
                     )}
