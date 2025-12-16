@@ -31,7 +31,7 @@ const ModeSwitcher = () => {
         className={cn(
           "absolute h-7 rounded-full shadow-sm transition-all duration-300 ease-out",
           mode === 'driver' 
-            ? "left-1 w-[calc(50%-2px)] bg-primary" 
+            ? "left-1 w-[calc(50%-2px)] bg-violet-300" 
             : "left-[calc(50%+1px)] w-[calc(50%-2px)] bg-primary"
         )}
       />
@@ -42,7 +42,7 @@ const ModeSwitcher = () => {
         className={cn(
           "relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors duration-300",
           mode === 'driver'
-            ? "text-primary-foreground"
+            ? "text-violet-900"
             : "text-muted-foreground hover:text-foreground"
         )}
       >
