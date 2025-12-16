@@ -668,15 +668,7 @@ const Booking = () => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => {
-                // Check if there's history to go back to
-                if (window.history.length > 1) {
-                  navigate(-1);
-                } else {
-                  // Fallback to spot detail page
-                  navigate(`/spot/${spotId}`);
-                }
-              }}
+            onClick={() => navigate(-1)}
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
