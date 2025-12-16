@@ -204,7 +204,7 @@ const AddVehicleContent = () => {
 
 const AddVehicle = () => {
   return (
-    <RequireAuth>
+    <RequireAuth feature="vehicles">
       <AddVehicleContent />
     </RequireAuth>
   );

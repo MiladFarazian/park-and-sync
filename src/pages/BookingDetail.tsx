@@ -957,7 +957,7 @@ const BookingDetailContent = () => {
 
 const BookingDetail = () => {
   return (
-    <RequireAuth>
+    <RequireAuth feature="booking">
       <BookingDetailContent />
     </RequireAuth>
   );

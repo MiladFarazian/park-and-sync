@@ -845,7 +845,7 @@ const MessagesContent = () => {
 
 const Messages = () => {
   return (
-    <RequireAuth>
+    <RequireAuth feature="messages">
       <MessagesContent />
     </RequireAuth>
   );

@@ -325,7 +325,7 @@ const PaymentMethodsContent = () => {
 
 const PaymentMethods = () => {
   return (
-    <RequireAuth>
+    <RequireAuth feature="payments">
       <PaymentMethodsContent />
     </RequireAuth>
   );
