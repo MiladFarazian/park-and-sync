@@ -228,13 +228,12 @@ const Reviews = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background border-b">
+    <div className="h-screen bg-background flex flex-col">
+      <header className="shrink-0 bg-background border-b">
         <div className="flex items-center gap-3 p-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/profile')}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/profile')}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           <div>
             <h1 className="text-xl font-bold">My Reviews</h1>
             <p className="text-sm text-muted-foreground">
@@ -242,110 +241,112 @@ const Reviews = () => {
             </p>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="p-4 pt-20 space-y-4 pb-24">
-        {/* Stats Summary */}
-        <Card className="p-4 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-primary/10 rounded-full">
-              <Star className="h-6 w-6 text-primary fill-primary" />
+      <main className="flex-1 overflow-y-auto">
+        <div className="p-4 space-y-4 pb-24">
+          {/* Stats Summary */}
+          <Card className="p-4 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-primary/10 rounded-full">
+                <Star className="h-6 w-6 text-primary fill-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{totalCount}</p>
+                <p className="text-sm text-muted-foreground">
+                  Total {totalCount === 1 ? 'review' : 'reviews'}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold">{totalCount}</p>
-              <p className="text-sm text-muted-foreground">
-                Total {totalCount === 1 ? 'review' : 'reviews'}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        {/* Reviews List */}
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : reviews.length === 0 ? (
-          <Card className="p-8 text-center">
-            <Star className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-            <h3 className="font-semibold text-lg mb-2">No reviews yet</h3>
-            <p className="text-sm text-muted-foreground">
-              {mode === 'driver' 
-                ? "You haven't received any reviews from hosts yet." 
-                : "You haven't received any reviews from drivers yet."}
-            </p>
           </Card>
-        ) : (
-          <div className="space-y-3">
-            {reviews.map((review) => (
-              <Card key={review.id} className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-0.5">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className={`h-4 w-4 ${
-                            star <= review.rating
-                              ? 'fill-yellow-400 text-yellow-400'
-                              : 'text-muted-foreground/30'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <span className="font-medium">{review.reviewer_name}</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(review.created_at).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}
-                  </span>
-                </div>
-                
-                {review.comment && (
-                  <div className="flex items-start gap-2 mb-2">
-                    <Quote className="h-4 w-4 text-primary/50 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-muted-foreground italic">{review.comment}</p>
-                  </div>
-                )}
-                
-                {review.spot_category && (
-                  <p className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full inline-block">
-                    {review.spot_category}
-                  </p>
-                )}
-              </Card>
-            ))}
-          </div>
-        )}
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 pt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1 || loading}
-            >
-              Previous
-            </Button>
-            <span className="text-sm text-muted-foreground px-2">
-              Page {page} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(p => p + 1)}
-              disabled={!hasMore || loading}
-            >
-              Next
-            </Button>
-          </div>
-        )}
-      </div>
+          {/* Reviews List */}
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : reviews.length === 0 ? (
+            <Card className="p-8 text-center">
+              <Star className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+              <h3 className="font-semibold text-lg mb-2">No reviews yet</h3>
+              <p className="text-sm text-muted-foreground">
+                {mode === 'driver'
+                  ? "You haven't received any reviews from hosts yet."
+                  : "You haven't received any reviews from drivers yet."}
+              </p>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {reviews.map((review) => (
+                <Card key={review.id} className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-0.5">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`h-4 w-4 ${
+                              star <= review.rating
+                                ? 'fill-yellow-400 text-yellow-400'
+                                : 'text-muted-foreground/30'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <span className="font-medium">{review.reviewer_name}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(review.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </span>
+                  </div>
+
+                  {review.comment && (
+                    <div className="flex items-start gap-2 mb-2">
+                      <Quote className="h-4 w-4 text-primary/50 mt-0.5 flex-shrink-0" />
+                      <p className="text-sm text-muted-foreground italic">{review.comment}</p>
+                    </div>
+                  )}
+
+                  {review.spot_category && (
+                    <p className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full inline-block">
+                      {review.spot_category}
+                    </p>
+                  )}
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1 || loading}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground px-2">
+                Page {page} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!hasMore || loading}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 };
