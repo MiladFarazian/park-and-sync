@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus, Navigation, Edit, AlertCircle, CheckCircle2 } from "lucide-react";
+import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus, Navigation, Edit, AlertCircle, CheckCircle2, TimerReset } from "lucide-react";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { toast } from "sonner";
@@ -513,7 +513,7 @@ export const ActiveBookingBanner = () => {
             </div>
 
             {/* Bottom: Action Buttons */}
-            <div className="flex items-center gap-2 justify-end flex-wrap" onClick={(e) => e.stopPropagation()}>
+            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
               {!isHost && (
                 <>
                   {canConfirmDeparture() && (
@@ -529,36 +529,38 @@ export const ActiveBookingBanner = () => {
                   )}
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="icon"
+                    className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
                     onClick={handleGetDirections}
                   >
-                    <Navigation className="h-4 w-4 mr-1.5" />
-                    <span className="hidden sm:inline">Directions</span>
+                    <Navigation className="h-4 w-4" />
                   </Button>
 
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="icon"
+                    className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
                     onClick={() => navigate(`/booking/${activeBooking.id}`)}
                   >
-                    <Edit className="h-4 w-4 mr-1.5" />
-                    <span className="hidden sm:inline">Modify</span>
+                    <Edit className="h-4 w-4" />
                   </Button>
 
                   {!isOverstayed && (
                     <Button
-                      size="sm"
+                      variant="outline"
+                      size="icon"
+                      className="flex-1 hover:bg-green-50 hover:text-green-600 hover:border-green-300 transition-colors"
                       onClick={() => setShowExtendDialog(true)}
                       disabled={loading}
                     >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Extend
+                      <TimerReset className="h-4 w-4" />
                     </Button>
                   )}
 
                   <Button
-                    variant="ghost"
-                    size="sm"
+                    variant="outline"
+                    size="icon"
+                    className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
                     onClick={handleMessage}
                   >
                     <MessageCircle className="h-4 w-4" />
@@ -570,11 +572,11 @@ export const ActiveBookingBanner = () => {
                 <>
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="icon"
+                    className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
                     onClick={handleMessage}
                   >
-                    <MessageCircle className="h-4 w-4 mr-1.5" />
-                    <span className="hidden sm:inline">Message</span>
+                    <MessageCircle className="h-4 w-4" />
                   </Button>
 
                   {/* Overstay Actions - Time-Gated Progressive System */}
