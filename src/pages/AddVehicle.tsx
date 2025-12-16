@@ -12,8 +12,9 @@ import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { vehicleMakes, vehicleModels, vehicleColors } from "@/lib/vehicleData";
+import RequireAuth from "@/components/auth/RequireAuth";
 
-const AddVehicle = () => {
+const AddVehicleContent = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -198,6 +199,14 @@ const AddVehicle = () => {
         </form>
       </div>
     </div>
+  );
+};
+
+const AddVehicle = () => {
+  return (
+    <RequireAuth>
+      <AddVehicleContent />
+    </RequireAuth>
   );
 };
 

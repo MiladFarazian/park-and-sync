@@ -17,6 +17,7 @@ import { differenceInHours, differenceInMinutes, addHours, format } from 'date-f
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { calculateDriverPrice, calculateBookingTotal } from '@/lib/pricing';
+import RequireAuth from '@/components/auth/RequireAuth';
 
 interface PaymentMethod {
   id: string;
@@ -26,7 +27,7 @@ interface PaymentMethod {
   expYear: number;
 }
 
-const Booking = () => {
+const BookingContent = () => {
   const { spotId } = useParams<{ spotId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -1046,6 +1047,14 @@ const Booking = () => {
         initialValue={endDateTime}
       />
     </div>
+  );
+};
+
+const Booking = () => {
+  return (
+    <RequireAuth>
+      <BookingContent />
+    </RequireAuth>
   );
 };
 

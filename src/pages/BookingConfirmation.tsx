@@ -10,8 +10,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { differenceInHours, format } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/contexts/AuthContext';
+import RequireAuth from '@/components/auth/RequireAuth';
 
-const BookingConfirmation = () => {
+const BookingConfirmationContent = () => {
   const {
     bookingId
   } = useParams<{
@@ -478,4 +479,13 @@ const BookingConfirmation = () => {
       </div>
     </div>;
 };
+
+const BookingConfirmation = () => {
+  return (
+    <RequireAuth>
+      <BookingConfirmationContent />
+    </RequireAuth>
+  );
+};
+
 export default BookingConfirmation;

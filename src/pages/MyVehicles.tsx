@@ -6,8 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import RequireAuth from "@/components/auth/RequireAuth";
 
-const MyVehicles = () => {
+const MyVehiclesContent = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -96,6 +97,14 @@ const MyVehicles = () => {
         )}
       </div>
     </div>
+  );
+};
+
+const MyVehicles = () => {
+  return (
+    <RequireAuth>
+      <MyVehiclesContent />
+    </RequireAuth>
   );
 };
 

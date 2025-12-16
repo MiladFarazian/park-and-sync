@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
+import RequireAuth from "@/components/auth/RequireAuth";
 
 let stripePromise: Promise<any> | null = null;
 
@@ -98,7 +99,7 @@ const AddCardForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel:
   );
 };
 
-const PaymentMethods = () => {
+const PaymentMethodsContent = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -319,6 +320,14 @@ const PaymentMethods = () => {
         </Dialog>
       </div>
     </div>
+  );
+};
+
+const PaymentMethods = () => {
+  return (
+    <RequireAuth>
+      <PaymentMethodsContent />
+    </RequireAuth>
   );
 };
 
