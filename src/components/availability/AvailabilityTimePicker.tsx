@@ -111,9 +111,10 @@ export const AvailabilityTimePicker = ({ value, onChange, label }: AvailabilityT
       </Button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 animate-fade-in" onClick={() => setIsOpen(false)}>
+        <div className="fixed inset-0 z-[100] bg-black/50 animate-fade-in" onClick={() => setIsOpen(false)}>
           <div 
-            className="absolute inset-x-0 bottom-0 bg-background rounded-t-2xl animate-slide-in-bottom pb-safe"
+            className="absolute inset-x-0 bottom-0 bg-background rounded-t-2xl animate-slide-in-bottom"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 80px)' }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
