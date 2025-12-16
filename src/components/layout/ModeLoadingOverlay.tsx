@@ -8,8 +8,8 @@ const ModeLoadingOverlay = () => {
   if (!isLoading || !targetMode) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in-0">
-      <div className="flex flex-col items-center gap-4 animate-in zoom-in-95">
+    <div className="fixed inset-0 top-14 md:top-16 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in-0">
+      <div className="flex flex-col items-center gap-4 animate-in zoom-in-95 -mt-14 md:-mt-16">
         <div className="relative">
           <div className="absolute inset-0 animate-ping">
             {targetMode === 'host' ? (
