@@ -244,7 +244,7 @@ const Reviews = () => {
         </div>
       </div>
 
-      <div className="p-4 space-y-4 pb-24">
+      <div className="p-4 pt-20 space-y-4 pb-24">
         {/* Stats Summary */}
         <Card className="p-4 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
           <div className="flex items-center gap-4">
