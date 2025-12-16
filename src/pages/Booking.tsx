@@ -1,7 +1,7 @@
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle, Loader2, Info } from 'lucide-react';
+import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle, Loader2 } from 'lucide-react';
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -16,7 +16,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { differenceInHours, differenceInMinutes, addHours, format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { calculateDriverPrice, calculateBookingTotal } from '@/lib/pricing';
 
 interface PaymentMethod {
@@ -399,17 +398,16 @@ const Booking = () => {
       return null;
     }
 
-    // Use new pricing: host earns their rate, driver pays +20% (min $1)
-    const { hostEarnings, platformFee, driverTotal } = calculateBookingTotal(spot.hourly_rate, hours);
+    // Use new pricing: driver sees all-in rate (host rate + 20% min $1)
+    const { driverTotal } = calculateBookingTotal(spot.hourly_rate, hours);
+    const driverHourlyRate = calculateDriverPrice(spot.hourly_rate);
 
-    console.log('Pricing:', { hours, hostEarnings, platformFee, driverTotal });
+    console.log('Pricing:', { hours, driverHourlyRate, driverTotal });
 
     return {
       hours: hours.toFixed(2), // Show decimal hours (e.g., 2.75)
-      subtotal: hostEarnings.toFixed(2),
-      platformFee: platformFee.toFixed(2),
       total: driverTotal.toFixed(2),
-      hostHourlyRate: spot.hourly_rate.toFixed(2),
+      driverHourlyRate: driverHourlyRate.toFixed(2),
     };
   };
 
@@ -703,7 +701,7 @@ const Booking = () => {
                 <span>{spot.address}</span>
               </div>
               <div className="flex items-center gap-3 text-sm mb-3">
-                <span className="font-bold">${spot.hourly_rate.toFixed(2)}/hr</span>
+                <span className="font-bold">${calculateDriverPrice(spot.hourly_rate).toFixed(2)}/hr</span>
               </div>
               <Separator className="my-3" />
               <div className="flex items-center gap-3">
@@ -959,25 +957,9 @@ const Booking = () => {
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">
-                  ${pricing.hostHourlyRate}/hr × {pricing.hours} hours
+                  ${pricing.driverHourlyRate}/hr × {pricing.hours} hours
                 </span>
-                <span className="font-medium">${pricing.subtotal}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="text-muted-foreground flex items-center gap-1 cursor-help">
-                        Service fee
-                        <Info className="h-3.5 w-3.5" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[200px]">
-                      <p className="text-xs">20% service fee (minimum $1) helps cover platform operations and support.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <span className="font-medium">${pricing.platformFee}</span>
+                <span className="font-medium">${pricing.total}</span>
               </div>
               <Separator />
               <div className="flex justify-between text-lg">

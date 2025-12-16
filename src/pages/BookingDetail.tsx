@@ -8,8 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, Plus, AlertTriangle, CheckCircle2, Copy, Info } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, Plus, AlertTriangle, CheckCircle2, Copy } from 'lucide-react';
 import { format, differenceInMinutes } from 'date-fns';
 import { toast } from 'sonner';
 import { loadStripe } from '@stripe/stripe-js';
@@ -616,24 +615,8 @@ const BookingDetail = () => {
           <h3 className="font-semibold">Payment Details</h3>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal ({booking.total_hours}h × ${booking.hourly_rate}/hr)</span>
-              <span className="font-medium">${booking.subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="text-muted-foreground flex items-center gap-1 cursor-help">
-                      Service Fee
-                      <Info className="h-3.5 w-3.5" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-[200px]">
-                    <p className="text-xs">20% service fee (minimum $1) helps cover platform operations and support.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <span className="font-medium">${booking.platform_fee.toFixed(2)}</span>
+              <span className="text-muted-foreground">{booking.total_hours}h × ${calculateDriverPrice(booking.hourly_rate).toFixed(2)}/hr</span>
+              <span className="font-medium">${booking.total_amount.toFixed(2)}</span>
             </div>
             {booking.overstay_charge_amount > 0 && (
               <div className="flex justify-between text-sm">
@@ -879,24 +862,8 @@ const BookingDetail = () => {
                 <Separator />
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Extension ({extensionCost.hours.toFixed(1)}h × ${booking?.hourly_rate}/hr)</span>
-                    <span className="font-medium">${extensionCost.subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="text-muted-foreground flex items-center gap-1 cursor-help">
-                            Service Fee
-                            <Info className="h-3.5 w-3.5" />
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-[200px]">
-                          <p className="text-xs">20% service fee (minimum $1) helps cover platform operations and support.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    <span className="font-medium">${extensionCost.platformFee.toFixed(2)}</span>
+                    <span className="text-muted-foreground">Extension ({extensionCost.hours.toFixed(1)}h × ${booking ? calculateDriverPrice(booking.hourly_rate).toFixed(2) : '0.00'}/hr)</span>
+                    <span className="font-medium">${extensionCost.total.toFixed(2)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-base font-semibold">
