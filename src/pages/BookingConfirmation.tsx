@@ -482,7 +482,7 @@ const BookingConfirmationContent = () => {
 
 const BookingConfirmation = () => {
   return (
-    <RequireAuth>
+    <RequireAuth feature="booking">
       <BookingConfirmationContent />
     </RequireAuth>
   );

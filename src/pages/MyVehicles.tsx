@@ -102,7 +102,7 @@ const MyVehiclesContent = () => {
 
 const MyVehicles = () => {
   return (
-    <RequireAuth>
+    <RequireAuth feature="vehicles">
       <MyVehiclesContent />
     </RequireAuth>
   );

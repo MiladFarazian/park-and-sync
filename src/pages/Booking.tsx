@@ -1052,7 +1052,7 @@ const BookingContent = () => {
 
 const Booking = () => {
   return (
-    <RequireAuth>
+    <RequireAuth feature="booking">
       <BookingContent />
     </RequireAuth>
   );
