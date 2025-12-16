@@ -874,6 +874,14 @@ const Profile = () => {
                 </div>
               ))}
             </div>
+            <Button 
+              variant="outline" 
+              className="w-full mt-4"
+              onClick={() => navigate('/reviews')}
+            >
+              See All Reviews
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
           </Card>
         )}
 

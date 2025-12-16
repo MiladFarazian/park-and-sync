@@ -35,6 +35,7 @@ import Notifications from "./pages/Notifications";
 import PrivacySecurity from "./pages/PrivacySecurity";
 import EditSpotAvailability from "./pages/EditSpotAvailability";
 import EditSpot from "./pages/EditSpot";
+import Reviews from "./pages/Reviews";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ModeProvider } from "./contexts/ModeContext";
 import { MessagesProvider } from "./contexts/MessagesContext";
@@ -99,6 +100,7 @@ const App = () => {
                   <Route path="/host-home" element={<HostHome />} />
                   <Route path="/messages" element={<Messages />} />
                   <Route path="/profile" element={<Profile />} />
+                  <Route path="/reviews" element={<Reviews />} />
                   <Route path="/manage-account" element={<ManageAccount />} />
                   <Route path="/book/:spotId" element={<Booking />} />
                   <Route path="/booking/:bookingId" element={<BookingDetail />} />
