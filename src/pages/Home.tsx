@@ -13,6 +13,7 @@ import { useMode } from '@/contexts/ModeContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import Index from './Index';
 import LocationSearchInput from '@/components/ui/location-search-input';
+import { calculateDriverPrice } from '@/lib/pricing';
 
 const Home = () => {
   const isMobile = useIsMobile();
@@ -173,7 +174,7 @@ const Home = () => {
               )}
             </div>
             <div className="text-right flex-shrink-0">
-              <p className="font-bold text-primary text-lg">${spot.hourlyRate}/hr</p>
+              <p className="font-bold text-primary text-lg">${calculateDriverPrice(spot.hourlyRate).toFixed(2)}/hr</p>
             </div>
           </div>
 
