@@ -400,7 +400,6 @@ const Booking = () => {
 
     // Use new pricing: host earns their rate, driver pays +20% (min $1)
     const { hostEarnings, platformFee, driverTotal } = calculateBookingTotal(spot.hourly_rate, hours);
-    const driverHourlyRate = calculateDriverPrice(spot.hourly_rate);
 
     console.log('Pricing:', { hours, hostEarnings, platformFee, driverTotal });
 
@@ -409,7 +408,7 @@ const Booking = () => {
       subtotal: hostEarnings.toFixed(2),
       platformFee: platformFee.toFixed(2),
       total: driverTotal.toFixed(2),
-      driverHourlyRate: driverHourlyRate.toFixed(2),
+      hostHourlyRate: spot.hourly_rate.toFixed(2),
     };
   };
 
@@ -959,7 +958,7 @@ const Booking = () => {
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">
-                  ${pricing.driverHourlyRate}/hr × {pricing.hours} hours
+                  ${pricing.hostHourlyRate}/hr × {pricing.hours} hours
                 </span>
                 <span className="font-medium">${pricing.subtotal}</span>
               </div>
