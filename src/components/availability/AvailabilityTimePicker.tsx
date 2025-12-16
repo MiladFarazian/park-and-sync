@@ -57,9 +57,11 @@ export const AvailabilityTimePicker = ({ value, onChange, label }: AvailabilityT
   const createScrollHandler = (
     ref: React.RefObject<HTMLDivElement>,
     items: any[],
-    setter: (value: any) => void
+    setter: (value: any) => void,
+    currentValue: any
   ) => {
     let scrollTimeout: NodeJS.Timeout;
+    let lastIndex = items.indexOf(currentValue);
     
     return () => {
       clearTimeout(scrollTimeout);
@@ -70,6 +72,12 @@ export const AvailabilityTimePicker = ({ value, onChange, label }: AvailabilityT
         const scrollTop = ref.current.scrollTop;
         const index = Math.round(scrollTop / itemHeight);
         const clampedIndex = Math.max(0, Math.min(items.length - 1, index));
+        
+        // Haptic feedback when selection changes
+        if (clampedIndex !== lastIndex && 'vibrate' in navigator) {
+          navigator.vibrate(10);
+          lastIndex = clampedIndex;
+        }
         
         ref.current.scrollTo({
           top: clampedIndex * itemHeight,
@@ -137,7 +145,7 @@ export const AvailabilityTimePicker = ({ value, onChange, label }: AvailabilityT
                     <div 
                       ref={hourRef}
                       className="overflow-y-scroll scrollbar-hide h-[132px] snap-y snap-mandatory"
-                      onScroll={createScrollHandler(hourRef, hours, setSelectedHour)}
+                      onScroll={createScrollHandler(hourRef, hours, setSelectedHour, selectedHour)}
                       style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                     >
                       <div className="h-11" />
@@ -165,7 +173,7 @@ export const AvailabilityTimePicker = ({ value, onChange, label }: AvailabilityT
                     <div 
                       ref={minuteRef}
                       className="overflow-y-scroll scrollbar-hide h-[132px] snap-y snap-mandatory"
-                      onScroll={createScrollHandler(minuteRef, minutes, setSelectedMinute)}
+                      onScroll={createScrollHandler(minuteRef, minutes, setSelectedMinute, selectedMinute)}
                       style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                     >
                       <div className="h-11" />
@@ -193,7 +201,7 @@ export const AvailabilityTimePicker = ({ value, onChange, label }: AvailabilityT
                     <div 
                       ref={periodRef}
                       className="overflow-y-scroll scrollbar-hide h-[132px] snap-y snap-mandatory"
-                      onScroll={createScrollHandler(periodRef, periods, setSelectedPeriod)}
+                      onScroll={createScrollHandler(periodRef, periods, setSelectedPeriod, selectedPeriod)}
                       style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                     >
                       <div className="h-11" />
