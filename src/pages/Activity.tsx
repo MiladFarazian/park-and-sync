@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Calendar, XCircle, MessageCircle, Navigation, Edit, Plus, Star } from 'lucide-react';
+import { MapPin, Clock, Calendar, XCircle, MessageCircle, Navigation, Edit, Plus, Star, TimerReset } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -237,6 +237,11 @@ const Activity = () => {
       navigate(`/booking/${booking.id}`);
     };
 
+    const handleExtend = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      navigate(`/booking/${booking.id}?action=extend`);
+    };
+
     const getStatusColor = () => {
       if (booking.status === 'canceled') return 'bg-destructive/10 text-destructive border-destructive/20';
       if (booking.status === 'completed') {
@@ -326,6 +331,16 @@ const Activity = () => {
                   >
                     <Navigation className="h-4 w-4" />
                   </Button>
+                  {canExtend && (
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      className="flex-1 hover:bg-green-50 hover:text-green-600 hover:border-green-300 transition-colors"
+                      onClick={handleExtend}
+                    >
+                      <TimerReset className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Button 
                     variant="outline" 
                     size="icon"
@@ -458,6 +473,17 @@ const Activity = () => {
                     <Navigation className="h-4 w-4 mr-2" />
                     Directions
                   </Button>
+                  {canExtend && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1 hover:bg-green-50 hover:text-green-600 hover:border-green-300 transition-colors"
+                      onClick={handleExtend}
+                    >
+                      <TimerReset className="h-4 w-4 mr-2" />
+                      Extend
+                    </Button>
+                  )}
                   <Button 
                     variant="outline" 
                     size="sm" 

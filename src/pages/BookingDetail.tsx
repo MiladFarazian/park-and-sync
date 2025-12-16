@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -50,6 +50,7 @@ interface BookingDetails {
 const BookingDetailContent = () => {
   const { bookingId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const [booking, setBooking] = useState<BookingDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,6 +73,20 @@ const BookingDetailContent = () => {
     if (!bookingId || !user) return;
     loadBookingDetails();
   }, [bookingId, user]);
+
+  // Auto-open extend dialog if action=extend query param is present
+  useEffect(() => {
+    if (!booking || loading) return;
+    const action = searchParams.get('action');
+    const canExtendBooking = (booking.status === 'pending' || booking.status === 'active' || booking.status === 'paid') && new Date() < new Date(booking.end_at);
+    
+    if (action === 'extend' && canExtendBooking && booking.renter_id === user?.id) {
+      setShowExtendDialog(true);
+      // Remove the query param to prevent re-opening on refresh
+      searchParams.delete('action');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [booking, loading, searchParams, user]);
 
   const loadBookingDetails = async () => {
     try {
