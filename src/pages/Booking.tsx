@@ -398,16 +398,17 @@ const Booking = () => {
       return null;
     }
 
-    // Use new pricing: driver sees all-in rate (host rate + 20% min $1)
-    const { driverTotal } = calculateBookingTotal(spot.hourly_rate, hours);
-    const driverHourlyRate = calculateDriverPrice(spot.hourly_rate);
+    // Use new pricing: driver sees upcharged rate + service fee
+    const { driverHourlyRate, driverSubtotal, serviceFee, driverTotal } = calculateBookingTotal(spot.hourly_rate, hours);
 
-    console.log('Pricing:', { hours, driverHourlyRate, driverTotal });
+    console.log('Pricing:', { hours, driverHourlyRate, driverSubtotal, serviceFee, driverTotal });
 
     return {
-      hours: hours.toFixed(2), // Show decimal hours (e.g., 2.75)
-      total: driverTotal.toFixed(2),
+      hours: hours.toFixed(2),
       driverHourlyRate: driverHourlyRate.toFixed(2),
+      subtotal: driverSubtotal.toFixed(2),
+      serviceFee: serviceFee.toFixed(2),
+      total: driverTotal.toFixed(2),
     };
   };
 
@@ -959,7 +960,11 @@ const Booking = () => {
                 <span className="text-muted-foreground">
                   ${pricing.driverHourlyRate}/hr × {pricing.hours} hours
                 </span>
-                <span className="font-medium">${pricing.total}</span>
+                <span className="font-medium">${pricing.subtotal}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Service fee</span>
+                <span className="font-medium">${pricing.serviceFee}</span>
               </div>
               <Separator />
               <div className="flex justify-between text-lg">

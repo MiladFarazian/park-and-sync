@@ -130,14 +130,26 @@ serve(async (req) => {
       throw new Error('You cannot book your own parking spot');
     }
 
-    // Calculate pricing - host earns their set rate, platform adds 20% or $1 minimum
+    // Calculate pricing
+    // - Driver sees upcharged rate (host rate + 20% or $1 min) as "Host Rate"
+    // - Service fee is separate and visible (20% of host earnings or $1 min)
     const startDate = new Date(start_at);
     const endDate = new Date(end_at);
     const totalHours = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60));
-    const hostEarnings = totalHours * parseFloat(spot.hourly_rate); // Host earns exactly what they set
-    const platformFee = Math.max(hostEarnings * 0.20, 1.00); // 20% or $1 minimum
-    const subtotal = hostEarnings; // For record keeping, subtotal is what host earns
-    const totalAmount = Math.round((hostEarnings + platformFee) * 100) / 100; // Driver pays host + platform fee
+    const hostHourlyRate = parseFloat(spot.hourly_rate);
+    const hostEarnings = totalHours * hostHourlyRate; // What host actually earns
+    
+    // Invisible upcharge on hourly rate
+    const upcharge = Math.max(hostHourlyRate * 0.20, 1.00);
+    const driverHourlyRate = hostHourlyRate + upcharge;
+    const driverSubtotal = Math.round(driverHourlyRate * totalHours * 100) / 100;
+    
+    // Visible service fee
+    const serviceFee = Math.round(Math.max(hostEarnings * 0.20, 1.00) * 100) / 100;
+    
+    const subtotal = driverSubtotal; // What driver sees as rate × hours
+    const platformFee = serviceFee; // Visible service fee
+    const totalAmount = Math.round((driverSubtotal + serviceFee) * 100) / 100;
 
     // Initialize Stripe
     const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');
