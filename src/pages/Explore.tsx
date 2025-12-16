@@ -362,7 +362,7 @@ const Explore = () => {
         title: spot.title,
         category: spot.category,
         address: spot.address,
-        hourlyRate: parseFloat(spot.hourly_rate),
+        hourlyRate: spot.driver_hourly_rate || parseFloat(spot.hourly_rate), // Use driver price from backend
         rating: spot.spot_rating || 0,
         reviews: spot.spot_review_count || 0,
         lat: parseFloat(spot.latitude),

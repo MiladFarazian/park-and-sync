@@ -12,6 +12,7 @@ import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation
 import { format, differenceInMinutes } from 'date-fns';
 import { toast } from 'sonner';
 import { loadStripe } from '@stripe/stripe-js';
+import { calculateBookingTotal, calculateDriverPrice } from '@/lib/pricing';
 
 interface BookingDetails {
   id: string;
@@ -342,10 +343,9 @@ const BookingDetail = () => {
     
     if (hours <= 0) return { subtotal: 0, platformFee: 0, total: 0, hours: 0 };
     
-    const subtotal = booking.hourly_rate * hours;
-    const platformFee = subtotal * 0.15; // 15% platform fee
-    const total = subtotal + platformFee;
-    return { subtotal, platformFee, total, hours };
+    // Use new pricing: host earns their rate, platform adds 20% or $1 min
+    const { hostEarnings, platformFee, driverTotal } = calculateBookingTotal(booking.hourly_rate, hours);
+    return { subtotal: hostEarnings, platformFee, total: driverTotal, hours };
   };
 
   const handleModifyTimes = async () => {
@@ -399,12 +399,11 @@ const BookingDetail = () => {
     
     if (hours <= 0) return { subtotal: 0, platformFee: 0, total: 0, hours: 0, difference: 0 };
     
-    const subtotal = booking.hourly_rate * hours;
-    const platformFee = subtotal * 0.15;
-    const total = subtotal + platformFee;
-    const difference = total - booking.total_amount;
+    // Use new pricing: host earns their rate, platform adds 20% or $1 min
+    const { hostEarnings, platformFee, driverTotal } = calculateBookingTotal(booking.hourly_rate, hours);
+    const difference = driverTotal - booking.total_amount;
     
-    return { subtotal, platformFee, total, hours, difference };
+    return { subtotal: hostEarnings, platformFee, total: driverTotal, hours, difference };
   };
 
   if (loading) {

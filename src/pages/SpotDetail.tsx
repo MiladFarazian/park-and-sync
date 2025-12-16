@@ -15,6 +15,7 @@ import { formatAvailability } from '@/lib/formatAvailability';
 import { useMode } from '@/contexts/ModeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { calculateDriverPrice } from '@/lib/pricing';
 
 // Import the generated images
 import uscGarage from '@/assets/usc-garage.jpg';
@@ -675,7 +676,7 @@ const SpotDetail = () => {
               </span>
             )}
             <div className="text-right">
-              <p className="text-2xl font-bold text-primary">${spot.hourlyRate}</p>
+              <p className="text-2xl font-bold text-primary">${calculateDriverPrice(spot.hourlyRate).toFixed(2)}</p>
               <p className="text-sm text-muted-foreground">per hour</p>
             </div>
           </div>
@@ -958,7 +959,7 @@ const SpotDetail = () => {
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 z-10">
         <div className="max-w-md mx-auto flex items-center justify-between gap-4">
           <div>
-            <p className="text-lg font-bold">${spot.hourlyRate} / hour</p>
+            <p className="text-lg font-bold">${calculateDriverPrice(spot.hourlyRate).toFixed(2)} / hour</p>
             <div className="flex items-center gap-1">
               <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
               <span className="text-sm font-medium">{spot.rating || 'New'}</span>

@@ -130,14 +130,14 @@ serve(async (req) => {
       throw new Error('You cannot book your own parking spot');
     }
 
-    // Calculate pricing
+    // Calculate pricing - host earns their set rate, platform adds 20% or $1 minimum
     const startDate = new Date(start_at);
     const endDate = new Date(end_at);
     const totalHours = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60));
-    const subtotal = totalHours * parseFloat(spot.hourly_rate);
-    const platformFee = Math.round(subtotal * 0.15 * 100) / 100; // 15% platform fee
-    const hostEarnings = subtotal - platformFee; // Host gets subtotal minus platform fee
-    const totalAmount = subtotal;
+    const hostEarnings = totalHours * parseFloat(spot.hourly_rate); // Host earns exactly what they set
+    const platformFee = Math.max(hostEarnings * 0.20, 1.00); // 20% or $1 minimum
+    const subtotal = hostEarnings; // For record keeping, subtotal is what host earns
+    const totalAmount = Math.round((hostEarnings + platformFee) * 100) / 100; // Driver pays host + platform fee
 
     // Initialize Stripe
     const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');

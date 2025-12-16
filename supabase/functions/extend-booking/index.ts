@@ -106,10 +106,10 @@ serve(async (req) => {
       throw new Error('This spot has another booking during the requested extension period. Please choose a shorter extension.');
     }
 
-    // Calculate extension cost
-    const extensionCost = booking.spots.hourly_rate * extensionHours;
-    const platformFee = Math.round(extensionCost * 0.15 * 100) / 100;
-    const hostEarnings = extensionCost - platformFee;
+    // Calculate extension cost - host earns their rate, platform adds 20% or $1 min
+    const hostEarnings = booking.spots.hourly_rate * extensionHours;
+    const platformFee = Math.max(hostEarnings * 0.20, 1.00);
+    const extensionCost = Math.round((hostEarnings + platformFee) * 100) / 100;
 
     // Initialize Stripe
     const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');

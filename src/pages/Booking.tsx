@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { differenceInHours, differenceInMinutes, addHours, format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { calculateDriverPrice, calculateBookingTotal } from '@/lib/pricing';
 
 interface PaymentMethod {
   id: string;
@@ -397,17 +398,18 @@ const Booking = () => {
       return null;
     }
 
-    const subtotal = hours * spot.hourly_rate;
-    const platformFee = subtotal * 0.15;
-    const total = subtotal + platformFee;
+    // Use new pricing: host earns their rate, driver pays +20% (min $1)
+    const { hostEarnings, platformFee, driverTotal } = calculateBookingTotal(spot.hourly_rate, hours);
+    const driverHourlyRate = calculateDriverPrice(spot.hourly_rate);
 
-    console.log('Pricing:', { hours, subtotal, platformFee, total });
+    console.log('Pricing:', { hours, hostEarnings, platformFee, driverTotal });
 
     return {
       hours: hours.toFixed(2), // Show decimal hours (e.g., 2.75)
-      subtotal: subtotal.toFixed(2),
+      subtotal: hostEarnings.toFixed(2),
       platformFee: platformFee.toFixed(2),
-      total: total.toFixed(2),
+      total: driverTotal.toFixed(2),
+      driverHourlyRate: driverHourlyRate.toFixed(2),
     };
   };
 
@@ -701,7 +703,7 @@ const Booking = () => {
                 <span>{spot.address}</span>
               </div>
               <div className="flex items-center gap-3 text-sm mb-3">
-                <span className="font-bold">${spot.hourly_rate}/hr</span>
+                <span className="font-bold">${calculateDriverPrice(spot.hourly_rate).toFixed(2)}/hr</span>
               </div>
               <Separator className="my-3" />
               <div className="flex items-center gap-3">
@@ -957,7 +959,7 @@ const Booking = () => {
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">
-                  ${spot.hourly_rate}/hr × {pricing.hours} hours
+                  ${pricing.driverHourlyRate}/hr × {pricing.hours} hours
                 </span>
                 <span className="font-medium">${pricing.subtotal}</span>
               </div>
