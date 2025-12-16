@@ -13,6 +13,7 @@ import { format, differenceInMinutes } from 'date-fns';
 import { toast } from 'sonner';
 import { loadStripe } from '@stripe/stripe-js';
 import { calculateBookingTotal, calculateDriverPrice } from '@/lib/pricing';
+import RequireAuth from '@/components/auth/RequireAuth';
 
 interface BookingDetails {
   id: string;
@@ -46,7 +47,7 @@ interface BookingDetails {
   };
 }
 
-const BookingDetail = () => {
+const BookingDetailContent = () => {
   const { bookingId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -951,6 +952,14 @@ const BookingDetail = () => {
         </DialogContent>
       </Dialog>
     </div>
+  );
+};
+
+const BookingDetail = () => {
+  return (
+    <RequireAuth>
+      <BookingDetailContent />
+    </RequireAuth>
   );
 };
 
