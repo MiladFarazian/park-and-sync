@@ -1,7 +1,7 @@
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle, Loader2, Info } from 'lucide-react';
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { differenceInHours, differenceInMinutes, addHours, format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { calculateDriverPrice, calculateBookingTotal } from '@/lib/pricing';
 
 interface PaymentMethod {
@@ -963,7 +964,19 @@ const Booking = () => {
                 <span className="font-medium">${pricing.subtotal}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Service fee</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-muted-foreground flex items-center gap-1 cursor-help">
+                        Service fee
+                        <Info className="h-3.5 w-3.5" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[200px]">
+                      <p className="text-xs">20% service fee (minimum $1) helps cover platform operations and support.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <span className="font-medium">${pricing.platformFee}</span>
               </div>
               <Separator />
