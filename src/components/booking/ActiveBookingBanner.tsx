@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus, Navigation, Edit, AlertCircle, CheckCircle2, TimerReset } from "lucide-react";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
@@ -513,71 +514,107 @@ export const ActiveBookingBanner = () => {
             </div>
 
             {/* Bottom: Action Buttons */}
-            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-              {!isHost && (
-                <>
-                  {canConfirmDeparture() && (
-                    <Button
-                      size="sm"
-                      onClick={handleConfirmDeparture}
-                      disabled={confirmingDeparture}
-                      className="flex-1"
-                    >
-                      <CheckCircle2 className="h-4 w-4 mr-1" />
-                      {confirmingDeparture ? 'Confirming...' : "I've Left"}
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
-                    onClick={handleGetDirections}
-                  >
-                    <Navigation className="h-4 w-4" />
-                  </Button>
+            <TooltipProvider delayDuration={300}>
+              <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                {!isHost && (
+                  <>
+                    {canConfirmDeparture() && (
+                      <Button
+                        size="sm"
+                        onClick={handleConfirmDeparture}
+                        disabled={confirmingDeparture}
+                        className="flex-1"
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                        {confirmingDeparture ? 'Confirming...' : "I've Left"}
+                      </Button>
+                    )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+                          onClick={handleGetDirections}
+                        >
+                          <Navigation className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Directions</p>
+                      </TooltipContent>
+                    </Tooltip>
 
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
-                    onClick={() => navigate(`/booking/${activeBooking.id}`)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+                          onClick={() => navigate(`/booking/${activeBooking.id}`)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Modify</p>
+                      </TooltipContent>
+                    </Tooltip>
 
-                  {!isOverstayed && (
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="flex-1 hover:bg-green-50 hover:text-green-600 hover:border-green-300 transition-colors"
-                      onClick={() => setShowExtendDialog(true)}
-                      disabled={loading}
-                    >
-                      <TimerReset className="h-4 w-4" />
-                    </Button>
-                  )}
+                    {!isOverstayed && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="flex-1 hover:bg-green-50 hover:text-green-600 hover:border-green-300 transition-colors"
+                            onClick={() => setShowExtendDialog(true)}
+                            disabled={loading}
+                          >
+                            <TimerReset className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Extend</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
 
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
-                    onClick={handleMessage}
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                  </Button>
-                </>
-              )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+                          onClick={handleMessage}
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Message</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </>
+                )}
 
-              {isHost && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
-                    onClick={handleMessage}
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                  </Button>
+                {isHost && (
+                  <>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+                          onClick={handleMessage}
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Message</p>
+                      </TooltipContent>
+                    </Tooltip>
 
                   {/* Overstay Actions - Time-Gated Progressive System */}
                   {isOverstayed && !activeBooking.overstay_action && (
@@ -650,7 +687,8 @@ export const ActiveBookingBanner = () => {
                   )}
                 </>
               )}
-            </div>
+              </div>
+            </TooltipProvider>
           </div>
         </div>
       </Card>
