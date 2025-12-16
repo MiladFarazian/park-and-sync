@@ -249,7 +249,7 @@ serve(async (req) => {
         type: 'extension',
         new_end_time: newEndTime.toISOString(),
         host_earnings: hostEarnings.toString(),
-        platform_fee: platformFee.toString(),
+        platform_fee: serviceFee.toString(),
       },
     });
 
