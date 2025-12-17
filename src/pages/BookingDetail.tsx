@@ -286,13 +286,16 @@ const BookingDetailContent = () => {
     }
   };
 
-  const handleModifyTimes = async () => {
-    if (!booking || !modifyStartTime || !modifyEndTime) {
+  const handleModifyTimes = async (newStart?: Date, newEnd?: Date) => {
+    const startTime = newStart || modifyStartTime;
+    const endTime = newEnd || modifyEndTime;
+    
+    if (!booking || !startTime || !endTime) {
       toast.error('Please select both start and end times');
       return;
     }
 
-    if (modifyEndTime <= modifyStartTime) {
+    if (endTime <= startTime) {
       toast.error('End time must be after start time');
       return;
     }
@@ -302,8 +305,8 @@ const BookingDetailContent = () => {
       const { data, error } = await supabase.functions.invoke('modify-booking-times', {
         body: {
           bookingId: booking.id,
-          newStartAt: modifyStartTime.toISOString(),
-          newEndAt: modifyEndTime.toISOString()
+          newStartAt: startTime.toISOString(),
+          newEndAt: endTime.toISOString()
         }
       });
 
@@ -794,14 +797,12 @@ const BookingDetailContent = () => {
         isOpen={showModifyEndPicker}
         onClose={() => {
           setShowModifyEndPicker(false);
-          if (modifyStartTime && modifyEndTime) {
-            handleModifyTimes();
-          }
         }}
         onConfirm={(date) => {
           setModifyEndTime(date);
           setShowModifyEndPicker(false);
-          handleModifyTimes();
+          // Pass both start and end times directly to avoid async state issues
+          handleModifyTimes(modifyStartTime || undefined, date);
         }}
         mode="end"
         startTime={modifyStartTime || undefined}
