@@ -268,6 +268,12 @@ serve(async (req) => {
     console.log(`Found ${postGraceBookings?.length || 0} bookings past grace period`);
 
     for (const booking of postGraceBookings || []) {
+      // Mark as pending_action to prevent duplicate notifications on next run
+      await supabaseClient
+        .from('bookings')
+        .update({ overstay_action: 'pending_action' })
+        .eq('id', booking.id);
+
       // Notify host that grace period has ended and they can take action
       const { error: hostActionError } = await supabaseClient
         .from('notifications')
@@ -297,6 +303,8 @@ serve(async (req) => {
       if (guestGraceError) {
         console.error(`Failed to insert guest grace ended notification for booking ${booking.id}:`, guestGraceError);
       }
+
+      console.log(`Marked booking ${booking.id} as pending_action after grace period ended`);
     }
 
     // Calculate overtime charges for bookings with charging action
