@@ -341,16 +341,38 @@ const SpotDetail = () => {
 
     setSubmittingReport(true);
     try {
-      const { error } = await supabase
+      const { data: reportData, error } = await supabase
         .from('spot_reports')
         .insert({
           spot_id: spot.id,
           reporter_id: user.id,
           reason: reportReason,
           details: reportDetails.trim() || null
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
+
+      // Send notification email to admin (fire and forget)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, email')
+        .eq('user_id', user.id)
+        .single();
+
+      supabase.functions.invoke('send-report-notification', {
+        body: {
+          reportId: reportData.id,
+          spotId: spot.id,
+          spotTitle: spot.title,
+          spotAddress: spot.address,
+          reporterName: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Anonymous' : 'Anonymous',
+          reporterEmail: profile?.email || null,
+          reason: reportReason,
+          details: reportDetails.trim() || null
+        }
+      }).catch(err => console.error('Failed to send report notification:', err));
 
       toast.success('Report submitted. We will review it shortly.');
       setReportReason('');
