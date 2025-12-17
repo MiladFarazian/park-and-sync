@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Calendar, XCircle, MessageCircle, Navigation, Edit, Plus, Star, TimerReset, Loader2 } from 'lucide-react';
+import { MapPin, Clock, Calendar, XCircle, MessageCircle, Navigation, Edit, Star, TimerReset } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -11,17 +11,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useMode } from '@/contexts/ModeContext';
 import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ReviewModal } from '@/components/booking/ReviewModal';
-import { calculateBookingTotal } from '@/lib/pricing';
-import { loadStripe } from '@stripe/stripe-js';
+import { ExtendParkingDialog } from '@/components/booking/ExtendParkingDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-
-const QUICK_EXTEND_OPTIONS = [
-  { label: '30 min', hours: 0.5 },
-  { label: '1 hour', hours: 1 },
-  { label: '2 hours', hours: 2 },
-];
 
 const Activity = () => {
   const navigate = useNavigate();
@@ -40,8 +32,6 @@ const Activity = () => {
   // Quick extend state
   const [extendDialogOpen, setExtendDialogOpen] = useState(false);
   const [extendBooking, setExtendBooking] = useState<any>(null);
-  const [extending, setExtending] = useState(false);
-  const [selectedExtendHours, setSelectedExtendHours] = useState<number | null>(null);
   useEffect(() => {
     fetchBookings();
   }, [mode]);
@@ -199,75 +189,6 @@ const Activity = () => {
     }
   };
 
-  const handleQuickExtend = async (hours: number) => {
-    if (!extendBooking) return;
-    
-    setSelectedExtendHours(hours);
-    setExtending(true);
-    
-    try {
-      // Get Stripe publishable key
-      const { data: keyData, error: keyError } = await supabase.functions.invoke('get-stripe-publishable-key');
-      if (keyError) throw keyError;
-
-      const stripe = await loadStripe(keyData.publishableKey);
-      if (!stripe) throw new Error('Failed to load Stripe');
-
-      // Call extend-booking function
-      const { data, error } = await supabase.functions.invoke('extend-booking', {
-        body: {
-          bookingId: extendBooking.id,
-          extensionHours: hours
-        }
-      });
-
-      if (error) throw error;
-
-      // If payment requires action (3D Secure)
-      if (data.requiresAction && data.clientSecret) {
-        const { error: confirmError } = await stripe.confirmCardPayment(data.clientSecret);
-        if (confirmError) throw confirmError;
-
-        // Finalize the payment
-        const { error: finalizeError } = await supabase.functions.invoke('extend-booking', {
-          body: {
-            bookingId: extendBooking.id,
-            extensionHours: hours,
-            paymentIntentId: data.paymentIntentId,
-            finalize: true
-          }
-        });
-
-        if (finalizeError) throw finalizeError;
-      }
-
-      toast({
-        title: "Booking extended!",
-        description: `Your parking has been extended by ${hours >= 1 ? `${hours} hour${hours > 1 ? 's' : ''}` : '30 minutes'}.`,
-      });
-      
-      setExtendDialogOpen(false);
-      setExtendBooking(null);
-      await fetchBookings();
-    } catch (error: any) {
-      console.error('Error extending booking:', error);
-      toast({
-        title: "Extension failed",
-        description: error.message || 'Failed to extend booking',
-        variant: "destructive"
-      });
-    } finally {
-      setExtending(false);
-      setSelectedExtendHours(null);
-    }
-  };
-
-  const getExtensionCost = (hours: number) => {
-    if (!extendBooking) return 0;
-    const { driverTotal } = calculateBookingTotal(extendBooking.hourly_rate || 5, hours);
-    return driverTotal;
-  };
-
   const now = new Date();
   const upcomingBookings = bookings.filter(b => new Date(b.end_at) >= now && b.status !== 'canceled');
   const pastBookings = bookings.filter(b => new Date(b.end_at) < now || b.status === 'canceled');
@@ -323,7 +244,6 @@ const Activity = () => {
     const handleExtend = (e: React.MouseEvent) => {
       e.stopPropagation();
       setExtendBooking(booking);
-      setSelectedExtendHours(null);
       setExtendDialogOpen(true);
     };
 
@@ -798,70 +718,16 @@ const Activity = () => {
         />
       )}
 
-      {/* Quick Extend Dialog */}
-      <Dialog open={extendDialogOpen} onOpenChange={(open) => {
-        if (!extending) {
+      {/* Extend Parking Dialog */}
+      <ExtendParkingDialog
+        open={extendDialogOpen}
+        onOpenChange={(open) => {
           setExtendDialogOpen(open);
           if (!open) setExtendBooking(null);
-        }
-      }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Extend Your Parking</DialogTitle>
-            <DialogDescription>
-              {extendBooking?.spots?.title || 'Parking Spot'}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-3 py-4">
-            <p className="text-sm text-muted-foreground mb-4">
-              Select how long you'd like to extend:
-            </p>
-            
-            {QUICK_EXTEND_OPTIONS.map((option) => (
-              <Button
-                key={option.hours}
-                variant="outline"
-                className="w-full justify-between h-auto py-3 px-4 hover:bg-primary/5 hover:border-primary/30"
-                onClick={() => handleQuickExtend(option.hours)}
-                disabled={extending}
-              >
-                <span className="font-medium">{option.label}</span>
-                <span className="flex items-center gap-2">
-                  {extending && selectedExtendHours === option.hours ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <span className="text-primary font-semibold">
-                      +${getExtensionCost(option.hours).toFixed(2)}
-                    </span>
-                  )}
-                </span>
-              </Button>
-            ))}
-            
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">or</span>
-              </div>
-            </div>
-            
-            <Button
-              variant="ghost"
-              className="w-full text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                setExtendDialogOpen(false);
-                navigate(`/booking/${extendBooking?.id}?action=extend`);
-              }}
-              disabled={extending}
-            >
-              Choose custom time
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        }}
+        booking={extendBooking}
+        onExtendSuccess={fetchBookings}
+      />
     </div>;
 };
 export default Activity;
