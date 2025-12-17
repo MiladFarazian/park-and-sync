@@ -111,10 +111,12 @@ export type Database = {
           created_at: string
           departed_at: string | null
           end_at: string
+          extension_charges: number | null
           host_earnings: number | null
           hourly_rate: number
           id: string
           idempotency_key: string | null
+          original_total_amount: number | null
           overstay_action: string | null
           overstay_charge_amount: number | null
           overstay_detected_at: string | null
@@ -141,10 +143,12 @@ export type Database = {
           created_at?: string
           departed_at?: string | null
           end_at: string
+          extension_charges?: number | null
           host_earnings?: number | null
           hourly_rate: number
           id?: string
           idempotency_key?: string | null
+          original_total_amount?: number | null
           overstay_action?: string | null
           overstay_charge_amount?: number | null
           overstay_detected_at?: string | null
@@ -171,10 +175,12 @@ export type Database = {
           created_at?: string
           departed_at?: string | null
           end_at?: string
+          extension_charges?: number | null
           host_earnings?: number | null
           hourly_rate?: number
           id?: string
           idempotency_key?: string | null
+          original_total_amount?: number | null
           overstay_action?: string | null
           overstay_charge_amount?: number | null
           overstay_detected_at?: string | null
