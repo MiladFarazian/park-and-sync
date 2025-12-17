@@ -179,6 +179,23 @@ serve(async (req) => {
       });
       if (balanceError) console.error('Error updating host balance:', balanceError);
 
+      // Notify the host about the extension
+      const extensionMinutes = Math.round(extensionHours * 60);
+      const extensionDisplay = extensionMinutes >= 60 
+        ? `${Math.floor(extensionMinutes / 60)}h ${extensionMinutes % 60 > 0 ? `${extensionMinutes % 60}m` : ''}`
+        : `${extensionMinutes}m`;
+      
+      const { error: notifError } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: booking.spots.host_id,
+          type: 'booking_host',
+          title: 'Booking Extended',
+          message: `A driver extended their parking at ${booking.spots.address} by ${extensionDisplay.trim()}. New end time: ${newEndTime.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true })}`,
+          related_id: bookingId,
+        });
+      if (notifError) console.error('Error creating host notification:', notifError);
+
       return new Response(JSON.stringify({
         success: true,
         message: `Booking extended by ${extensionHours} hour${extensionHours > 1 ? 's' : ''}`,
@@ -296,6 +313,23 @@ serve(async (req) => {
       amount: hostEarnings,
     });
     if (balanceError) console.error('Error updating host balance:', balanceError);
+
+    // Notify the host about the extension
+    const extensionMinutes = Math.round(extensionHours * 60);
+    const extensionDisplay = extensionMinutes >= 60 
+      ? `${Math.floor(extensionMinutes / 60)}h ${extensionMinutes % 60 > 0 ? `${extensionMinutes % 60}m` : ''}`
+      : `${extensionMinutes}m`;
+    
+    const { error: notifError } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: booking.spots.host_id,
+        type: 'booking_host',
+        title: 'Booking Extended',
+        message: `A driver extended their parking at ${booking.spots.address} by ${extensionDisplay.trim()}. New end time: ${newEndTime.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true })}`,
+        related_id: bookingId,
+      });
+    if (notifError) console.error('Error creating host notification:', notifError);
 
     return new Response(JSON.stringify({
       success: true,
