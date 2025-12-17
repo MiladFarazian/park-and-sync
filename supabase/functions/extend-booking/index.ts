@@ -185,16 +185,41 @@ serve(async (req) => {
         ? `${Math.floor(extensionMinutes / 60)}h ${extensionMinutes % 60 > 0 ? `${extensionMinutes % 60}m` : ''}`
         : `${extensionMinutes}m`;
       
+      const notificationMessage = `A driver extended their parking at ${booking.spots.address} by ${extensionDisplay.trim()}. New end time: ${newEndTime.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true })}`;
+      
       const { error: notifError } = await supabase
         .from('notifications')
         .insert({
           user_id: booking.spots.host_id,
           type: 'booking_host',
           title: 'Booking Extended',
-          message: `A driver extended their parking at ${booking.spots.address} by ${extensionDisplay.trim()}. New end time: ${newEndTime.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true })}`,
+          message: notificationMessage,
           related_id: bookingId,
         });
       if (notifError) console.error('Error creating host notification:', notifError);
+
+      // Send push notification to host
+      try {
+        const pushResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-push-notification`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({
+            userId: booking.spots.host_id,
+            title: 'Booking Extended',
+            body: notificationMessage,
+            tag: `extension-${bookingId}`,
+            url: `/host-booking-confirmation/${bookingId}`,
+          }),
+        });
+        if (!pushResponse.ok) {
+          console.error('Push notification failed:', await pushResponse.text());
+        }
+      } catch (pushError) {
+        console.error('Error sending push notification:', pushError);
+      }
 
       return new Response(JSON.stringify({
         success: true,
@@ -320,16 +345,41 @@ serve(async (req) => {
       ? `${Math.floor(extensionMinutes / 60)}h ${extensionMinutes % 60 > 0 ? `${extensionMinutes % 60}m` : ''}`
       : `${extensionMinutes}m`;
     
+    const notificationMessage = `A driver extended their parking at ${booking.spots.address} by ${extensionDisplay.trim()}. New end time: ${newEndTime.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true })}`;
+    
     const { error: notifError } = await supabase
       .from('notifications')
       .insert({
         user_id: booking.spots.host_id,
         type: 'booking_host',
         title: 'Booking Extended',
-        message: `A driver extended their parking at ${booking.spots.address} by ${extensionDisplay.trim()}. New end time: ${newEndTime.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true })}`,
+        message: notificationMessage,
         related_id: bookingId,
       });
     if (notifError) console.error('Error creating host notification:', notifError);
+
+    // Send push notification to host
+    try {
+      const pushResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-push-notification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({
+          userId: booking.spots.host_id,
+          title: 'Booking Extended',
+          body: notificationMessage,
+          tag: `extension-${bookingId}`,
+          url: `/host-booking-confirmation/${bookingId}`,
+        }),
+      });
+      if (!pushResponse.ok) {
+        console.error('Push notification failed:', await pushResponse.text());
+      }
+    } catch (pushError) {
+      console.error('Error sending push notification:', pushError);
+    }
 
     return new Response(JSON.stringify({
       success: true,
