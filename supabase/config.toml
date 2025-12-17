@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.send-listing-confirmation]
 verify_jwt = true
+
+[functions.send-report-notification]
+verify_jwt = true
