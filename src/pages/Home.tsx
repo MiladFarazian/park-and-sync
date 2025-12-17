@@ -14,6 +14,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import Index from './Index';
 import LocationSearchInput from '@/components/ui/location-search-input';
 import { calculateDriverPrice } from '@/lib/pricing';
+import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
 
 const Home = () => {
   const isMobile = useIsMobile();
@@ -266,6 +267,9 @@ const Home = () => {
   return (
     <div className="bg-background">
       <div className="p-4 space-y-6">
+        {/* Active Booking Banner */}
+        <ActiveBookingBanner />
+
         {/* Search Card */}
         <Card className="p-6 space-y-4">
           <LocationSearchInput
