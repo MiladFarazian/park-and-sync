@@ -54,13 +54,12 @@ Deno.serve(async (req) => {
       throw new Error('Booking cannot be modified');
     }
 
-    // Verify modification is at least 1 hour before start time
+    // Verify booking hasn't started yet - after start, driver can only extend
     const startTime = new Date(booking.start_at);
     const now = new Date();
-    const hourBeforeStart = new Date(startTime.getTime() - 60 * 60 * 1000);
 
-    if (now >= hourBeforeStart) {
-      throw new Error('Cannot modify booking less than 1 hour before start time');
+    if (now >= startTime) {
+      throw new Error('Cannot modify booking after it has started. Use extend instead.');
     }
 
     // Validate new times
