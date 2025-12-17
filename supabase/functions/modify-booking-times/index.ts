@@ -103,6 +103,17 @@ Deno.serve(async (req) => {
     const priceDifference = newTotalAmount - booking.total_amount;
     const absoluteDifference = Math.abs(priceDifference);
 
+    console.log('Pricing calculation:', {
+      oldTotalHours: booking.total_hours,
+      newTotalHours,
+      hostHourlyRate,
+      oldTotalAmount: booking.total_amount,
+      newTotalAmount,
+      priceDifference,
+      willCharge: priceDifference > 0,
+      willRefund: priceDifference < 0
+    });
+
     // Only process payment if difference is significant (> $0.50)
     if (absoluteDifference > 0.50) {
       const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
