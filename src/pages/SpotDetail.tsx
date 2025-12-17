@@ -476,15 +476,33 @@ const SpotDetail = () => {
         setIsOwnSpot(isOwner);
         
         // Check if user has an existing active or paid booking for this spot
+        // that OVERLAPS with the requested time range (from URL params)
         if (!isOwner) {
+          const requestedStart = searchParams.get('start');
+          const requestedEnd = searchParams.get('end');
+          
+          // Only check for overlapping bookings if we have requested times
+          // If no times specified, check for any current/future booking
           const now = new Date().toISOString();
-          const { data: existingBooking } = await supabase
+          
+          let query = supabase
             .from('bookings')
             .select('id, start_at, end_at, status')
             .eq('spot_id', spotData.id)
             .eq('renter_id', user.id)
-            .in('status', ['paid', 'active'])
-            .gte('end_at', now) // Only show bookings that haven't ended yet
+            .in('status', ['paid', 'active']);
+          
+          if (requestedStart && requestedEnd) {
+            // Check for overlapping bookings: existing.start < requested.end AND existing.end > requested.start
+            query = query
+              .lt('start_at', requestedEnd)
+              .gt('end_at', requestedStart);
+          } else {
+            // No specific time requested, check for any booking that hasn't ended
+            query = query.gte('end_at', now);
+          }
+          
+          const { data: existingBooking } = await query
             .order('start_at', { ascending: true })
             .limit(1)
             .maybeSingle();

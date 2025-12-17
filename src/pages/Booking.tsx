@@ -222,14 +222,29 @@ const BookingContent = () => {
           }
 
           // Check if user already has an active/paid booking for this spot
-          const now = new Date().toISOString();
-          const { data: existingBookingData } = await supabase
+          // that OVERLAPS with the requested time range
+          const requestedStart = searchParams.get('start');
+          const requestedEnd = searchParams.get('end');
+          
+          let existingQuery = supabase
             .from('bookings')
             .select('id')
             .eq('spot_id', spotId)
             .eq('renter_id', user.id)
-            .in('status', ['paid', 'active'])
-            .gte('end_at', now)
+            .in('status', ['paid', 'active']);
+          
+          if (requestedStart && requestedEnd) {
+            // Check for overlapping bookings: existing.start < requested.end AND existing.end > requested.start
+            existingQuery = existingQuery
+              .lt('start_at', requestedEnd)
+              .gt('end_at', requestedStart);
+          } else {
+            // No specific time, check for any current/future booking
+            const now = new Date().toISOString();
+            existingQuery = existingQuery.gte('end_at', now);
+          }
+          
+          const { data: existingBookingData } = await existingQuery
             .limit(1)
             .maybeSingle();
 
