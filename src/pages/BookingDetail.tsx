@@ -9,7 +9,10 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { ExtendParkingDialog } from '@/components/booking/ExtendParkingDialog';
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, AlertTriangle, CheckCircle2, Copy, TimerReset } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, AlertTriangle, CheckCircle2, Copy, TimerReset, Flag } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { calculateBookingTotal, calculateDriverPrice } from '@/lib/pricing';
@@ -67,6 +70,10 @@ const BookingDetailContent = () => {
   const [modifyStartTime, setModifyStartTime] = useState<Date | null>(null);
   const [modifyEndTime, setModifyEndTime] = useState<Date | null>(null);
   const [modifying, setModifying] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDetails, setReportDetails] = useState('');
+  const [submittingReport, setSubmittingReport] = useState(false);
 
   useEffect(() => {
     if (!bookingId || !user) return;
@@ -346,6 +353,47 @@ const BookingDetailContent = () => {
     
     return { subtotal: driverSubtotal, serviceFee, total: driverTotal, hours, difference, driverHourlyRate };
   };
+
+  const handleReportSpot = () => {
+    if (!user) {
+      toast.error('Please sign in to report a listing');
+      return;
+    }
+    setReportDialogOpen(true);
+  };
+
+  const handleSubmitReport = async () => {
+    if (!reportReason) {
+      toast.error('Please select a reason for reporting');
+      return;
+    }
+    if (!user || !booking?.spots?.id) return;
+
+    setSubmittingReport(true);
+    try {
+      const { error } = await supabase
+        .from('spot_reports')
+        .insert({
+          spot_id: booking.spots.id,
+          reporter_id: user.id,
+          reason: reportReason,
+          details: reportDetails.trim() || null
+        });
+
+      if (error) throw error;
+
+      toast.success('Report submitted. We will review it shortly.');
+      setReportReason('');
+      setReportDetails('');
+      setReportDialogOpen(false);
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      toast.error('Failed to submit report');
+    } finally {
+      setSubmittingReport(false);
+    }
+  };
+
 
   if (loading) {
     return (
@@ -767,6 +815,19 @@ const BookingDetailContent = () => {
             </div>
           </Card>
         )}
+
+        {/* Report Listing Option (Renters Only) */}
+        {!isHost && (
+          <div className="flex justify-center">
+            <button
+              onClick={handleReportSpot}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Flag className="h-4 w-4" />
+              Report Listing
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Extend Parking Dialog (same as Activity page) */}
@@ -829,6 +890,80 @@ const BookingDetailContent = () => {
               Cancel Booking
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Report Listing Dialog */}
+      <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Report Listing</DialogTitle>
+            <DialogDescription>
+              Help us keep Parkzy safe by reporting inappropriate listings
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <RadioGroup value={reportReason} onValueChange={setReportReason}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="inaccurate_info" id="bd_inaccurate_info" />
+                <Label htmlFor="bd_inaccurate_info">Inaccurate information</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="misleading_photos" id="bd_misleading_photos" />
+                <Label htmlFor="bd_misleading_photos">Misleading photos</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="scam" id="bd_scam" />
+                <Label htmlFor="bd_scam">Suspected scam or fraud</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="unsafe" id="bd_unsafe" />
+                <Label htmlFor="bd_unsafe">Unsafe location</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="unavailable" id="bd_unavailable" />
+                <Label htmlFor="bd_unavailable">Spot doesn't exist or unavailable</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="other" id="bd_other" />
+                <Label htmlFor="bd_other">Other</Label>
+              </div>
+            </RadioGroup>
+            <Textarea
+              placeholder="Additional details (optional)"
+              value={reportDetails}
+              onChange={(e) => setReportDetails(e.target.value)}
+              rows={3}
+              className="resize-none"
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setReportDialogOpen(false);
+                  setReportReason('');
+                  setReportDetails('');
+                }}
+                disabled={submittingReport}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSubmitReport} 
+                disabled={submittingReport || !reportReason}
+                variant="destructive"
+              >
+                {submittingReport ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  'Submit Report'
+                )}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
