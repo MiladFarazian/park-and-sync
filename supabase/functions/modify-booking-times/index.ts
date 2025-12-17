@@ -124,10 +124,24 @@ Deno.serve(async (req) => {
         // Charge additional amount
         console.log(`Charging additional $${absoluteDifference.toFixed(2)}`);
         
+        // Get customer's default payment method
+        const paymentMethods = await stripe.paymentMethods.list({
+          customer: profile.stripe_customer_id,
+          type: 'card',
+          limit: 1,
+        });
+
+        if (paymentMethods.data.length === 0) {
+          throw new Error('No payment method on file. Please add a payment method first.');
+        }
+
+        const defaultPaymentMethod = paymentMethods.data[0].id;
+        
         const paymentIntent = await stripe.paymentIntents.create({
           amount: Math.round(absoluteDifference * 100),
           currency: 'usd',
           customer: profile.stripe_customer_id,
+          payment_method: defaultPaymentMethod,
           description: `Booking modification for ${booking.spots.title}`,
           metadata: {
             booking_id: bookingId,
