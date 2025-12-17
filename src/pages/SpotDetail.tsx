@@ -475,25 +475,22 @@ const SpotDetail = () => {
         });
         setIsOwnSpot(isOwner);
         
-        // Check if user has an existing booking for this spot within the search time range
+        // Check if user has an existing active or paid booking for this spot
         if (!isOwner) {
-          const start = searchParams.get('start');
-          const end = searchParams.get('end');
+          const now = new Date().toISOString();
+          const { data: existingBooking } = await supabase
+            .from('bookings')
+            .select('id, start_at, end_at, status')
+            .eq('spot_id', spotData.id)
+            .eq('renter_id', user.id)
+            .in('status', ['paid', 'active'])
+            .gte('end_at', now) // Only show bookings that haven't ended yet
+            .order('start_at', { ascending: true })
+            .limit(1)
+            .maybeSingle();
           
-          if (start && end) {
-            const { data: existingBooking } = await supabase
-              .from('bookings')
-              .select('id, start_at, end_at, status')
-              .eq('spot_id', spotData.id)
-              .eq('renter_id', user.id)
-              .in('status', ['paid', 'active'])
-              .gte('end_at', start)
-              .lte('start_at', end)
-              .maybeSingle();
-            
-            if (existingBooking) {
-              setUserBooking(existingBooking);
-            }
+          if (existingBooking) {
+            setUserBooking(existingBooking);
           }
         }
       }
