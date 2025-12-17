@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, ChevronLeft, Clock, DollarSign, Calendar } from 'lucide-react';
-import { calculateBookingTotal } from '@/lib/pricing';
+import { Loader2, ChevronLeft, Clock, DollarSign } from 'lucide-react';
 import { format, addDays, startOfDay, setHours, setMinutes, differenceInMinutes } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { loadStripe } from '@stripe/stripe-js';
@@ -162,8 +161,8 @@ export const ExtendParkingDialog = ({
 
   const getExtensionCost = (hrs: number) => {
     if (!booking) return 0;
-    const { driverTotal } = calculateBookingTotal(booking.hourly_rate || 5, hrs);
-    return driverTotal;
+    // Simple proportional pricing: hourly_rate * hours
+    return Math.round((booking.hourly_rate || 5) * hrs * 100) / 100;
   };
 
   const calculateCustomExtensionCost = () => {
@@ -174,8 +173,9 @@ export const ExtendParkingDialog = ({
     
     if (hrs <= 0) return { hours: 0, cost: 0 };
     
-    const { driverTotal } = calculateBookingTotal(booking.hourly_rate || 5, hrs);
-    return { hours: hrs, cost: driverTotal };
+    // Simple proportional pricing: hourly_rate * hours
+    const cost = Math.round((booking.hourly_rate || 5) * hrs * 100) / 100;
+    return { hours: hrs, cost };
   };
 
   const validateCustomTime = () => {
