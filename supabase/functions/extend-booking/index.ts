@@ -221,6 +221,31 @@ serve(async (req) => {
         console.error('Error sending push notification:', pushError);
       }
 
+      // Notify driver of successful extension
+      const driverMessage = `Your parking has been extended by ${extensionDisplay.trim()}. New end time: ${newEndTime.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true })}`;
+      
+      try {
+        const driverPushResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-push-notification`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({
+            userId: userData.user.id,
+            title: 'Extension Confirmed',
+            body: driverMessage,
+            tag: `extension-confirmed-${bookingId}`,
+            url: `/booking/${bookingId}`,
+          }),
+        });
+        if (!driverPushResponse.ok) {
+          console.error('Driver push notification failed:', await driverPushResponse.text());
+        }
+      } catch (pushError) {
+        console.error('Error sending driver push notification:', pushError);
+      }
+
       return new Response(JSON.stringify({
         success: true,
         message: `Booking extended by ${extensionHours} hour${extensionHours > 1 ? 's' : ''}`,
@@ -379,6 +404,31 @@ serve(async (req) => {
       }
     } catch (pushError) {
       console.error('Error sending push notification:', pushError);
+    }
+
+    // Notify driver of successful extension
+    const driverMessage = `Your parking has been extended by ${extensionDisplay.trim()}. New end time: ${newEndTime.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true })}`;
+    
+    try {
+      const driverPushResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-push-notification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({
+          userId: userData.user.id,
+          title: 'Extension Confirmed',
+          body: driverMessage,
+          tag: `extension-confirmed-${bookingId}`,
+          url: `/booking/${bookingId}`,
+        }),
+      });
+      if (!driverPushResponse.ok) {
+        console.error('Driver push notification failed:', await driverPushResponse.text());
+      }
+    } catch (pushError) {
+      console.error('Error sending driver push notification:', pushError);
     }
 
     return new Response(JSON.stringify({
