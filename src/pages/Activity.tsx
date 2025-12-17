@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ReviewModal } from '@/components/booking/ReviewModal';
 import { calculateBookingTotal } from '@/lib/pricing';
 import { loadStripe } from '@stripe/stripe-js';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const QUICK_EXTEND_OPTIONS = [
   { label: '30 min', hours: 0.5 },
@@ -404,76 +405,108 @@ const Activity = () => {
             </div>
 
             {/* Mobile Actions - Icon Only */}
-            <div className="p-3 flex gap-2 border-t bg-background" onClick={(e) => e.stopPropagation()}>
-              {booking.userRole === 'renter' && (
-                <>
-                  <Button 
-                    variant="outline" 
-                    size="icon"
-                    className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
-                    onClick={handleGetDirections}
-                  >
-                    <Navigation className="h-4 w-4" />
-                  </Button>
-                  {canExtend && (
+            <TooltipProvider>
+              <div className="p-3 flex gap-2 border-t bg-background" onClick={(e) => e.stopPropagation()}>
+                {booking.userRole === 'renter' && (
+                  <>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+                          onClick={handleGetDirections}
+                        >
+                          <Navigation className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Directions</TooltipContent>
+                    </Tooltip>
+                    {canExtend && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            size="icon"
+                            className="flex-1 hover:bg-green-50 hover:text-green-600 hover:border-green-300 transition-colors"
+                            onClick={handleExtend}
+                          >
+                            <TimerReset className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Extend</TooltipContent>
+                      </Tooltip>
+                    )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+                          onClick={handleModify}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Details</TooltipContent>
+                    </Tooltip>
+                  </>
+                )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
                     <Button 
                       variant="outline" 
                       size="icon"
-                      className="flex-1 hover:bg-green-50 hover:text-green-600 hover:border-green-300 transition-colors"
-                      onClick={handleExtend}
+                      className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (otherPartyId) {
+                          navigate(`/messages?userId=${otherPartyId}`);
+                        }
+                      }} 
+                      disabled={!otherPartyId}
                     >
-                      <TimerReset className="h-4 w-4" />
+                      <MessageCircle className="h-4 w-4" />
                     </Button>
-                  )}
-                  <Button 
-                    variant="outline" 
-                    size="icon"
-                    className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
-                    onClick={handleModify}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                </>
-              )}
-              <Button 
-                variant="outline" 
-                size="icon"
-                className="flex-1 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (otherPartyId) {
-                    navigate(`/messages?userId=${otherPartyId}`);
-                  }
-                }} 
-                disabled={!otherPartyId}
-              >
-                <MessageCircle className="h-4 w-4" />
-              </Button>
-              {canReview && (
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  className="flex-1 hover:bg-yellow-50 hover:text-yellow-600 hover:border-yellow-300 transition-colors"
-                  onClick={handleReview}
-                >
-                  <Star className="h-4 w-4" />
-                </Button>
-              )}
-              {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && (
-                <Button 
-                  variant="destructive" 
-                  size="icon"
-                  className="flex-1"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedBooking(booking);
-                    setCancelDialogOpen(true);
-                  }}
-                >
-                  <XCircle className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
+                  </TooltipTrigger>
+                  <TooltipContent>Message</TooltipContent>
+                </Tooltip>
+                {canReview && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        className="flex-1 hover:bg-yellow-50 hover:text-yellow-600 hover:border-yellow-300 transition-colors"
+                        onClick={handleReview}
+                      >
+                        <Star className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Review</TooltipContent>
+                  </Tooltip>
+                )}
+                {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="destructive" 
+                        size="icon"
+                        className="flex-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedBooking(booking);
+                          setCancelDialogOpen(true);
+                        }}
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Cancel</TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            </TooltipProvider>
           </div>
 
           {/* Desktop Layout - Unchanged */}
@@ -579,43 +612,64 @@ const Activity = () => {
                   </Button>
                 </>
               )}
-              <Button 
-                variant="outline" 
-                size="icon"
-                className="shrink-0 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (otherPartyId) {
-                    navigate(`/messages?userId=${otherPartyId}`);
-                  }
-                }} 
-                disabled={!otherPartyId}
-              >
-                <MessageCircle className="h-4 w-4" />
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      className="shrink-0 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (otherPartyId) {
+                          navigate(`/messages?userId=${otherPartyId}`);
+                        }
+                      }} 
+                      disabled={!otherPartyId}
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Message</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               {canReview && (
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  className="shrink-0 hover:bg-yellow-50 hover:text-yellow-600 hover:border-yellow-300 transition-colors"
-                  onClick={handleReview}
-                >
-                  <Star className="h-4 w-4" />
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        className="shrink-0 hover:bg-yellow-50 hover:text-yellow-600 hover:border-yellow-300 transition-colors"
+                        onClick={handleReview}
+                      >
+                        <Star className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Review</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
               {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && (
-                <Button 
-                  variant="destructive" 
-                  size="icon"
-                  className="shrink-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedBooking(booking);
-                    setCancelDialogOpen(true);
-                  }}
-                >
-                  <XCircle className="h-4 w-4" />
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="destructive" 
+                        size="icon"
+                        className="shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedBooking(booking);
+                          setCancelDialogOpen(true);
+                        }}
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Cancel</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </div>
           </div>
