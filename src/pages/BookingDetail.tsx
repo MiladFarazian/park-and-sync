@@ -536,7 +536,17 @@ const BookingDetailContent = () => {
               <Clock className="h-4 w-4 text-muted-foreground" />
               <div className="flex-1">
                 <p className="text-sm font-medium">Duration</p>
-                <p className="text-sm text-muted-foreground">{booking.total_hours} hour{booking.total_hours !== 1 ? 's' : ''}</p>
+                <p className="text-sm text-muted-foreground">
+                  {(() => {
+                    const durationMs = new Date(booking.end_at).getTime() - new Date(booking.start_at).getTime();
+                    const totalMinutes = Math.round(durationMs / (1000 * 60));
+                    const hours = Math.floor(totalMinutes / 60);
+                    const minutes = totalMinutes % 60;
+                    if (hours === 0) return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+                    if (minutes === 0) return `${hours} hour${hours !== 1 ? 's' : ''}`;
+                    return `${hours} hour${hours !== 1 ? 's' : ''} ${minutes} min`;
+                  })()}
+                </p>
               </div>
             </div>
           </div>
@@ -547,7 +557,17 @@ const BookingDetailContent = () => {
           <h3 className="font-semibold">Payment Details</h3>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">{booking.total_hours}h × ${calculateDriverPrice(booking.hourly_rate).toFixed(2)}/hr</span>
+              <span className="text-muted-foreground">
+                {(() => {
+                  const durationMs = new Date(booking.end_at).getTime() - new Date(booking.start_at).getTime();
+                  const totalMinutes = Math.round(durationMs / (1000 * 60));
+                  const hours = Math.floor(totalMinutes / 60);
+                  const minutes = totalMinutes % 60;
+                  if (hours === 0) return `${minutes}min`;
+                  if (minutes === 0) return `${hours}h`;
+                  return `${hours}h ${minutes}min`;
+                })()} × ${calculateDriverPrice(booking.hourly_rate).toFixed(2)}/hr
+              </span>
               <span className="font-medium">${booking.subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm">
