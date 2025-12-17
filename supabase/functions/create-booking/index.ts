@@ -135,9 +135,10 @@ serve(async (req) => {
     // - Service fee is separate and visible (20% of host earnings or $1 min)
     const startDate = new Date(start_at);
     const endDate = new Date(end_at);
-    const totalHours = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60));
+    // Calculate actual hours as decimal (e.g., 0.5 for 30 minutes)
+    const totalHours = Math.round(((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)) * 100) / 100;
     const hostHourlyRate = parseFloat(spot.hourly_rate);
-    const hostEarnings = totalHours * hostHourlyRate; // What host actually earns
+    const hostEarnings = Math.round(totalHours * hostHourlyRate * 100) / 100; // What host actually earns
     
     // Invisible upcharge on hourly rate
     const upcharge = Math.max(hostHourlyRate * 0.20, 1.00);
@@ -150,6 +151,8 @@ serve(async (req) => {
     const subtotal = driverSubtotal; // What driver sees as rate × hours
     const platformFee = serviceFee; // Visible service fee
     const totalAmount = Math.round((driverSubtotal + serviceFee) * 100) / 100;
+    
+    console.log('Pricing calculated:', { totalHours, hostHourlyRate, hostEarnings, driverSubtotal, serviceFee, totalAmount });
 
     // Initialize Stripe
     const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');
