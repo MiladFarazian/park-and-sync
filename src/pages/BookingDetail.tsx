@@ -371,13 +371,12 @@ const BookingDetailContent = () => {
   const isHost = user?.id === booking.spots.host_id;
   const isRenter = booking?.renter_id === user?.id;
   
-  // Can modify if renter, booking is active/paid, and more than 1 hour before start
+  // Can modify if renter, booking is active/paid, and booking hasn't started yet
   const canModifyTimes = () => {
     if (!isRenter || (!isActive && booking.status !== 'pending')) return false;
     const startTime = new Date(booking.start_at);
     const now = new Date();
-    const hourBeforeStart = new Date(startTime.getTime() - 60 * 60 * 1000);
-    return now < hourBeforeStart;
+    return now < startTime;
   };
 
   // Check if booking is ending soon or has just ended for departure confirmation
