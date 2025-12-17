@@ -52,7 +52,7 @@ export const ExtendParkingDialog = ({
 
   const days = generateDays();
   const hours = Array.from({ length: 12 }, (_, i) => i + 1);
-  const minutes = [0, 15, 30, 45];
+  const minutes = Array.from({ length: 60 }, (_, i) => i); // All 60 minutes
   const periods = ['AM', 'PM'];
 
   const getInitialValues = () => {
@@ -64,7 +64,7 @@ export const ExtendParkingDialog = ({
     let hour = baseTime.getHours();
     const period = hour >= 12 ? 'PM' : 'AM';
     hour = hour % 12 || 12;
-    const minute = Math.floor(baseTime.getMinutes() / 15) * 15;
+    const minute = baseTime.getMinutes(); // Use exact minute, not rounded
     
     return {
       dayIndex: dayIndex >= 0 ? dayIndex : 0,
