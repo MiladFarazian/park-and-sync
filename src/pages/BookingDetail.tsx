@@ -401,6 +401,12 @@ const BookingDetailContent = () => {
 
   const modifyCost = calculateModifyCost();
 
+  const baseTotal = (booking.subtotal ?? 0) + (booking.platform_fee ?? 0);
+  const inferredExtensionCharges = Math.max(0, (booking.total_amount ?? 0) - baseTotal);
+  const extensionChargesToShow = (booking.extension_charges ?? 0) > 0
+    ? (booking.extension_charges ?? 0)
+    : inferredExtensionCharges;
+
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* Header */}
@@ -548,13 +554,13 @@ const BookingDetailContent = () => {
               <span className="text-muted-foreground">Service fee</span>
               <span className="font-medium">${booking.platform_fee.toFixed(2)}</span>
             </div>
-            {(booking.extension_charges ?? 0) > 0 && (
+            {extensionChargesToShow > 0.01 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground flex items-center gap-1">
                   <TimerReset className="h-3 w-3" />
                   Extension Charges
                 </span>
-                <span className="font-medium">${(booking.extension_charges ?? 0).toFixed(2)}</span>
+                <span className="font-medium">${extensionChargesToShow.toFixed(2)}</span>
               </div>
             )}
             {booking.overstay_charge_amount > 0 && (
