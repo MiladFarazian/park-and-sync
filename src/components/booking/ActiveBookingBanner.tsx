@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,11 +9,18 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus, Navigation, Edit, AlertCircle, CheckCircle2, TimerReset } from "lucide-react";
+import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus, Navigation, Edit, AlertCircle, CheckCircle2, TimerReset, MapPin } from "lucide-react";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { toast } from "sonner";
 import { formatDistanceToNow, addHours, format } from "date-fns";
+import { ReviewModal } from "./ReviewModal";
+
+interface HostProfile {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+}
 
 interface ActiveBooking {
   id: string;
@@ -32,6 +39,7 @@ interface ActiveBooking {
     address: string;
     host_id: string;
     hourly_rate: number;
+    host_profile?: HostProfile;
   };
   profiles: {
     first_name: string;
@@ -54,6 +62,10 @@ export const ActiveBookingBanner = () => {
   const [stripePublishableKey, setStripePublishableKey] = useState<string | null>(null);
   const [stripePromise, setStripePromise] = useState<Promise<any> | null>(null);
   const [confirmingDeparture, setConfirmingDeparture] = useState(false);
+  const [showDepartureDialog, setShowDepartureDialog] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [hostProfile, setHostProfile] = useState<HostProfile | null>(null);
+  const departureDialogShownRef = useRef<string | null>(null);
   const isHost = activeBooking && profile?.user_id === activeBooking.spots.host_id;
 
   useEffect(() => {
@@ -113,6 +125,16 @@ export const ActiveBookingBanner = () => {
       // Only show bookings where user is the renter
       const { data: renterData } = await query.eq('renter_id', user.id).maybeSingle();
       setActiveBooking(renterData as ActiveBooking);
+      
+      // Fetch host profile for review modal
+      if (renterData) {
+        const { data: hostData } = await supabase
+          .from('profiles')
+          .select('user_id, first_name, last_name')
+          .eq('user_id', renterData.spots.host_id)
+          .maybeSingle();
+        setHostProfile(hostData);
+      }
     } else if (mode === 'host') {
       // Only show bookings where user's spot is being rented by someone else
       const { data: hostData } = await query
@@ -122,6 +144,32 @@ export const ActiveBookingBanner = () => {
       setActiveBooking(hostData as ActiveBooking);
     }
   };
+
+  // Show departure dialog when booking end time passes
+  useEffect(() => {
+    if (!activeBooking || isHost || mode !== 'driver') return;
+    
+    const endTime = new Date(activeBooking.end_at);
+    const now = new Date();
+    
+    // If already past end time and we haven't shown dialog for this booking yet
+    if (now > endTime && departureDialogShownRef.current !== activeBooking.id) {
+      departureDialogShownRef.current = activeBooking.id;
+      setShowDepartureDialog(true);
+    } else if (now <= endTime) {
+      // Set a timer to show dialog when end time passes
+      const timeUntilEnd = endTime.getTime() - now.getTime();
+      if (timeUntilEnd > 0) {
+        const timer = setTimeout(() => {
+          if (departureDialogShownRef.current !== activeBooking.id) {
+            departureDialogShownRef.current = activeBooking.id;
+            setShowDepartureDialog(true);
+          }
+        }, timeUntilEnd);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [activeBooking, isHost, mode]);
 
   const getStripeKey = async (): Promise<string> => {
     if (stripePublishableKey) return stripePublishableKey;
@@ -145,7 +193,7 @@ export const ActiveBookingBanner = () => {
     }
   };
 
-  const handleConfirmDeparture = async () => {
+  const handleConfirmDeparture = async (fromDialog = false) => {
     if (!activeBooking) return;
 
     setConfirmingDeparture(true);
@@ -157,6 +205,15 @@ export const ActiveBookingBanner = () => {
       if (error) throw error;
 
       toast.success('Departure confirmed! Thank you.');
+      
+      // Close departure dialog if it was open
+      if (fromDialog) {
+        setShowDepartureDialog(false);
+      }
+      
+      // Show review modal after confirming departure
+      setShowReviewModal(true);
+      
       await loadActiveBooking();
     } catch (error) {
       console.error('Error confirming departure:', error);
@@ -521,7 +578,7 @@ export const ActiveBookingBanner = () => {
                     {canConfirmDeparture() && (
                       <Button
                         size="sm"
-                        onClick={handleConfirmDeparture}
+                        onClick={() => handleConfirmDeparture()}
                         disabled={confirmingDeparture}
                         className="flex-1"
                       >
@@ -782,6 +839,62 @@ export const ActiveBookingBanner = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Departure Confirmation Dialog */}
+      <Dialog open={showDepartureDialog} onOpenChange={setShowDepartureDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-primary" />
+              Your parking time has ended
+            </DialogTitle>
+            <DialogDescription>
+              Have you left the parking spot at {activeBooking?.spots.address}?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <div className="p-4 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                If you haven't left yet, please vacate as soon as possible to avoid overtime charges.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowDepartureDialog(false)}
+              className="w-full sm:w-auto"
+            >
+              Not yet
+            </Button>
+            <Button
+              onClick={() => handleConfirmDeparture(true)}
+              disabled={confirmingDeparture}
+              className="w-full sm:w-auto"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              {confirmingDeparture ? 'Confirming...' : "Yes, I've left"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Review Modal */}
+      {activeBooking && hostProfile && (
+        <ReviewModal
+          open={showReviewModal}
+          onOpenChange={setShowReviewModal}
+          bookingId={activeBooking.id}
+          revieweeId={hostProfile.user_id}
+          revieweeName={`${hostProfile.first_name || ''} ${hostProfile.last_name || ''}`.trim() || 'Host'}
+          reviewerRole="driver"
+          onReviewSubmitted={() => {
+            setShowReviewModal(false);
+          }}
+        />
+      )}
     </>
   );
 };
