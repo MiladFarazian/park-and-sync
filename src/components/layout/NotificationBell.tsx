@@ -6,12 +6,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { useMode } from "@/contexts/ModeContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Notification {
   id: string;
@@ -29,9 +30,11 @@ export const NotificationBell = () => {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const { mode, setMode } = useMode();
+  const { user } = useAuth();
+  const channelRef = useRef<any>(null);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchNotifications = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+  const fetchNotifications = useCallback(async () => {
     if (!user) return;
 
     const { data, error } = await supabase
@@ -45,31 +48,65 @@ export const NotificationBell = () => {
       setNotifications(data);
       setUnreadCount(data.filter((n) => !n.read).length);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
+    if (!user) return;
+
+    // Initial fetch
     fetchNotifications();
 
-    // Subscribe to new notifications
-    const channel = supabase
-      .channel("notifications")
+    // Set up realtime subscription with user filter
+    const channelName = `notifications-${user.id}-${Date.now()}`;
+    channelRef.current = supabase
+      .channel(channelName)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "notifications",
+          filter: `user_id=eq.${user.id}`,
         },
-        () => {
+        (payload) => {
+          console.log('[NotificationBell] Realtime update:', payload.eventType);
           fetchNotifications();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[NotificationBell] Subscription status:', status);
+      });
+
+    // Polling fallback every 10 seconds for reliability
+    pollingRef.current = setInterval(() => {
+      fetchNotifications();
+    }, 10000);
+
+    // Refresh on visibility change (when user returns to tab)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchNotifications();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Refresh on window focus
+    const handleFocus = () => {
+      fetchNotifications();
+    };
+    window.addEventListener('focus', handleFocus);
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
     };
-  }, []);
+  }, [user, fetchNotifications]);
 
   const markAsRead = async (notificationId: string) => {
     await supabase
