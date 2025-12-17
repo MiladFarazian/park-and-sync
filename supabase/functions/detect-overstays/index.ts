@@ -112,7 +112,7 @@ serve(async (req) => {
           const notifTitle = '⏰ 15 Minutes Left';
           const notifMessage = `Your parking at ${booking.spots.title} ends in 15 minutes. Tap to extend your booking.`;
 
-          await supabaseClient
+          const { error: notifError } = await supabaseClient
             .from('notifications')
             .insert({
               user_id: booking.renter_id,
@@ -121,6 +121,12 @@ serve(async (req) => {
               message: notifMessage,
               related_id: booking.id,
             });
+
+          if (notifError) {
+            console.error(`Failed to insert 15-min warning notification for booking ${booking.id}:`, notifError);
+          } else {
+            console.log(`Sent 15-minute warning notification to user ${booking.renter_id} for booking ${booking.id}`);
+          }
 
           // Send push notification
           await sendPushNotification(
@@ -132,8 +138,6 @@ serve(async (req) => {
             `/booking/${booking.id}`,
             false
           );
-
-          console.log(`Sent 15-minute warning to user ${booking.renter_id} for booking ${booking.id}`);
         }
       }
     }
@@ -184,7 +188,7 @@ serve(async (req) => {
       const renterTitle = '🚨 Grace Period - Leave Now!';
       const renterMessage = `Your parking at ${booking.spots.title} has expired! You have 10 minutes to leave or you WILL be charged $25/hour and may be towed. Tap to extend or confirm departure.`;
       
-      await supabaseClient
+      const { error: renterNotifError } = await supabaseClient
         .from('notifications')
         .insert({
           user_id: booking.renter_id,
@@ -193,6 +197,12 @@ serve(async (req) => {
           message: renterMessage,
           related_id: booking.id,
         });
+
+      if (renterNotifError) {
+        console.error(`Failed to insert overstay warning notification for booking ${booking.id}:`, renterNotifError);
+      } else {
+        console.log(`Sent grace period warning notification to renter ${booking.renter_id} for booking ${booking.id}`);
+      }
 
       // Send PUSH notification to renter (works even when app is closed)
       await sendPushNotification(
@@ -209,7 +219,7 @@ serve(async (req) => {
       const hostTitle = 'Guest Overstay Detected';
       const hostMessage = `Guest at ${booking.spots.title} has exceeded their booking time. 10-minute grace period started.`;
       
-      await supabaseClient
+      const { error: hostNotifError } = await supabaseClient
         .from('notifications')
         .insert({
           user_id: booking.spots.host_id,
@@ -218,6 +228,12 @@ serve(async (req) => {
           message: hostMessage,
           related_id: booking.id,
         });
+
+      if (hostNotifError) {
+        console.error(`Failed to insert host overstay notification for booking ${booking.id}:`, hostNotifError);
+      } else {
+        console.log(`Sent overstay notification to host ${booking.spots.host_id} for booking ${booking.id}`);
+      }
 
       // Send PUSH notification to host
       await sendPushNotification(
@@ -253,7 +269,7 @@ serve(async (req) => {
 
     for (const booking of postGraceBookings || []) {
       // Notify host that grace period has ended and they can take action
-      await supabaseClient
+      const { error: hostActionError } = await supabaseClient
         .from('notifications')
         .insert({
           user_id: booking.spots.host_id,
@@ -263,8 +279,12 @@ serve(async (req) => {
           related_id: booking.id,
         });
 
+      if (hostActionError) {
+        console.error(`Failed to insert host action notification for booking ${booking.id}:`, hostActionError);
+      }
+
       // Notify guest that grace period has ended
-      await supabaseClient
+      const { error: guestGraceError } = await supabaseClient
         .from('notifications')
         .insert({
           user_id: booking.renter_id,
@@ -273,6 +293,10 @@ serve(async (req) => {
           message: `Your grace period has ended. Please vacate ${booking.spots.title} immediately or you may incur overtime charges.`,
           related_id: booking.id,
         });
+
+      if (guestGraceError) {
+        console.error(`Failed to insert guest grace ended notification for booking ${booking.id}:`, guestGraceError);
+      }
     }
 
     // Calculate overtime charges for bookings with charging action
@@ -312,7 +336,7 @@ serve(async (req) => {
         // Send notification every $25 increment
         const chargeIncrease = overtimeCharge - (booking.overstay_charge_amount || 0);
         if (chargeIncrease >= 25) {
-          await supabaseClient
+          const { error: chargeNotifError } = await supabaseClient
             .from('notifications')
             .insert({
               user_id: booking.renter_id,
@@ -321,6 +345,10 @@ serve(async (req) => {
               message: `You are still parked at ${booking.spots.title} past your booking time. Current overtime charge: $${overtimeCharge}. Please vacate immediately.`,
               related_id: booking.id,
             });
+
+          if (chargeNotifError) {
+            console.error(`Failed to insert charge update notification for booking ${booking.id}:`, chargeNotifError);
+          }
         }
       }
     }
@@ -356,7 +384,7 @@ serve(async (req) => {
         .eq('id', booking.id);
 
       // Notify host
-      await supabaseClient
+      const { error: hostCompleteError } = await supabaseClient
         .from('notifications')
         .insert({
           user_id: booking.spots.host_id,
@@ -366,8 +394,12 @@ serve(async (req) => {
           related_id: booking.id,
         });
 
+      if (hostCompleteError) {
+        console.error(`Failed to insert host booking completed notification for booking ${booking.id}:`, hostCompleteError);
+      }
+
       // Notify renter
-      await supabaseClient
+      const { error: renterCompleteError } = await supabaseClient
         .from('notifications')
         .insert({
           user_id: booking.renter_id,
@@ -375,7 +407,11 @@ serve(async (req) => {
           title: 'Booking Completed',
           message: `Your booking at ${booking.spots.title} has been completed.`,
           related_id: booking.id,
-      });
+        });
+
+      if (renterCompleteError) {
+        console.error(`Failed to insert renter booking completed notification for booking ${booking.id}:`, renterCompleteError);
+      }
     }
 
     // Auto-complete bookings with overstays that have been resolved
@@ -418,7 +454,7 @@ serve(async (req) => {
         console.log(`Completed overstay booking ${booking.id} with final charge: $${finalCharge}`);
         
         // Notify renter about the final charge
-        await supabaseClient
+        const { error: finalChargeError } = await supabaseClient
           .from('notifications')
           .insert({
             user_id: booking.renter_id,
@@ -427,9 +463,13 @@ serve(async (req) => {
             message: `Your booking at ${booking.spots.title} has been completed. You were charged $${finalCharge} for overstaying. Total charge: $${(booking.total_amount + finalCharge).toFixed(2)}.`,
             related_id: booking.id,
           });
+
+        if (finalChargeError) {
+          console.error(`Failed to insert final charge notification for booking ${booking.id}:`, finalChargeError);
+        }
         
         // Notify host
-        await supabaseClient
+        const { error: hostOverstayCompleteError } = await supabaseClient
           .from('notifications')
           .insert({
             user_id: booking.spots.host_id,
@@ -438,6 +478,10 @@ serve(async (req) => {
             message: `Booking at ${booking.spots.title} completed with $${finalCharge} overtime charge applied.`,
             related_id: booking.id,
           });
+
+        if (hostOverstayCompleteError) {
+          console.error(`Failed to insert host overstay complete notification for booking ${booking.id}:`, hostOverstayCompleteError);
+        }
       }
     }
 
