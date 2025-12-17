@@ -370,7 +370,9 @@ const BookingDetailContent = () => {
   const isCancelled = booking.status === 'canceled';
   const isCompleted = booking.status === 'completed';
   const canCancel = isActive && new Date() < new Date(booking.start_at);
-  const canExtend = (booking.status === 'pending' || booking.status === 'active' || booking.status === 'paid') && new Date() < new Date(booking.end_at);
+  // Can extend only after booking has started (before start: use modify instead)
+  const bookingHasStarted = new Date() >= new Date(booking.start_at);
+  const canExtend = (booking.status === 'pending' || booking.status === 'active' || booking.status === 'paid') && bookingHasStarted && new Date() < new Date(booking.end_at);
   const isHost = user?.id === booking.spots.host_id;
   const isRenter = booking?.renter_id === user?.id;
   
