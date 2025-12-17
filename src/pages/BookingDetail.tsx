@@ -32,6 +32,8 @@ interface BookingDetails {
   overstay_action: string | null;
   cancellation_reason: string | null;
   renter_id: string;
+  original_total_amount: number | null;
+  extension_charges: number | null;
   spots: {
     id: string;
     title: string;
@@ -107,6 +109,8 @@ const BookingDetailContent = () => {
           overstay_action,
           renter_id,
           cancellation_reason,
+          original_total_amount,
+          extension_charges,
           spots!inner(id, title, address, host_id, description, access_notes),
           profiles!bookings_renter_id_fkey(first_name, last_name, avatar_url)
         `)
@@ -544,6 +548,15 @@ const BookingDetailContent = () => {
               <span className="text-muted-foreground">Service fee</span>
               <span className="font-medium">${booking.platform_fee.toFixed(2)}</span>
             </div>
+            {(booking.extension_charges ?? 0) > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <TimerReset className="h-3 w-3" />
+                  Extension Charges
+                </span>
+                <span className="font-medium">${(booking.extension_charges ?? 0).toFixed(2)}</span>
+              </div>
+            )}
             {booking.overstay_charge_amount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-destructive flex items-center gap-1">

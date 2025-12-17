@@ -153,12 +153,17 @@ serve(async (req) => {
         throw new Error('Payment not completed');
       }
 
-      // Update the booking with new end time
+      // Update the booking with new end time and track extension charges
+      const currentExtensionCharges = booking.extension_charges || 0;
+      const originalTotal = booking.original_total_amount || booking.total_amount;
+      
       const { error: updateError } = await supabase
         .from('bookings')
         .update({
           end_at: newEndTime.toISOString(),
           total_amount: booking.total_amount + extensionCost,
+          original_total_amount: originalTotal,
+          extension_charges: currentExtensionCharges + extensionCost,
           updated_at: new Date().toISOString(),
         })
         .eq('id', bookingId);
@@ -266,12 +271,17 @@ serve(async (req) => {
       throw new Error('Payment failed. Please try again or update your payment method.');
     }
 
-    // Update booking on success
+    // Update booking on success and track extension charges
+    const currentExtensionCharges = booking.extension_charges || 0;
+    const originalTotal = booking.original_total_amount || booking.total_amount;
+    
     const { error: updateError } = await supabase
       .from('bookings')
       .update({
         end_at: newEndTime.toISOString(),
         total_amount: booking.total_amount + extensionCost,
+        original_total_amount: originalTotal,
+        extension_charges: currentExtensionCharges + extensionCost,
         updated_at: new Date().toISOString(),
       })
       .eq('id', bookingId);
