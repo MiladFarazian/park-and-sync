@@ -180,9 +180,9 @@ serve(async (req) => {
         continue;
       }
 
-      // Send notification to renter (warning)
-      const renterTitle = '⏰ Grace Period Started';
-      const renterMessage = `Your parking at ${booking.spots.title} has expired. You have a 10-minute grace period to vacate or extend your booking. After that, overtime charges of $25/hour may apply.`;
+      // Send notification to renter (urgent warning)
+      const renterTitle = '🚨 Grace Period - Leave Now!';
+      const renterMessage = `Your parking at ${booking.spots.title} has expired! You have 10 minutes to leave or you WILL be charged $25/hour and may be towed. Tap to extend or confirm departure.`;
       
       await supabaseClient
         .from('notifications')
