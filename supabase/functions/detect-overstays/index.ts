@@ -70,6 +70,73 @@ serve(async (req) => {
     );
 
     const now = new Date();
+    const fifteenMinutesFromNow = new Date(now.getTime() + 15 * 60 * 1000);
+    const sixteenMinutesFromNow = new Date(now.getTime() + 16 * 60 * 1000);
+    
+    // Find active bookings ending in ~15 minutes (within the next minute window)
+    // to send a 15-minute warning push notification
+    const { data: endingSoonBookings, error: endingSoonError } = await supabaseClient
+      .from('bookings')
+      .select(`
+        *,
+        spots (
+          title,
+          address,
+          hourly_rate,
+          host_id
+        )
+      `)
+      .in('status', ['active', 'paid'])
+      .gte('end_at', fifteenMinutesFromNow.toISOString())
+      .lt('end_at', sixteenMinutesFromNow.toISOString())
+      .is('overstay_detected_at', null);
+
+    if (endingSoonError) {
+      console.error('Error fetching ending soon bookings:', endingSoonError);
+    } else {
+      console.log(`Found ${endingSoonBookings?.length || 0} bookings ending in ~15 minutes`);
+
+      for (const booking of endingSoonBookings || []) {
+        // Check if we already sent a 15-minute warning notification for this booking
+        const { data: existingNotif } = await supabaseClient
+          .from('notifications')
+          .select('id')
+          .eq('user_id', booking.renter_id)
+          .eq('related_id', booking.id)
+          .eq('type', 'booking_ending_soon')
+          .limit(1)
+          .maybeSingle();
+
+        if (!existingNotif) {
+          // Send in-app notification
+          const notifTitle = '⏰ 15 Minutes Left';
+          const notifMessage = `Your parking at ${booking.spots.title} ends in 15 minutes. Tap to extend your booking.`;
+
+          await supabaseClient
+            .from('notifications')
+            .insert({
+              user_id: booking.renter_id,
+              type: 'booking_ending_soon',
+              title: notifTitle,
+              message: notifMessage,
+              related_id: booking.id,
+            });
+
+          // Send push notification
+          await sendPushNotification(
+            supabaseClient,
+            booking.renter_id,
+            notifTitle,
+            notifMessage,
+            `ending-soon-${booking.id}`,
+            `/booking/${booking.id}`,
+            false
+          );
+
+          console.log(`Sent 15-minute warning to user ${booking.renter_id} for booking ${booking.id}`);
+        }
+      }
+    }
     
     // Find active bookings that have passed their end time
     const { data: overstayedBookings, error: fetchError } = await supabaseClient
