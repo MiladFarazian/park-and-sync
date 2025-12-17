@@ -36,6 +36,7 @@ import PrivacySecurity from "./pages/PrivacySecurity";
 import EditSpotAvailability from "./pages/EditSpotAvailability";
 import EditSpot from "./pages/EditSpot";
 import Reviews from "./pages/Reviews";
+import AdminDashboard from "./pages/AdminDashboard";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ModeProvider } from "./contexts/ModeContext";
 import { MessagesProvider } from "./contexts/MessagesContext";
@@ -106,6 +107,7 @@ const App = () => {
                   <Route path="/booking/:bookingId" element={<BookingDetail />} />
                   <Route path="/booking-confirmation/:bookingId" element={<BookingConfirmation />} />
                   <Route path="/host-booking-confirmation/:bookingId" element={<HostBookingConfirmation />} />
+                  <Route path="/admin" element={<AdminDashboard />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

@@ -50,3 +50,6 @@ verify_jwt = true
 
 [functions.send-report-notification]
 verify_jwt = true
+
+[functions.admin-action]
+verify_jwt = true
