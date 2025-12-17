@@ -42,6 +42,7 @@ const BookingContent = () => {
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [isOwnSpot, setIsOwnSpot] = useState(false);
+  const [existingBooking, setExistingBooking] = useState<{ id: string } | null>(null);
   const [availabilityRules, setAvailabilityRules] = useState<any[]>([]);
   const [availabilityDisplay, setAvailabilityDisplay] = useState<string>('');
   const [serverAvailable, setServerAvailable] = useState<{ ok: boolean; reason?: string }>({ ok: true });
@@ -219,6 +220,28 @@ const BookingContent = () => {
           if (spotData.host_id === user.id) {
             setIsOwnSpot(true);
           }
+
+          // Check if user already has an active/paid booking for this spot
+          const now = new Date().toISOString();
+          const { data: existingBookingData } = await supabase
+            .from('bookings')
+            .select('id')
+            .eq('spot_id', spotId)
+            .eq('renter_id', user.id)
+            .in('status', ['paid', 'active'])
+            .gte('end_at', now)
+            .limit(1)
+            .maybeSingle();
+
+          if (existingBookingData) {
+            toast({
+              title: "You already have a booking",
+              description: "Redirecting to your existing booking...",
+            });
+            navigate(`/booking/${existingBookingData.id}`);
+            return;
+          }
+
           const { data: vehiclesData } = await supabase
             .from('vehicles')
             .select('*')
@@ -532,6 +555,27 @@ const BookingContent = () => {
           description: "You're the host of this spot and cannot book it",
           variant: "destructive",
         });
+        return;
+      }
+
+      // Double-check user doesn't already have a booking for this spot
+      const now = new Date().toISOString();
+      const { data: existingBookingData } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('spot_id', spotId)
+        .eq('renter_id', user.id)
+        .in('status', ['paid', 'active'])
+        .gte('end_at', now)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingBookingData) {
+        toast({
+          title: "You already have a booking",
+          description: "Redirecting to your existing booking...",
+        });
+        navigate(`/booking/${existingBookingData.id}`);
         return;
       }
 
