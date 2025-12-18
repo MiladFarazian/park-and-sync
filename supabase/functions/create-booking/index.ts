@@ -207,7 +207,7 @@ serve(async (req) => {
         .eq('user_id', userData.user.id);
     }
 
-    // Check for saved payment methods
+    // Check for saved payment methods BEFORE creating booking
     console.log('Checking for saved payment methods...');
     const paymentMethods = await stripe.paymentMethods.list({
       customer: customerId,
@@ -215,9 +215,39 @@ serve(async (req) => {
       limit: 1,
     });
 
+    // If no saved card, return error prompting user to add one (don't create booking)
+    if (paymentMethods.data.length === 0) {
+      console.log('No saved payment methods found - not creating booking');
+      return new Response(JSON.stringify({ 
+        error: 'no_payment_method',
+        message: 'Please add a payment method before booking'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Cancel any existing pending bookings for the same spot/time/user to avoid duplicates
+    const { error: cancelError } = await supabase
+      .from('bookings')
+      .update({ 
+        status: 'canceled', 
+        cancellation_reason: 'Superseded by new booking attempt' 
+      })
+      .eq('spot_id', spot_id)
+      .eq('renter_id', userData.user.id)
+      .eq('start_at', start_at)
+      .eq('end_at', end_at)
+      .eq('status', 'pending');
+
+    if (cancelError) {
+      console.warn('Failed to cancel existing pending bookings:', cancelError);
+      // Continue anyway - not critical
+    }
+
     const bookingId = crypto.randomUUID();
     
-    // Create booking record first
+    // Create booking record
     const { data: booking, error: bookingError } = await supabase
       .from('bookings')
       .insert({
@@ -245,19 +275,6 @@ serve(async (req) => {
     }
 
     console.log('Booking created:', booking.id);
-
-    // If no saved card, return error prompting user to add one
-    if (paymentMethods.data.length === 0) {
-      console.log('No saved payment methods found');
-      return new Response(JSON.stringify({ 
-        error: 'no_payment_method',
-        message: 'Please add a payment method before booking',
-        booking_id: booking.id
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
 
     // Handle payment based on instant_book setting
     if (isInstantBook) {
