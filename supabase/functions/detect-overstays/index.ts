@@ -143,6 +143,8 @@ serve(async (req) => {
     }
     
     // Find active bookings that have passed their end time
+    // SAFEGUARD: Only check bookings from the last 24 hours to prevent old stuck bookings from triggering
+    const twentyFourHoursAgoForOverstay = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const { data: overstayedBookings, error: fetchError } = await supabaseClient
       .from('bookings')
       .select(`
@@ -161,6 +163,7 @@ serve(async (req) => {
       `)
       .in('status', ['active', 'paid'])
       .lt('end_at', now.toISOString())
+      .gt('end_at', twentyFourHoursAgoForOverstay.toISOString())
       .is('overstay_detected_at', null);
 
     if (fetchError) throw fetchError;
@@ -248,6 +251,8 @@ serve(async (req) => {
     }
 
     // Check for bookings past grace period that need charging or escalation
+    // SAFEGUARD: Only check bookings from the last 24 hours to prevent old stuck bookings from triggering
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const { data: postGraceBookings, error: graceError } = await supabaseClient
       .from('bookings')
       .select(`
@@ -261,6 +266,7 @@ serve(async (req) => {
       .in('status', ['active', 'paid'])
       .not('overstay_detected_at', 'is', null)
       .lt('overstay_grace_end', now.toISOString())
+      .gt('overstay_grace_end', twentyFourHoursAgo.toISOString())
       .is('overstay_action', null);
 
     if (graceError) throw graceError;
