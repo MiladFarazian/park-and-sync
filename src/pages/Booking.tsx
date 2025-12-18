@@ -1,6 +1,6 @@
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle, Loader2, Info } from 'lucide-react';
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Button } from '@/components/ui/button';
@@ -31,8 +31,18 @@ interface PaymentMethod {
 const BookingContent = () => {
   const { spotId } = useParams<{ spotId: string }>();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const paymentMethodsReturnTo = `${location.pathname}${location.search}`;
+  const goToPaymentMethods = (options?: { add?: boolean }) => {
+    const params = new URLSearchParams();
+    params.set('returnTo', paymentMethodsReturnTo);
+    if (options?.add) params.set('add', '1');
+    navigate(`/payment-methods?${params.toString()}`);
+  };
+
   const [spot, setSpot] = useState<any>(null);
   const [host, setHost] = useState<any>(null);
   const [vehicles, setVehicles] = useState<any[]>([]);
@@ -634,7 +644,34 @@ const BookingContent = () => {
         },
       });
 
-      if (bookingError) throw bookingError;
+      // If the edge function returned a non-2xx status, Supabase puts the response in `bookingError`.
+      // We still want to handle known cases like "no_payment_method" gracefully.
+      if (bookingError) {
+        const msg = (bookingError as any)?.message ? String((bookingError as any).message) : '';
+        const jsonStart = msg.indexOf('{');
+        const jsonEnd = msg.lastIndexOf('}');
+        let payload: any = null;
+
+        if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+          try {
+            payload = JSON.parse(msg.slice(jsonStart, jsonEnd + 1));
+          } catch {
+            payload = null;
+          }
+        }
+
+        if (payload?.error === 'no_payment_method') {
+          toast({
+            title: "No payment method",
+            description: "Please add a payment method before booking",
+            variant: "destructive",
+          });
+          goToPaymentMethods({ add: true });
+          return;
+        }
+
+        throw bookingError;
+      }
 
       console.log('[Booking] Booking response:', bookingData);
 
@@ -660,7 +697,7 @@ const BookingContent = () => {
           description: "Please add a payment method before booking",
           variant: "destructive",
         });
-        navigate('/payment-methods');
+        goToPaymentMethods({ add: true });
         return;
       }
 
@@ -957,7 +994,7 @@ const BookingContent = () => {
                   <Button
                     variant="outline"
                     className="w-full"
-                    onClick={() => navigate('/payment-methods')}
+                    onClick={() => goToPaymentMethods({ add: true })}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Add New Payment Method
@@ -991,7 +1028,7 @@ const BookingContent = () => {
                   <Button
                     variant="link"
                     className="h-auto p-0 text-xs text-primary"
-                    onClick={() => navigate('/payment-methods')}
+                    onClick={() => goToPaymentMethods({ add: true })}
                   >
                     Add payment method
                   </Button>

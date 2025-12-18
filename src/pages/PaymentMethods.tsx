@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CreditCard, Plus, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -101,14 +101,21 @@ const AddCardForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel:
 
 const PaymentMethodsContent = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddCard, setShowAddCard] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [autoOpenHandled, setAutoOpenHandled] = useState(false);
 
   const handleBack = () => {
+    const returnTo = searchParams.get('returnTo');
+    if (returnTo && returnTo.startsWith('/')) {
+      navigate(returnTo);
+      return;
+    }
     navigate(-1);
   };
 
@@ -165,6 +172,17 @@ const PaymentMethodsContent = () => {
     }
     setShowAddCard(true);
   };
+
+  useEffect(() => {
+    if (autoOpenHandled) return;
+    if (loading) return;
+
+    const shouldAutoOpen = searchParams.get('add') === '1';
+    if (!shouldAutoOpen) return;
+
+    setAutoOpenHandled(true);
+    handleAddCardClick();
+  }, [autoOpenHandled, loading, searchParams, userEmail]);
 
   const handleAddSuccess = () => {
     setShowAddCard(false);
