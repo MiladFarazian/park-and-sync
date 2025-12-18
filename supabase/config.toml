@@ -53,3 +53,12 @@ verify_jwt = true
 
 [functions.admin-action]
 verify_jwt = true
+
+[functions.approve-booking]
+verify_jwt = true
+
+[functions.reject-booking]
+verify_jwt = true
+
+[functions.expire-pending-bookings]
+verify_jwt = false
