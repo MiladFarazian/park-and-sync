@@ -713,10 +713,15 @@ const SpotDetail = () => {
                   {spot.category}
                 </span>
               )}
-              {spot.instant_book !== false && (
+              {spot.instant_book !== false ? (
                 <Badge variant="secondary" className="w-fit text-xs bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
                   <BoltIcon className="h-3 w-3 mr-1" />
                   Instant Book
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="w-fit text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                  <Clock className="h-3 w-3 mr-1" />
+                  Requires Confirmation
                 </Badge>
               )}
             </div>

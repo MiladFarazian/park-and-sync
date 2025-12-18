@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Clock, MapPin, Star, MessageCircle, Car, Calendar, XCircle, Navigation, Copy } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, MapPin, Star, MessageCircle, Car, Calendar, XCircle, Navigation, Copy, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { differenceInHours, format } from 'date-fns';
+import { differenceInHours, format, formatDistanceToNow } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import RequireAuth from '@/components/auth/RequireAuth';
@@ -240,6 +241,9 @@ const BookingConfirmationContent = () => {
   const hostName = host ? `${host.first_name || ''} ${host.last_name || ''}`.trim() : 'Host';
   const hostInitial = hostName.charAt(0).toUpperCase();
   const bookingNumber = `#PK-${new Date(booking.created_at).getFullYear()}-${booking.id.slice(0, 3).toUpperCase()}`;
+  const isPendingApproval = booking.status === 'held';
+  const timeUntilExpiry = isPendingApproval ? formatDistanceToNow(new Date(new Date(booking.created_at).getTime() + 60 * 60 * 1000), { addSuffix: true }) : null;
+
   return <div className="bg-background">
       {/* Header */}
       <div className="border-b bg-card sticky top-0 z-10">
@@ -248,24 +252,65 @@ const BookingConfirmationContent = () => {
             <Button variant="ghost" size="icon" onClick={() => navigate('/activity')}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-xl font-bold">Booking Confirmed</h1>
+            <h1 className="text-xl font-bold">
+              {isPendingApproval ? 'Booking Request Sent' : 'Booking Confirmed'}
+            </h1>
+            {isPendingApproval && (
+              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                Pending Approval
+              </Badge>
+            )}
           </div>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
-        {/* Success Message */}
-        <div className="text-center space-y-4">
-          <div className="flex justify-center">
-            <div className="rounded-full bg-green-100 dark:bg-green-900/20 p-6">
-              <CheckCircle2 className="h-16 w-16 text-green-600 dark:text-green-500" />
+        {/* Status Message */}
+        {isPendingApproval ? (
+          <>
+            <div className="text-center space-y-4">
+              <div className="flex justify-center">
+                <div className="rounded-full bg-yellow-100 dark:bg-yellow-900/20 p-6">
+                  <Clock className="h-16 w-16 text-yellow-600 dark:text-yellow-500" />
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold text-yellow-700 dark:text-yellow-500">Request Sent!</h2>
+              <p className="text-muted-foreground">
+                Your booking request has been sent to the host. They have 1 hour to respond.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Request expires {timeUntilExpiry}
+              </p>
             </div>
+
+            <Card className="p-4 border-yellow-200 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-900/10">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-sm">What happens next?</h4>
+                  <ul className="text-sm text-muted-foreground mt-1 space-y-1">
+                    <li>• Your card has been authorized (not charged)</li>
+                    <li>• If approved, you'll be charged and receive confirmation</li>
+                    <li>• If declined or no response in 1 hour, authorization is released</li>
+                    <li>• You'll be notified either way</li>
+                  </ul>
+                </div>
+              </div>
+            </Card>
+          </>
+        ) : (
+          <div className="text-center space-y-4">
+            <div className="flex justify-center">
+              <div className="rounded-full bg-green-100 dark:bg-green-900/20 p-6">
+                <CheckCircle2 className="h-16 w-16 text-green-600 dark:text-green-500" />
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold text-green-700 dark:text-green-500">Booking Confirmed!</h2>
+            <p className="text-muted-foreground">
+              Your parking reservation has been confirmed. You'll receive a confirmation email shortly.
+            </p>
           </div>
-          <h2 className="text-2xl font-bold text-green-700 dark:text-green-500">Booking Confirmed!</h2>
-          <p className="text-muted-foreground">
-            Your parking reservation has been confirmed. You'll receive a confirmation email shortly.
-          </p>
-        </div>
+        )}
 
         {/* Booking Summary Card */}
         <Card className="p-6">
