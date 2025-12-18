@@ -50,10 +50,11 @@ const ModeSwitcher = () => {
       >
         <div
           className={cn(
-            "absolute top-0.5 h-5 w-5 rounded-full shadow-md transition-all duration-300 ease-out",
+            "absolute top-0.5 h-5 w-5 rounded-full transition-all duration-300 ease-out",
+            isLoading && "scale-90",
             mode === 'driver' 
-              ? "left-0.5 bg-violet-500" 
-              : "left-[calc(100%-1.375rem)] bg-primary"
+              ? "left-0.5 bg-violet-500 shadow-[0_0_12px_rgba(139,92,246,0.6)]" 
+              : "left-[calc(100%-1.375rem)] bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.5)]"
           )}
         />
       </button>
