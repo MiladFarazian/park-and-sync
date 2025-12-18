@@ -392,19 +392,31 @@ const Activity = () => {
                   <TooltipContent>Message</TooltipContent>
                 </Tooltip>
                 {canReview && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        className="flex-1 hover:bg-yellow-50 hover:text-yellow-600 hover:border-yellow-300 transition-colors"
-                        onClick={handleReview}
-                      >
-                        <Star className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Review</TooltipContent>
-                  </Tooltip>
+                  isHost ? (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="flex-1 hover:bg-yellow-50 hover:text-yellow-600 hover:border-yellow-300 transition-colors"
+                      onClick={handleReview}
+                    >
+                      <Star className="h-4 w-4 mr-1" />
+                      Review
+                    </Button>
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          className="flex-1 hover:bg-yellow-50 hover:text-yellow-600 hover:border-yellow-300 transition-colors"
+                          onClick={handleReview}
+                        >
+                          <Star className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Review</TooltipContent>
+                    </Tooltip>
+                  )
                 )}
                 {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && (
                   <Tooltip>
@@ -554,21 +566,33 @@ const Activity = () => {
                 </Tooltip>
               </TooltipProvider>
               {canReview && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        className="shrink-0 hover:bg-yellow-50 hover:text-yellow-600 hover:border-yellow-300 transition-colors"
-                        onClick={handleReview}
-                      >
-                        <Star className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Review</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                isHost ? (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="hover:bg-yellow-50 hover:text-yellow-600 hover:border-yellow-300 transition-colors"
+                    onClick={handleReview}
+                  >
+                    <Star className="h-4 w-4 mr-2" />
+                    Review Guest
+                  </Button>
+                ) : (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          className="shrink-0 hover:bg-yellow-50 hover:text-yellow-600 hover:border-yellow-300 transition-colors"
+                          onClick={handleReview}
+                        >
+                          <Star className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Review</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )
               )}
               {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && (
                 <TooltipProvider>
