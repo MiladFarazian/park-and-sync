@@ -13,6 +13,13 @@ import parkzyLogo from '@/assets/parkzy-logo-white.png';
 import IsometricBackground from '@/components/auth/IsometricBackground';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -60,6 +67,7 @@ const Auth = () => {
   const [otpSent, setOtpSent] = useState(false);
   const [countryCode, setCountryCode] = useState('+1');
   const [rememberMe, setRememberMe] = useState(true);
+  const [termsOpen, setTermsOpen] = useState(false);
   
   const [phoneData, setPhoneData] = useState({
     phone: '',
@@ -545,9 +553,157 @@ const Auth = () => {
 
         {/* Footer */}
         <p className="text-center text-white/80 text-sm">
-          By continuing, you agree to our Terms of Service and Privacy Policy
+          By continuing, you agree to our{' '}
+          <button 
+            onClick={() => setTermsOpen(true)}
+            className="underline hover:text-white transition-colors"
+          >
+            Terms & Conditions
+          </button>
         </p>
       </div>
+
+      {/* Terms & Conditions Dialog */}
+      <Dialog open={termsOpen} onOpenChange={setTermsOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] p-0">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle className="text-xl font-bold">Terms & Conditions</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] px-6 pb-6">
+            <div className="prose prose-sm max-w-none text-muted-foreground space-y-4">
+              <p className="text-xs text-muted-foreground">Last Updated: Dec 11, 2025</p>
+              
+              <p>Welcome to Parkzy. These Terms & Conditions ("Terms") are a binding legal agreement between you ("User," "you," or "your") and Parkzy, Inc. ("Parkzy," "we," "us," or "our"). These Terms govern your access to and use of the Parkzy mobile application, website, and related services (collectively, the "Platform").</p>
+              
+              <p>By accessing or using the Platform, you acknowledge that you have read, understood, and agree to be bound by these Terms. If you do not agree, do not use the Platform.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">1. OVERVIEW OF THE SERVICE</h3>
+              <p>Parkzy is a peer-to-peer platform that allows:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Property owners or authorized users ("Hosts") to list parking spaces ("Spots"), and</li>
+                <li>Drivers ("Drivers") to reserve those Spots for short-term or scheduled parking.</li>
+              </ul>
+              <p>Parkzy is not a parking operator, insurer, real estate broker, transportation provider, or towing company. Parkzy does not own, control, inspect, or manage any Spots. All interactions and transactions occur directly between Hosts and Drivers.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">2. ELIGIBILITY</h3>
+              <p>To use the Platform, you represent and warrant that:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>You are 18 years of age or older.</li>
+                <li>You have the legal capacity to enter into binding agreements.</li>
+                <li>If you are a Host, you have full legal authority to list and rent out the Spot (ownership, leasehold rights, or written authorization).</li>
+              </ul>
+              <p>Parkzy may suspend or terminate accounts at its discretion for violations of these Terms or for suspected fraudulent or harmful activity.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">3. USER ACCOUNTS</h3>
+              <p>Users must create an account to use certain features of the Platform. You agree to:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Provide accurate, truthful, and complete information.</li>
+                <li>Maintain the confidentiality of your credentials.</li>
+                <li>Be responsible for all activities under your account.</li>
+              </ul>
+              <p>Parkzy is not liable for unauthorized access resulting from your sharing or mishandling of login information.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">4. HOST RESPONSIBILITIES</h3>
+              <h4 className="font-medium text-foreground">4.1 Legal Authority to List</h4>
+              <p>Hosts represent, warrant, and affirm that they own the Spot, or have express written permission from the lawful owner or property manager to list the Spot.</p>
+              <p><strong>Unauthorized Listings:</strong> If a Host lists a Spot without proper authorization, the Host assumes full legal and financial responsibility. The Host agrees to indemnify and hold harmless Parkzy from all claims, damages, losses, attorney's fees, penalties, disputes, and enforcement actions arising from the unauthorized listing. Parkzy may immediately suspend or terminate the Host's account. Parkzy has no obligation to verify ownership or authorization.</p>
+              
+              <h4 className="font-medium text-foreground">4.2 Accuracy & Condition</h4>
+              <p>Hosts are solely responsible for ensuring that the Spot is accurately described, clear instructions, access information, and rules are provided, and the Spot is safe, accessible, and free of hazardous conditions. Parkzy is not liable for inaccurate listings, property hazards, or loss/damage occurring at a Spot.</p>
+
+              <h4 className="font-medium text-foreground">4.3 Compliance With Laws & Rules</h4>
+              <p>Hosts must comply with local parking laws, zoning ordinances, HOA/condo/co-op rules, lease agreements, signage requirements, and applicable state and local regulations. Hosts assume all responsibility for consequences arising from non-compliance.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">5. DRIVER RESPONSIBILITIES</h3>
+              <p>Drivers agree to park only in the reserved Spot and only during the reserved time, follow all Host rules, listing instructions, and applicable laws, not damage property or obstruct other vehicles, and vacate the Spot by the reservation end time unless extended through the Platform.</p>
+              <p>Drivers assume all risk and liability for property damage, parking violations, towings, fines, penalties, and citations. Parkzy is not responsible for the safety of Spots or any incidents occurring while vehicles are parked.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">6. BOOKINGS, PAYMENTS, FEES & OVERSTAYS</h3>
+              <h4 className="font-medium text-foreground">6.1 Pricing Structure</h4>
+              <p>Hosts set a base price ("Host Price"). Parkzy automatically applies a 20% markup to create the price shown to Drivers ("Driver Price"): Driver Price = Host Price × 1.20. Drivers pay the Driver Price plus taxes, fees, penalties, and adjustments. Hosts receive payouts based on the Host Price, minus applicable fees.</p>
+
+              <h4 className="font-medium text-foreground">6.2 Payment Authorization</h4>
+              <p>Drivers authorize Parkzy and its payment partners to charge the Driver Price, charge overstay fees, penalties, and towing fees, place temporary authorization holds, and charge all costs related to enforcement actions. Hosts authorize Parkzy to remit payouts based on the Host Price minus fees.</p>
+
+              <h4 className="font-medium text-foreground">6.3 Cancellations & Refunds</h4>
+              <p>Cancellation policies vary by listing and are shown at checkout. Refunds are issued solely at Parkzy's discretion, unless legally required.</p>
+
+              <h4 className="font-medium text-foreground">6.4 Service Fees</h4>
+              <p>Parkzy may charge driver service fees, host service fees, processing fees, and administrative or enforcement fees.</p>
+
+              <h4 className="font-medium text-foreground">6.5 Host Payouts</h4>
+              <p>Hosts are paid the Host Price minus Parkzy host fees, payment processor fees, applicable deductions, and fraud holds or chargebacks. Parkzy retains the markup difference between the Host Price and the Driver Price.</p>
+
+              <h4 className="font-medium text-foreground">6.6 Markup Disclosure</h4>
+              <p>Hosts acknowledge that Drivers may see prices different from the Host Price. Drivers acknowledge that displayed prices include Parkzy's markup.</p>
+
+              <h4 className="font-medium text-foreground">6.7 Overstay Policy</h4>
+              <p>Drivers must vacate the Spot by the reservation end time. Drivers receive a 15-minute grace period following the reservation end time. If the Driver remains after the grace period, the Driver will be automatically charged $25 per hour, billed in 15-minute increments. These fees are non-refundable. Parkzy may pre-authorize or charge additional amounts to cover expected fees.</p>
+
+              <h4 className="font-medium text-foreground">6.8 Host Towing Rights</h4>
+              <p>After the 15-minute grace period, the Host may request towing directly through the Parkzy app, have the vehicle removed by a licensed towing provider, subject to local laws, and charge all towing-related costs directly to the Driver's stored payment method.</p>
+              <p>Drivers expressly authorize Parkzy to charge their payment method for towing fees, storage fees, release fees, service charges, court or administrative penalties, and any Host-imposed towing-related expenses.</p>
+              <p>Parkzy does not own, operate, or control towing providers and bears no responsibility for towing damage, delays, improper tows, disputes, or costs incurred. All towing disputes must be resolved between Drivers, Hosts, and towing providers.</p>
+
+              <h4 className="font-medium text-foreground">6.9 Violations, Damage & Enforcement</h4>
+              <p>Drivers are solely responsible for parking citations, private property violations, damage to the Spot or surrounding property, and nuisance or trespass complaints. Hosts are solely responsible for ensuring their listing complies with law and enforcement actions taken. Parkzy assumes no liability for any legal, civil, or financial consequences arising from Host or Driver actions.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">7. ENFORCEMENT & TOWING</h3>
+              <p>Parkzy is not a towing company and does not supervise, direct, or control towing providers. Parkzy is not responsible for towing outcomes, vehicle damage, losses, delays, or costs, improper or illegal towing initiated by Hosts, and enforcement actions or property access issues. Drivers agree towing may occur at their full expense under the terms above.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">8. USER-GENERATED CONTENT</h3>
+              <p>Users grant Parkzy a worldwide, royalty-free, perpetual license to use, display, reproduce, distribute, modify, and create derivative works from User Content, solely for Platform operations. Users represent they have all rights necessary to provide such content and that it does not violate any laws or third-party rights.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">9. PROHIBITED CONDUCT</h3>
+              <p>Users may not misrepresent identity or authority, list unauthorized Spots, damage property or vehicles, violate any law or third-party rights, engage in fraud or deceptive behavior, reverse engineer the Platform, use automated tools without authorization, or interfere with Platform operations. Parkzy reserves the right to take appropriate action, including account termination.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">10. INSURANCE & LIABILITY</h3>
+              <p>Parkzy does not provide auto insurance, property insurance, liability insurance, Host or Driver insurance, or coverage for theft, vandalism, damage, or injury. Users are solely responsible for obtaining appropriate insurance coverage. Parkzy does not guarantee any dispute resolution, reimbursement, or protection related to any parking interaction.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">11. DISCLAIMERS</h3>
+              <p>The Platform is provided on an "AS IS" and "AS AVAILABLE" basis. Parkzy disclaims all warranties, express or implied, including merchantability, fitness for a particular purpose, non-infringement, safety or condition of properties, accuracy or reliability of content, and continuous, error-free operation. Use of the Platform is entirely at your own risk.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">12. LIMITATION OF LIABILITY</h3>
+              <p>To the fullest extent permitted by law, Parkzy is not liable for unauthorized Spot listings, towing actions, vehicle damage or theft, property damage, personal injury or death, lost profits or data, municipal fines or penalties, disputes between Hosts and Drivers, or any acts or omissions of towing providers. Parkzy's maximum cumulative liability shall not exceed the greater of (a) the total fees paid by the User to Parkzy in the prior 12 months, or (b) $100.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">13. INDEMNIFICATION</h3>
+              <p>Users agree to indemnify, defend, and hold harmless Parkzy, its officers, directors, employees, and affiliates from any claims, liabilities, damages, losses, penalties, towing fees, citations, legal fees, and costs arising from unauthorized Spot listings, property or vehicle damage, overstay violations, towing actions or disputes, misuse of the Platform, violation of these Terms, violations of law or third-party rights, and bodily injury or property loss occurring at a Spot. This obligation survives termination of your account.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">14. DISPUTE RESOLUTION & ARBITRATION</h3>
+              <h4 className="font-medium text-foreground">14.1 Mandatory Arbitration</h4>
+              <p>All disputes must be resolved through binding arbitration administered by the American Arbitration Association (AAA).</p>
+              <h4 className="font-medium text-foreground">14.2 Class Action Waiver</h4>
+              <p>Users waive the right to participate in class actions, bring representative suits, and proceed on behalf of others.</p>
+              <h4 className="font-medium text-foreground">14.3 Governing Law</h4>
+              <p>These Terms are governed by the laws of the State of Delaware, without regard to conflict-of-laws principles.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">15. TERMINATION</h3>
+              <p>Parkzy may suspend or terminate accounts at any time for violations, risk issues, or harmful activity. Users may delete their accounts at any time but remain responsible for outstanding obligations.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">16. MODIFICATIONS</h3>
+              <p>Parkzy may modify these Terms at any time. Updates take effect upon posting. Continued use constitutes acceptance.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">17. PRIVACY POLICY</h3>
+              <p>Your use of the Platform is also governed by Parkzy's Privacy Policy, incorporated by reference.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">18. MISCELLANEOUS</h3>
+              <ul className="list-disc pl-5 space-y-1">
+                <li><strong>Entire Agreement:</strong> These Terms constitute the entire agreement.</li>
+                <li><strong>Severability:</strong> Invalid provisions do not affect remaining terms.</li>
+                <li><strong>No Waiver:</strong> Failure to enforce rights does not waive them.</li>
+                <li><strong>Assignment:</strong> Users may not assign rights; Parkzy may assign freely.</li>
+              </ul>
+
+              <h3 className="font-semibold text-foreground mt-6">19. CONTACT INFORMATION</h3>
+              <p>
+                Parkzy, Inc.<br />
+                Email: support@useparkzy.com<br />
+                Website: www.useparkzy.com
+              </p>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
