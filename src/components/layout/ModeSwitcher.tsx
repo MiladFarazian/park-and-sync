@@ -22,44 +22,54 @@ const ModeSwitcher = () => {
   return (
     <div
       className={cn(
-        "relative flex items-center h-9 p-1 bg-muted rounded-full",
-        isLoading && "pointer-events-none"
+        "flex items-center gap-3",
+        isLoading && "pointer-events-none opacity-70"
       )}
     >
-      {/* Animated sliding indicator */}
-      <div
-        className={cn(
-          "absolute h-7 rounded-full shadow-sm transition-all duration-300 ease-out",
-          mode === 'driver' 
-            ? "left-1 w-[calc(50%-2px)] bg-violet-300" 
-            : "left-[calc(50%+1px)] w-[calc(50%-2px)] bg-primary"
-        )}
-      />
-      
+      {/* Driver label */}
       <button
         onClick={() => handleModeSwitch('driver')}
         disabled={isLoading}
         className={cn(
-          "relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors duration-300",
+          "flex items-center gap-1.5 text-sm font-medium transition-colors duration-300",
           mode === 'driver'
-            ? "text-violet-900"
+            ? "text-foreground"
             : "text-muted-foreground hover:text-foreground"
         )}
       >
-        <Car className="h-3.5 w-3.5" />
+        <Car className="h-4 w-4" />
         <span>Driver</span>
       </button>
+
+      {/* Toggle track with sliding circle */}
+      <button
+        onClick={() => handleModeSwitch(mode === 'driver' ? 'host' : 'driver')}
+        disabled={isLoading}
+        className="relative w-12 h-6 bg-muted rounded-full p-0.5 transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        aria-label={`Switch to ${mode === 'driver' ? 'host' : 'driver'} mode`}
+      >
+        <div
+          className={cn(
+            "absolute top-0.5 h-5 w-5 rounded-full shadow-md transition-all duration-300 ease-out",
+            mode === 'driver' 
+              ? "left-0.5 bg-violet-500" 
+              : "left-[calc(100%-1.375rem)] bg-primary"
+          )}
+        />
+      </button>
+
+      {/* Host label */}
       <button
         onClick={() => handleModeSwitch('host')}
         disabled={isLoading}
         className={cn(
-          "relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors duration-300",
+          "flex items-center gap-1.5 text-sm font-medium transition-colors duration-300",
           mode === 'host'
-            ? "text-primary-foreground"
+            ? "text-foreground"
             : "text-muted-foreground hover:text-foreground"
         )}
       >
-        <Home className="h-3.5 w-3.5" />
+        <Home className="h-4 w-4" />
         <span>Host</span>
       </button>
     </div>
