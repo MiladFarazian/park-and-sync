@@ -67,7 +67,37 @@ serve(async (req) => {
     });
 
     // Check Stripe account status
-    const account = await stripe.accounts.retrieve(profile.stripe_account_id);
+    let account;
+    try {
+      account = await stripe.accounts.retrieve(profile.stripe_account_id);
+    } catch (stripeError: any) {
+      // Handle case where the Stripe Connect account was deleted/revoked
+      if (stripeError.code === 'account_invalid' || stripeError.statusCode === 403) {
+        console.log(`Stripe account ${profile.stripe_account_id} is invalid or revoked. Clearing from profile.`);
+        
+        // Clear the invalid Stripe account from the user's profile
+        await supabaseClient
+          .from("profiles")
+          .update({ 
+            stripe_account_id: null, 
+            stripe_account_enabled: false 
+          })
+          .eq("user_id", user.id);
+
+        return new Response(
+          JSON.stringify({ 
+            connected: false, 
+            charges_enabled: false,
+            details_submitted: false 
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          }
+        );
+      }
+      throw stripeError;
+    }
 
     const charges_enabled = account.charges_enabled || false;
     const details_submitted = account.details_submitted || false;
