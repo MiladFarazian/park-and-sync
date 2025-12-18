@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, MapPin, Footprints, Umbrella, Zap, Shield, Car, X } from 'lucide-react';
+import { Star, MapPin, Footprints, Umbrella, Zap, Shield, Car, X, BoltIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -34,6 +34,7 @@ interface Spot {
   hostId?: string;
   sizeConstraints?: string[];
   userBooking?: UserBooking | null;
+  instantBook?: boolean;
 }
 
 export interface SpotFilters {
@@ -324,6 +325,12 @@ const DesktopSpotList = ({
                           <h3 className="font-semibold text-sm truncate">
                             {spot.category || spot.title}
                           </h3>
+                          {spot.instantBook !== false && (
+                            <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                              <BoltIcon className="h-3 w-3 mr-0.5" />
+                              Instant
+                            </Badge>
+                          )}
                           {spot.userBooking && (
                             <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
                               Your Booking

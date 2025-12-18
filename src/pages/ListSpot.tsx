@@ -9,8 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Star, ChevronLeft, ChevronRight, X, Loader2, CreditCard, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Star, ChevronLeft, ChevronRight, X, Loader2, CreditCard, ExternalLink, BoltIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { AvailabilityManager, AvailabilityRule } from '@/components/availability/AvailabilityManager';
@@ -72,6 +73,7 @@ const ListSpot = () => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
+  const [instantBook, setInstantBook] = useState(true); // Default to instant book
   const [photos, setPhotos] = useState<File[]>([]);
   const [primaryIndex, setPrimaryIndex] = useState<number>(0);
   const [mapboxToken, setMapboxToken] = useState<string>('');
@@ -373,6 +375,7 @@ const ListSpot = () => {
           longitude: coordinates.lng,
           location: `POINT(${coordinates.lng} ${coordinates.lat})`,
           status: 'active',
+          instant_book: instantBook,
           is_covered: selectedAmenities.includes('covered'),
           is_secure: selectedAmenities.includes('security'),
           has_ev_charging: selectedAmenities.includes('ev'),
@@ -822,6 +825,30 @@ const ListSpot = () => {
                       </button>
                     );
                   })}
+                </div>
+
+                {/* Instant Book Toggle */}
+                <div className="p-4 rounded-lg border bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900">
+                        <BoltIcon className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                      </div>
+                      <div>
+                        <Label htmlFor="instant-book" className="text-base font-medium cursor-pointer">
+                          Instant Book
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Allow drivers to book without your approval
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      id="instant-book"
+                      checked={instantBook}
+                      onCheckedChange={setInstantBook}
+                    />
+                  </div>
                 </div>
 
                 <div className="flex gap-3">
