@@ -116,13 +116,16 @@ serve(async (req) => {
     // Get spot details for pricing
     const { data: spot, error: spotError } = await supabase
       .from('spots')
-      .select('*, host_id')
+      .select('*, host_id, instant_book')
       .eq('id', spot_id)
       .single();
 
     if (spotError || !spot) {
       throw new Error('Spot not found');
     }
+
+    const isInstantBook = spot.instant_book !== false; // Default to true for backwards compatibility
+    console.log('Spot instant_book setting:', isInstantBook);
 
     // Check if user is trying to book their own spot
     if (userData.user.id === spot.host_id) {
@@ -238,186 +241,297 @@ serve(async (req) => {
       });
     }
 
-    // Try to charge the saved card
-    console.log('Creating PaymentIntent with saved card...');
-    try {
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(totalAmount * 100),
-        currency: 'usd',
-        customer: customerId,
-        payment_method: paymentMethods.data[0].id,
-        off_session: true,
-        confirm: true,
-        metadata: {
-          booking_id: booking.id,
-          spot_id,
-          host_id: spot.host_id,
-          renter_id: userData.user.id,
-        },
-        description: `Parking at ${spot.title}`,
-      });
-
-      console.log('PaymentIntent created and confirmed:', paymentIntent.id);
-
-      // Update booking to active and store payment intent ID
-      const { error: updateError } = await supabase
-        .from('bookings')
-        .update({ 
-          status: 'active',
-          stripe_payment_intent_id: paymentIntent.id,
-          stripe_charge_id: paymentIntent.latest_charge as string
-        })
-        .eq('id', booking.id);
-
-      if (updateError) {
-        console.error('Failed to update booking status:', updateError);
-        throw updateError;
-      }
-
-      console.log('Booking activated successfully');
-
-    // Release the hold if provided
-    if (hold_id) {
-      await supabase
-        .from('booking_holds')
-        .delete()
-        .eq('id', hold_id);
-    }
-
-    // Get host and renter profiles for notifications and emails
-    const { data: hostProfile } = await supabase
-      .from('profiles')
-      .select('first_name, email')
-      .eq('user_id', spot.host_id)
-      .single();
-
-    // Get host's auth email using service role client
-    const { data: { user: hostUser } } = await supabaseAdmin.auth.admin.getUserById(spot.host_id);
-
-    const { data: renterProfile } = await supabase
-      .from('profiles')
-      .select('first_name, email')
-      .eq('user_id', userData.user.id)
-      .single();
-
-    // Create notifications for host and renter with appropriate routing
-    if (hostProfile && renterProfile) {
-      const hostNotification = {
-        user_id: spot.host_id,
-        type: 'booking_host', // Different type so NotificationBell can route to host confirmation page
-        title: 'New Booking Received',
-        message: `${renterProfile.first_name || 'A driver'} has booked your spot at ${spot.address}`,
-        related_id: booking.id,
-      };
-
-      const renterNotification = {
-        user_id: userData.user.id,
-        type: 'booking',
-        title: 'Booking Confirmed',
-        message: `Your booking at ${spot.address} has been confirmed`,
-        related_id: booking.id,
-      };
-
-      const { error: notificationError } = await supabaseAdmin
-        .from('notifications')
-        .insert([hostNotification, renterNotification]);
-
-      if (notificationError) {
-        console.error('Failed to create booking notifications:', notificationError);
-      }
-
-      // Send confirmation emails
+    // Handle payment based on instant_book setting
+    if (isInstantBook) {
+      // INSTANT BOOK: Charge immediately
+      console.log('Creating PaymentIntent with saved card (instant book)...');
       try {
-        const hostEmail = hostUser?.email || hostProfile?.email || '';
-        const driverEmail = userData.user.email || renterProfile?.email || '';
-        
-        console.log('Sending confirmation emails to:', { hostEmail, driverEmail });
-        
-        await supabase.functions.invoke('send-booking-confirmation', {
-          body: {
-            hostEmail,
-            hostName: hostProfile?.first_name || 'Host',
-            driverEmail,
-            driverName: renterProfile?.first_name || 'Driver',
-            spotTitle: spot.title,
-            spotAddress: spot.address,
-            startAt: start_at,
-            endAt: end_at,
-            totalAmount: totalAmount,
-            bookingId: booking.id,
-          },
-        });
-      } catch (emailError) {
-        console.error('Failed to send confirmation emails:', emailError);
-        // Don't fail the booking if email fails
-      }
-    }
-
-      // Return success
-      return new Response(JSON.stringify({
-        success: true,
-        booking_id: booking.id,
-        total_amount: totalAmount,
-        platform_fee: platformFee
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-
-    } catch (paymentError: any) {
-      console.error('Payment failed:', paymentError);
-      
-      // If 3DS is required or card declined, fallback to checkout session
-      const requiresAction = paymentError.type === 'StripeCardError' || 
-                            paymentError.code === 'authentication_required' ||
-                            paymentError.code === 'card_declined';
-
-      if (requiresAction) {
-        console.log('Payment requires additional action, creating checkout session...');
-        const origin = req.headers.get('origin') || 'http://localhost:8080';
-        
-        const checkoutSession = await stripe.checkout.sessions.create({
-          ui_mode: 'embedded',
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: Math.round(totalAmount * 100),
+          currency: 'usd',
           customer: customerId,
-          payment_method_types: ['card'],
-          line_items: [{
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: `Parking at ${spot.title}`,
-                description: `${new Date(start_at).toLocaleString()} - ${new Date(end_at).toLocaleString()}`,
-              },
-              unit_amount: Math.round(totalAmount * 100),
-            },
-            quantity: 1,
-          }],
-          mode: 'payment',
-          return_url: `${origin}/checkout-success?session_id={CHECKOUT_SESSION_ID}&booking_id=${booking.id}`,
+          payment_method: paymentMethods.data[0].id,
+          off_session: true,
+          confirm: true,
           metadata: {
             booking_id: booking.id,
             spot_id,
             host_id: spot.host_id,
             renter_id: userData.user.id,
           },
+          description: `Parking at ${spot.title}`,
         });
 
-        // Update booking with checkout session ID
-        await supabase
+        console.log('PaymentIntent created and confirmed:', paymentIntent.id);
+
+        // Update booking to active and store payment intent ID
+        const { error: updateError } = await supabase
           .from('bookings')
-          .update({ stripe_payment_intent_id: checkoutSession.id })
+          .update({ 
+            status: 'active',
+            stripe_payment_intent_id: paymentIntent.id,
+            stripe_charge_id: paymentIntent.latest_charge as string
+          })
           .eq('id', booking.id);
 
+        if (updateError) {
+          console.error('Failed to update booking status:', updateError);
+          throw updateError;
+        }
+
+        console.log('Booking activated successfully');
+
+        // Release the hold if provided
+        if (hold_id) {
+          await supabase
+            .from('booking_holds')
+            .delete()
+            .eq('id', hold_id);
+        }
+
+        // Get host and renter profiles for notifications and emails
+        const { data: hostProfile } = await supabase
+          .from('profiles')
+          .select('first_name, email')
+          .eq('user_id', spot.host_id)
+          .single();
+
+        // Get host's auth email using service role client
+        const { data: { user: hostUser } } = await supabaseAdmin.auth.admin.getUserById(spot.host_id);
+
+        const { data: renterProfile } = await supabase
+          .from('profiles')
+          .select('first_name, email')
+          .eq('user_id', userData.user.id)
+          .single();
+
+        // Create notifications for host and renter with appropriate routing
+        if (hostProfile && renterProfile) {
+          const hostNotification = {
+            user_id: spot.host_id,
+            type: 'booking_host',
+            title: 'New Booking Received',
+            message: `${renterProfile.first_name || 'A driver'} has booked your spot at ${spot.address}`,
+            related_id: booking.id,
+          };
+
+          const renterNotification = {
+            user_id: userData.user.id,
+            type: 'booking',
+            title: 'Booking Confirmed',
+            message: `Your booking at ${spot.address} has been confirmed`,
+            related_id: booking.id,
+          };
+
+          const { error: notificationError } = await supabaseAdmin
+            .from('notifications')
+            .insert([hostNotification, renterNotification]);
+
+          if (notificationError) {
+            console.error('Failed to create booking notifications:', notificationError);
+          }
+
+          // Send confirmation emails
+          try {
+            const hostEmail = hostUser?.email || hostProfile?.email || '';
+            const driverEmail = userData.user.email || renterProfile?.email || '';
+            
+            console.log('Sending confirmation emails to:', { hostEmail, driverEmail });
+            
+            await supabase.functions.invoke('send-booking-confirmation', {
+              body: {
+                hostEmail,
+                hostName: hostProfile?.first_name || 'Host',
+                driverEmail,
+                driverName: renterProfile?.first_name || 'Driver',
+                spotTitle: spot.title,
+                spotAddress: spot.address,
+                startAt: start_at,
+                endAt: end_at,
+                totalAmount: totalAmount,
+                bookingId: booking.id,
+              },
+            });
+          } catch (emailError) {
+            console.error('Failed to send confirmation emails:', emailError);
+          }
+        }
+
+        // Return success
         return new Response(JSON.stringify({
-          requires_action: true,
-          client_secret: checkoutSession.client_secret,
+          success: true,
           booking_id: booking.id,
-          message: paymentError.code === 'card_declined' ? 'Card declined' : 'Additional verification required'
+          total_amount: totalAmount,
+          platform_fee: platformFee
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
-      }
 
-      // For other errors, throw
-      throw paymentError;
+      } catch (paymentError: any) {
+        console.error('Payment failed:', paymentError);
+        
+        // If 3DS is required or card declined, fallback to checkout session
+        const requiresAction = paymentError.type === 'StripeCardError' || 
+                              paymentError.code === 'authentication_required' ||
+                              paymentError.code === 'card_declined';
+
+        if (requiresAction) {
+          console.log('Payment requires additional action, creating checkout session...');
+          const origin = req.headers.get('origin') || 'http://localhost:8080';
+          
+          const checkoutSession = await stripe.checkout.sessions.create({
+            ui_mode: 'embedded',
+            customer: customerId,
+            payment_method_types: ['card'],
+            line_items: [{
+              price_data: {
+                currency: 'usd',
+                product_data: {
+                  name: `Parking at ${spot.title}`,
+                  description: `${new Date(start_at).toLocaleString()} - ${new Date(end_at).toLocaleString()}`,
+                },
+                unit_amount: Math.round(totalAmount * 100),
+              },
+              quantity: 1,
+            }],
+            mode: 'payment',
+            return_url: `${origin}/checkout-success?session_id={CHECKOUT_SESSION_ID}&booking_id=${booking.id}`,
+            metadata: {
+              booking_id: booking.id,
+              spot_id,
+              host_id: spot.host_id,
+              renter_id: userData.user.id,
+            },
+          });
+
+          // Update booking with checkout session ID
+          await supabase
+            .from('bookings')
+            .update({ stripe_payment_intent_id: checkoutSession.id })
+            .eq('id', booking.id);
+
+          return new Response(JSON.stringify({
+            requires_action: true,
+            client_secret: checkoutSession.client_secret,
+            booking_id: booking.id,
+            message: paymentError.code === 'card_declined' ? 'Card declined' : 'Additional verification required'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // For other errors, throw
+        throw paymentError;
+      }
+    } else {
+      // NON-INSTANT BOOK: Hold card, wait for host approval
+      console.log('Creating PaymentIntent with manual capture (requires host approval)...');
+      try {
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: Math.round(totalAmount * 100),
+          currency: 'usd',
+          customer: customerId,
+          payment_method: paymentMethods.data[0].id,
+          off_session: true,
+          confirm: true,
+          capture_method: 'manual', // Hold funds but don't capture
+          metadata: {
+            booking_id: booking.id,
+            spot_id,
+            host_id: spot.host_id,
+            renter_id: userData.user.id,
+          },
+          description: `Parking at ${spot.title} (pending host approval)`,
+        });
+
+        console.log('PaymentIntent created with hold:', paymentIntent.id);
+
+        // Update booking to 'held' status (awaiting host approval)
+        const { error: updateError } = await supabase
+          .from('bookings')
+          .update({ 
+            status: 'held',
+            stripe_payment_intent_id: paymentIntent.id,
+          })
+          .eq('id', booking.id);
+
+        if (updateError) {
+          console.error('Failed to update booking status:', updateError);
+          throw updateError;
+        }
+
+        console.log('Booking set to held status, awaiting host approval');
+
+        // Get host and renter profiles for notifications
+        const { data: hostProfile } = await supabase
+          .from('profiles')
+          .select('first_name, email')
+          .eq('user_id', spot.host_id)
+          .single();
+
+        const { data: renterProfile } = await supabase
+          .from('profiles')
+          .select('first_name, email')
+          .eq('user_id', userData.user.id)
+          .single();
+
+        // Create notifications
+        if (hostProfile && renterProfile) {
+          // Host notification - needs to approve
+          const hostNotification = {
+            user_id: spot.host_id,
+            type: 'booking_approval_required',
+            title: 'New Booking Request',
+            message: `${renterProfile.first_name || 'A driver'} wants to book your spot at ${spot.address}. Approve within 1 hour.`,
+            related_id: booking.id,
+          };
+
+          // Driver notification - pending approval
+          const renterNotification = {
+            user_id: userData.user.id,
+            type: 'booking_pending',
+            title: 'Booking Request Sent',
+            message: `Your booking request at ${spot.address} is awaiting host approval. You'll be notified when they respond.`,
+            related_id: booking.id,
+          };
+
+          const { error: notificationError } = await supabaseAdmin
+            .from('notifications')
+            .insert([hostNotification, renterNotification]);
+
+          if (notificationError) {
+            console.error('Failed to create booking notifications:', notificationError);
+          }
+        }
+
+        // Return success with pending status
+        return new Response(JSON.stringify({
+          success: true,
+          pending_approval: true,
+          booking_id: booking.id,
+          total_amount: totalAmount,
+          platform_fee: platformFee,
+          message: 'Your booking request has been sent to the host. You will be notified once they approve.',
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      } catch (paymentError: any) {
+        console.error('Payment hold failed:', paymentError);
+        
+        // Handle card errors
+        if (paymentError.type === 'StripeCardError' || paymentError.code === 'card_declined') {
+          return new Response(JSON.stringify({
+            error: 'Your card was declined. Please update your payment method and try again.',
+            booking_id: booking.id
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        throw paymentError;
+      }
     }
 
   } catch (error) {
