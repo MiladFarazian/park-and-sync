@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
+import { Resend } from "npm:resend@2.0.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -72,8 +73,18 @@ serve(async (req) => {
           .eq('user_id', booking.renter_id)
           .single();
 
+        // Get host info for email
+        const { data: hostProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('first_name, email')
+          .eq('user_id', hostId)
+          .single();
+
         const renterName = renterProfile?.first_name || 'A driver';
+        const hostName = hostProfile?.first_name || 'Host';
+        const hostEmail = hostProfile?.email;
         const spotAddress = booking.spots?.address || 'your parking spot';
+        const spotCategory = booking.spots?.category || booking.spots?.title || 'Parking Spot';
 
         // Create reminder notification for host
         await supabaseAdmin
@@ -105,6 +116,90 @@ serve(async (req) => {
           }
         } catch (pushError) {
           console.error(`Failed to send push notification for booking ${booking.id}:`, pushError);
+        }
+
+        // Send email reminder to host
+        if (hostEmail) {
+          try {
+            const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+            const appUrl = Deno.env.get('APP_URL') || 'https://parkzy.lovable.app';
+            const startTime = new Date(booking.start_at).toLocaleString('en-US', { 
+              dateStyle: 'medium', 
+              timeStyle: 'short' 
+            });
+
+            await resend.emails.send({
+              from: "Parkzy <notifications@useparkzy.com>",
+              to: [hostEmail],
+              subject: "⏰ Booking Request Expiring in 30 Minutes",
+              html: `
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                  <div style="text-align: center; margin-bottom: 30px;">
+                    <h1 style="color: #8b5cf6; margin: 0;">Parkzy</h1>
+                  </div>
+                  
+                  <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+                    <h2 style="color: #92400e; margin: 0 0 8px 0; font-size: 20px;">⏰ Action Required - 30 Minutes Left!</h2>
+                    <p style="color: #78350f; margin: 0; font-size: 14px;">A booking request is about to expire</p>
+                  </div>
+                  
+                  <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                    Hi ${hostName},
+                  </p>
+                  
+                  <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                    <strong>${renterName}</strong> requested to book your spot and you have <strong>only 30 minutes</strong> to respond before it automatically expires.
+                  </p>
+                  
+                  <div style="background: #f9fafb; border-radius: 12px; padding: 20px; margin: 24px 0;">
+                    <h3 style="color: #111827; margin: 0 0 16px 0; font-size: 16px;">Booking Details</h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                      <tr>
+                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Spot</td>
+                        <td style="padding: 8px 0; color: #111827; font-size: 14px; text-align: right;">${spotCategory}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Address</td>
+                        <td style="padding: 8px 0; color: #111827; font-size: 14px; text-align: right;">${spotAddress}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Requested Start</td>
+                        <td style="padding: 8px 0; color: #111827; font-size: 14px; text-align: right;">${startTime}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Driver</td>
+                        <td style="padding: 8px 0; color: #111827; font-size: 14px; text-align: right;">${renterName}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Total</td>
+                        <td style="padding: 8px 0; color: #111827; font-size: 14px; font-weight: 600; text-align: right;">$${(booking.total_amount / 100).toFixed(2)}</td>
+                      </tr>
+                    </table>
+                  </div>
+                  
+                  <div style="text-align: center; margin: 32px 0;">
+                    <a href="${appUrl}/host-booking-confirmation/${booking.id}" 
+                       style="display: inline-block; background: #8b5cf6; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+                      Review & Respond Now
+                    </a>
+                  </div>
+                  
+                  <p style="color: #6b7280; font-size: 14px; text-align: center;">
+                    If you don't respond in time, the request will be automatically cancelled and you'll miss this booking opportunity.
+                  </p>
+                  
+                  <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;" />
+                  
+                  <p style="color: #9ca3af; font-size: 12px; text-align: center; margin: 0;">
+                    © ${new Date().getFullYear()} Parkzy. All rights reserved.
+                  </p>
+                </div>
+              `,
+            });
+            console.log(`Sent email reminder to host ${hostEmail} for booking ${booking.id}`);
+          } catch (emailError) {
+            console.error(`Failed to send email reminder for booking ${booking.id}:`, emailError);
+          }
         }
 
         console.log(`Sent reminder for booking ${booking.id} to host ${hostId}`);
