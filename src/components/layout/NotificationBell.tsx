@@ -121,13 +121,13 @@ export const NotificationBell = () => {
     await markAsRead(notification.id);
 
     // Handle navigation based on notification type
-    if (notification.type === "booking") {
+    if (notification.type === "booking" || notification.type === "booking_pending") {
       // Driver booking confirmation - switch to driver mode if needed
       if (mode === 'host') {
         setMode('driver');
       }
       navigate(`/booking-confirmation/${notification.related_id}`);
-    } else if (notification.type === "booking_host") {
+    } else if (notification.type === "booking_host" || notification.type === "booking_approval_required") {
       // Host booking confirmation - switch to host mode if needed
       if (mode === 'driver') {
         setMode('host');

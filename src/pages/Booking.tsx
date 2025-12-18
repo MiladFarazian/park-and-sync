@@ -665,12 +665,21 @@ const BookingContent = () => {
       }
 
       if (bookingData.success) {
-        // Payment successful, booking is active
-        toast({
-          title: "Booking confirmed!",
-          description: "Your payment was processed successfully",
-        });
-        navigate(`/booking-confirmation/${bookingData.booking_id}`);
+        if (bookingData.pending_approval) {
+          // Non-instant book - waiting for host approval
+          toast({
+            title: "Request Sent!",
+            description: "The host has 1 hour to approve your booking. You'll be notified when they respond.",
+          });
+          navigate(`/booking-confirmation/${bookingData.booking_id}`);
+        } else {
+          // Instant book - payment successful, booking is active
+          toast({
+            title: "Booking confirmed!",
+            description: "Your payment was processed successfully",
+          });
+          navigate(`/booking-confirmation/${bookingData.booking_id}`);
+        }
       } else if (bookingData.requires_action) {
         // Fallback to embedded checkout for 3DS or declined card
         toast({

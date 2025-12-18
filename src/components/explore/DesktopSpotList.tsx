@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, MapPin, Footprints, Umbrella, Zap, Shield, Car, X, BoltIcon } from 'lucide-react';
+import { Star, MapPin, Footprints, Umbrella, Zap, Shield, Car, X, BoltIcon, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -325,10 +325,15 @@ const DesktopSpotList = ({
                           <h3 className="font-semibold text-sm truncate">
                             {spot.category || spot.title}
                           </h3>
-                          {spot.instantBook !== false && (
+                          {spot.instantBook !== false ? (
                             <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
                               <BoltIcon className="h-3 w-3 mr-0.5" />
                               Instant
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                              <Clock className="h-3 w-3 mr-0.5" />
+                              Confirmation
                             </Badge>
                           )}
                           {spot.userBooking && (
