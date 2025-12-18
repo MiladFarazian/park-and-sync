@@ -68,6 +68,7 @@ const Auth = () => {
   const [countryCode, setCountryCode] = useState('+1');
   const [rememberMe, setRememberMe] = useState(true);
   const [termsOpen, setTermsOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   
   const [phoneData, setPhoneData] = useState({
     phone: '',
@@ -560,6 +561,13 @@ const Auth = () => {
           >
             Terms & Conditions
           </button>
+          {' '}and{' '}
+          <button 
+            onClick={() => setPrivacyOpen(true)}
+            className="underline hover:text-white transition-colors"
+          >
+            Privacy Policy
+          </button>
         </p>
       </div>
 
@@ -695,6 +703,145 @@ const Auth = () => {
               </ul>
 
               <h3 className="font-semibold text-foreground mt-6">19. CONTACT INFORMATION</h3>
+              <p>
+                Parkzy, Inc.<br />
+                Email: support@useparkzy.com<br />
+                Website: www.useparkzy.com
+              </p>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Privacy Policy Dialog */}
+      <Dialog open={privacyOpen} onOpenChange={setPrivacyOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] p-0">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle className="text-xl font-bold">Privacy Policy</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] px-6 pb-6">
+            <div className="prose prose-sm max-w-none text-muted-foreground space-y-4">
+              <p className="text-xs text-muted-foreground">Last Updated: Dec 11, 2025</p>
+              
+              <p>This Privacy Policy describes how Parkzy, Inc. ("Parkzy," "we," "us," or "our") collects, uses, discloses, and protects your information when you access or use the Parkzy mobile application, website, and related services (collectively, the "Platform").</p>
+              
+              <p>By using the Platform, you consent to the practices described in this Privacy Policy.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">1. INFORMATION WE COLLECT</h3>
+              <p>We collect information in the following categories:</p>
+
+              <h4 className="font-medium text-foreground">1.1 Information You Provide Directly</h4>
+              <p>When you create an account, list a parking spot, or reserve a spot, you may provide:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Name</li>
+                <li>Email address</li>
+                <li>Phone number</li>
+                <li>Account credentials</li>
+                <li>Payment information (processed by third-party providers)</li>
+                <li>Vehicle information (license plate, make, model, color)</li>
+                <li>Spot details (address, access instructions, rules)</li>
+                <li>Identity verification information (if required)</li>
+                <li>Communications with Parkzy or other users</li>
+              </ul>
+              <p>We do not store full credit card numbers; these are processed by Stripe or other PCI-compliant processors.</p>
+
+              <h4 className="font-medium text-foreground">1.2 Information We Automatically Collect</h4>
+              <p>When you use the Platform, we may automatically collect:</p>
+              <p><strong>Device & Usage Information:</strong> IP address, device type and settings, operating system, mobile device identifiers, browser type, app and website usage information, log data, cookies, and analytics data.</p>
+              <p><strong>Location Information:</strong> With your permission, Parkzy may collect approximate or precise location, GPS data, and device-based location metadata. Drivers acknowledge that location access may be required to help identify nearby available parking spots or assist Hosts in locating a parked vehicle.</p>
+
+              <h4 className="font-medium text-foreground">1.3 Information From Third Parties</h4>
+              <p>We may receive information from payment processors, identity verification services, analytics providers, advertising partners, towing partners (e.g., tow status, timestamps, fees), public databases, and social media platforms (if you connect an account).</p>
+
+              <h3 className="font-semibold text-foreground mt-6">2. HOW WE USE YOUR INFORMATION</h3>
+              <p>We use collected information for the following purposes:</p>
+
+              <h4 className="font-medium text-foreground">To Operate the Platform</h4>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Facilitate parking spot listings, bookings, payments, and payouts</li>
+                <li>Verify user identities</li>
+                <li>Display and manage reservations</li>
+                <li>Enable Hosts to enforce rules, including towing actions</li>
+              </ul>
+
+              <h4 className="font-medium text-foreground">To Communicate With You</h4>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Transaction confirmations</li>
+                <li>Security alerts</li>
+                <li>Customer support</li>
+                <li>Policy updates</li>
+                <li>Promotional content (you may opt out)</li>
+              </ul>
+
+              <h4 className="font-medium text-foreground">To Improve the Platform</h4>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Debugging, analytics, testing, and research</li>
+                <li>Personalizing your experience</li>
+                <li>Monitoring trends and usage</li>
+              </ul>
+
+              <h4 className="font-medium text-foreground">To Ensure Compliance & Safety</h4>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Detect fraud or unauthorized listing activity</li>
+                <li>Support Hosts in enforcement actions</li>
+                <li>Process violations, overstays, and towing fees</li>
+                <li>Comply with legal obligations</li>
+              </ul>
+
+              <h4 className="font-medium text-foreground">To Protect Parkzy</h4>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Enforce our Terms & Conditions</li>
+                <li>Resolve disputes between Hosts and Drivers</li>
+                <li>Investigate prohibited activity or misuse</li>
+              </ul>
+
+              <h3 className="font-semibold text-foreground mt-6">3. HOW WE SHARE YOUR INFORMATION</h3>
+              <p>We may share your information with:</p>
+
+              <h4 className="font-medium text-foreground">3.1 Other Users</h4>
+              <p>Certain information may be shared between Hosts and Drivers, including:</p>
+              <p><strong>Shared with Hosts:</strong> Driver's first name, vehicle details, reservation times, profile information necessary for enforcement or towing.</p>
+              <p><strong>Shared with Drivers:</strong> Host name or business name, spot address, parking instructions, contact or verification details if required for access.</p>
+
+              <h4 className="font-medium text-foreground">3.2 Service Providers</h4>
+              <p>We share information with trusted third-party service providers, such as payment processors (e.g., Stripe), cloud hosting providers, data analytics providers, customer support platforms, towing partners (for enforcement requests), and identity verification vendors. These providers are contractually obligated to protect your information.</p>
+
+              <h4 className="font-medium text-foreground">3.3 Legal, Safety, and Compliance</h4>
+              <p>We may disclose information when required by law or when necessary to comply with court orders, warrants, or subpoenas, prevent fraud or abuse, enforce our Terms & Conditions, respond to safety or security concerns, and assist law enforcement or government agencies.</p>
+
+              <h4 className="font-medium text-foreground">3.4 Business Transfers</h4>
+              <p>If Parkzy undergoes a merger, acquisition, asset sale, financing, or similar transaction, information may be transferred as part of the business assets.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">4. COOKIES & TRACKING TECHNOLOGIES</h3>
+              <p>We use cookies, pixels, SDKs, and similar technologies to authenticate users, remember preferences, enable app functionality, analyze usage, and improve marketing and advertising. Users may adjust cookie settings through browser or device controls, though certain features may not function properly if disabled.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">5. DATA RETENTION</h3>
+              <p>We retain information for as long as necessary to provide services, fulfill legitimate business purposes, comply with legal obligations, resolve disputes, and enforce agreements. We may retain anonymized or aggregated data indefinitely.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">6. DATA SECURITY</h3>
+              <p>We implement reasonable administrative, technical, and physical safeguards to protect your information. However, no method of transmission or storage is 100% secure. You use the Platform at your own risk.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">7. CHILDREN'S PRIVACY</h3>
+              <p>The Platform is not intended for individuals under 18. We do not knowingly collect personal information from minors. If you believe a minor has provided information, contact us and we will delete it.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">8. YOUR PRIVACY RIGHTS</h3>
+              <p>Depending on your location, you may have rights including access to personal information, correction or deletion of personal information, opt-out of marketing communications, data portability, and restriction of processing.</p>
+
+              <h4 className="font-medium text-foreground">CCPA / California Privacy Rights</h4>
+              <p>California residents may have additional rights, including right to know what personal data is collected, right to delete personal data, right to opt out of data "sales" or "sharing", and right to non-discrimination. Parkzy does not sell personal information as defined under the CCPA.</p>
+              <p>To request access or deletion, email support@useparkzy.com. We may require identity verification.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">9. THIRD-PARTY LINKS</h3>
+              <p>The Platform may contain links to third-party websites or services. Parkzy is not responsible for their privacy practices or content.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">10. INTERNATIONAL USERS</h3>
+              <p>Parkzy is based in the United States. By using the Platform, you consent to your information being transferred to and processed in the U.S.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">11. CHANGES TO THIS PRIVACY POLICY</h3>
+              <p>We may update this Privacy Policy at any time. Changes become effective upon posting. Continued use of the Platform constitutes acceptance of updated terms.</p>
+
+              <h3 className="font-semibold text-foreground mt-6">12. CONTACT US</h3>
+              <p>For questions, concerns, or privacy requests, contact:</p>
               <p>
                 Parkzy, Inc.<br />
                 Email: support@useparkzy.com<br />
