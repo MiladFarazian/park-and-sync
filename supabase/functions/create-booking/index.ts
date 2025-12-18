@@ -177,6 +177,20 @@ serve(async (req) => {
 
     let customerId = profile?.stripe_customer_id;
 
+    // Verify customer exists in Stripe, or create a new one
+    if (customerId) {
+      try {
+        await stripe.customers.retrieve(customerId);
+      } catch (err: any) {
+        if (err.code === 'resource_missing') {
+          console.log('Stripe customer not found, will create new one');
+          customerId = null;
+        } else {
+          throw err;
+        }
+      }
+    }
+
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: userData.user.email!,
