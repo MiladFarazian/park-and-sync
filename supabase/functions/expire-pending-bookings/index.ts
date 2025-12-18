@@ -20,8 +20,8 @@ serve(async (req) => {
 
     console.log('Checking for expired pending bookings...');
 
-    // Find bookings in 'held' status that are older than 1 hour
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    // Find bookings in 'held' status that are older than 1.5 hours (90 minutes)
+    const ninetyMinutesAgo = new Date(Date.now() - 90 * 60 * 1000).toISOString();
     
     const { data: expiredBookings, error: fetchError } = await supabaseAdmin
       .from('bookings')
@@ -33,7 +33,7 @@ serve(async (req) => {
         spots (address)
       `)
       .eq('status', 'held')
-      .lt('created_at', oneHourAgo);
+      .lt('created_at', ninetyMinutesAgo);
 
     if (fetchError) {
       console.error('Error fetching expired bookings:', fetchError);
@@ -75,7 +75,7 @@ serve(async (req) => {
           .from('bookings')
           .update({ 
             status: 'canceled',
-            cancellation_reason: 'Booking request expired - host did not respond within 1 hour'
+            cancellation_reason: 'Booking request expired - host did not respond within 1.5 hours'
           })
           .eq('id', booking.id);
 
@@ -93,7 +93,7 @@ serve(async (req) => {
             user_id: booking.renter_id,
             type: 'booking',
             title: 'Booking Request Expired',
-            message: `Your booking request at ${booking.spots?.address || 'the parking spot'} expired because the host didn't respond in time. Your card was not charged.`,
+            message: `Your booking request at ${booking.spots?.address || 'the parking spot'} expired because the host didn't respond within 1.5 hours. Your card was not charged.`,
             related_id: booking.id,
           });
 
