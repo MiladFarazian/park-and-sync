@@ -18,11 +18,104 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log('Checking for expired pending bookings...');
+    console.log('Checking for pending bookings needing reminders or expiration...');
 
-    // Find bookings in 'held' status that are older than 1.5 hours (90 minutes)
-    const ninetyMinutesAgo = new Date(Date.now() - 90 * 60 * 1000).toISOString();
-    
+    const now = Date.now();
+    const sixtyMinutesAgo = new Date(now - 60 * 60 * 1000).toISOString();
+    const ninetyMinutesAgo = new Date(now - 90 * 60 * 1000).toISOString();
+
+    // ============================================
+    // PART 1: Send reminders for bookings at 60+ minutes (30 min before expiration)
+    // ============================================
+    const { data: bookingsNeedingReminder, error: reminderFetchError } = await supabaseAdmin
+      .from('bookings')
+      .select(`
+        id,
+        renter_id,
+        spot_id,
+        start_at,
+        end_at,
+        total_amount,
+        spots (host_id, address, category, title)
+      `)
+      .eq('status', 'held')
+      .lt('created_at', sixtyMinutesAgo)
+      .gte('created_at', ninetyMinutesAgo);
+
+    if (reminderFetchError) {
+      console.error('Error fetching bookings for reminders:', reminderFetchError);
+    } else if (bookingsNeedingReminder && bookingsNeedingReminder.length > 0) {
+      console.log(`Found ${bookingsNeedingReminder.length} bookings needing reminders`);
+
+      for (const booking of bookingsNeedingReminder) {
+        const hostId = booking.spots?.host_id;
+        if (!hostId) continue;
+
+        // Check if reminder already sent for this booking
+        const { data: existingReminder } = await supabaseAdmin
+          .from('notifications')
+          .select('id')
+          .eq('user_id', hostId)
+          .eq('related_id', booking.id)
+          .eq('type', 'booking_reminder_host')
+          .single();
+
+        if (existingReminder) {
+          console.log(`Reminder already sent for booking ${booking.id}`);
+          continue;
+        }
+
+        // Get renter info
+        const { data: renterProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('first_name')
+          .eq('user_id', booking.renter_id)
+          .single();
+
+        const renterName = renterProfile?.first_name || 'A driver';
+        const spotAddress = booking.spots?.address || 'your parking spot';
+
+        // Create reminder notification for host
+        await supabaseAdmin
+          .from('notifications')
+          .insert({
+            user_id: hostId,
+            type: 'booking_reminder_host',
+            title: '⏰ Booking Request Expiring Soon',
+            message: `${renterName}'s booking request at ${spotAddress} will expire in 30 minutes. Please approve or decline it soon.`,
+            related_id: booking.id,
+          });
+
+        // Send push notification to host
+        try {
+          const { data: subscriptions } = await supabaseAdmin
+            .from('push_subscriptions')
+            .select('*')
+            .eq('user_id', hostId);
+
+          if (subscriptions && subscriptions.length > 0) {
+            await supabaseAdmin.functions.invoke('send-push-notification', {
+              body: {
+                subscriptions,
+                title: '⏰ Booking Request Expiring Soon',
+                body: `${renterName}'s booking request will expire in 30 minutes. Approve or decline now.`,
+                data: { url: `/host-booking-confirmation/${booking.id}` },
+              },
+            });
+          }
+        } catch (pushError) {
+          console.error(`Failed to send push notification for booking ${booking.id}:`, pushError);
+        }
+
+        console.log(`Sent reminder for booking ${booking.id} to host ${hostId}`);
+      }
+    } else {
+      console.log('No bookings need reminders');
+    }
+
+    // ============================================
+    // PART 2: Expire bookings older than 90 minutes
+    // ============================================
     const { data: expiredBookings, error: fetchError } = await supabaseAdmin
       .from('bookings')
       .select(`
