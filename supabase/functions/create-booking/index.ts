@@ -85,8 +85,9 @@ serve(async (req) => {
     }
 
     // Require a valid non-expired hold from this user for exact time window
+    // Get the most recent one in case there are duplicates
     console.log('Verifying booking hold...');
-    const { data: hold, error: holdError } = await supabase
+    const { data: holds, error: holdError } = await supabase
       .from('booking_holds')
       .select('id, start_at, end_at, expires_at')
       .eq('spot_id', spot_id)
@@ -94,7 +95,10 @@ serve(async (req) => {
       .eq('start_at', start_at)
       .eq('end_at', end_at)
       .gt('expires_at', new Date().toISOString())
-      .maybeSingle();
+      .order('created_at', { ascending: false })
+      .limit(1);
+    
+    const hold = holds?.[0] || null;
 
     if (holdError) {
       console.error('Hold verification error:', holdError);
