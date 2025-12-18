@@ -109,7 +109,7 @@ const PaymentMethodsContent = () => {
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   const handleBack = () => {
-    navigate('/profile');
+    navigate(-1);
   };
 
   const fetchPaymentMethods = async () => {
