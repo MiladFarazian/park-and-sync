@@ -109,13 +109,7 @@ const PaymentMethodsContent = () => {
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   const handleBack = () => {
-    // Check if there's history to go back to
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      // Fallback to home if no history
-      navigate('/');
-    }
+    navigate('/profile');
   };
 
   const fetchPaymentMethods = async () => {
