@@ -372,7 +372,8 @@ const Explore = () => {
         amenities: [...(spot.has_ev_charging ? ['EV Charging'] : []), ...(spot.is_covered ? ['Covered'] : []), ...(spot.is_secure ? ['Secure'] : [])],
         hostId: spot.host_id,
         sizeConstraints: spot.size_constraints || [],
-        userBooking: spot.user_booking || null
+        userBooking: spot.user_booking || null,
+        instantBook: spot.instant_book !== false
       })) || [];
       setParkingSpots(transformedSpots);
     } catch (err) {

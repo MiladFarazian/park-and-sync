@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Heart, Share, Star, MapPin, Calendar, Navigation, MessageCircle, Phone, Camera, Clock, Shield, Zap, Loader2, Pencil, ChevronLeft, ChevronRight, Flag } from 'lucide-react';
+import { ArrowLeft, Heart, Share, Star, MapPin, Calendar, Navigation, MessageCircle, Phone, Camera, Clock, Shield, Zap, Loader2, Pencil, ChevronLeft, ChevronRight, Flag, BoltIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -700,18 +700,26 @@ const SpotDetail = () => {
       <div className="p-4 space-y-6">
         <div>
           {/* Category & Price Header */}
-          <div className="flex justify-between items-center mb-4">
-            {spot.category && (
-              <span className="inline-flex items-center gap-2.5 px-4 py-2 bg-primary/10 text-primary rounded-full text-base font-semibold">
-                {spot.category === 'Residential Driveway' && <span className="text-lg">🏠</span>}
-                {spot.category === 'Apartment / Condo Lot' && <span className="text-lg">🏢</span>}
-                {spot.category === 'Commercial Lot' && <span className="text-lg">🅿️</span>}
-                {spot.category === 'Garage' && <span className="text-lg">🚗</span>}
-                {spot.category === 'Street Parking' && <span className="text-lg">🛣️</span>}
-                {spot.category === 'Event / Venue Lot' && <span className="text-lg">🎭</span>}
-                {spot.category}
-              </span>
-            )}
+          <div className="flex justify-between items-start mb-4">
+            <div className="flex flex-col gap-2">
+              {spot.category && (
+                <span className="inline-flex items-center gap-2.5 px-4 py-2 bg-primary/10 text-primary rounded-full text-base font-semibold">
+                  {spot.category === 'Residential Driveway' && <span className="text-lg">🏠</span>}
+                  {spot.category === 'Apartment / Condo Lot' && <span className="text-lg">🏢</span>}
+                  {spot.category === 'Commercial Lot' && <span className="text-lg">🅿️</span>}
+                  {spot.category === 'Garage' && <span className="text-lg">🚗</span>}
+                  {spot.category === 'Street Parking' && <span className="text-lg">🛣️</span>}
+                  {spot.category === 'Event / Venue Lot' && <span className="text-lg">🎭</span>}
+                  {spot.category}
+                </span>
+              )}
+              {spot.instant_book !== false && (
+                <Badge variant="secondary" className="w-fit text-xs bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                  <BoltIcon className="h-3 w-3 mr-1" />
+                  Instant Book
+                </Badge>
+              )}
+            </div>
             <div className="text-right">
               <p className="text-2xl font-bold text-primary">${calculateDriverPrice(spot.hourlyRate).toFixed(2)}</p>
               <p className="text-sm text-muted-foreground">per hour</p>

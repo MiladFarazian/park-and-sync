@@ -10,8 +10,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Shield, Camera, MapPin, DollarSign, Trash2, Upload, Star, CheckCircle2, ChevronLeft, ChevronRight, Save, Zap, GripVertical, Clock, Car, Lightbulb, CalendarDays } from 'lucide-react';
+import { ArrowLeft, Shield, Camera, MapPin, DollarSign, Trash2, Upload, Star, CheckCircle2, ChevronLeft, ChevronRight, Save, Zap, GripVertical, Clock, Car, Lightbulb, CalendarDays, BoltIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { compressImage } from '@/lib/compressImage';
@@ -198,6 +199,7 @@ const EditSpot = () => {
     spotId: string;
   }>();
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
+  const [instantBook, setInstantBook] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -323,6 +325,7 @@ const EditSpot = () => {
         if (spotData.is_secure) amenities.push('security');
         if (spotData.has_ev_charging) amenities.push('ev');
         setSelectedAmenities(amenities);
+        setInstantBook(spotData.instant_book !== false); // Default to true if null/undefined
         const {
           data: photosData,
           error: photosError
@@ -653,6 +656,7 @@ const EditSpot = () => {
         access_notes: data.accessNotes || null,
         host_rules: data.hostRules || null,
         cancellation_policy: data.cancellationPolicy || null,
+        instant_book: instantBook,
         is_covered: selectedAmenities.includes('covered'),
         is_secure: selectedAmenities.includes('security'),
         has_ev_charging: selectedAmenities.includes('ev'),
@@ -791,6 +795,30 @@ const EditSpot = () => {
                           </p>
                         </button>;
                   })}
+                  </div>
+                </div>
+
+                {/* Instant Book Toggle */}
+                <div className="p-4 rounded-lg border bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900">
+                        <BoltIcon className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                      </div>
+                      <div>
+                        <Label htmlFor="instant-book" className="text-base font-medium cursor-pointer">
+                          Instant Book
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Allow drivers to book without your approval
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      id="instant-book"
+                      checked={instantBook}
+                      onCheckedChange={setInstantBook}
+                    />
                   </div>
                 </div>
 

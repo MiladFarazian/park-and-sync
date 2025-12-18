@@ -654,6 +654,7 @@ export type Database = {
           host_rules: string | null
           hourly_rate: number
           id: string
+          instant_book: boolean
           is_covered: boolean | null
           is_secure: boolean | null
           latitude: number
@@ -677,6 +678,7 @@ export type Database = {
           host_rules?: string | null
           hourly_rate: number
           id?: string
+          instant_book?: boolean
           is_covered?: boolean | null
           is_secure?: boolean | null
           latitude: number
@@ -702,6 +704,7 @@ export type Database = {
           host_rules?: string | null
           hourly_rate?: number
           id?: string
+          instant_book?: boolean
           is_covered?: boolean | null
           is_secure?: boolean | null
           latitude?: number

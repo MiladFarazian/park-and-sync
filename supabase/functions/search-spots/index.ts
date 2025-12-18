@@ -150,6 +150,7 @@ serve(async (req) => {
         is_covered,
         is_secure,
         size_constraints,
+        instant_book,
         status,
         profiles!spots_host_id_fkey (
           first_name,
