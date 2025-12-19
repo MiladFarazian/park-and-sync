@@ -359,8 +359,8 @@ const PaymentMethodsContent = () => {
   return (
     <div className="bg-background">
       <div className="container max-w-2xl mx-auto p-4 space-y-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={handleBack} className="shrink-0">
+        <div className="flex items-center gap-3 relative z-10">
+          <Button variant="ghost" size="icon" onClick={handleBack} className="shrink-0 pointer-events-auto">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1 min-w-0">
