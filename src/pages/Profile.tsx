@@ -852,7 +852,7 @@ const Profile = () => {
           </Card>
         )}
         {userReviews.length > 0 && !isLoadingReviews && (
-          <Card className="p-6">
+          <Card className="p-6 animate-fade-in">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-primary/10 rounded-lg">
                 <Star className="h-5 w-5 text-primary" />
