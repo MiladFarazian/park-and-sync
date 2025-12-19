@@ -4,7 +4,7 @@ type Mode = 'driver' | 'host';
 
 interface ModeContextType {
   mode: Mode;
-  setMode: (mode: Mode) => void;
+  setMode: (mode: Mode, showOverlay?: boolean) => void;
   isLoading: boolean;
   targetMode: Mode | null;
 }
@@ -20,17 +20,23 @@ export const ModeProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [targetMode, setTargetMode] = useState<Mode | null>(null);
 
-  const setMode = (newMode: Mode) => {
-    setIsLoading(true);
-    setTargetMode(newMode);
-    
-    // Simulate mode switch loading
-    setTimeout(() => {
+  const setMode = (newMode: Mode, showOverlay: boolean = true) => {
+    if (showOverlay) {
+      setIsLoading(true);
+      setTargetMode(newMode);
+      
+      // Simulate mode switch loading
+      setTimeout(() => {
+        setModeState(newMode);
+        localStorage.setItem('parkway-mode', newMode);
+        setIsLoading(false);
+        setTargetMode(null);
+      }, 300);
+    } else {
+      // Instant switch without overlay
       setModeState(newMode);
       localStorage.setItem('parkway-mode', newMode);
-      setIsLoading(false);
-      setTargetMode(null);
-    }, 300);
+    }
   };
 
   return (
