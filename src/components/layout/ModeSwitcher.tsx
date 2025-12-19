@@ -31,9 +31,9 @@ const ModeSwitcher = () => {
         onClick={() => handleModeSwitch('driver')}
         disabled={isLoading}
         className={cn(
-          "flex items-center gap-1.5 text-sm font-medium transition-colors duration-300",
+          "flex items-center gap-1.5 text-sm font-medium transition-colors duration-200",
           mode === 'driver'
-            ? "text-foreground"
+            ? "text-violet-500"
             : "text-muted-foreground hover:text-foreground"
         )}
       >
@@ -64,9 +64,9 @@ const ModeSwitcher = () => {
         onClick={() => handleModeSwitch('host')}
         disabled={isLoading}
         className={cn(
-          "flex items-center gap-1.5 text-sm font-medium transition-colors duration-300",
+          "flex items-center gap-1.5 text-sm font-medium transition-colors duration-200",
           mode === 'host'
-            ? "text-foreground"
+            ? "text-violet-500"
             : "text-muted-foreground hover:text-foreground"
         )}
       >
