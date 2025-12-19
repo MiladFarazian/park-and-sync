@@ -208,7 +208,13 @@ const PaymentMethodsContent = () => {
       navigate(returnTo);
       return;
     }
-    navigate(-1);
+    // Check if we have history to go back to
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      // Fallback to profile if no history
+      navigate('/profile');
+    }
   };
 
   const fetchPaymentMethods = async () => {
