@@ -48,29 +48,60 @@ const Home = () => {
 
   useEffect(() => {
     // Get user's location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          setUserLocation({ lat, lng });
-          setLocationResolved(true);
-          setIsUsingCurrentLocation(true);
-        },
-        () => {
-          console.log('Location access denied, using default location');
-          setUserLocation({ lat: 34.0224, lng: -118.2851 });
-          setSearchQuery('University Park, Los Angeles');
-          setLocationResolved(true);
-          setIsUsingCurrentLocation(false);
-        }
-      );
-    } else {
+    const cachedRaw = localStorage.getItem('parkzy:lastLocation');
+    const cached = cachedRaw ? (JSON.parse(cachedRaw) as { lat: number; lng: number; ts?: number }) : null;
+
+    const useCachedLocation = () => {
+      if (!cached) return false;
+      setUserLocation({ lat: cached.lat, lng: cached.lng });
+      setSearchQuery('');
+      setLocationResolved(true);
+      setIsUsingCurrentLocation(true);
+      return true;
+    };
+
+    const useDefaultLocation = () => {
       setUserLocation({ lat: 34.0224, lng: -118.2851 });
       setSearchQuery('University Park, Los Angeles');
       setLocationResolved(true);
       setIsUsingCurrentLocation(false);
+    };
+
+    if (!navigator.geolocation) {
+      if (!useCachedLocation()) useDefaultLocation();
+      return;
     }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const loc = { lat, lng };
+
+        setUserLocation(loc);
+        setSearchQuery('');
+        setLocationResolved(true);
+        setIsUsingCurrentLocation(true);
+
+        localStorage.setItem('parkzy:lastLocation', JSON.stringify({ ...loc, ts: Date.now() }));
+      },
+      (error) => {
+        console.log('Location error, using fallback', error);
+
+        if (useCachedLocation()) {
+          toast('Using your last known location');
+          return;
+        }
+
+        toast.error('Could not access your location — showing default area');
+        useDefaultLocation();
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 60000,
+        timeout: 10000,
+      }
+    );
   }, []);
 
   useEffect(() => {

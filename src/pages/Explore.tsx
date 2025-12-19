@@ -346,9 +346,9 @@ const Explore = () => {
           setIsLoadingLocation(false);
         },
         {
-          enableHighAccuracy: false,
-          maximumAge: 60000, // Accept position cached up to 1 minute
-          timeout: 5000
+          enableHighAccuracy: true,
+          maximumAge: 60000,
+          timeout: 15000
         }
       );
     }
