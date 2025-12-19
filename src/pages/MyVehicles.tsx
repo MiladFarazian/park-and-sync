@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Car, MoreVertical, Pencil, Trash2, Star } from "lucide-react";
+import { ArrowLeft, Plus, Car, MoreVertical, Pencil, Trash2, Star, Truck, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,37 @@ import {
 import { useState, useRef } from "react";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
+
+// Color mapping for vehicle colors
+const vehicleColorMap: Record<string, string> = {
+  black: "from-gray-800 to-gray-900",
+  white: "from-gray-100 to-gray-200",
+  silver: "from-gray-300 to-gray-400",
+  gray: "from-gray-400 to-gray-500",
+  red: "from-red-500 to-red-600",
+  blue: "from-blue-500 to-blue-600",
+  green: "from-green-500 to-green-600",
+  yellow: "from-yellow-400 to-yellow-500",
+  orange: "from-orange-400 to-orange-500",
+  brown: "from-amber-700 to-amber-800",
+  gold: "from-yellow-500 to-amber-600",
+  beige: "from-amber-100 to-amber-200",
+  purple: "from-purple-500 to-purple-600",
+  pink: "from-pink-400 to-pink-500",
+};
+
+const getVehicleIcon = (sizeClass: string) => {
+  if (sizeClass === "truck" || sizeClass === "suv") {
+    return Truck;
+  }
+  return Car;
+};
+
+const getGradientColor = (color?: string | null): string => {
+  if (!color) return "from-primary/80 to-primary";
+  const normalized = color.toLowerCase();
+  return vehicleColorMap[normalized] || "from-primary/80 to-primary";
+};
 
 interface SwipeableCardProps {
   children: React.ReactNode;
@@ -190,65 +221,74 @@ const MyVehiclesContent = () => {
   };
 
   const renderVehicleCard = (vehicle: any) => {
+    const VehicleIcon = getVehicleIcon(vehicle.size_class);
+    const gradientColor = getGradientColor(vehicle.color);
+    const vehicleTitle = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ");
+    
     const cardContent = (
-      <Card className="p-6">
-        <div className="flex items-start gap-4">
-          <div className="p-3 rounded-full bg-muted flex-shrink-0">
-            <Car className="h-6 w-6" />
+      <Card className="overflow-hidden">
+        <div className="flex">
+          {/* Vehicle Image/Icon Section */}
+          <div className={`relative w-28 sm:w-36 flex-shrink-0 bg-gradient-to-br ${gradientColor} flex items-center justify-center`}>
+            <VehicleIcon className="h-10 w-10 sm:h-12 sm:w-12 text-white/90" />
+            {vehicle.is_ev && (
+              <div className="absolute bottom-2 right-2 bg-white/20 backdrop-blur-sm rounded-full p-1">
+                <Zap className="h-3 w-3 text-white" />
+              </div>
+            )}
           </div>
-          <div className="flex-1 min-w-0">
+          
+          {/* Content Section */}
+          <div className="flex-1 p-4 min-w-0">
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <h3 className="font-semibold text-lg truncate">
-                  {vehicle.year} {vehicle.make} {vehicle.model}
-                </h3>
-                <p className="text-sm text-muted-foreground">{vehicle.license_plate}</p>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-base sm:text-lg leading-tight">
+                    {vehicleTitle || "Unnamed Vehicle"}
+                  </h3>
+                  {vehicle.is_primary && (
+                    <Badge variant="secondary" className="flex-shrink-0 text-xs">Primary</Badge>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mt-0.5">{vehicle.license_plate}</p>
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {vehicle.is_primary && (
-                  <Badge variant="secondary">Primary</Badge>
-                )}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-background border">
-                    {!vehicle.is_primary && (
-                      <>
-                        <DropdownMenuItem 
-                          onClick={() => handleSetPrimary(vehicle.id)}
-                          disabled={setPrimaryMutation.isPending}
-                        >
-                          <Star className="h-4 w-4 mr-2" />
-                          Set as Primary
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                      </>
-                    )}
-                    <DropdownMenuItem onClick={() => navigate(`/edit-vehicle/${vehicle.id}`)}>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => handleDeleteClick(vehicle.id)}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-background border">
+                  {!vehicle.is_primary && (
+                    <>
+                      <DropdownMenuItem 
+                        onClick={() => handleSetPrimary(vehicle.id)}
+                        disabled={setPrimaryMutation.isPending}
+                      >
+                        <Star className="h-4 w-4 mr-2" />
+                        Set as Primary
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  <DropdownMenuItem onClick={() => navigate(`/edit-vehicle/${vehicle.id}`)}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => handleDeleteClick(vehicle.id)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Badge variant="outline" className="capitalize">{vehicle.size_class}</Badge>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <Badge variant="outline" className="capitalize text-xs">{vehicle.size_class}</Badge>
               {vehicle.color && (
-                <Badge variant="outline" className="capitalize">{vehicle.color}</Badge>
-              )}
-              {vehicle.is_ev && (
-                <Badge variant="outline">EV</Badge>
+                <Badge variant="outline" className="capitalize text-xs">{vehicle.color}</Badge>
               )}
             </div>
           </div>
@@ -304,11 +344,11 @@ const MyVehiclesContent = () => {
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2].map((i) => (
-              <Card key={i} className="p-6">
-                <div className="flex items-start gap-4">
-                  <Skeleton className="h-12 w-12 rounded-full" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-5 w-48" />
+              <Card key={i} className="overflow-hidden">
+                <div className="flex">
+                  <Skeleton className="w-28 sm:w-36 h-24" />
+                  <div className="flex-1 p-4 space-y-2">
+                    <Skeleton className="h-5 w-3/4" />
                     <Skeleton className="h-4 w-24" />
                     <div className="flex gap-2 mt-2">
                       <Skeleton className="h-5 w-16 rounded-full" />
