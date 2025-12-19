@@ -139,14 +139,12 @@ const LocationSearchInput = ({
           `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${mapboxToken}&types=address,neighborhood,place`
         );
         const data = await response.json();
-        const address = data.features?.[0]?.place_name || 'Current location';
-
         localStorage.setItem('parkzy:lastLocation', JSON.stringify({ ...coords, ts: Date.now() }));
-        onSelectLocation({ ...coords, name: address });
+        onSelectLocation({ ...coords, name: 'Current Location' });
       } catch (error) {
         console.error('Error reverse geocoding:', error);
         localStorage.setItem('parkzy:lastLocation', JSON.stringify({ ...coords, ts: Date.now() }));
-        onSelectLocation({ ...coords, name: 'Current location' });
+        onSelectLocation({ ...coords, name: 'Current Location' });
       } finally {
         setIsDetectingLocation(false);
       }
@@ -197,7 +195,7 @@ const LocationSearchInput = ({
     setTimeout(() => setShowDropdown(false), 200);
   };
 
-  const displayValue = isUsingCurrentLocation && !value ? 'Current location' : value;
+  const displayValue = isUsingCurrentLocation && !value ? 'Current Location' : value;
   const showClearButton = value.length > 0 || isUsingCurrentLocation;
 
   return (
