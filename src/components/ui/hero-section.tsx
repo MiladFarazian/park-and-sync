@@ -71,15 +71,16 @@ const HeroSection = () => {
 
             {/* Search Box - SpotHero Style */}
             <div className="bg-card border rounded-2xl p-6 space-y-4 shadow-lg">
-              {/* Location Input */}
+            {/* Location Input */}
               <LocationSearchInput
                 value={searchLocation}
                 onChange={setSearchLocation}
                 onSelectLocation={handleSelectLocation}
                 onClear={handleClearLocation}
                 isUsingCurrentLocation={isUsingCurrentLocation}
-                placeholder="Where are you going?"
+                placeholder="Where do you need parking?"
                 inputClassName="h-14 text-base border-muted bg-muted/30 rounded-xl"
+                showPopularPOIs
               />
 
               {/* Time Selection */}
