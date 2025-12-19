@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Search, X, Navigation, MapPin, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -255,11 +256,20 @@ const LocationSearchInput = ({
             </div>
           </button>
 
-          {/* Loading indicator */}
+          {/* Loading shimmer placeholders */}
           {isLoadingLocation && (
-            <div className="px-4 py-3 flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm">Searching...</span>
+            <div className="animate-fade-in">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="px-4 py-3 border-b border-border/50 last:border-b-0">
+                  <div className="flex items-start gap-3">
+                    <Skeleton className="h-4 w-4 mt-0.5 rounded-full flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
