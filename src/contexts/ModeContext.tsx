@@ -30,7 +30,7 @@ export const ModeProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem('parkway-mode', newMode);
       setIsLoading(false);
       setTargetMode(null);
-    }, 800);
+    }, 300);
   };
 
   return (
