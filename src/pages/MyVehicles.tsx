@@ -333,13 +333,6 @@ const MyVehiclesContent = () => {
           </Button>
         </div>
 
-        {/* Swipe hint for mobile */}
-        {isMobile && vehicles && vehicles.length > 0 && (
-          <p className="text-xs text-muted-foreground text-center">
-            Swipe left on a vehicle to delete
-          </p>
-        )}
-
         {/* Vehicle List */}
         {isLoading ? (
           <div className="space-y-4">
