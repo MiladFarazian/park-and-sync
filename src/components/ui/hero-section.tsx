@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MapPin, Clock, Shield, Calendar, ChevronRight } from 'lucide-react';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
@@ -11,42 +11,17 @@ const HeroSection = () => {
   const navigate = useNavigate();
   const [searchLocation, setSearchLocation] = useState('');
   const [searchCoords, setSearchCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(true);
+  const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false);
   const [startTime, setStartTime] = useState<Date>(addHours(new Date(), 1));
   const [endTime, setEndTime] = useState<Date>(addHours(new Date(), 3));
   const [mobileStartPickerOpen, setMobileStartPickerOpen] = useState(false);
   const [mobileEndPickerOpen, setMobileEndPickerOpen] = useState(false);
 
-  // Auto-detect current location on mount
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setSearchCoords({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-          setIsUsingCurrentLocation(true);
-        },
-        () => {
-          // Default to University Park if geolocation fails
-          setSearchCoords({ lat: 34.0224, lng: -118.2851 });
-          setSearchLocation('University Park, Los Angeles');
-          setIsUsingCurrentLocation(false);
-        },
-        { timeout: 5000 }
-      );
-    } else {
-      setSearchCoords({ lat: 34.0224, lng: -118.2851 });
-      setSearchLocation('University Park, Los Angeles');
-      setIsUsingCurrentLocation(false);
-    }
-  }, []);
-
   const handleSelectLocation = (location: { lat: number; lng: number; name: string }) => {
     setSearchCoords({ lat: location.lat, lng: location.lng });
-    setSearchLocation(location.name);
-    setIsUsingCurrentLocation(location.name === 'Current location');
+    const isCurrentLoc = location.name === 'Current location' || location.name === 'Current Location';
+    setSearchLocation(isCurrentLoc ? 'Current Location' : location.name);
+    setIsUsingCurrentLocation(isCurrentLoc);
   };
 
   const handleClearLocation = () => {
