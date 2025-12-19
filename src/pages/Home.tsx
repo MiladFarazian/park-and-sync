@@ -49,15 +49,15 @@ const Home = () => {
   useEffect(() => {
     // Get user's location
     const cachedRaw = localStorage.getItem('parkzy:lastLocation');
-    const cached = cachedRaw ? (JSON.parse(cachedRaw) as { lat: number; lng: number; ts?: number }) : null;
+    const cached = cachedRaw
+      ? (JSON.parse(cachedRaw) as { lat: number; lng: number; ts?: number })
+      : null;
 
-    const useCachedLocation = () => {
-      if (!cached) return false;
-      setUserLocation({ lat: cached.lat, lng: cached.lng });
+    const applyLocation = (loc: { lat: number; lng: number }) => {
+      setUserLocation(loc);
       setSearchQuery('');
       setLocationResolved(true);
       setIsUsingCurrentLocation(true);
-      return true;
     };
 
     const useDefaultLocation = () => {
@@ -67,39 +67,85 @@ const Home = () => {
       setIsUsingCurrentLocation(false);
     };
 
+    // If we have a last-known location, use it immediately so we never "snap" to University Park
+    if (cached?.lat && cached?.lng) {
+      applyLocation({ lat: cached.lat, lng: cached.lng });
+    }
+
     if (!navigator.geolocation) {
-      if (!useCachedLocation()) useDefaultLocation();
+      if (!cached) useDefaultLocation();
       return;
     }
 
+    const logGeoError = (label: string, error: GeolocationPositionError) => {
+      console.log(label, { code: error.code, message: error.message });
+    };
+
+    const save = (loc: { lat: number; lng: number }) => {
+      localStorage.setItem('parkzy:lastLocation', JSON.stringify({ ...loc, ts: Date.now() }));
+    };
+
+    const onSuccess = (position: GeolocationPosition) => {
+      const loc = { lat: position.coords.latitude, lng: position.coords.longitude };
+      applyLocation(loc);
+      save(loc);
+    };
+
+    // 1) Fast, low-power attempt (often cached) so we don't block UX
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        const loc = { lat, lng };
-
-        setUserLocation(loc);
-        setSearchQuery('');
-        setLocationResolved(true);
-        setIsUsingCurrentLocation(true);
-
-        localStorage.setItem('parkzy:lastLocation', JSON.stringify({ ...loc, ts: Date.now() }));
-      },
+      onSuccess,
       (error) => {
-        console.log('Location error, using fallback', error);
+        logGeoError('Location quick attempt failed', error);
+      },
+      {
+        enableHighAccuracy: false,
+        maximumAge: 5 * 60 * 1000,
+        timeout: 4000,
+      }
+    );
 
-        if (useCachedLocation()) {
-          toast('Using your last known location');
+    // 2) Then try for a real GPS fix (this is the accurate one)
+    navigator.geolocation.getCurrentPosition(
+      onSuccess,
+      (error) => {
+        logGeoError('Location GPS attempt failed', error);
+
+        // 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT
+        if (error.code === 1) {
+          if (cached) {
+            toast('Location permission denied — using last known location');
+            return;
+          }
+          toast.error('Location permission denied — showing default area');
+          useDefaultLocation();
           return;
         }
 
-        toast.error('Could not access your location — showing default area');
-        useDefaultLocation();
+        // If we already had cached/quick location, keep it; don't jump to default.
+        if (cached) {
+          toast('Could not get a GPS fix — using last known location');
+          return;
+        }
+
+        // Last resort: try one more time without GPS but longer timeout
+        navigator.geolocation.getCurrentPosition(
+          onSuccess,
+          (error2) => {
+            logGeoError('Location fallback attempt failed', error2);
+            toast.error('Could not access your location — showing default area');
+            useDefaultLocation();
+          },
+          {
+            enableHighAccuracy: false,
+            maximumAge: 60000,
+            timeout: 15000,
+          }
+        );
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 60000,
-        timeout: 10000,
+        maximumAge: 0,
+        timeout: 20000,
       }
     );
   }, []);
