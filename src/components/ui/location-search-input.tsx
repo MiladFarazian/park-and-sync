@@ -356,8 +356,9 @@ const LocationSearchInput = ({
     setTimeout(() => setShowDropdown(false), 200);
   };
 
-  const displayValue = isUsingCurrentLocation && !value ? 'Current Location' : value;
-  const showClearButton = value.length > 0 || isUsingCurrentLocation;
+  // Only show "Current Location" text if there's actual content in value field, not auto-pre-fill
+  const displayValue = value;
+  const showClearButton = value.length > 0;
 
   return (
     <div className={`relative ${className}`}>
@@ -376,7 +377,7 @@ const LocationSearchInput = ({
           }
         }}
         placeholder={isDetectingLocation ? "Detecting location..." : placeholder}
-        className={`pl-12 pr-12 ${inputClassName}`}
+        className={`pl-12 pr-10 ${inputClassName}`}
       />
       
       {/* Right side button: Clear or Loading */}
