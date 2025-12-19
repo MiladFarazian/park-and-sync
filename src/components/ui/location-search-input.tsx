@@ -137,10 +137,12 @@ const LocationSearchInput = ({
           );
           const data = await response.json();
           const address = data.features?.[0]?.place_name || 'Current location';
-          
+
+          localStorage.setItem('parkzy:lastLocation', JSON.stringify({ ...coords, ts: Date.now() }));
           onSelectLocation({ ...coords, name: address });
         } catch (error) {
           console.error('Error reverse geocoding:', error);
+          localStorage.setItem('parkzy:lastLocation', JSON.stringify({ ...coords, ts: Date.now() }));
           onSelectLocation({ ...coords, name: 'Current location' });
         } finally {
           setIsDetectingLocation(false);
@@ -150,7 +152,11 @@ const LocationSearchInput = ({
         console.error('Error getting location:', error);
         setIsDetectingLocation(false);
       },
-      { timeout: 10000 }
+      {
+        enableHighAccuracy: true,
+        maximumAge: 60000,
+        timeout: 15000,
+      }
     );
   };
 
