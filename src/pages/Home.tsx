@@ -379,6 +379,7 @@ const Home = () => {
             isUsingCurrentLocation={isUsingCurrentLocation}
             placeholder="Where do you need parking?"
             inputClassName="h-12 text-base"
+            showPopularPOIs
           />
 
           {/* Location error banner */}
