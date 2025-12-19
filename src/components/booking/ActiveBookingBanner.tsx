@@ -7,14 +7,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus, Navigation, Edit, AlertCircle, CheckCircle2, TimerReset, MapPin } from "lucide-react";
-import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { loadStripe } from "@stripe/stripe-js";
 import { toast } from "sonner";
-import { formatDistanceToNow, addHours, format } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 import { ReviewModal } from "./ReviewModal";
+import { ExtendParkingDialog } from "./ExtendParkingDialog";
 
 interface HostProfile {
   user_id: string;
@@ -54,13 +52,7 @@ export const ActiveBookingBanner = () => {
   const navigate = useNavigate();
   const [activeBooking, setActiveBooking] = useState<ActiveBooking | null>(null);
   const [showExtendDialog, setShowExtendDialog] = useState(false);
-  const [extensionHours, setExtensionHours] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [useNewCard, setUseNewCard] = useState(false);
-  const [newPaymentMethodId, setNewPaymentMethodId] = useState<string | null>(null);
-  const [setupClientSecret, setSetupClientSecret] = useState<string | null>(null);
-  const [stripePublishableKey, setStripePublishableKey] = useState<string | null>(null);
-  const [stripePromise, setStripePromise] = useState<Promise<any> | null>(null);
   const [confirmingDeparture, setConfirmingDeparture] = useState(false);
   const [showDepartureDialog, setShowDepartureDialog] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -171,27 +163,6 @@ export const ActiveBookingBanner = () => {
     }
   }, [activeBooking, isHost, mode]);
 
-  const getStripeKey = async (): Promise<string> => {
-    if (stripePublishableKey) return stripePublishableKey;
-    const { data, error } = await supabase.functions.invoke('get-stripe-publishable-key');
-    if (error) throw error;
-    setStripePublishableKey(data.publishableKey);
-    return data.publishableKey as string;
-  };
-
-  const startNewCardFlow = async () => {
-    try {
-      setUseNewCard(true);
-      const key = await getStripeKey();
-      setStripePromise(loadStripe(key));
-      const { data, error } = await supabase.functions.invoke('setup-payment-method');
-      if (error) throw error;
-      setSetupClientSecret(data.clientSecret);
-    } catch (e) {
-      console.error('Failed to start card setup flow', e);
-      toast.error('Unable to start card setup. Please try again.');
-    }
-  };
 
   const handleConfirmDeparture = async (fromDialog = false) => {
     if (!activeBooking) return;
@@ -313,94 +284,6 @@ export const ActiveBookingBanner = () => {
     setLoading(false);
   };
 
-  const handleExtendBooking = async () => {
-    if (!activeBooking) return;
-    setLoading(true);
-
-    try {
-      // If user chose to add a new card, ensure it's saved first
-      if (useNewCard) {
-        if (!setupClientSecret) {
-          await startNewCardFlow();
-          setLoading(false);
-          return;
-        }
-        if (!newPaymentMethodId) {
-          toast.error('Please save your new card first.');
-          setLoading(false);
-          return;
-        }
-      }
-
-      const body: any = {
-        bookingId: activeBooking.id,
-        extensionHours,
-      };
-      if (newPaymentMethodId) body.paymentMethodId = newPaymentMethodId;
-
-      const { data, error } = await supabase.functions.invoke('extend-booking', { body });
-      if (error) throw error;
-
-      if (data.requiresAction && data.clientSecret && data.paymentIntentId) {
-        const key = await getStripeKey();
-        const stripe = await loadStripe(key);
-        const result = await stripe!.confirmCardPayment(data.clientSecret);
-        if (result.error) {
-          throw new Error(result.error.message || 'Payment authentication failed');
-        }
-        // Finalize the booking update after successful authentication
-        const finalize = await supabase.functions.invoke('extend-booking', {
-          body: {
-            bookingId: activeBooking.id,
-            extensionHours,
-            paymentIntentId: data.paymentIntentId,
-            finalize: true,
-          },
-        });
-        if (finalize.error) throw finalize.error;
-        toast.success(finalize.data.message || 'Booking extended successfully!');
-        setShowExtendDialog(false);
-        setExtensionHours(1);
-        setUseNewCard(false);
-        setNewPaymentMethodId(null);
-        loadActiveBooking();
-        setLoading(false);
-        return;
-      }
-
-      if (data.success) {
-        toast.success(data.message || 'Booking extended successfully!');
-        setShowExtendDialog(false);
-        setExtensionHours(1);
-        setUseNewCard(false);
-        setNewPaymentMethodId(null);
-        loadActiveBooking();
-      } else {
-        throw new Error(data.error || 'Failed to extend booking');
-      }
-    } catch (error: any) {
-      const msg = error?.message || String(error);
-      if (msg.includes('No payment method on file')) {
-        await startNewCardFlow();
-        toast.message('Add a card to continue', { description: 'Enter your card details below and press Save.' });
-      } else {
-        console.error('Error extending booking:', error);
-        toast.error(msg || 'Failed to extend booking');
-      }
-    }
-
-    setLoading(false);
-  };
-
-  const getNewEndTime = () => {
-    if (!activeBooking) return '';
-    return format(addHours(new Date(activeBooking.end_at), extensionHours), 'MMM d, h:mm a');
-  };
-  const getExtensionCost = () => {
-    if (!activeBooking) return 0;
-    return activeBooking.spots.hourly_rate * extensionHours;
-  };
-
   // Check if booking is ending soon (within 15 min) or has just ended (within 15 min past)
   const canConfirmDeparture = () => {
     if (!activeBooking || isHost) return false;
@@ -411,41 +294,17 @@ export const ActiveBookingBanner = () => {
     return now >= fifteenMinBefore && now <= fifteenMinAfter && !activeBooking.overstay_action;
   };
 
-  const AddCardInline = () => {
-    const stripe = useStripe();
-    const elements = useElements();
-
-    const onSave = async () => {
-      if (!stripe || !elements || !setupClientSecret) return;
-      const card = elements.getElement(CardElement);
-      if (!card) return;
-      const { error, setupIntent } = await stripe.confirmCardSetup(setupClientSecret, {
-        payment_method: { card },
-      });
-      if (error) {
-        toast.error(error.message || 'Failed to save card');
-        return;
-      }
-      const pmId = setupIntent?.payment_method as string | undefined;
-      if (pmId) {
-        setNewPaymentMethodId(pmId);
-        toast.success('Card saved. You can now confirm the extension.');
-      }
+  // Transform activeBooking to match ExtendParkingDialog expected format
+  const getExtendBookingData = () => {
+    if (!activeBooking) return null;
+    return {
+      id: activeBooking.id,
+      end_at: activeBooking.end_at,
+      hourly_rate: activeBooking.spots.hourly_rate,
+      spots: {
+        title: activeBooking.spots.title,
+      },
     };
-
-    return (
-      <div className="space-y-3 border rounded-lg p-3">
-        <Label>New card</Label>
-        <div className="rounded-md border p-3 bg-background">
-          <CardElement options={{ hidePostalCode: true }} />
-        </div>
-        <div className="flex justify-end">
-          <Button size="sm" onClick={onSave} disabled={loading || !setupClientSecret}>
-            {loading ? 'Saving...' : 'Save Card'}
-          </Button>
-        </div>
-      </div>
-    );
   };
   if (!activeBooking) return null;
 
@@ -751,94 +610,12 @@ export const ActiveBookingBanner = () => {
       </Card>
 
       {/* Extend Booking Dialog */}
-      <Dialog open={showExtendDialog} onOpenChange={setShowExtendDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Extend Your Parking</DialogTitle>
-            <DialogDescription>
-              Choose how much time to add to your booking
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-4 gap-2">
-              {[1, 2, 3, 4].map((hours) => (
-                <Button
-                  key={hours}
-                  variant={extensionHours === hours ? "default" : "outline"}
-                  onClick={() => setExtensionHours(hours)}
-                  className="h-20 flex flex-col gap-1"
-                >
-                  <span className="text-3xl font-bold">{hours}</span>
-                  <span className="text-xs opacity-80">hr{hours > 1 ? 's' : ''}</span>
-                </Button>
-              ))}
-            </div>
-
-            <div className="space-y-2 p-4 bg-muted/50 rounded-lg border">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Current end</span>
-                <span className="text-sm font-medium">
-                  {format(new Date(activeBooking?.end_at || ''), 'h:mm a')}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">New end</span>
-                <span className="text-sm font-semibold text-primary">
-                  {getNewEndTime()}
-                </span>
-              </div>
-              <div className="pt-2 mt-2 border-t flex justify-between items-center">
-                <span className="font-semibold">Total cost</span>
-                <span className="text-2xl font-bold text-primary">
-                  ${getExtensionCost().toFixed(2)}
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm">Payment method</Label>
-                {!useNewCard && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={startNewCardFlow}
-                    className="h-auto py-1 px-2 text-xs"
-                  >
-                    Change card
-                  </Button>
-                )}
-              </div>
-              
-              {!useNewCard && (
-                <div className="p-3 bg-muted/50 rounded-md border">
-                  <p className="text-sm text-muted-foreground">Using same card from booking</p>
-                </div>
-              )}
-
-              {useNewCard && stripePromise && setupClientSecret && (
-                <Elements stripe={stripePromise} options={{ clientSecret: setupClientSecret }}>
-                  <AddCardInline />
-                </Elements>
-              )}
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowExtendDialog(false);
-              setUseNewCard(false);
-              setNewPaymentMethodId(null);
-            }}>
-              Cancel
-            </Button>
-            <Button onClick={handleExtendBooking} disabled={loading}>
-              {loading ? 'Processing...' : 'Confirm Extension'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ExtendParkingDialog
+        open={showExtendDialog}
+        onOpenChange={setShowExtendDialog}
+        booking={getExtendBookingData()}
+        onExtendSuccess={loadActiveBooking}
+      />
 
       {/* Departure Confirmation Dialog */}
       <Dialog open={showDepartureDialog} onOpenChange={setShowDepartureDialog}>
