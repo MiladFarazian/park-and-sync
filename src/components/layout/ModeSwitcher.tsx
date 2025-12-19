@@ -6,19 +6,22 @@ import { cn } from '@/lib/utils';
 
 interface ModeSwitcherProps {
   variant?: 'default' | 'light';
+  navigate?: boolean;
 }
 
-const ModeSwitcher = ({ variant = 'default' }: ModeSwitcherProps) => {
+const ModeSwitcher = ({ variant = 'default', navigate: shouldNavigate = true }: ModeSwitcherProps) => {
   const { mode, setMode, isLoading } = useMode();
   const navigate = useNavigate();
 
   const handleModeSwitch = (newMode: 'driver' | 'host') => {
     if (newMode !== mode) {
       setMode(newMode);
-      if (newMode === 'host') {
-        navigate('/host-home');
-      } else {
-        navigate('/');
+      if (shouldNavigate) {
+        if (newMode === 'host') {
+          navigate('/host-home');
+        } else {
+          navigate('/');
+        }
       }
     }
   };
