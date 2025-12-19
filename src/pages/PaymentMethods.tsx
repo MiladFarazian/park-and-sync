@@ -232,17 +232,17 @@ const PaymentMethodsContent = () => {
   return (
     <div className="bg-background">
       <div className="container max-w-2xl mx-auto p-4 space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={handleBack}>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={handleBack} className="shrink-0">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold">Payment Methods</h1>
-            <p className="text-muted-foreground">Manage your cards and billing</p>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold truncate">Payment Methods</h1>
+            <p className="text-sm text-muted-foreground">Manage your cards and billing</p>
           </div>
-          <Button onClick={handleAddCardClick}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Card
+          <Button onClick={handleAddCardClick} size="sm" className="shrink-0">
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Add Card</span>
           </Button>
         </div>
 
