@@ -33,7 +33,7 @@ const ModeSwitcher = () => {
         className={cn(
           "flex items-center gap-1.5 text-sm font-medium transition-colors duration-200",
           mode === 'driver'
-            ? "text-violet-500"
+            ? "text-primary"
             : "text-muted-foreground hover:text-foreground"
         )}
       >
@@ -53,7 +53,7 @@ const ModeSwitcher = () => {
             "absolute top-0.5 h-5 w-5 rounded-full transition-all duration-300 ease-out",
             isLoading && "scale-90",
             mode === 'driver' 
-              ? "left-0.5 bg-violet-500 shadow-[0_0_12px_rgba(139,92,246,0.6)]" 
+              ? "left-0.5 bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.5)]" 
               : "left-[calc(100%-1.375rem)] bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.5)]"
           )}
         />
@@ -66,7 +66,7 @@ const ModeSwitcher = () => {
         className={cn(
           "flex items-center gap-1.5 text-sm font-medium transition-colors duration-200",
           mode === 'host'
-            ? "text-violet-500"
+            ? "text-primary"
             : "text-muted-foreground hover:text-foreground"
         )}
       >
