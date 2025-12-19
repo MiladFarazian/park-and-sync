@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Car, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Car, MoreVertical, Pencil, Trash2, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -24,13 +25,91 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { toast } from "sonner";
+import { useIsMobile } from "@/hooks/use-mobile";
+
+interface SwipeableCardProps {
+  children: React.ReactNode;
+  onDelete: () => void;
+  disabled?: boolean;
+}
+
+const SwipeableCard = ({ children, onDelete, disabled }: SwipeableCardProps) => {
+  const [translateX, setTranslateX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const startXRef = useRef(0);
+  const currentXRef = useRef(0);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (disabled || !isMobile) return;
+    startXRef.current = e.touches[0].clientX;
+    currentXRef.current = e.touches[0].clientX;
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || disabled || !isMobile) return;
+    currentXRef.current = e.touches[0].clientX;
+    const diff = currentXRef.current - startXRef.current;
+    // Only allow left swipe (negative values)
+    if (diff < 0) {
+      setTranslateX(Math.max(diff, -100));
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDragging || disabled) return;
+    setIsDragging(false);
+    
+    // If swiped more than 80px, trigger delete
+    if (translateX < -80) {
+      setTranslateX(-100);
+      // Small delay before triggering delete for visual feedback
+      setTimeout(() => {
+        onDelete();
+        setTranslateX(0);
+      }, 200);
+    } else {
+      setTranslateX(0);
+    }
+  };
+
+  return (
+    <div className="relative overflow-hidden rounded-xl">
+      {/* Delete background */}
+      <div 
+        className="absolute inset-y-0 right-0 w-24 bg-destructive flex items-center justify-center rounded-r-xl"
+        style={{ opacity: Math.min(Math.abs(translateX) / 80, 1) }}
+      >
+        <Trash2 className="h-5 w-5 text-destructive-foreground" />
+      </div>
+      
+      {/* Card content */}
+      <div
+        ref={cardRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          transform: `translateX(${translateX}px)`,
+          transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+        }}
+        className="relative bg-card"
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
 
 const MyVehiclesContent = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [vehicleToDelete, setVehicleToDelete] = useState<string | null>(null);
 
@@ -68,6 +147,33 @@ const MyVehiclesContent = () => {
     },
   });
 
+  const setPrimaryMutation = useMutation({
+    mutationFn: async (vehicleId: string) => {
+      // First, unset all vehicles as primary
+      const { error: unsetError } = await supabase
+        .from("vehicles")
+        .update({ is_primary: false })
+        .eq("user_id", user?.id);
+      
+      if (unsetError) throw unsetError;
+
+      // Then set the selected vehicle as primary
+      const { error: setError } = await supabase
+        .from("vehicles")
+        .update({ is_primary: true })
+        .eq("id", vehicleId);
+      
+      if (setError) throw setError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vehicles", user?.id] });
+      toast.success("Primary vehicle updated");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to set primary vehicle");
+    },
+  });
+
   const handleDeleteClick = (vehicleId: string) => {
     setVehicleToDelete(vehicleId);
     setDeleteDialogOpen(true);
@@ -77,6 +183,96 @@ const MyVehiclesContent = () => {
     if (vehicleToDelete) {
       deleteMutation.mutate(vehicleToDelete);
     }
+  };
+
+  const handleSetPrimary = (vehicleId: string) => {
+    setPrimaryMutation.mutate(vehicleId);
+  };
+
+  const renderVehicleCard = (vehicle: any) => {
+    const cardContent = (
+      <Card className="p-6">
+        <div className="flex items-start gap-4">
+          <div className="p-3 rounded-full bg-muted flex-shrink-0">
+            <Car className="h-6 w-6" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="font-semibold text-lg truncate">
+                  {vehicle.year} {vehicle.make} {vehicle.model}
+                </h3>
+                <p className="text-sm text-muted-foreground">{vehicle.license_plate}</p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {vehicle.is_primary && (
+                  <Badge variant="secondary">Primary</Badge>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-background border">
+                    {!vehicle.is_primary && (
+                      <>
+                        <DropdownMenuItem 
+                          onClick={() => handleSetPrimary(vehicle.id)}
+                          disabled={setPrimaryMutation.isPending}
+                        >
+                          <Star className="h-4 w-4 mr-2" />
+                          Set as Primary
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                    <DropdownMenuItem onClick={() => navigate(`/edit-vehicle/${vehicle.id}`)}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleDeleteClick(vehicle.id)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Badge variant="outline" className="capitalize">{vehicle.size_class}</Badge>
+              {vehicle.color && (
+                <Badge variant="outline" className="capitalize">{vehicle.color}</Badge>
+              )}
+              {vehicle.is_ev && (
+                <Badge variant="outline">EV</Badge>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
+    );
+
+    if (isMobile) {
+      return (
+        <SwipeableCard 
+          key={vehicle.id} 
+          onDelete={() => handleDeleteClick(vehicle.id)}
+          disabled={deleteMutation.isPending}
+        >
+          {cardContent}
+        </SwipeableCard>
+      );
+    }
+
+    return (
+      <div key={vehicle.id} className="animate-fade-in">
+        {cardContent}
+      </div>
+    );
   };
 
   return (
@@ -96,6 +292,13 @@ const MyVehiclesContent = () => {
             Add
           </Button>
         </div>
+
+        {/* Swipe hint for mobile */}
+        {isMobile && vehicles && vehicles.length > 0 && (
+          <p className="text-xs text-muted-foreground text-center">
+            Swipe left on a vehicle to delete
+          </p>
+        )}
 
         {/* Vehicle List */}
         {isLoading ? (
@@ -118,59 +321,7 @@ const MyVehiclesContent = () => {
           </div>
         ) : vehicles && vehicles.length > 0 ? (
           <div className="space-y-4">
-            {vehicles.map((vehicle) => (
-              <Card key={vehicle.id} className="p-6 animate-fade-in">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-full bg-muted flex-shrink-0">
-                    <Car className="h-6 w-6" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <h3 className="font-semibold text-lg truncate">
-                          {vehicle.year} {vehicle.make} {vehicle.model}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">{vehicle.license_plate}</p>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {vehicle.is_primary && (
-                          <Badge variant="secondary">Primary</Badge>
-                        )}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="bg-background border">
-                            <DropdownMenuItem onClick={() => navigate(`/edit-vehicle/${vehicle.id}`)}>
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleDeleteClick(vehicle.id)}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Badge variant="outline" className="capitalize">{vehicle.size_class}</Badge>
-                      {vehicle.color && (
-                        <Badge variant="outline" className="capitalize">{vehicle.color}</Badge>
-                      )}
-                      {vehicle.is_ev && (
-                        <Badge variant="outline">EV</Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            ))}
+            {vehicles.map(renderVehicleCard)}
           </div>
         ) : (
           <Card className="p-12 text-center">
