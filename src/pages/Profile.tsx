@@ -825,7 +825,7 @@ const Profile = () => {
           </Card>}
 
         {/* My Reviews Section */}
-        {mode === 'host' && isLoadingReviews && (
+        {isLoadingReviews && (
           <Card className="p-6">
             <div className="flex items-center gap-3 mb-4">
               <Skeleton className="h-9 w-9 rounded-lg" />
