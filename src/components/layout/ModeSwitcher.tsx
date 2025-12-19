@@ -15,7 +15,7 @@ const ModeSwitcher = ({ variant = 'default', navigate: shouldNavigate = true }: 
 
   const handleModeSwitch = (newMode: 'driver' | 'host') => {
     if (newMode !== mode) {
-      setMode(newMode);
+      setMode(newMode, shouldNavigate); // Only show overlay when navigating
       if (shouldNavigate) {
         if (newMode === 'host') {
           navigate('/host-home');
