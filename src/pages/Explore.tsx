@@ -144,6 +144,22 @@ const Explore = () => {
   useEffect(() => {
     if (!navigator.geolocation) return;
     
+    // First, get a quick position using cached data
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCurrentLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+      },
+      () => {}, // Ignore errors for initial quick fetch
+      {
+        enableHighAccuracy: false,
+        maximumAge: 60000, // Accept cached position up to 1 minute old
+        timeout: 3000
+      }
+    );
+    
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
         setCurrentLocation({
@@ -156,8 +172,8 @@ const Explore = () => {
       },
       {
         enableHighAccuracy: false, // Reduce battery drain
-        maximumAge: 10000, // Cache for 10 seconds
-        timeout: 5000
+        maximumAge: 30000, // Cache for 30 seconds
+        timeout: 10000
       }
     );
 
@@ -301,32 +317,55 @@ const Explore = () => {
     }
   };
 
-  const handleGoToCurrentLocation = () => {
+  const handleGoToCurrentLocation = async () => {
+    // If we already have a cached current location, use it immediately
+    if (currentLocation) {
+      setSearchLocation(currentLocation);
+      fetchNearbySpots(currentLocation, 15000, false);
+      
+      // Get address in background
+      if (mapboxToken) {
+        reverseGeocode(currentLocation.lat, currentLocation.lng).then(address => {
+          if (address) setSearchQuery(address);
+        });
+      }
+      return;
+    }
+    
+    // Otherwise fetch fresh location
     setIsLoadingLocation(true);
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(async (position) => {
-        const deviceLoc = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        };
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const deviceLoc = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
 
-        // Update physical current location
-        setCurrentLocation(deviceLoc);
-        // Also center the search/destination on the current location when user taps this button
-        setSearchLocation(deviceLoc);
-        
-        // Get address for current location
-        if (mapboxToken) {
-          const address = await reverseGeocode(deviceLoc.lat, deviceLoc.lng);
-          if (address) setSearchQuery(address);
+          // Update physical current location
+          setCurrentLocation(deviceLoc);
+          // Also center the search/destination on the current location when user taps this button
+          setSearchLocation(deviceLoc);
+          
+          // Get address for current location
+          if (mapboxToken) {
+            const address = await reverseGeocode(deviceLoc.lat, deviceLoc.lng);
+            if (address) setSearchQuery(address);
+          }
+          
+          fetchNearbySpots(deviceLoc, 15000, false);
+          setIsLoadingLocation(false);
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          setIsLoadingLocation(false);
+        },
+        {
+          enableHighAccuracy: false,
+          maximumAge: 60000, // Accept position cached up to 1 minute
+          timeout: 5000
         }
-        
-        fetchNearbySpots(deviceLoc, 15000, false);
-        setIsLoadingLocation(false);
-      }, error => {
-        console.error('Error getting location:', error);
-        setIsLoadingLocation(false);
-      });
+      );
     }
   };
   const clearSearch = () => {
