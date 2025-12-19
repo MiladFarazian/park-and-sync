@@ -13,7 +13,20 @@ interface LocationSearchInputProps {
   className?: string;
   inputClassName?: string;
   isUsingCurrentLocation?: boolean;
+  showPopularPOIs?: boolean;
 }
+
+// Popular POIs in the LA area
+const POPULAR_POIS = [
+  { name: 'LAX Airport', lat: 33.9425, lng: -118.4081, description: 'Los Angeles International Airport' },
+  { name: 'Crypto.com Arena', lat: 34.0430, lng: -118.2673, description: 'Downtown Los Angeles' },
+  { name: 'Hollywood Sign', lat: 34.1341, lng: -118.3215, description: 'Hollywood Hills' },
+  { name: 'Santa Monica Pier', lat: 34.0100, lng: -118.4961, description: 'Santa Monica' },
+  { name: 'Venice Beach', lat: 33.9850, lng: -118.4695, description: 'Venice' },
+  { name: 'Dodger Stadium', lat: 34.0739, lng: -118.2400, description: 'Elysian Park' },
+  { name: 'USC Campus', lat: 34.0224, lng: -118.2851, description: 'University Park' },
+  { name: 'The Grove', lat: 34.0720, lng: -118.3576, description: 'Fairfax District' },
+];
 
 const LocationSearchInput = ({
   value,
@@ -24,6 +37,7 @@ const LocationSearchInput = ({
   className = "",
   inputClassName = "",
   isUsingCurrentLocation = false,
+  showPopularPOIs = false,
 }: LocationSearchInputProps) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -296,6 +310,34 @@ const LocationSearchInput = ({
               </div>
             </button>
           ))}
+
+          {/* Popular POIs - shown when no search query and showPopularPOIs is enabled */}
+          {showPopularPOIs && !isLoadingLocation && suggestions.length === 0 && value.length === 0 && (
+            <>
+              <div className="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide bg-muted/30">
+                Popular Destinations
+              </div>
+              {POPULAR_POIS.map((poi) => (
+                <button
+                  key={poi.name}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onSelectLocation({ lat: poi.lat, lng: poi.lng, name: poi.name });
+                    setShowDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-b-0 focus:outline-none focus:bg-muted/50"
+                >
+                  <div className="flex items-start gap-3">
+                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{poi.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{poi.description}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </>
+          )}
 
           {/* No results message */}
           {!isLoadingLocation && suggestions.length === 0 && value.length > 2 && (
