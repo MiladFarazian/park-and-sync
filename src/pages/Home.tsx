@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { format } from 'date-fns';
 import { CalendarIcon, Clock, Search } from 'lucide-react';
-import { Star, MapPin, Loader2, Plus, Activity, Zap } from 'lucide-react';
+import { Star, MapPin, Loader2, Plus, Activity, Zap, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ import Index from './Index';
 import LocationSearchInput from '@/components/ui/location-search-input';
 import { calculateDriverPrice } from '@/lib/pricing';
 import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
+import FixLocationDialog from '@/components/location/FixLocationDialog';
 
 const Home = () => {
   const isMobile = useIsMobile();
@@ -30,6 +31,8 @@ const Home = () => {
   const [endTime, setEndTime] = useState(new Date(Date.now() + 2 * 60 * 60 * 1000));
   const [mobileStartPickerOpen, setMobileStartPickerOpen] = useState(false);
   const [mobileEndPickerOpen, setMobileEndPickerOpen] = useState(false);
+  const [locationErrorCode, setLocationErrorCode] = useState<number | null>(null);
+  const [showFixLocationDialog, setShowFixLocationDialog] = useState(false);
 
   const handleStartTimeChange = (date: Date) => {
     setStartTime(date);
@@ -109,21 +112,37 @@ const Home = () => {
       onSuccess,
       (error) => {
         logGeoError('Location GPS attempt failed', error);
+        setLocationErrorCode(error.code);
 
         // 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT
         if (error.code === 1) {
           if (cached) {
-            toast('Location permission denied — using last known location');
+            toast('Location permission denied — using last known location', {
+              action: {
+                label: 'Fix',
+                onClick: () => setShowFixLocationDialog(true),
+              },
+            });
             return;
           }
-          toast.error('Location permission denied — showing default area');
+          toast.error('Location permission denied — showing default area', {
+            action: {
+              label: 'Fix',
+              onClick: () => setShowFixLocationDialog(true),
+            },
+          });
           useDefaultLocation();
           return;
         }
 
         // If we already had cached/quick location, keep it; don't jump to default.
         if (cached) {
-          toast('Could not get a GPS fix — using last known location');
+          toast('Could not get a GPS fix — using last known location', {
+            action: {
+              label: 'Fix',
+              onClick: () => setShowFixLocationDialog(true),
+            },
+          });
           return;
         }
 
@@ -132,7 +151,13 @@ const Home = () => {
           onSuccess,
           (error2) => {
             logGeoError('Location fallback attempt failed', error2);
-            toast.error('Could not access your location — showing default area');
+            setLocationErrorCode(error2.code);
+            toast.error('Could not access your location — showing default area', {
+              action: {
+                label: 'Fix',
+                onClick: () => setShowFixLocationDialog(true),
+              },
+            });
             useDefaultLocation();
           },
           {
@@ -356,6 +381,24 @@ const Home = () => {
             inputClassName="h-12 text-base"
           />
 
+          {/* Location error banner */}
+          {!isUsingCurrentLocation && locationErrorCode && (
+            <button
+              onClick={() => setShowFixLocationDialog(true)}
+              className="w-full flex items-center gap-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-left transition-colors hover:bg-yellow-500/20"
+            >
+              <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                  Location access issue
+                </p>
+                <p className="text-xs text-yellow-600/80 dark:text-yellow-500/80">
+                  Tap here to fix and use your current location
+                </p>
+              </div>
+            </button>
+          )}
+
           <div>
             <p className="font-semibold mb-4">When do you need parking?</p>
 
@@ -479,6 +522,25 @@ const Home = () => {
           initialValue={endTime}
         />
       )}
+
+      {/* Fix Location Dialog */}
+      <FixLocationDialog
+        open={showFixLocationDialog}
+        onOpenChange={setShowFixLocationDialog}
+        errorCode={locationErrorCode}
+        onRetry={() => {
+          // Trigger refetch of nearby spots
+          if (userLocation) {
+            fetchNearbySpots();
+          }
+        }}
+        onSuccess={(coords) => {
+          setUserLocation(coords);
+          setSearchQuery('');
+          setIsUsingCurrentLocation(true);
+          setLocationErrorCode(null);
+        }}
+      />
     </div>
   );
 };
