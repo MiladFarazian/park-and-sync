@@ -7,8 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { loadStripe } from "@stripe/stripe-js";
+import { Elements, CardElement, PaymentRequestButtonElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { loadStripe, PaymentRequest } from "@stripe/stripe-js";
 import RequireAuth from "@/components/auth/RequireAuth";
 
 let stripePromise: Promise<any> | null = null;
@@ -20,6 +20,95 @@ interface PaymentMethod {
   expMonth: number;
   expYear: number;
 }
+
+const WalletPaymentButton = ({ onSuccess }: { onSuccess: () => void }) => {
+  const stripe = useStripe();
+  const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
+  const [canMakePayment, setCanMakePayment] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!stripe) return;
+
+    const pr = stripe.paymentRequest({
+      country: 'US',
+      currency: 'usd',
+      total: {
+        label: 'Add payment method',
+        amount: 0, // $0 for setup
+      },
+      requestPayerName: true,
+      requestPayerEmail: true,
+    });
+
+    pr.canMakePayment().then(result => {
+      if (result) {
+        setPaymentRequest(pr);
+        setCanMakePayment(true);
+      }
+    });
+
+    pr.on('paymentmethod', async (ev) => {
+      try {
+        // Get setup intent
+        const { data, error } = await supabase.functions.invoke('setup-payment-method');
+        if (error) throw error;
+
+        const { error: confirmError } = await stripe.confirmCardSetup(
+          data.clientSecret,
+          { payment_method: ev.paymentMethod.id },
+          { handleActions: false }
+        );
+
+        if (confirmError) {
+          ev.complete('fail');
+          throw confirmError;
+        }
+
+        ev.complete('success');
+        toast({
+          title: "Success",
+          description: "Payment method added successfully",
+        });
+        onSuccess();
+      } catch (error: any) {
+        ev.complete('fail');
+        toast({
+          title: "Error",
+          description: error.message || "Failed to add payment method",
+          variant: "destructive",
+        });
+      }
+    });
+  }, [stripe, onSuccess, toast]);
+
+  if (!canMakePayment || !paymentRequest) return null;
+
+  return (
+    <div className="space-y-3">
+      <PaymentRequestButtonElement
+        options={{
+          paymentRequest,
+          style: {
+            paymentRequestButton: {
+              type: 'default',
+              theme: 'dark',
+              height: '44px',
+            },
+          },
+        }}
+      />
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">Or pay with card</span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const AddCardForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: () => void }) => {
   const stripe = useStripe();
@@ -71,31 +160,34 @@ const AddCardForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel:
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="p-4 border rounded-lg">
-        <CardElement
-          options={{
-            style: {
-              base: {
-                fontSize: '16px',
-                color: 'hsl(var(--foreground))',
-                '::placeholder': {
-                  color: 'hsl(var(--muted-foreground))',
+    <div className="space-y-4">
+      <WalletPaymentButton onSuccess={onSuccess} />
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="p-4 border rounded-lg">
+          <CardElement
+            options={{
+              style: {
+                base: {
+                  fontSize: '16px',
+                  color: 'hsl(var(--foreground))',
+                  '::placeholder': {
+                    color: 'hsl(var(--muted-foreground))',
+                  },
                 },
               },
-            },
-          }}
-        />
-      </div>
-      <div className="flex gap-2">
-        <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
-          Cancel
-        </Button>
-        <Button type="submit" disabled={!stripe || loading} className="flex-1">
-          {loading ? "Adding..." : "Add Card"}
-        </Button>
-      </div>
-    </form>
+            }}
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
+            Cancel
+          </Button>
+          <Button type="submit" disabled={!stripe || loading} className="flex-1">
+            {loading ? "Adding..." : "Add Card"}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 };
 
