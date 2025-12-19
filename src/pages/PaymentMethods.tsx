@@ -216,17 +216,52 @@ const PaymentMethodsContent = () => {
     }
   };
 
-  const getCardBrandColor = (brand: string) => {
-    switch (brand.toLowerCase()) {
-      case 'visa':
-        return 'text-blue-600';
-      case 'mastercard':
-        return 'text-red-600';
-      case 'amex':
-        return 'text-blue-500';
-      default:
-        return 'text-foreground';
+  const CardBrandLogo = ({ brand }: { brand: string }) => {
+    const brandLower = brand.toLowerCase();
+    
+    if (brandLower === 'visa') {
+      return (
+        <svg viewBox="0 0 48 32" className="h-8 w-12">
+          <rect width="48" height="32" rx="4" fill="#1A1F71"/>
+          <path d="M19.5 21H17L18.9 11H21.4L19.5 21ZM15.3 11L12.9 18L12.6 16.5L11.8 12C11.8 12 11.7 11 10.4 11H6.1L6 11.2C6 11.2 7.5 11.5 9.2 12.5L11.4 21H14L17.8 11H15.3ZM35.4 21H37.5L35.7 11H33.6C32.5 11 32.2 11.8 32.2 11.8L28.3 21H30.9L31.4 19.5H34.6L34.9 21H35.4ZM32.1 17.5L33.5 13.5L34.3 17.5H32.1ZM28.5 13.5L28.8 11.8C28.8 11.8 27.5 11.3 26.1 11.3C24.6 11.3 21.3 12 21.3 14.8C21.3 17.4 24.8 17.4 24.8 18.8C24.8 20.2 21.7 19.8 20.5 18.9L20.1 20.7C20.1 20.7 21.4 21.3 23.3 21.3C25.2 21.3 28 20.2 28 17.6C28 14.9 24.5 14.7 24.5 13.5C24.5 12.3 26.9 12.5 28.5 13.5Z" fill="white"/>
+        </svg>
+      );
     }
+    
+    if (brandLower === 'mastercard') {
+      return (
+        <svg viewBox="0 0 48 32" className="h-8 w-12">
+          <rect width="48" height="32" rx="4" fill="#000"/>
+          <circle cx="19" cy="16" r="9" fill="#EB001B"/>
+          <circle cx="29" cy="16" r="9" fill="#F79E1B"/>
+          <path d="M24 9.5C26.1 11.1 27.5 13.4 27.5 16C27.5 18.6 26.1 20.9 24 22.5C21.9 20.9 20.5 18.6 20.5 16C20.5 13.4 21.9 11.1 24 9.5Z" fill="#FF5F00"/>
+        </svg>
+      );
+    }
+    
+    if (brandLower === 'amex' || brandLower === 'american express') {
+      return (
+        <svg viewBox="0 0 48 32" className="h-8 w-12">
+          <rect width="48" height="32" rx="4" fill="#006FCF"/>
+          <path d="M8 16L10 12H12.5L14.5 16L16.5 12H19L15 20H12.5L10.5 16L8.5 20H6L8 16Z" fill="white"/>
+          <path d="M20 12H28V14H22V15H27.5V17H22V18H28V20H20V12Z" fill="white"/>
+          <path d="M29 12H32L34 15L36 12H39L35.5 16L39 20H36L34 17L32 20H29L32.5 16L29 12Z" fill="white"/>
+        </svg>
+      );
+    }
+    
+    if (brandLower === 'discover') {
+      return (
+        <svg viewBox="0 0 48 32" className="h-8 w-12">
+          <rect width="48" height="32" rx="4" fill="#FF6600"/>
+          <circle cx="30" cy="16" r="8" fill="#FFF"/>
+          <path d="M8 14H12C13.7 14 15 15.3 15 17C15 18.7 13.7 20 12 20H8V14Z" fill="white"/>
+        </svg>
+      );
+    }
+    
+    // Default fallback
+    return <CreditCard className="h-8 w-8 text-muted-foreground" />;
   };
 
   return (
@@ -268,7 +303,7 @@ const PaymentMethodsContent = () => {
               <Card key={pm.id} className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <CreditCard className={`h-8 w-8 ${getCardBrandColor(pm.brand)}`} />
+                    <CardBrandLogo brand={pm.brand} />
                     <div>
                       <p className="font-semibold capitalize">
                         {pm.brand} •••• {pm.last4}
