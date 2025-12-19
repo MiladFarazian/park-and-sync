@@ -19,6 +19,7 @@ import { formatPhoneNumber } from '@/lib/utils';
 import { ImageCropDialog } from '@/components/profile/ImageCropDialog';
 import ModeSwitcher from '@/components/layout/ModeSwitcher';
 import { useMode } from '@/contexts/ModeContext';
+import { Skeleton } from '@/components/ui/skeleton';
 const profileSchema = z.object({
   first_name: z.string().trim().min(1, 'First name is required').max(50, 'First name must be less than 50 characters'),
   last_name: z.string().trim().min(1, 'Last name is required').max(50, 'Last name must be less than 50 characters'),
@@ -63,6 +64,7 @@ const Profile = () => {
   const [phoneOtpSent, setPhoneOtpSent] = useState(false);
   const [phoneVerifyCooldown, setPhoneVerifyCooldown] = useState(0);
   const [hostRating, setHostRating] = useState<{ average: number; count: number } | null>(null);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
   const [userReviews, setUserReviews] = useState<Array<{
     id: string;
     rating: number;
@@ -207,6 +209,7 @@ const Profile = () => {
   const fetchUserReviews = async () => {
     if (!user) return;
     try {
+      setIsLoadingReviews(true);
       setUserReviews([]);
       
       if (mode === 'driver') {
@@ -322,6 +325,8 @@ const Profile = () => {
       }
     } catch (error) {
       console.error('Error fetching user reviews:', error);
+    } finally {
+      setIsLoadingReviews(false);
     }
   };
   const checkUserSpots = async () => {
@@ -820,7 +825,33 @@ const Profile = () => {
           </Card>}
 
         {/* My Reviews Section */}
-        {userReviews.length > 0 && (
+        {mode === 'host' && isLoadingReviews && (
+          <Card className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Skeleton className="h-9 w-9 rounded-lg" />
+              <div className="space-y-2">
+                <Skeleton className="h-5 w-24" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </div>
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="border-l-2 border-muted pl-4 py-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4 mt-1" />
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+        {userReviews.length > 0 && !isLoadingReviews && (
           <Card className="p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-primary/10 rounded-lg">
