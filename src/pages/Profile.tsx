@@ -638,7 +638,7 @@ const Profile = () => {
         <div className="flex justify-between items-start mb-6">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold">Profile</h1>
-            <ModeSwitcher variant="light" />
+            <ModeSwitcher variant="light" navigate={false} />
           </div>
           
         </div>
