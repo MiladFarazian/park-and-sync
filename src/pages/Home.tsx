@@ -26,7 +26,7 @@ const Home = () => {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationResolved, setLocationResolved] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(true);
+  const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false);
   const [startTime, setStartTime] = useState(new Date());
   const [endTime, setEndTime] = useState(new Date(Date.now() + 2 * 60 * 60 * 1000));
   const [mobileStartPickerOpen, setMobileStartPickerOpen] = useState(false);
@@ -60,7 +60,7 @@ const Home = () => {
       setUserLocation(loc);
       setSearchQuery('');
       setLocationResolved(true);
-      setIsUsingCurrentLocation(true);
+      // Don't auto-set isUsingCurrentLocation - keep search bar blank
     };
 
     const useDefaultLocation = () => {
