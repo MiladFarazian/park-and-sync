@@ -267,9 +267,6 @@ const Home = () => {
   return (
     <div className="bg-background">
       <div className="p-4 space-y-6">
-        {/* Active Booking Banner */}
-        <ActiveBookingBanner />
-
         {/* Search Card */}
         <Card className="p-6 space-y-4">
           <LocationSearchInput
@@ -345,6 +342,9 @@ const Home = () => {
             })}
           </div>
         </div>
+
+        {/* Active Booking Banner */}
+        <ActiveBookingBanner />
 
         {/* Nearby Spots */}
         {!locationResolved ? (
