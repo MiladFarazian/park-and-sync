@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -7,15 +7,18 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Combobox } from "@/components/ui/combobox";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { vehicleMakes, vehicleModels, vehicleColors } from "@/lib/vehicleData";
+import { useQuery } from "@tanstack/react-query";
 import RequireAuth from "@/components/auth/RequireAuth";
 
-const AddVehicleContent = () => {
+const EditVehicleContent = () => {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -28,6 +31,38 @@ const AddVehicleContent = () => {
     is_ev: false,
     is_primary: false,
   });
+
+  // Fetch existing vehicle data
+  const { data: vehicle, isLoading } = useQuery({
+    queryKey: ["vehicle", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vehicles")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
+  // Populate form when vehicle data is loaded
+  useEffect(() => {
+    if (vehicle) {
+      setFormData({
+        license_plate: vehicle.license_plate || "",
+        make: vehicle.make || "",
+        model: vehicle.model || "",
+        year: vehicle.year || new Date().getFullYear(),
+        color: vehicle.color || "",
+        size_class: vehicle.size_class || "compact",
+        is_ev: vehicle.is_ev || false,
+        is_primary: vehicle.is_primary || false,
+      });
+    }
+  }, [vehicle]);
 
   // Filter models based on selected make
   const availableModels = useMemo(() => {
@@ -42,25 +77,54 @@ const AddVehicleContent = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.id) return;
+    if (!user?.id || !id) return;
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from("vehicles").insert([{
-        user_id: user.id,
-        ...formData,
-      }]);
+      const { error } = await supabase
+        .from("vehicles")
+        .update({
+          ...formData,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
 
       if (error) throw error;
 
-      toast.success("Vehicle added successfully");
+      toast.success("Vehicle updated successfully");
       navigate("/my-vehicles");
     } catch (error: any) {
-      toast.error(error.message || "Failed to add vehicle");
+      toast.error(error.message || "Failed to update vehicle");
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <div className="container max-w-2xl mx-auto p-4 space-y-6 pb-24">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/my-vehicles')}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <Skeleton className="h-8 w-32 mb-1" />
+              <Skeleton className="h-4 w-48" />
+            </div>
+          </div>
+          <Card className="p-6 space-y-6">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ))}
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto">
@@ -70,8 +134,8 @@ const AddVehicleContent = () => {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Add Vehicle</h1>
-            <p className="text-sm text-muted-foreground">Register a new vehicle</p>
+            <h1 className="text-2xl font-bold tracking-tight">Edit Vehicle</h1>
+            <p className="text-sm text-muted-foreground">Update your vehicle details</p>
           </div>
         </div>
 
@@ -192,7 +256,7 @@ const AddVehicleContent = () => {
                 Cancel
               </Button>
               <Button type="submit" className="flex-1" disabled={isSubmitting}>
-                {isSubmitting ? "Adding..." : "Add Vehicle"}
+                {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>
             </div>
           </Card>
@@ -202,12 +266,12 @@ const AddVehicleContent = () => {
   );
 };
 
-const AddVehicle = () => {
+const EditVehicle = () => {
   return (
     <RequireAuth feature="vehicles">
-      <AddVehicleContent />
+      <EditVehicleContent />
     </RequireAuth>
   );
 };
 
-export default AddVehicle;
+export default EditVehicle;

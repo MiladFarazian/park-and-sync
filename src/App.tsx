@@ -30,6 +30,7 @@ import PersonalInformation from "./pages/PersonalInformation";
 import ManageAccount from "./pages/ManageAccount";
 import MyVehicles from "./pages/MyVehicles";
 import AddVehicle from "./pages/AddVehicle";
+import EditVehicle from "./pages/EditVehicle";
 import PaymentMethods from "./pages/PaymentMethods";
 import Notifications from "./pages/Notifications";
 import PrivacySecurity from "./pages/PrivacySecurity";
@@ -85,6 +86,7 @@ const App = () => {
             <Route path="/personal-information" element={<PersonalInformation />} />
             <Route path="/my-vehicles" element={<MyVehicles />} />
             <Route path="/add-vehicle" element={<AddVehicle />} />
+            <Route path="/edit-vehicle/:id" element={<EditVehicle />} />
             <Route path="/payment-methods" element={<PaymentMethods />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/privacy-security" element={<PrivacySecurity />} />
