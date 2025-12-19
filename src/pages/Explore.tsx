@@ -307,50 +307,68 @@ const Explore = () => {
     if (currentLocation) {
       setSearchLocation(currentLocation);
       fetchNearbySpots(currentLocation, 15000, false);
-      
+
       // Get address in background
       if (mapboxToken) {
-        reverseGeocode(currentLocation.lat, currentLocation.lng).then(address => {
+        reverseGeocode(currentLocation.lat, currentLocation.lng).then((address) => {
           if (address) setSearchQuery(address);
         });
       }
       return;
     }
-    
-    // Otherwise fetch fresh location
+
+    const logGeoError = (label: string, error: GeolocationPositionError) => {
+      console.log(label, { code: error.code, message: error.message });
+    };
+
+    const onSuccess = async (position: GeolocationPosition) => {
+      const deviceLoc = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+      };
+
+      setCurrentLocation(deviceLoc);
+      setSearchLocation(deviceLoc);
+
+      if (mapboxToken) {
+        const address = await reverseGeocode(deviceLoc.lat, deviceLoc.lng);
+        if (address) setSearchQuery(address);
+      }
+
+      fetchNearbySpots(deviceLoc, 15000, false);
+      setIsLoadingLocation(false);
+    };
+
+    const onError = (error: GeolocationPositionError) => {
+      logGeoError('Explore current location failed', error);
+
+      // If GPS times out/unavailable, retry once without high accuracy
+      if (error.code === 2 || error.code === 3) {
+        navigator.geolocation.getCurrentPosition(
+          onSuccess,
+          (error2) => {
+            logGeoError('Explore current location fallback failed', error2);
+            setIsLoadingLocation(false);
+          },
+          {
+            enableHighAccuracy: false,
+            maximumAge: 60000,
+            timeout: 15000,
+          }
+        );
+        return;
+      }
+
+      setIsLoadingLocation(false);
+    };
+
     setIsLoadingLocation(true);
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const deviceLoc = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          };
-
-          // Update physical current location
-          setCurrentLocation(deviceLoc);
-          // Also center the search/destination on the current location when user taps this button
-          setSearchLocation(deviceLoc);
-          
-          // Get address for current location
-          if (mapboxToken) {
-            const address = await reverseGeocode(deviceLoc.lat, deviceLoc.lng);
-            if (address) setSearchQuery(address);
-          }
-          
-          fetchNearbySpots(deviceLoc, 15000, false);
-          setIsLoadingLocation(false);
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          setIsLoadingLocation(false);
-        },
-        {
-          enableHighAccuracy: true,
-          maximumAge: 60000,
-          timeout: 15000
-        }
-      );
+      navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 20000,
+      });
     }
   };
   const clearSearch = () => {

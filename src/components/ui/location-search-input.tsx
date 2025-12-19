@@ -124,40 +124,62 @@ const LocationSearchInput = ({
     setIsDetectingLocation(true);
     setShowDropdown(false);
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const coords = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        };
+    const logGeoError = (label: string, error: GeolocationPositionError) => {
+      console.log(label, { code: error.code, message: error.message });
+    };
 
-        try {
-          const response = await fetch(
-            `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${mapboxToken}&types=address,neighborhood,place`
-          );
-          const data = await response.json();
-          const address = data.features?.[0]?.place_name || 'Current location';
+    const onSuccess = async (position: GeolocationPosition) => {
+      const coords = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+      };
 
-          localStorage.setItem('parkzy:lastLocation', JSON.stringify({ ...coords, ts: Date.now() }));
-          onSelectLocation({ ...coords, name: address });
-        } catch (error) {
-          console.error('Error reverse geocoding:', error);
-          localStorage.setItem('parkzy:lastLocation', JSON.stringify({ ...coords, ts: Date.now() }));
-          onSelectLocation({ ...coords, name: 'Current location' });
-        } finally {
-          setIsDetectingLocation(false);
-        }
-      },
-      (error) => {
-        console.error('Error getting location:', error);
+      try {
+        const response = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${mapboxToken}&types=address,neighborhood,place`
+        );
+        const data = await response.json();
+        const address = data.features?.[0]?.place_name || 'Current location';
+
+        localStorage.setItem('parkzy:lastLocation', JSON.stringify({ ...coords, ts: Date.now() }));
+        onSelectLocation({ ...coords, name: address });
+      } catch (error) {
+        console.error('Error reverse geocoding:', error);
+        localStorage.setItem('parkzy:lastLocation', JSON.stringify({ ...coords, ts: Date.now() }));
+        onSelectLocation({ ...coords, name: 'Current location' });
+      } finally {
         setIsDetectingLocation(false);
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 60000,
-        timeout: 15000,
       }
-    );
+    };
+
+    const onError = (error: GeolocationPositionError) => {
+      logGeoError('LocationSearchInput current location failed', error);
+
+      // If GPS times out/unavailable, retry once without high accuracy
+      if (error.code === 2 || error.code === 3) {
+        navigator.geolocation.getCurrentPosition(
+          onSuccess,
+          (error2) => {
+            logGeoError('LocationSearchInput current location fallback failed', error2);
+            setIsDetectingLocation(false);
+          },
+          {
+            enableHighAccuracy: false,
+            maximumAge: 60000,
+            timeout: 15000,
+          }
+        );
+        return;
+      }
+
+      setIsDetectingLocation(false);
+    };
+
+    navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 20000,
+    });
   };
 
   const handleClear = () => {
