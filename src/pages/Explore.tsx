@@ -144,22 +144,7 @@ const Explore = () => {
   useEffect(() => {
     if (!navigator.geolocation) return;
     
-    // First, get a quick position using cached data
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setCurrentLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        });
-      },
-      () => {}, // Ignore errors for initial quick fetch
-      {
-        enableHighAccuracy: false,
-        maximumAge: 60000, // Accept cached position up to 1 minute old
-        timeout: 3000
-      }
-    );
-    
+    // Use high accuracy for precise GPS location
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
         setCurrentLocation({
@@ -171,9 +156,9 @@ const Explore = () => {
         console.error('Error watching location:', error);
       },
       {
-        enableHighAccuracy: false, // Reduce battery drain
-        maximumAge: 30000, // Cache for 30 seconds
-        timeout: 10000
+        enableHighAccuracy: true, // Use GPS for accurate location
+        maximumAge: 10000, // Accept position up to 10 seconds old
+        timeout: 15000
       }
     );
 
