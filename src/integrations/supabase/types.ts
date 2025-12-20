@@ -655,6 +655,7 @@ export type Database = {
           hourly_rate: number
           id: string
           instant_book: boolean
+          is_ada_accessible: boolean | null
           is_covered: boolean | null
           is_secure: boolean | null
           latitude: number
@@ -679,6 +680,7 @@ export type Database = {
           hourly_rate: number
           id?: string
           instant_book?: boolean
+          is_ada_accessible?: boolean | null
           is_covered?: boolean | null
           is_secure?: boolean | null
           latitude: number
@@ -705,6 +707,7 @@ export type Database = {
           hourly_rate?: number
           id?: string
           instant_book?: boolean
+          is_ada_accessible?: boolean | null
           is_covered?: boolean | null
           is_secure?: boolean | null
           latitude?: number

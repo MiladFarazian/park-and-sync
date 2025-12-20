@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Star, ChevronLeft, ChevronRight, X, Loader2, CreditCard, ExternalLink, BoltIcon } from 'lucide-react';
+import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Star, ChevronLeft, ChevronRight, X, Loader2, CreditCard, ExternalLink, BoltIcon, Accessibility } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { AvailabilityManager, AvailabilityRule } from '@/components/availability/AvailabilityManager';
@@ -66,6 +66,7 @@ const amenitiesList = [
   { id: 'ev', label: 'EV Charging', icon: Zap },
   { id: 'easy', label: 'Easy Access', icon: Car },
   { id: 'lit', label: 'Well Lit', icon: Lightbulb },
+  { id: 'ada', label: 'ADA Accessible', icon: Accessibility },
 ];
 
 const ListSpot = () => {
@@ -379,6 +380,7 @@ const ListSpot = () => {
           is_covered: selectedAmenities.includes('covered'),
           is_secure: selectedAmenities.includes('security'),
           has_ev_charging: selectedAmenities.includes('ev'),
+          is_ada_accessible: selectedAmenities.includes('ada'),
           size_constraints: ['compact', 'midsize'] // Default values
         })
         .select()
