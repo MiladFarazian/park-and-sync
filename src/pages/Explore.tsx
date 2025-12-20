@@ -46,6 +46,7 @@ const Explore = () => {
     covered: false,
     evCharging: false,
     secure: false,
+    adaAccessible: false,
     vehicleSize: null,
   });
 
@@ -411,7 +412,7 @@ const Explore = () => {
         lng: parseFloat(spot.longitude),
         imageUrl: spot.spot_photos?.find((photo: any) => photo.is_primary)?.url || spot.spot_photos?.[0]?.url,
         distance: spot.distance ? `${(spot.distance / 1000).toFixed(1)} km` : undefined,
-        amenities: [...(spot.has_ev_charging ? ['EV Charging'] : []), ...(spot.is_covered ? ['Covered'] : []), ...(spot.is_secure ? ['Secure'] : [])],
+        amenities: [...(spot.has_ev_charging ? ['EV Charging'] : []), ...(spot.is_covered ? ['Covered'] : []), ...(spot.is_secure ? ['Secure'] : []), ...(spot.is_ada_accessible ? ['ADA Accessible'] : [])],
         hostId: spot.host_id,
         sizeConstraints: spot.size_constraints || [],
         userBooking: spot.user_booking || null,
