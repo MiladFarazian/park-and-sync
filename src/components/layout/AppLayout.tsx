@@ -9,32 +9,35 @@ import NotificationPermissionBanner from './NotificationPermissionBanner';
 import { NotificationBell } from './NotificationBell';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useMode } from '@/contexts/ModeContext';
+
 interface AppLayoutProps {
   children: React.ReactNode;
 }
-const AppLayout = ({
-  children
-}: AppLayoutProps) => {
+
+const AppLayout = ({ children }: AppLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const {
-    mode,
-    setMode
-  } = useMode();
+  const { mode, setMode } = useMode();
   const isProfilePage = location.pathname === '/profile';
   const isHomePage = location.pathname === '/';
-
+  
   // Pages that need full-width/height without container padding
-  const isFullScreenPage = location.pathname === '/explore' || location.pathname === '/messages' || location.pathname === '/reviews';
+  const isFullScreenPage =
+    location.pathname === '/explore' ||
+    location.pathname === '/messages' ||
+    location.pathname === '/reviews';
   // Initialize notifications hook to set up realtime listeners
   useNotifications();
+  
   const handleLogoClick = () => {
     if (mode === 'host') {
       setMode('driver');
     }
     navigate('/');
   };
-  return <>
+  
+  return (
+    <>
       <ModeLoadingOverlay />
       
       {/* Desktop Layout with Top Header */}
@@ -51,22 +54,31 @@ const AppLayout = ({
       {/* Mobile Layout with Bottom Navigation */}
       <div className="md:hidden flex flex-col h-screen">
         <NotificationPermissionBanner />
-        {!isProfilePage && <header className="flex-shrink-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
+        {!isProfilePage && (
+          <header className="flex-shrink-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
             <div className="flex items-center gap-3">
-              <img src={parkzyLogo} alt="Parkzy" className="h-8 cursor-pointer" onClick={handleLogoClick} />
+              <img 
+                src={parkzyLogo} 
+                alt="Parkzy" 
+                className="h-8 cursor-pointer" 
+                onClick={handleLogoClick}
+              />
               <ModeSwitcher />
             </div>
-            <div className="flex items-center gap-2 my-0 px-0">
+            <div className="flex items-center gap-2">
               <NotificationBell />
             </div>
-          </header>}
+          </header>
+        )}
         <main className="flex-1 overflow-hidden bg-background">
-          <div className="">
+          <div className={`h-full overflow-y-auto ${isFullScreenPage ? '' : 'pb-20 pb-[calc(5rem+env(safe-area-inset-bottom))]'}`}>
             {children}
           </div>
         </main>
         <BottomNavigation />
       </div>
-    </>;
+    </>
+  );
 };
+
 export default AppLayout;
