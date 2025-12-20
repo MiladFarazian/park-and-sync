@@ -377,7 +377,7 @@ const LocationSearchInput = ({
           }
         }}
         placeholder={isDetectingLocation ? "Detecting location..." : placeholder}
-        className={`pl-12 pr-10 ${inputClassName}`}
+        className={`pl-12 ${showClearButton || isDetectingLocation ? 'pr-10' : 'pr-4'} ${inputClassName}`}
       />
       
       {/* Right side button: Clear or Loading */}
