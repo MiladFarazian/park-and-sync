@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeft, Phone, Mail, Loader2, Car, MapPin, Shield } from 'lucide-react';
+import { ArrowLeft, Phone, Mail, Loader2, Car, MapPin, Shield, Eye, EyeOff } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -74,6 +74,8 @@ const Auth = () => {
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
   const [resetAttempts, setResetAttempts] = useState(0);
   const [resetCooldown, setResetCooldown] = useState(0);
+  const [showSignInPassword, setShowSignInPassword] = useState(false);
+  const [showSignUpPassword, setShowSignUpPassword] = useState(false);
   
   const [phoneData, setPhoneData] = useState({
     phone: '',
@@ -551,14 +553,23 @@ const Auth = () => {
                             Forgot password?
                           </button>
                         </div>
-                        <Input 
-                          id="password" 
-                          type="password" 
-                          value={signInData.password}
-                          onChange={e => setSignInData({ ...signInData, password: e.target.value })}
-                          className="h-12 rounded-xl border-2"
-                          required 
-                        />
+                        <div className="relative">
+                          <Input 
+                            id="password" 
+                            type={showSignInPassword ? "text" : "password"} 
+                            value={signInData.password}
+                            onChange={e => setSignInData({ ...signInData, password: e.target.value })}
+                            className="h-12 rounded-xl border-2 pr-12"
+                            required 
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowSignInPassword(!showSignInPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            {showSignInPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                          </button>
+                        </div>
                       </div>
                       
                       <div className="flex items-center space-x-2">
@@ -626,14 +637,23 @@ const Auth = () => {
                       
                       <div className="space-y-2">
                         <Label htmlFor="signupPassword">Password</Label>
-                        <Input 
-                          id="signupPassword" 
-                          type="password" 
-                          value={signUpData.password}
-                          onChange={e => setSignUpData({ ...signUpData, password: e.target.value })}
-                          className="h-12 rounded-xl border-2"
-                          required 
-                        />
+                        <div className="relative">
+                          <Input 
+                            id="signupPassword" 
+                            type={showSignUpPassword ? "text" : "password"} 
+                            value={signUpData.password}
+                            onChange={e => setSignUpData({ ...signUpData, password: e.target.value })}
+                            className="h-12 rounded-xl border-2 pr-12"
+                            required 
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowSignUpPassword(!showSignUpPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            {showSignUpPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                          </button>
+                        </div>
                       </div>
                       
                       <Button type="submit" className="w-full h-14 text-base font-semibold rounded-xl" disabled={loading}>
