@@ -24,6 +24,7 @@ import BookingDetail from "./pages/BookingDetail";
 import CheckoutSuccess from "./pages/CheckoutSuccess";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import EmailConfirmation from "./pages/EmailConfirmation";
 import NotFound from "./pages/NotFound";
 import PersonalInformation from "./pages/PersonalInformation";
@@ -78,6 +79,7 @@ const App = () => {
           <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/email-confirmation" element={<EmailConfirmation />} />
             <Route path="/checkout-success" element={<CheckoutSuccess />} />
             <Route path="/embedded-checkout/:bookingId" element={<EmbeddedCheckout />} />
