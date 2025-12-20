@@ -646,6 +646,36 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     const pinImageId = 'pin-blue';
 
     const addLayers = () => {
+      // Add cluster pulse/glow layer (behind the main cluster circle)
+      (map.current as any).addLayer({
+        id: 'cluster-pulse',
+        type: 'circle',
+        source: sourceId,
+        filter: ['has', 'point_count'],
+        paint: {
+          'circle-color': [
+            'step',
+            ['get', 'point_count'],
+            'hsl(250, 100%, 65%)', // Blue for small clusters
+            10,
+            'hsl(270, 100%, 60%)', // Purple for medium clusters
+            25,
+            'hsl(290, 100%, 55%)'  // Darker purple for large clusters
+          ],
+          'circle-radius': [
+            'step',
+            ['get', 'point_count'],
+            28,  // Small clusters pulse
+            10,
+            42,  // Medium clusters pulse
+            25,
+            56   // Large clusters pulse
+          ],
+          'circle-opacity': 0.4,
+          'circle-blur': 0.5
+        }
+      } as any);
+
       // Add cluster circle layer
       (map.current as any).addLayer({
         id: 'clusters',
@@ -675,6 +705,36 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           'circle-stroke-color': '#ffffff'
         }
       } as any);
+      
+      // Animate the pulse layer
+      let pulseDirection = 1;
+      let pulseRadius = 0;
+      
+      const animatePulse = () => {
+        if (!map.current || !map.current.getLayer('cluster-pulse')) return;
+        
+        pulseRadius += 0.02 * pulseDirection;
+        if (pulseRadius >= 1) pulseDirection = -1;
+        if (pulseRadius <= 0) pulseDirection = 1;
+        
+        const opacityValue = 0.15 + (0.25 * (1 - pulseRadius));
+        const radiusMultiplier = 1 + (0.2 * pulseRadius);
+        
+        map.current.setPaintProperty('cluster-pulse', 'circle-opacity', opacityValue);
+        map.current.setPaintProperty('cluster-pulse', 'circle-radius', [
+          'step',
+          ['get', 'point_count'],
+          28 * radiusMultiplier,  // Small
+          10,
+          42 * radiusMultiplier,  // Medium
+          25,
+          56 * radiusMultiplier   // Large
+        ]);
+        
+        requestAnimationFrame(animatePulse);
+      };
+      
+      animatePulse();
 
       // Add cluster count label
       (map.current as any).addLayer({
