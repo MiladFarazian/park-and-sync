@@ -72,6 +72,8 @@ const Auth = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
+  const [resetAttempts, setResetAttempts] = useState(0);
+  const [resetCooldown, setResetCooldown] = useState(0);
   
   const [phoneData, setPhoneData] = useState({
     phone: '',
@@ -242,6 +244,16 @@ const Auth = () => {
     e.preventDefault();
     if (!forgotPasswordEmail) return;
     
+    // Check if user is in cooldown
+    if (resetCooldown > 0) {
+      toast({
+        title: "Please wait",
+        description: `You can request another reset link in ${resetCooldown} seconds`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setLoading(true);
     
     const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
@@ -249,13 +261,47 @@ const Auth = () => {
     });
     
     if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
-      });
+      // Check for rate limit error from Supabase
+      if (error.message.toLowerCase().includes('rate') || error.message.toLowerCase().includes('too many')) {
+        setResetCooldown(60);
+        const interval = setInterval(() => {
+          setResetCooldown(prev => {
+            if (prev <= 1) {
+              clearInterval(interval);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+        
+        toast({
+          title: "Too many requests",
+          description: "Please wait 60 seconds before requesting another reset link",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
     } else {
       setForgotPasswordSent(true);
+      setResetAttempts(prev => prev + 1);
+      
+      // Start cooldown after successful request (30 seconds between requests)
+      setResetCooldown(30);
+      const interval = setInterval(() => {
+        setResetCooldown(prev => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
       toast({
         title: "Reset link sent",
         description: "Check your email for the password reset link"
@@ -628,16 +674,23 @@ const Auth = () => {
                           required 
                         />
                       </div>
+                      {resetCooldown > 0 && (
+                        <p className="text-sm text-amber-600 dark:text-amber-400 text-center">
+                          Please wait {resetCooldown}s before requesting another link
+                        </p>
+                      )}
                       <Button 
                         type="submit" 
                         className="w-full h-14 text-base font-semibold rounded-xl" 
-                        disabled={loading}
+                        disabled={loading || resetCooldown > 0}
                       >
                         {loading ? (
                           <>
                             <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                             Sending...
                           </>
+                        ) : resetCooldown > 0 ? (
+                          `Wait ${resetCooldown}s`
                         ) : (
                           'Send Reset Link'
                         )}
