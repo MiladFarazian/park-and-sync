@@ -56,7 +56,7 @@ const AppLayout = ({
               <img src={parkzyLogo} alt="Parkzy" className="h-8 cursor-pointer" onClick={handleLogoClick} />
               <ModeSwitcher />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 my-0 px-0">
               <NotificationBell />
             </div>
           </header>}
