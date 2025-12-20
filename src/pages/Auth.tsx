@@ -391,9 +391,9 @@ const Auth = () => {
       </div>
 
       {/* Right Panel - Auth Form */}
-      <div className="w-full lg:w-1/2 flex flex-col min-h-screen bg-background">
+      <div className="w-full lg:w-1/2 flex flex-col min-h-screen bg-background overflow-y-auto">
         {/* Mobile Header */}
-        <div className="flex items-center justify-between p-4 lg:p-8">
+        <div className="flex items-center justify-between p-4 lg:p-8 flex-shrink-0">
           <Button 
             variant="ghost" 
             size="icon" 
@@ -407,8 +407,8 @@ const Auth = () => {
         </div>
 
         {/* Form Container */}
-        <div className="flex-1 flex items-center justify-center px-6 py-8 lg:px-16">
-          <div className="w-full max-w-md space-y-8">
+        <div className="flex-1 flex flex-col justify-center px-6 py-8 lg:px-16">
+          <div className="w-full max-w-md mx-auto space-y-8">
             {/* Header */}
             <div className="text-center lg:text-left">
               <h1 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">Welcome to Parkzy</h1>
