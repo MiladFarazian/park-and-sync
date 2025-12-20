@@ -817,19 +817,137 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       // Track hover state for smooth animations
       let hoveredSpotId: string | null = null;
 
-      // Handle cluster clicks - zoom in
+      // ===== MAGNETIC CLUSTER ANIMATION =====
+      const CLUSTER_ZOOM_THRESHOLD = 12; // Must match clusterMaxZoom
+      let lastZoom = map.current!.getZoom();
+      let isAnimating = false;
+      
+      // Function to animate markers toward/away from cluster centers
+      const animateClusterTransition = async (zoomingIn: boolean) => {
+        if (isAnimating || !map.current) return;
+        isAnimating = true;
+        
+        const source = map.current.getSource(sourceId) as any;
+        if (!source || !source.getClusterChildren) {
+          isAnimating = false;
+          return;
+        }
+        
+        // Get all cluster features
+        const clusterFeatures = map.current.querySourceFeatures(sourceId, {
+          filter: ['has', 'point_count']
+        });
+        
+        if (clusterFeatures.length === 0) {
+          isAnimating = false;
+          return;
+        }
+        
+        // Build a map of spot ID -> cluster center for animation
+        const spotToCluster = new Map<string, [number, number]>();
+        
+        for (const cluster of clusterFeatures) {
+          const clusterId = cluster.properties?.cluster_id;
+          const clusterCenter = (cluster.geometry as any).coordinates as [number, number];
+          
+          if (!clusterId) continue;
+          
+          try {
+            // Get all leaves (individual points) in this cluster
+            const leaves = await new Promise<any[]>((resolve) => {
+              source.getClusterLeaves(clusterId, 100, 0, (err: any, features: any[]) => {
+                if (err) resolve([]);
+                else resolve(features || []);
+              });
+            });
+            
+            for (const leaf of leaves) {
+              if (leaf.properties?.id) {
+                spotToCluster.set(leaf.properties.id, clusterCenter);
+              }
+            }
+          } catch (e) {
+            // Ignore errors
+          }
+        }
+        
+        // Animate the icon-translate property for unclustered points
+        const duration = 300;
+        const startTime = performance.now();
+        
+        const animate = () => {
+          if (!map.current) {
+            isAnimating = false;
+            return;
+          }
+          
+          const elapsed = performance.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          // Ease out cubic
+          const eased = zoomingIn ? progress : 1 - progress;
+          const translateFactor = 1 - eased;
+          
+          // We can't easily translate individual features, but we can add a subtle scale effect
+          // to give the impression of gathering/dispersing
+          const scale = zoomingIn 
+            ? 0.5 + (0.5 * eased) // Growing from 0.5 to 1
+            : 1 - (0.5 * (1 - eased)); // Shrinking from 1 to 0.5
+          
+          try {
+            map.current.setPaintProperty('spots-circles', 'icon-opacity', 
+              zoomingIn ? eased * 0.95 : (1 - (1 - eased) * 0.5) * 0.95
+            );
+          } catch (e) {
+            // Layer might not exist
+          }
+          
+          if (progress < 1) {
+            requestAnimationFrame(animate);
+          } else {
+            isAnimating = false;
+          }
+        };
+        
+        requestAnimationFrame(animate);
+      };
+      
+      // Listen for zoom changes to trigger animation
+      map.current!.on('zoom', () => {
+        if (!map.current) return;
+        const currentZoom = map.current.getZoom();
+        
+        // Detect crossing the cluster threshold
+        if (lastZoom <= CLUSTER_ZOOM_THRESHOLD && currentZoom > CLUSTER_ZOOM_THRESHOLD) {
+          // Zooming in past threshold - markers should "disperse" from clusters
+          animateClusterTransition(true);
+        } else if (lastZoom > CLUSTER_ZOOM_THRESHOLD && currentZoom <= CLUSTER_ZOOM_THRESHOLD) {
+          // Zooming out past threshold - markers should "gather" to clusters
+          animateClusterTransition(false);
+        }
+        
+        lastZoom = currentZoom;
+      });
+
+      // Handle cluster clicks - zoom in with magnetic animation
       (map.current as any).on('click', 'clusters', (e: any) => {
         const features = (map.current as any).queryRenderedFeatures(e.point, {
           layers: ['clusters']
         });
         const clusterId = features[0].properties.cluster_id;
+        const clusterCenter = features[0].geometry.coordinates;
+        
         (map.current as any).getSource(sourceId).getClusterExpansionZoom(
           clusterId,
           (err: any, zoom: number) => {
             if (err) return;
+            
+            // Trigger magnetic animation
+            animateClusterTransition(true);
+            
             (map.current as any).easeTo({
-              center: features[0].geometry.coordinates,
-              zoom: zoom
+              center: clusterCenter,
+              zoom: zoom,
+              duration: 500
             });
           }
         );
