@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, MapPin, Footprints, Umbrella, Zap, Shield, Car, X, BoltIcon, Clock } from 'lucide-react';
+import { Star, MapPin, Footprints, Umbrella, Zap, Shield, Car, X, BoltIcon, Clock, Accessibility } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -41,6 +41,7 @@ export interface SpotFilters {
   covered: boolean;
   evCharging: boolean;
   secure: boolean;
+  adaAccessible: boolean;
   vehicleSize: string | null;
 }
 
@@ -116,6 +117,7 @@ const DesktopSpotList = ({
     filters.covered,
     filters.evCharging,
     filters.secure,
+    filters.adaAccessible,
     filters.vehicleSize !== null,
   ].filter(Boolean).length;
 
@@ -124,6 +126,7 @@ const DesktopSpotList = ({
       covered: false,
       evCharging: false,
       secure: false,
+      adaAccessible: false,
       vehicleSize: null,
     });
   };
@@ -133,6 +136,7 @@ const DesktopSpotList = ({
     if (filters.covered && !spot.amenities?.includes('Covered')) return false;
     if (filters.evCharging && !spot.amenities?.includes('EV Charging')) return false;
     if (filters.secure && !spot.amenities?.includes('Secure')) return false;
+    if (filters.adaAccessible && !spot.amenities?.includes('ADA Accessible')) return false;
     if (filters.vehicleSize && spot.sizeConstraints && !spot.sizeConstraints.includes(filters.vehicleSize)) return false;
     return true;
   });
@@ -231,6 +235,17 @@ const DesktopSpotList = ({
           >
             <Shield className="h-3.5 w-3.5" />
             Secure
+          </button>
+          <button
+            onClick={() => toggleFilter('adaAccessible')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              filters.adaAccessible
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted hover:bg-muted/80 text-foreground'
+            }`}
+          >
+            <Accessibility className="h-3.5 w-3.5" />
+            ADA Accessible
           </button>
           
           {/* Vehicle Size Dropdown */}

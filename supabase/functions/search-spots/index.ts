@@ -16,6 +16,7 @@ interface SearchRequest {
   has_ev_charging?: boolean;
   is_covered?: boolean;
   is_secure?: boolean;
+  is_ada_accessible?: boolean;
   max_price?: number;
   min_price?: number;
 }
@@ -126,6 +127,7 @@ serve(async (req) => {
       has_ev_charging,
       is_covered,
       is_secure,
+      is_ada_accessible,
       max_price,
       min_price
     }: SearchRequest = await req.json();
@@ -149,6 +151,7 @@ serve(async (req) => {
         has_ev_charging,
         is_covered,
         is_secure,
+        is_ada_accessible,
         size_constraints,
         instant_book,
         status,
@@ -178,6 +181,10 @@ serve(async (req) => {
     
     if (is_secure !== undefined) {
       query = query.eq('is_secure', is_secure);
+    }
+
+    if (is_ada_accessible !== undefined) {
+      query = query.eq('is_ada_accessible', is_ada_accessible);
     }
     
     if (min_price !== undefined) {
