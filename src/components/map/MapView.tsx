@@ -817,7 +817,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       // Track hover state for smooth animations
       let hoveredSpotId: string | null = null;
 
-      // Handle cluster clicks - zoom in
+      // Handle cluster clicks - smooth zoom animation to expand
       (map.current as any).on('click', 'clusters', (e: any) => {
         const features = (map.current as any).queryRenderedFeatures(e.point, {
           layers: ['clusters']
@@ -827,9 +827,13 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           clusterId,
           (err: any, zoom: number) => {
             if (err) return;
-            (map.current as any).easeTo({
+            (map.current as any).flyTo({
               center: features[0].geometry.coordinates,
-              zoom: zoom
+              zoom: zoom,
+              duration: 800,
+              essential: true,
+              curve: 1.2,
+              easing: (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
             });
           }
         );
