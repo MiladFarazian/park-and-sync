@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Shield, Camera, MapPin, DollarSign, Trash2, Upload, Star, CheckCircle2, ChevronLeft, ChevronRight, Save, Zap, GripVertical, Clock, Car, Lightbulb, CalendarDays, BoltIcon } from 'lucide-react';
+import { ArrowLeft, Shield, Camera, MapPin, DollarSign, Trash2, Upload, Star, CheckCircle2, ChevronLeft, ChevronRight, Save, Zap, GripVertical, Clock, Car, Lightbulb, CalendarDays, BoltIcon, Accessibility } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { compressImage } from '@/lib/compressImage';
@@ -73,6 +73,11 @@ const amenitiesList = [{
   label: 'Well Lit',
   icon: Lightbulb,
   dbField: null
+}, {
+  id: 'ada',
+  label: 'ADA Accessible',
+  icon: Accessibility,
+  dbField: 'is_ada_accessible'
 }];
 interface SpotPhoto {
   id: string;
@@ -324,6 +329,7 @@ const EditSpot = () => {
         if (spotData.is_covered) amenities.push('covered');
         if (spotData.is_secure) amenities.push('security');
         if (spotData.has_ev_charging) amenities.push('ev');
+        if (spotData.is_ada_accessible) amenities.push('ada');
         setSelectedAmenities(amenities);
         setInstantBook(spotData.instant_book !== false); // Default to true if null/undefined
         const {
@@ -660,6 +666,7 @@ const EditSpot = () => {
         is_covered: selectedAmenities.includes('covered'),
         is_secure: selectedAmenities.includes('security'),
         has_ev_charging: selectedAmenities.includes('ev'),
+        is_ada_accessible: selectedAmenities.includes('ada'),
         updated_at: new Date().toISOString()
       };
       const {
