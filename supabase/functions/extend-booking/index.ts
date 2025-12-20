@@ -87,13 +87,13 @@ serve(async (req) => {
     const currentEndTime = new Date(booking.end_at);
     const newEndTime = new Date(currentEndTime.getTime() + extensionHours * 60 * 60 * 1000);
     
-    // Check for conflicts with other bookings
+    // Check for conflicts with other bookings (including held bookings)
     const { data: conflictingBookings, error: conflictError } = await supabase
       .from('bookings')
-      .select('id')
+      .select('id, start_at')
       .eq('spot_id', booking.spot_id)
       .neq('id', bookingId)
-      .in('status', ['active', 'paid', 'pending'])
+      .in('status', ['active', 'paid', 'pending', 'held'])
       .lte('start_at', newEndTime.toISOString())
       .gte('end_at', currentEndTime.toISOString());
 
@@ -102,8 +102,44 @@ serve(async (req) => {
       throw new Error('Failed to check booking availability');
     }
 
-    if (conflictingBookings && conflictingBookings.length > 0) {
-      throw new Error('This spot has another booking during the requested extension period. Please choose a shorter extension.');
+    // Also check booking_holds table for any active holds
+    const { data: conflictingHolds, error: holdsError } = await supabase
+      .from('booking_holds')
+      .select('id, start_at')
+      .eq('spot_id', booking.spot_id)
+      .neq('user_id', userData.user.id)
+      .gt('expires_at', new Date().toISOString())
+      .lte('start_at', newEndTime.toISOString())
+      .gte('end_at', currentEndTime.toISOString());
+
+    if (holdsError) {
+      console.error('Error checking holds:', holdsError);
+    }
+
+    const hasConflict = (conflictingBookings && conflictingBookings.length > 0) || 
+                        (conflictingHolds && conflictingHolds.length > 0);
+
+    if (hasConflict) {
+      // Find the earliest conflicting start time to give a helpful message
+      const conflictStartTimes = [
+        ...(conflictingBookings || []).map(b => new Date(b.start_at)),
+        ...(conflictingHolds || []).map(h => new Date(h.start_at))
+      ].sort((a, b) => a.getTime() - b.getTime());
+      
+      const nextBookingStart = conflictStartTimes[0];
+      const maxExtensionMinutes = Math.floor((nextBookingStart.getTime() - currentEndTime.getTime()) / (1000 * 60));
+      
+      if (maxExtensionMinutes <= 0) {
+        throw new Error('Another guest has already booked this spot starting at your current end time. Extension is not available.');
+      }
+      
+      const maxHours = Math.floor(maxExtensionMinutes / 60);
+      const maxMins = maxExtensionMinutes % 60;
+      const maxExtensionText = maxHours > 0 
+        ? `${maxHours} hour${maxHours > 1 ? 's' : ''}${maxMins > 0 ? ` ${maxMins} min` : ''}`
+        : `${maxMins} minutes`;
+      
+      throw new Error(`Another guest has booked this spot soon. You can extend by up to ${maxExtensionText}.`);
     }
 
     // Calculate extension cost with invisible upcharge + visible service fee
