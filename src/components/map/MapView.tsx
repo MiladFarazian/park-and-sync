@@ -752,6 +752,30 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         }
       } as any);
 
+      // Add selected highlight circle layer (shows on selection) - BEFORE other layers
+      (map.current as any).addLayer({
+        id: 'spots-selected',
+        type: 'circle',
+        source: sourceId,
+        filter: ['!', ['has', 'point_count']],
+        paint: {
+          'circle-radius': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            28,
+            0
+          ],
+          'circle-color': 'hsl(250, 100%, 55%)',
+          'circle-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            0.35,
+            0
+          ],
+          'circle-translate': [0, -20] // Offset to align with pin head
+        }
+      } as any);
+
       // Add highlight circle layer (shows on hover) - BEFORE the pin layer
       (map.current as any).addLayer({
         id: 'spots-highlight',
@@ -784,7 +808,12 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         filter: ['!', ['has', 'point_count']],
         layout: {
           'icon-image': pinImageId,
-          'icon-size': 1.5,
+          'icon-size': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            1.8,  // Larger when selected
+            1.5   // Normal size
+          ],
           'icon-allow-overlap': true,
           'icon-anchor': 'bottom'
         },
@@ -980,6 +1009,34 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
 
     prevHighlightedRef.current = highlightedSpotId || null;
   }, [highlightedSpotId, mapReady]);
+
+  // Update feature-state when selectedSpot changes (enlarge selected pin)
+  const prevSelectedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!map.current || !mapReady) return;
+    
+    const sourceId = 'spots-source';
+    const source = map.current.getSource(sourceId);
+    if (!source) return;
+
+    // Remove selection from previous spot
+    if (prevSelectedRef.current) {
+      map.current.setFeatureState(
+        { source: sourceId, id: prevSelectedRef.current },
+        { selected: false }
+      );
+    }
+
+    // Add selection to new spot
+    if (selectedSpot?.id) {
+      map.current.setFeatureState(
+        { source: sourceId, id: selectedSpot.id },
+        { selected: true }
+      );
+    }
+
+    prevSelectedRef.current = selectedSpot?.id || null;
+  }, [selectedSpot?.id, mapReady]);
 
   const handleSpotClick = (spot: Spot) => {
     setSelectedSpot(spot);
