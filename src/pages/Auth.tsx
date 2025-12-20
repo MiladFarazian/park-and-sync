@@ -239,11 +239,23 @@ const Auth = () => {
     <div className="min-h-screen flex">
       {/* Left Panel - Branding (hidden on mobile) */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary via-primary/90 to-primary/80 relative overflow-hidden">
-        {/* Decorative elements */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl" />
-          <div className="absolute bottom-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl" />
+        {/* Animated gradient overlay */}
+        <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_50%,transparent_75%)] bg-[length:400%_400%] animate-[gradient-shift_8s_ease-in-out_infinite]" />
+        
+        {/* Floating orbs */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute top-[10%] left-[15%] w-64 h-64 bg-white/10 rounded-full blur-3xl animate-[float_12s_ease-in-out_infinite]" />
+          <div className="absolute top-[60%] left-[60%] w-80 h-80 bg-white/8 rounded-full blur-3xl animate-[float_15s_ease-in-out_infinite_reverse]" />
+          <div className="absolute top-[30%] right-[10%] w-48 h-48 bg-white/12 rounded-full blur-2xl animate-[float_10s_ease-in-out_infinite_2s]" />
+          <div className="absolute bottom-[20%] left-[5%] w-56 h-56 bg-white/6 rounded-full blur-3xl animate-[float_14s_ease-in-out_infinite_1s]" />
         </div>
+        
+        {/* Grid pattern overlay */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                           linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+          backgroundSize: '60px 60px'
+        }} />
         
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           {/* Logo */}
