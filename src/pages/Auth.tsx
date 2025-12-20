@@ -69,6 +69,9 @@ const Auth = () => {
   const [rememberMe, setRememberMe] = useState(true);
   const [termsOpen, setTermsOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
   
   const [phoneData, setPhoneData] = useState({
     phone: '',
@@ -232,6 +235,32 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
     const { error } = await signUp(signUpData.email, signUpData.password, signUpData.firstName, signUpData.lastName);
+    setLoading(false);
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotPasswordEmail) return;
+    
+    setLoading(true);
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
+      redirectTo: `${window.location.origin}/reset-password`
+    });
+    
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } else {
+      setForgotPasswordSent(true);
+      toast({
+        title: "Reset link sent",
+        description: "Check your email for the password reset link"
+      });
+    }
     setLoading(false);
   };
 
@@ -441,7 +470,7 @@ const Auth = () => {
               )}
 
               {/* Email Auth */}
-              {authMethod === 'email' && (
+              {authMethod === 'email' && !showForgotPassword && (
                 <Tabs defaultValue="signin" className="space-y-4">
                   <TabsList className="grid w-full grid-cols-2 h-12 rounded-xl p-1">
                     <TabsTrigger value="signin" className="rounded-lg text-sm font-medium">Sign In</TabsTrigger>
@@ -463,7 +492,19 @@ const Auth = () => {
                       </div>
                       
                       <div className="space-y-2">
-                        <Label htmlFor="password">Password</Label>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="password">Password</Label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowForgotPassword(true);
+                              setForgotPasswordEmail(signInData.email);
+                            }}
+                            className="text-sm text-primary hover:underline"
+                          >
+                            Forgot password?
+                          </button>
+                        </div>
                         <Input 
                           id="password" 
                           type="password" 
@@ -562,6 +603,83 @@ const Auth = () => {
                     </form>
                   </TabsContent>
                 </Tabs>
+              )}
+
+              {/* Forgot Password Form */}
+              {authMethod === 'email' && showForgotPassword && (
+                <div className="space-y-4">
+                  {!forgotPasswordSent ? (
+                    <form onSubmit={handleForgotPassword} className="space-y-4">
+                      <div className="text-center mb-2">
+                        <h2 className="text-lg font-semibold">Reset your password</h2>
+                        <p className="text-sm text-muted-foreground">
+                          Enter your email and we'll send you a reset link
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="forgotEmail">Email</Label>
+                        <Input 
+                          id="forgotEmail" 
+                          type="email" 
+                          value={forgotPasswordEmail}
+                          onChange={e => setForgotPasswordEmail(e.target.value)}
+                          className="h-12 rounded-xl border-2"
+                          placeholder="Enter your email"
+                          required 
+                        />
+                      </div>
+                      <Button 
+                        type="submit" 
+                        className="w-full h-14 text-base font-semibold rounded-xl" 
+                        disabled={loading}
+                      >
+                        {loading ? (
+                          <>
+                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          'Send Reset Link'
+                        )}
+                      </Button>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        className="w-full text-muted-foreground"
+                        onClick={() => {
+                          setShowForgotPassword(false);
+                          setForgotPasswordSent(false);
+                        }}
+                      >
+                        Back to sign in
+                      </Button>
+                    </form>
+                  ) : (
+                    <div className="text-center space-y-4 py-4">
+                      <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                        <Mail className="h-7 w-7 text-green-600" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-semibold mb-1">Check your email</h2>
+                        <p className="text-sm text-muted-foreground">
+                          We've sent a password reset link to<br />
+                          <span className="font-medium text-foreground">{forgotPasswordEmail}</span>
+                        </p>
+                      </div>
+                      <Button 
+                        variant="outline"
+                        className="w-full h-12 rounded-xl"
+                        onClick={() => {
+                          setShowForgotPassword(false);
+                          setForgotPasswordSent(false);
+                          setForgotPasswordEmail('');
+                        }}
+                      >
+                        Back to sign in
+                      </Button>
+                    </div>
+                  )}
+                </div>
               )}
 
               <div className="relative py-2">
