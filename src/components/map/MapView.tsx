@@ -638,8 +638,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       type: 'geojson', 
       data,
       cluster: true,
-      clusterMaxZoom: 12, // Max zoom to cluster points on (lower = less clustering)
-      clusterRadius: 40, // Radius of each cluster when clustering points
+      clusterMaxZoom: 8, // Max zoom to cluster points on (lower = less clustering)
+      clusterRadius: 25, // Radius of each cluster when clustering points
       promoteId: 'id' // Use the 'id' property for feature-state
     } as any);
 
