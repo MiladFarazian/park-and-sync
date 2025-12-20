@@ -1,13 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, CheckCircle, Lock } from 'lucide-react';
+import { ArrowLeft, Loader2, CheckCircle, Lock, Check, X } from 'lucide-react';
 import parkzyLogo from '@/assets/parkzy-logo.png';
 import { Card } from '@/components/ui/card';
+
+const PasswordRequirement = ({ met, label }: { met: boolean; label: string }) => (
+  <div className="flex items-center gap-2 text-sm">
+    {met ? (
+      <Check className="h-4 w-4 text-green-500" />
+    ) : (
+      <X className="h-4 w-4 text-muted-foreground" />
+    )}
+    <span className={met ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}>
+      {label}
+    </span>
+  </div>
+);
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -17,6 +30,26 @@ const ResetPassword = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+
+  const requirements = useMemo(() => ({
+    minLength: password.length >= 6,
+    hasUppercase: /[A-Z]/.test(password),
+    hasLowercase: /[a-z]/.test(password),
+    hasNumber: /\d/.test(password),
+    hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+  }), [password]);
+
+  const strengthScore = useMemo(() => {
+    return Object.values(requirements).filter(Boolean).length;
+  }, [requirements]);
+
+  const strengthLabel = useMemo(() => {
+    if (strengthScore <= 1) return { text: 'Weak', color: 'bg-red-500' };
+    if (strengthScore <= 2) return { text: 'Fair', color: 'bg-orange-500' };
+    if (strengthScore <= 3) return { text: 'Good', color: 'bg-yellow-500' };
+    if (strengthScore <= 4) return { text: 'Strong', color: 'bg-green-400' };
+    return { text: 'Very Strong', color: 'bg-green-500' };
+  }, [strengthScore]);
 
   // Check if we have a valid session from the reset link
   useEffect(() => {
@@ -134,6 +167,30 @@ const ResetPassword = () => {
                 required
                 minLength={6}
               />
+
+              {password && (
+                <div className="space-y-3 p-3 bg-muted/50 rounded-lg mt-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Password strength:</span>
+                    <span className={`font-medium ${strengthScore <= 2 ? 'text-orange-500' : 'text-green-500'}`}>
+                      {strengthLabel.text}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-300 ${strengthLabel.color}`}
+                      style={{ width: `${(strengthScore / 5) * 100}%` }}
+                    />
+                  </div>
+                  <div className="grid gap-1.5 pt-1">
+                    <PasswordRequirement met={requirements.minLength} label="At least 6 characters" />
+                    <PasswordRequirement met={requirements.hasUppercase} label="One uppercase letter" />
+                    <PasswordRequirement met={requirements.hasLowercase} label="One lowercase letter" />
+                    <PasswordRequirement met={requirements.hasNumber} label="One number" />
+                    <PasswordRequirement met={requirements.hasSpecial} label="One special character" />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
