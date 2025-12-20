@@ -861,6 +861,19 @@ const SpotDetail = () => {
           </div>
         </div>
 
+        {/* Report Listing Option (Non-owners Only) */}
+        {!isOwnSpot && (
+          <div className="flex justify-center py-2">
+            <button
+              onClick={handleReportSpot}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Flag className="h-4 w-4" />
+              Report Listing
+            </button>
+          </div>
+        )}
+
         {/* Reviews Section */}
         <div>
           <h2 className="text-xl font-semibold mb-4">Reviews</h2>
