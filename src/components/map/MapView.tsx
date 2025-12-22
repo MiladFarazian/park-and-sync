@@ -468,8 +468,16 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       }
     };
 
+    // Debounced version for zoom events (fires during zooming)
+    let zoomTimeout: NodeJS.Timeout | null = null;
+    const debouncedUpdateOnZoom = () => {
+      if (zoomTimeout) clearTimeout(zoomTimeout);
+      zoomTimeout = setTimeout(updateVisibleSpots, 150);
+    };
+
     map.current.on('moveend', updateVisibleSpots);
     map.current.on('zoomend', updateVisibleSpots);
+    map.current.on('zoom', debouncedUpdateOnZoom); // Fire during zooming for faster feedback
     
     // Initial update after map loads
     map.current.on('idle', () => {

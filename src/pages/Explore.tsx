@@ -437,7 +437,7 @@ const Explore = () => {
     }
     fetchTimeoutRef.current = setTimeout(() => {
       fetchNearbySpots(center, radiusMeters, false); // Don't show loading on map movement
-    }, 800); // Longer debounce to reduce requests
+    }, 300); // Faster debounce for more responsive feel
   };
   const handleDateTimeUpdate = (newStartTime?: Date, newEndTime?: Date) => {
     const effectiveStartTime = newStartTime || startTime;
