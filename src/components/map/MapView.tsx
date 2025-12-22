@@ -582,49 +582,6 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     const sourceId = 'spots-source';
     const circleId = 'spots-circles';
     const labelId = 'spots-labels';
-    const pinImageId = 'pin-blue';
-    
-    // Helper function to ensure pin image exists
-    const ensurePinImage = (callback: () => void) => {
-      if (!map.current) return;
-      
-      if (map.current.hasImage(pinImageId)) {
-        callback();
-        return;
-      }
-      
-      const svg = `
-        <svg width="50" height="60" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
-              <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.35)" />
-            </filter>
-          </defs>
-          <g filter="url(#shadow)">
-            <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
-                  fill="hsl(250, 100%, 65%)" stroke="white" stroke-width="2.5"/>
-            <circle cx="25" cy="20" r="13" fill="white" opacity="0.95"/>
-          </g>
-        </svg>`;
-      const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-      const img = new Image(50, 60);
-      img.onload = () => {
-        try {
-          if (map.current && !map.current.hasImage(pinImageId)) {
-            map.current.addImage(pinImageId, img, { pixelRatio: 2 });
-          }
-          callback();
-        } catch (e) {
-          console.warn('addImage error:', e);
-          callback(); // Still try to proceed
-        }
-      };
-      img.onerror = () => {
-        console.error('Failed to load pin image');
-        callback(); // Proceed anyway
-      };
-      img.src = url;
-    };
     
     // If spots array is empty, just update the source to be empty
     if (!spots.length) {
@@ -670,26 +627,10 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
 
     // Update existing source or create new one
     const existingSource = (map.current as any).getSource(sourceId);
-    const layersExist = (map.current as any).getLayer(circleId);
-    
-    if (existingSource && layersExist) {
+    if (existingSource) {
       // Just update the data instead of removing and re-adding everything
       existingSource.setData(data);
-      // Still ensure the pin image exists (may have been cleared on style change)
-      ensurePinImage(() => {
-        // Layers already exist, just need to make sure image is available
-        console.log('Updated spots data,', features.length, 'spots');
-      });
       return; // Exit early, layers already exist
-    }
-    
-    // If source exists but layers don't (e.g., after style change), remove and recreate
-    if (existingSource && !layersExist) {
-      try {
-        (map.current as any).removeSource(sourceId);
-      } catch (e) {
-        console.warn('Could not remove old source:', e);
-      }
     }
 
     // First time: Add source with clustering enabled
@@ -702,7 +643,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       promoteId: 'id' // Use the 'id' property for feature-state
     } as any);
 
-    // pinImageId already defined above
+    const pinImageId = 'pin-blue';
 
     const addLayers = () => {
       // Add cluster pulse/glow layer (behind the main cluster circle)
@@ -982,9 +923,34 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     };
 
     // Ensure the pin image is available, then add layers
-    ensurePinImage(() => {
+    if (!(map.current as any).hasImage?.(pinImageId)) {
+      const svg = `
+        <svg width="50" height="60" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.35)" />
+            </filter>
+          </defs>
+          <g filter="url(#shadow)">
+            <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
+                  fill="hsl(250, 100%, 65%)" stroke="white" stroke-width="2.5"/>
+            <circle cx="25" cy="20" r="13" fill="white" opacity="0.95"/>
+          </g>
+        </svg>`;
+      const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      const img = new Image(50, 60);
+      img.onload = () => {
+        try {
+          (map.current as any).addImage(pinImageId, img, { pixelRatio: 2 });
+        } catch (e) {
+          console.warn('addImage error (may already exist):', e);
+        }
+        addLayers();
+      };
+      img.src = url;
+    } else {
       addLayers();
-    });
+    }
   }, [spots, mapReady, onSpotHover]);
 
   // Update feature-state when highlightedSpotId changes (from list hover)
