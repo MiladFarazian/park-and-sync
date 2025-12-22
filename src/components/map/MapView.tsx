@@ -96,6 +96,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
   const markers = useRef<mapboxgl.Marker[]>([]);
   const searchMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const spotsRef = useRef<Spot[]>([]); // Keep current spots for event handlers
+  const spotLayersInitializedRef = useRef(false); // Track if spot layers/handlers are set up
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [nearestSpotId, setNearestSpotId] = useState<string | null>(null);
   const [userSelectedSpot, setUserSelectedSpot] = useState(false);
@@ -713,6 +714,11 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     // pinImageId already defined above
 
     const addLayers = () => {
+      const layersExist = (map.current as any).getLayer('cluster-pulse');
+      
+      // Only add layers if they don't exist yet
+      if (!layersExist) {
+      
       // Add cluster pulse/glow layer (behind the main cluster circle)
       (map.current as any).addLayer({
         id: 'cluster-pulse',
@@ -880,103 +886,117 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           'text-opacity': 1
         }
       } as any);
+      } // End of if (!layersExist)
 
       // Track hover state for smooth animations
       let hoveredSpotId: string | null = null;
 
-      // Handle cluster clicks - smooth zoom animation to expand
-      (map.current as any).on('click', 'clusters', (e: any) => {
-        const features = (map.current as any).queryRenderedFeatures(e.point, {
-          layers: ['clusters']
+      // Only add event handlers once
+      if (!spotLayersInitializedRef.current) {
+        spotLayersInitializedRef.current = true;
+        
+        // Handle cluster clicks - smooth zoom animation to expand
+        (map.current as any).on('click', 'clusters', (e: any) => {
+          const features = (map.current as any).queryRenderedFeatures(e.point, {
+            layers: ['clusters']
+          });
+          if (!features?.length) return;
+          const clusterId = features[0].properties.cluster_id;
+          const source = (map.current as any).getSource(sourceId);
+          if (!source) return;
+          source.getClusterExpansionZoom(
+            clusterId,
+            (err: any, zoom: number) => {
+              if (err) return;
+              (map.current as any).flyTo({
+                center: features[0].geometry.coordinates,
+                zoom: zoom,
+                duration: 800,
+                essential: true,
+                curve: 1.2,
+                easing: (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+              });
+            }
+          );
         });
-        const clusterId = features[0].properties.cluster_id;
-        (map.current as any).getSource(sourceId).getClusterExpansionZoom(
-          clusterId,
-          (err: any, zoom: number) => {
-            if (err) return;
-            (map.current as any).flyTo({
-              center: features[0].geometry.coordinates,
-              zoom: zoom,
-              duration: 800,
-              essential: true,
-              curve: 1.2,
-              easing: (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
-            });
+
+        // Handle unclustered point clicks - show spot details
+        const onClick = (e: any) => {
+          const f = e.features?.[0];
+          console.log('[MapView] Pin clicked:', { 
+            featureId: f?.properties?.id, 
+            featureTitle: f?.properties?.title,
+            hasFeature: !!f 
+          });
+          
+          if (!f) {
+            console.warn('[MapView] No feature found on click');
+            return;
           }
-        );
-      });
+          
+          // Use spotsRef.current to get the most recent spots array
+          const spot = spotsRef.current.find((s) => s.id === f.properties.id);
+          console.log('[MapView] Spot lookup result:', { 
+            spotId: f.properties.id, 
+            foundSpot: !!spot,
+            spotTitle: spot?.title,
+            totalSpotsInRef: spotsRef.current.length
+          });
+          
+          if (spot) {
+            console.log('[MapView] Setting selected spot:', spot.id);
+            setUserSelectedSpot(true); // Mark that user manually selected a spot
+            setSelectedSpot(spot);
+            // Scroll carousel to this spot
+            scrollToSpot(spot.id);
+          } else {
+            console.error('[MapView] Spot not found in spots array for ID:', f.properties.id);
+          }
+        };
+        (map.current as any).on('click', circleId, onClick);
+        (map.current as any).on('click', labelId, onClick);
 
-      // Handle unclustered point clicks - show spot details
-      const onClick = (e: any) => {
-        const f = e.features?.[0];
-        console.log('[MapView] Pin clicked:', { 
-          featureId: f?.properties?.id, 
-          featureTitle: f?.properties?.title,
-          hasFeature: !!f 
+        // Change cursor on hover for clusters
+        (map.current as any).on('mouseenter', 'clusters', () => {
+          if (map.current) (map.current as any).getCanvas().style.cursor = 'pointer';
         });
-        
-        if (!f) {
-          console.warn('[MapView] No feature found on click');
-          return;
-        }
-        
-        // Use spotsRef.current to get the most recent spots array
-        const spot = spotsRef.current.find((s) => s.id === f.properties.id);
-        console.log('[MapView] Spot lookup result:', { 
-          spotId: f.properties.id, 
-          foundSpot: !!spot,
-          spotTitle: spot?.title,
-          totalSpotsInRef: spotsRef.current.length
+        (map.current as any).on('mouseleave', 'clusters', () => {
+          if (map.current) (map.current as any).getCanvas().style.cursor = '';
         });
+
+        // Track if hovering over any spot layer to prevent cursor flickering
+        let isOverSpot = false;
+
+        // Change cursor and notify on hover for spots (both layers)
+        const handleSpotEnter = (e: any) => {
+          isOverSpot = true;
+          if (map.current) (map.current as any).getCanvas().style.cursor = 'pointer';
+          const f = e.features?.[0];
+          if (f?.properties?.id) {
+            onSpotHover?.(f.properties.id);
+          }
+        };
         
-        if (spot) {
-          console.log('[MapView] Setting selected spot:', spot.id);
-          setUserSelectedSpot(true); // Mark that user manually selected a spot
-          setSelectedSpot(spot);
-          // Scroll carousel to this spot
-          scrollToSpot(spot.id);
-        } else {
-          console.error('[MapView] Spot not found in spots array for ID:', f.properties.id);
-        }
-      };
-      (map.current as any).on('click', circleId, onClick);
-      (map.current as any).on('click', labelId, onClick);
+        const handleSpotLeave = () => {
+          // Use a small delay to prevent flickering between overlapping layers
+          setTimeout(() => {
+            if (!isOverSpot && map.current) {
+              (map.current as any).getCanvas().style.cursor = '';
+              onSpotHover?.(null);
+            }
+          }, 10);
+          isOverSpot = false;
+        };
 
-      // Change cursor on hover for clusters
-      (map.current as any).on('mouseenter', 'clusters', () => {
-        (map.current as any).getCanvas().style.cursor = 'pointer';
-      });
-      (map.current as any).on('mouseleave', 'clusters', () => {
-        (map.current as any).getCanvas().style.cursor = '';
-      });
-
-      // Change cursor and notify on hover for spots
-      (map.current as any).on('mouseenter', circleId, (e: any) => {
-        (map.current as any).getCanvas().style.cursor = 'pointer';
-        const f = e.features?.[0];
-        if (f?.properties?.id) {
-          onSpotHover?.(f.properties.id);
-        }
-      });
-      (map.current as any).on('mouseleave', circleId, () => {
-        (map.current as any).getCanvas().style.cursor = '';
-        onSpotHover?.(null);
-      });
-
-      (map.current as any).on('mouseenter', labelId, (e: any) => {
-        (map.current as any).getCanvas().style.cursor = 'pointer';
-        const f = e.features?.[0];
-        if (f?.properties?.id) {
-          onSpotHover?.(f.properties.id);
-        }
-      });
-      (map.current as any).on('mouseleave', labelId, () => {
-        (map.current as any).getCanvas().style.cursor = '';
-        onSpotHover?.(null);
-      });
+        (map.current as any).on('mouseenter', circleId, handleSpotEnter);
+        (map.current as any).on('mouseleave', circleId, handleSpotLeave);
+        (map.current as any).on('mouseenter', labelId, handleSpotEnter);
+        (map.current as any).on('mouseleave', labelId, handleSpotLeave);
+      }
 
       // Trigger visible spots count update after rendering
       setTimeout(() => {
+        if (!map.current) return;
         const bounds = (map.current as any).getBounds();
         const visibleSpots = spots.filter(spot => {
           const lat = Number(spot.lat);
