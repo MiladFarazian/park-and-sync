@@ -49,6 +49,7 @@ interface MapViewProps {
   };
   highlightedSpotId?: string | null;
   onSpotHover?: (spotId: string | null) => void;
+  onSpotSelect?: (spotId: string) => void;
   hideCarousel?: boolean;
 }
 
@@ -70,7 +71,7 @@ const calculateWalkTime = (distanceMiles: number): number => {
   return Math.round((distanceMiles / 3) * 60);
 };
 
-const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, onMapMove, searchQuery, exploreParams, highlightedSpotId, onSpotHover, hideCarousel }: MapViewProps) => {
+const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, onMapMove, searchQuery, exploreParams, highlightedSpotId, onSpotHover, onSpotSelect, hideCarousel }: MapViewProps) => {
   const navigate = useNavigate();
   const { mode, setMode } = useMode();
   const { user } = useAuth();
@@ -949,6 +950,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
             setSelectedSpot(spot);
             // Scroll carousel to this spot
             scrollToSpot(spot.id);
+            // Notify parent of selection (for desktop list sync)
+            onSpotSelect?.(spot.id);
           } else {
             console.error('[MapView] Spot not found in spots array for ID:', f.properties.id);
           }
