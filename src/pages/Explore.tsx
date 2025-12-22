@@ -437,7 +437,7 @@ const Explore = () => {
     }
     fetchTimeoutRef.current = setTimeout(() => {
       fetchNearbySpots(center, radiusMeters, false); // Don't show loading on map movement
-    }, 300); // Faster debounce for more responsive feel
+    }, 800); // Longer debounce to reduce requests
   };
   const handleDateTimeUpdate = (newStartTime?: Date, newEndTime?: Date) => {
     const effectiveStartTime = newStartTime || startTime;
@@ -612,7 +612,6 @@ const Explore = () => {
             exploreParams={exploreParams}
             highlightedSpotId={hoveredSpotId || selectedSpotId || undefined}
             onSpotHover={setHoveredSpotId}
-            onSpotSelect={setSelectedSpotId}
             hideCarousel={true}
           />
         </div>
