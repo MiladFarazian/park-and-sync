@@ -5,8 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Calendar as CalendarIcon, Trash2, X, ChevronLeft, ChevronRight, DollarSign, MousePointer, ArrowLeftRight } from 'lucide-react';
-import { format, isBefore, startOfDay, addMonths, startOfMonth, endOfMonth, getDay, addDays, eachDayOfInterval, isAfter, parseISO } from 'date-fns';
+import { Calendar as CalendarIcon, Trash2, X, ChevronLeft, ChevronRight, DollarSign, MousePointer, ArrowLeftRight, Ban, CalendarRange, Sparkles } from 'lucide-react';
+import { format, isBefore, startOfDay, addMonths, startOfMonth, endOfMonth, getDay, addDays, eachDayOfInterval, parseISO, isWeekend, isSaturday, isSunday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { AvailabilityTimePicker } from './AvailabilityTimePicker';
@@ -194,6 +194,47 @@ export const DateOverrideManager = ({
     clearSelection();
   };
 
+  // Preset quick actions
+  const applyPreset = (preset: 'next7' | 'weekendsMonth' | 'weekdaysMonth') => {
+    const today = startOfDay(new Date());
+    let dates: Date[] = [];
+    
+    switch (preset) {
+      case 'next7':
+        // Next 7 days starting from today
+        dates = eachDayOfInterval({ 
+          start: today, 
+          end: addDays(today, 6) 
+        });
+        break;
+      case 'weekendsMonth':
+        // All weekends in the current preview month
+        const monthStart = startOfMonth(previewMonth);
+        const monthEnd = endOfMonth(previewMonth);
+        dates = eachDayOfInterval({ start: monthStart, end: monthEnd })
+          .filter(date => isWeekend(date) && !isBefore(date, today));
+        break;
+      case 'weekdaysMonth':
+        // All weekdays (Mon-Fri) in the current preview month
+        const mStart = startOfMonth(previewMonth);
+        const mEnd = endOfMonth(previewMonth);
+        dates = eachDayOfInterval({ start: mStart, end: mEnd })
+          .filter(date => !isWeekend(date) && !isBefore(date, today));
+        break;
+    }
+    
+    if (dates.length === 0) {
+      toast.error('No applicable dates found');
+      return;
+    }
+    
+    const dateStrings = dates.map(d => format(d, 'yyyy-MM-dd'));
+    setSelectedDates(new Set(dateStrings));
+    setIsAvailable(false); // Default to blocking for presets
+    setUseCustomHours(false);
+    toast.success(`Selected ${dateStrings.length} dates`);
+  };
+
   // Save the current form state for all selected dates
   const saveOverrides = () => {
     if (selectedDates.size === 0) return;
@@ -282,6 +323,41 @@ export const DateOverrideManager = ({
         >
           <ArrowLeftRight className="h-4 w-4 mr-1.5" />
           Select Range
+        </Button>
+      </div>
+
+      {/* Quick Presets */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground">Quick select:</span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => applyPreset('next7')}
+          className="h-7 text-xs"
+        >
+          <Ban className="h-3 w-3 mr-1" />
+          Next 7 Days
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => applyPreset('weekendsMonth')}
+          className="h-7 text-xs"
+        >
+          <CalendarRange className="h-3 w-3 mr-1" />
+          Weekends ({format(previewMonth, 'MMM')})
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => applyPreset('weekdaysMonth')}
+          className="h-7 text-xs"
+        >
+          <Sparkles className="h-3 w-3 mr-1" />
+          Weekdays ({format(previewMonth, 'MMM')})
         </Button>
       </div>
 
