@@ -1,16 +1,21 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { Home, Calendar, MessageCircle, User, List, CalendarDays } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useMode } from '@/contexts/ModeContext';
-import { useMessages } from '@/contexts/MessagesContext';
 import { Badge } from '@/components/ui/badge';
+
+// Import context directly for safe access
+import { MessagesContext, MessagesContextType } from '@/contexts/MessagesContext';
 
 const BottomNavigation = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { mode } = useMode();
-  const { totalUnreadCount } = useMessages();
+  
+  // Use context directly with null check to prevent crashes
+  const messagesContext = useContext<MessagesContextType | null>(MessagesContext);
+  const totalUnreadCount = messagesContext?.totalUnreadCount ?? 0;
 
   const tabs = mode === 'host' 
     ? [
