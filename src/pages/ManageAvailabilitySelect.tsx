@@ -77,8 +77,9 @@ const ManageAvailabilitySelect = () => {
       // Single spot - go directly to its availability page
       navigate(`/edit-spot/${selectedSpots[0]}/availability`);
     } else if (selectedSpots.length > 1) {
-      // Multiple spots - for now, go to first one (could implement multi-spot editing later)
-      navigate(`/edit-spot/${selectedSpots[0]}/availability`);
+      // Multiple spots - go to bulk editor with spot IDs and date
+      const spotIdsParam = selectedSpots.join(',');
+      navigate(`/manage-availability/bulk?spots=${spotIdsParam}${dateParam ? `&date=${dateParam}` : ''}`);
     }
   };
 
