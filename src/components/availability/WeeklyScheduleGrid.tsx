@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { DollarSign, RotateCcw, Clock, Briefcase, CalendarClock } from 'lucide-react';
+import { DollarSign, Undo2, Briefcase, CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -72,6 +72,9 @@ export const WeeklyScheduleGrid = ({
     return initial;
   });
 
+  // History for undo
+  const [history, setHistory] = useState<boolean[][][]>([]);
+
   // Custom rates per day
   const [customRates, setCustomRates] = useState<(number | null)[]>(() => {
     const rates: (number | null)[] = Array(7).fill(null);
@@ -113,6 +116,11 @@ export const WeeklyScheduleGrid = ({
 
   const dragRange = useMemo(() => getDragRange(), [getDragRange]);
 
+  // Save current state to history
+  const saveToHistory = useCallback(() => {
+    setHistory(prev => [...prev, grid.map(row => [...row])]);
+  }, [grid]);
+
   // Apply drag selection
   const applyDrag = useCallback(() => {
     if (!dragStart) return;
@@ -120,6 +128,7 @@ export const WeeklyScheduleGrid = ({
     const range = getDragRange();
     if (range.length === 0) return;
 
+    saveToHistory();
     setGrid(prev => {
       const newGrid = prev.map(row => [...row]);
       range.forEach(({ day, slot }) => {
@@ -127,7 +136,7 @@ export const WeeklyScheduleGrid = ({
       });
       return newGrid;
     });
-  }, [dragStart, getDragRange, dragMode]);
+  }, [dragStart, getDragRange, dragMode, saveToHistory]);
 
   // Convert grid to rules
   useEffect(() => {
@@ -220,37 +229,34 @@ export const WeeklyScheduleGrid = ({
   };
 
   // Quick actions
-  const set9to5 = () => {
+  const set9to5MF = () => {
+    saveToHistory();
     const newGrid = Array.from({ length: 7 }, () => Array(TOTAL_SLOTS).fill(false));
-    for (let day = 0; day < 7; day++) {
+    // Monday (1) through Friday (5) only
+    for (let day = 1; day <= 5; day++) {
       for (let slot = timeToSlot('09:00'); slot < timeToSlot('17:00'); slot++) {
         newGrid[day][slot] = true;
       }
     }
     setGrid(newGrid);
-    toast.success('Set weekdays 9 AM - 5 PM');
+    toast.success('Set Mon-Fri 9 AM - 5 PM');
   };
 
   const set24_7 = () => {
+    saveToHistory();
     setGrid(Array.from({ length: 7 }, () => Array(TOTAL_SLOTS).fill(true)));
     toast.success('Set available 24/7');
   };
 
-  const clearAll = () => {
-    setGrid(Array.from({ length: 7 }, () => Array(TOTAL_SLOTS).fill(false)));
-    setCustomRates(Array(7).fill(null));
-    toast.success('Cleared all availability');
-  };
-
-  const setWeekendPremium = () => {
-    if (baseRate > 0) {
-      const weekendRate = Math.round(baseRate * 1.5 * 100) / 100;
-      const newRates = [...customRates];
-      newRates[0] = weekendRate; // Sunday
-      newRates[6] = weekendRate; // Saturday
-      setCustomRates(newRates);
-      toast.success(`Weekend rate set to $${weekendRate}/hr`);
+  const undo = () => {
+    if (history.length === 0) {
+      toast.error('Nothing to undo');
+      return;
     }
+    const previousState = history[history.length - 1];
+    setHistory(prev => prev.slice(0, -1));
+    setGrid(previousState);
+    toast.success('Undid last action');
   };
 
   // Get summary for a day
@@ -280,52 +286,6 @@ export const WeeklyScheduleGrid = ({
 
   return (
     <div className="space-y-4">
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-9"
-          onClick={set9to5}
-        >
-          <Briefcase className="h-4 w-4 mr-1.5" />
-          9-5
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-9"
-          onClick={set24_7}
-        >
-          <CalendarClock className="h-4 w-4 mr-1.5" />
-          24/7
-        </Button>
-        {baseRate > 0 && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9"
-            onClick={setWeekendPremium}
-          >
-            <DollarSign className="h-4 w-4 mr-1.5" />
-            Weekend +50%
-          </Button>
-        )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-9"
-          onClick={clearAll}
-        >
-          <RotateCcw className="h-4 w-4 mr-1.5" />
-          Clear
-        </Button>
-      </div>
-
       {/* Instructions & Legend */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <p className="text-xs text-muted-foreground">
@@ -431,7 +391,41 @@ export const WeeklyScheduleGrid = ({
         </div>
       </Card>
 
-      {/* Custom Rate Editor */}
+      {/* Quick Actions - Below Grid */}
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="flex-1 h-9"
+          onClick={set24_7}
+        >
+          <CalendarClock className="h-4 w-4 mr-1.5" />
+          24/7
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="flex-1 h-9"
+          onClick={set9to5MF}
+        >
+          <Briefcase className="h-4 w-4 mr-1.5" />
+          M-F 9-5
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="flex-1 h-9"
+          onClick={undo}
+          disabled={history.length === 0}
+        >
+          <Undo2 className="h-4 w-4 mr-1.5" />
+          Undo
+        </Button>
+      </div>
+
       {editingRate !== null && (
         <Card className="p-4">
           <div className="flex items-center justify-between gap-3">
