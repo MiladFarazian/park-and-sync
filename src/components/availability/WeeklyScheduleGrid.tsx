@@ -22,6 +22,7 @@ interface WeeklyScheduleGridProps {
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAYS_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const SLOTS_PER_HOUR = 2; // 30-minute slots
 const TOTAL_SLOTS = 24 * SLOTS_PER_HOUR;
@@ -334,83 +335,82 @@ export const WeeklyScheduleGrid = ({
       <Card className="overflow-hidden">
         <div 
           ref={gridRef}
-          className="overflow-x-auto"
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onTouchEnd={handleTouchEnd}
           onTouchMove={handleTouchMove}
         >
-          <div className="min-w-[600px]">
-            {/* Header Row */}
-            <div className="flex border-b bg-muted/30">
-              <div className="w-14 shrink-0 p-2 text-xs font-medium text-muted-foreground border-r">
-                Time
+          {/* Header Row */}
+          <div className="flex border-b bg-muted/30">
+            <div className="w-8 sm:w-14 shrink-0 p-1 sm:p-2 text-[10px] sm:text-xs font-medium text-muted-foreground border-r">
+              <span className="hidden sm:inline">Time</span>
+            </div>
+            {DAYS.map((day, dayIndex) => (
+              <div 
+                key={day} 
+                className="flex-1 min-w-0 p-1 sm:p-2 text-center border-r last:border-r-0"
+              >
+                <div className="text-[10px] sm:text-xs font-medium">
+                  <span className="sm:hidden">{DAYS_SHORT[dayIndex]}</span>
+                  <span className="hidden sm:inline">{day}</span>
+                </div>
+                <div className="hidden sm:block text-[10px] text-muted-foreground mt-0.5">
+                  {getDaySummary(dayIndex)}
+                </div>
+                {customRates[dayIndex] !== null && (
+                  <Badge 
+                    variant="secondary" 
+                    className="hidden sm:inline-flex mt-1 text-[10px] px-1.5 py-0 h-4 bg-green-500/20 text-green-700 dark:text-green-400 cursor-pointer"
+                    onClick={() => setEditingRate(dayIndex)}
+                  >
+                    ${customRates[dayIndex]}/hr
+                  </Badge>
+                )}
               </div>
-              {DAYS.map((day, dayIndex) => (
-                <div 
-                  key={day} 
-                  className="flex-1 p-2 text-center border-r last:border-r-0"
-                >
-                  <div className="text-xs font-medium">{day}</div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5">
-                    {getDaySummary(dayIndex)}
-                  </div>
-                  {customRates[dayIndex] !== null && (
-                    <Badge 
-                      variant="secondary" 
-                      className="mt-1 text-[10px] px-1.5 py-0 h-4 bg-green-500/20 text-green-700 dark:text-green-400 cursor-pointer"
-                      onClick={() => setEditingRate(dayIndex)}
-                    >
-                      ${customRates[dayIndex]}/hr
-                    </Badge>
-                  )}
-                </div>
-              ))}
-            </div>
+            ))}
+          </div>
 
-            {/* Time Grid */}
-            <div className="relative">
-              {HOURS.map((hour) => (
-                <div key={hour} className="flex border-b last:border-b-0">
-                  {/* Time Label */}
-                  <div className="w-14 shrink-0 p-1 text-[10px] text-muted-foreground border-r flex items-start justify-end pr-2">
-                    {formatTimeDisplay(hour)}
-                  </div>
-                  
-                  {/* Day Columns */}
-                  {DAYS.map((_, dayIndex) => (
-                    <div key={dayIndex} className="flex-1 flex flex-col border-r last:border-r-0">
-                      {/* Two 30-minute slots per hour */}
-                      {[0, 1].map((halfHour) => {
-                        const slot = hour * SLOTS_PER_HOUR + halfHour;
-                        const isActive = grid[dayIndex][slot];
-                        const inRange = isInDragRange(dayIndex, slot);
-                        const willBeActive = inRange ? dragMode === 'add' : isActive;
-
-                        return (
-                          <div
-                            key={halfHour}
-                            data-day={dayIndex}
-                            data-slot={slot}
-                            onMouseDown={(e) => handleMouseDown(dayIndex, slot, e)}
-                            onMouseEnter={() => handleMouseEnter(dayIndex, slot)}
-                            onTouchStart={(e) => handleTouchStart(dayIndex, slot, e)}
-                            className={cn(
-                              "h-3 border-b border-border/30 last:border-b-0 cursor-pointer transition-colors",
-                              isActive && !inRange && "bg-primary",
-                              inRange && dragMode === 'add' && "bg-primary/70",
-                              inRange && dragMode === 'remove' && "bg-destructive/30",
-                              !isActive && !inRange && "hover:bg-muted",
-                              halfHour === 0 && "border-t border-border/50"
-                            )}
-                          />
-                        );
-                      })}
-                    </div>
-                  ))}
+          {/* Time Grid */}
+          <div className="relative">
+            {HOURS.map((hour) => (
+              <div key={hour} className="flex border-b last:border-b-0">
+                {/* Time Label */}
+                <div className="w-8 sm:w-14 shrink-0 p-0.5 sm:p-1 text-[8px] sm:text-[10px] text-muted-foreground border-r flex items-start justify-end pr-0.5 sm:pr-2">
+                  {formatTimeDisplay(hour)}
                 </div>
-              ))}
-            </div>
+                
+                {/* Day Columns */}
+                {DAYS.map((_, dayIndex) => (
+                  <div key={dayIndex} className="flex-1 min-w-0 flex flex-col border-r last:border-r-0">
+                    {/* Two 30-minute slots per hour */}
+                    {[0, 1].map((halfHour) => {
+                      const slot = hour * SLOTS_PER_HOUR + halfHour;
+                      const isActive = grid[dayIndex][slot];
+                      const inRange = isInDragRange(dayIndex, slot);
+
+                      return (
+                        <div
+                          key={halfHour}
+                          data-day={dayIndex}
+                          data-slot={slot}
+                          onMouseDown={(e) => handleMouseDown(dayIndex, slot, e)}
+                          onMouseEnter={() => handleMouseEnter(dayIndex, slot)}
+                          onTouchStart={(e) => handleTouchStart(dayIndex, slot, e)}
+                          className={cn(
+                            "h-2.5 sm:h-3 border-b border-border/30 last:border-b-0 cursor-pointer transition-colors",
+                            isActive && !inRange && "bg-primary",
+                            inRange && dragMode === 'add' && "bg-primary/70",
+                            inRange && dragMode === 'remove' && "bg-destructive/30",
+                            !isActive && !inRange && "hover:bg-muted",
+                            halfHour === 0 && "border-t border-border/50"
+                          )}
+                        />
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
         </div>
       </Card>
