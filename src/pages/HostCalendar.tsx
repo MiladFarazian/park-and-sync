@@ -285,11 +285,19 @@ const HostCalendar = () => {
 
         {/* Calendar Grid */}
         {loading ? (
-          <div className={cn("grid grid-cols-7 gap-1", viewMode === 'week' && "min-h-[300px]")}>
-            {Array.from({ length: viewMode === 'month' ? 35 : 7 }).map((_, i) => (
-              <Skeleton key={i} className={viewMode === 'month' ? "aspect-square" : "h-[300px]"} />
-            ))}
-          </div>
+          viewMode === 'month' ? (
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: 35 }).map((_, i) => (
+                <Skeleton key={i} className="aspect-square" />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-lg" />
+              ))}
+            </div>
+          )
         ) : viewMode === 'month' ? (
           // Month View
           <div className="grid grid-cols-7 gap-1">
