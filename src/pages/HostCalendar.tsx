@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, ArrowLeft, Calendar as CalendarIcon, LayoutGrid, Clock, DollarSign, User, MapPin, X, Ban, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowLeft, Calendar as CalendarIcon, LayoutGrid, Clock, DollarSign, User, MapPin, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +11,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addDays, addMonths, addWeeks, isSameDay, isBefore, startOfDay, isToday, startOfWeek, endOfWeek } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
 
 interface SpotWithRate {
   id: string;
@@ -57,7 +56,6 @@ const HostCalendar = () => {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [savingOverride, setSavingOverride] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -205,47 +203,6 @@ const HostCalendar = () => {
   const handleDayClick = (date: Date) => {
     setSelectedDate(date);
     setSheetOpen(true);
-  };
-
-  const toggleDateAvailability = async (spotId: string, date: Date, currentlyUnavailable: boolean) => {
-    if (!user) return;
-    
-    setSavingOverride(true);
-    const dateStr = format(date, 'yyyy-MM-dd');
-    
-    try {
-      if (currentlyUnavailable) {
-        // Remove the override to make it available
-        const { error } = await supabase
-          .from('calendar_overrides')
-          .delete()
-          .eq('spot_id', spotId)
-          .eq('override_date', dateStr)
-          .eq('is_available', false);
-          
-        if (error) throw error;
-        toast.success('Date is now available');
-      } else {
-        // Add override to make it unavailable
-        const { error } = await supabase
-          .from('calendar_overrides')
-          .upsert({
-            spot_id: spotId,
-            override_date: dateStr,
-            is_available: false
-          }, { onConflict: 'spot_id,override_date' });
-          
-        if (error) throw error;
-        toast.success('Date blocked successfully');
-      }
-      
-      await fetchData();
-    } catch (error) {
-      console.error('Error updating availability:', error);
-      toast.error('Failed to update availability');
-    } finally {
-      setSavingOverride(false);
-    }
   };
 
   const selectedDateData = selectedDate ? getDateData(selectedDate) : null;
@@ -538,47 +495,36 @@ const HostCalendar = () => {
                 </Card>
               </div>
 
-              {/* Availability Management */}
-              <div>
-                <h3 className="font-semibold mb-3">Manage Availability</h3>
+              {/* Manage Availability Link */}
+              {spots.length > 0 && (
                 <div className="space-y-2">
                   {spots.map(spot => {
                     const spotOverride = selectedDateData.overrides.find(o => o.spot_id === spot.id && !o.is_available);
                     const isBlocked = !!spotOverride;
                     
                     return (
-                      <Card key={spot.id} className="p-3">
+                      <Card 
+                        key={spot.id} 
+                        className="p-3 cursor-pointer hover:bg-accent/50 transition-colors"
+                        onClick={() => navigate(`/edit-spot/${spot.id}/availability`)}
+                      >
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium">{spot.title}</div>
                             <div className="text-sm text-muted-foreground">
-                              {isBlocked ? 'Currently blocked' : `$${spot.hourly_rate}/hr`}
+                              {isBlocked ? 'Blocked this day' : `$${spot.hourly_rate}/hr`}
                             </div>
                           </div>
-                          <Button
-                            variant={isBlocked ? "outline" : "destructive"}
-                            size="sm"
-                            disabled={savingOverride}
-                            onClick={() => toggleDateAvailability(spot.id, selectedDate, isBlocked)}
-                          >
-                            {isBlocked ? (
-                              <>
-                                <Check className="h-4 w-4 mr-1" />
-                                Unblock
-                              </>
-                            ) : (
-                              <>
-                                <Ban className="h-4 w-4 mr-1" />
-                                Block
-                              </>
-                            )}
+                          <Button variant="ghost" size="sm">
+                            <Settings className="h-4 w-4 mr-1" />
+                            Manage
                           </Button>
                         </div>
                       </Card>
                     );
                   })}
                 </div>
-              </div>
+              )}
 
               {/* Bookings List */}
               {selectedDateData.bookings.length > 0 && (
