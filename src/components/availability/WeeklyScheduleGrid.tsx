@@ -1,11 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { DollarSign, Undo2, Briefcase, CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
 
 export interface AvailabilityRule {
   day_of_week: number;
@@ -51,7 +46,6 @@ const formatTimeDisplay = (hour: number): string => {
 export const WeeklyScheduleGrid = ({
   initialRules = [],
   onChange,
-  baseRate = 0
 }: WeeklyScheduleGridProps) => {
   // Grid state: 7 days x 48 slots (30-min each)
   const [grid, setGrid] = useState<boolean[][]>(() => {
@@ -72,29 +66,12 @@ export const WeeklyScheduleGrid = ({
     return initial;
   });
 
-  // History for undo
-  const [history, setHistory] = useState<boolean[][][]>([]);
-
-  // Custom rates per day
-  const [customRates, setCustomRates] = useState<(number | null)[]>(() => {
-    const rates: (number | null)[] = Array(7).fill(null);
-    initialRules.forEach(rule => {
-      if (rule.custom_rate !== undefined && rule.custom_rate !== null) {
-        rates[rule.day_of_week] = rule.custom_rate;
-      }
-    });
-    return rates;
-  });
-
   // Drag state
   const [isDragging, setIsDragging] = useState(false);
   const [dragMode, setDragMode] = useState<'add' | 'remove'>('add');
   const [dragStart, setDragStart] = useState<{ day: number; slot: number } | null>(null);
   const [dragEnd, setDragEnd] = useState<{ day: number; slot: number } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-
-  // Custom rate editing
-  const [editingRate, setEditingRate] = useState<number | null>(null);
 
   // Get cells in drag range
   const getDragRange = useCallback(() => {
@@ -116,11 +93,6 @@ export const WeeklyScheduleGrid = ({
 
   const dragRange = useMemo(() => getDragRange(), [getDragRange]);
 
-  // Save current state to history
-  const saveToHistory = useCallback(() => {
-    setHistory(prev => [...prev, grid.map(row => [...row])]);
-  }, [grid]);
-
   // Apply drag selection
   const applyDrag = useCallback(() => {
     if (!dragStart) return;
@@ -128,7 +100,6 @@ export const WeeklyScheduleGrid = ({
     const range = getDragRange();
     if (range.length === 0) return;
 
-    saveToHistory();
     setGrid(prev => {
       const newGrid = prev.map(row => [...row]);
       range.forEach(({ day, slot }) => {
@@ -136,7 +107,7 @@ export const WeeklyScheduleGrid = ({
       });
       return newGrid;
     });
-  }, [dragStart, getDragRange, dragMode, saveToHistory]);
+  }, [dragStart, getDragRange, dragMode]);
 
   // Convert grid to rules
   useEffect(() => {
@@ -156,7 +127,6 @@ export const WeeklyScheduleGrid = ({
             start_time: slotToTime(slotStart),
             end_time: slotToTime(slot),
             is_available: true,
-            custom_rate: customRates[day],
           });
           slotStart = null;
         }
@@ -164,7 +134,7 @@ export const WeeklyScheduleGrid = ({
     }
 
     onChange?.(rules);
-  }, [grid, customRates, onChange]);
+  }, [grid, onChange]);
 
   // Handle mouse events
   const handleMouseDown = (day: number, slot: number, e: React.MouseEvent) => {
@@ -226,37 +196,6 @@ export const WeeklyScheduleGrid = ({
   // Check if cell is in drag range
   const isInDragRange = (day: number, slot: number) => {
     return dragRange.some(cell => cell.day === day && cell.slot === slot);
-  };
-
-  // Quick actions
-  const set9to5MF = () => {
-    saveToHistory();
-    const newGrid = Array.from({ length: 7 }, () => Array(TOTAL_SLOTS).fill(false));
-    // Monday (1) through Friday (5) only
-    for (let day = 1; day <= 5; day++) {
-      for (let slot = timeToSlot('09:00'); slot < timeToSlot('17:00'); slot++) {
-        newGrid[day][slot] = true;
-      }
-    }
-    setGrid(newGrid);
-    toast.success('Set Mon-Fri 9 AM - 5 PM');
-  };
-
-  const set24_7 = () => {
-    saveToHistory();
-    setGrid(Array.from({ length: 7 }, () => Array(TOTAL_SLOTS).fill(true)));
-    toast.success('Set available 24/7');
-  };
-
-  const undo = () => {
-    if (history.length === 0) {
-      toast.error('Nothing to undo');
-      return;
-    }
-    const previousState = history[history.length - 1];
-    setHistory(prev => prev.slice(0, -1));
-    setGrid(previousState);
-    toast.success('Undid last action');
   };
 
   // Get summary for a day
@@ -333,15 +272,6 @@ export const WeeklyScheduleGrid = ({
                 <div className="hidden sm:block text-[10px] text-muted-foreground mt-0.5">
                   {getDaySummary(dayIndex)}
                 </div>
-                {customRates[dayIndex] !== null && (
-                  <Badge 
-                    variant="secondary" 
-                    className="hidden sm:inline-flex mt-1 text-[10px] px-1.5 py-0 h-4 bg-green-500/20 text-green-700 dark:text-green-400 cursor-pointer"
-                    onClick={() => setEditingRate(dayIndex)}
-                  >
-                    ${customRates[dayIndex]}/hr
-                  </Badge>
-                )}
               </div>
             ))}
           </div>
@@ -390,123 +320,6 @@ export const WeeklyScheduleGrid = ({
           </div>
         </div>
       </Card>
-
-      {/* Quick Actions - Below Grid */}
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="flex-1 h-9"
-          onClick={set24_7}
-        >
-          <CalendarClock className="h-4 w-4 mr-1.5" />
-          24/7
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="flex-1 h-9"
-          onClick={set9to5MF}
-        >
-          <Briefcase className="h-4 w-4 mr-1.5" />
-          M-F 9-5
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="flex-1 h-9"
-          onClick={undo}
-          disabled={history.length === 0}
-        >
-          <Undo2 className="h-4 w-4 mr-1.5" />
-          Undo
-        </Button>
-      </div>
-
-      {editingRate !== null && (
-        <Card className="p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">
-                Custom rate for {DAYS[editingRate]}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={customRates[editingRate] || ''}
-                  onChange={(e) => {
-                    const newRates = [...customRates];
-                    newRates[editingRate] = e.target.value ? parseFloat(e.target.value) : null;
-                    setCustomRates(newRates);
-                  }}
-                  className="w-24 pl-5 h-8 text-sm"
-                  placeholder="0"
-                />
-              </div>
-              <span className="text-xs text-muted-foreground">/hr</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  const newRates = [...customRates];
-                  newRates[editingRate] = null;
-                  setCustomRates(newRates);
-                }}
-              >
-                Reset
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setEditingRate(null)}
-              >
-                Done
-              </Button>
-            </div>
-          </div>
-          {!customRates[editingRate] && baseRate > 0 && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Using base rate: ${baseRate}/hr
-            </p>
-          )}
-        </Card>
-      )}
-
-      {/* Day Rate Quick Buttons */}
-      <div className="flex flex-wrap gap-2">
-        {DAYS.map((day, dayIndex) => {
-          const hasSlots = grid[dayIndex].some(Boolean);
-          if (!hasSlots) return null;
-          
-          return (
-            <Button
-              key={dayIndex}
-              type="button"
-              variant={customRates[dayIndex] !== null ? "secondary" : "outline"}
-              size="sm"
-              className={cn(
-                "h-8 text-xs",
-                customRates[dayIndex] !== null && "bg-green-500/20 hover:bg-green-500/30 text-green-700 dark:text-green-400"
-              )}
-              onClick={() => setEditingRate(dayIndex)}
-            >
-              <DollarSign className="h-3 w-3 mr-1" />
-              {day} {customRates[dayIndex] !== null ? `$${customRates[dayIndex]}` : 'Set rate'}
-            </Button>
-          );
-        })}
-      </div>
     </div>
   );
 };
