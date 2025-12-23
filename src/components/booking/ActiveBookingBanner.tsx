@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus, Navigation, Edit, AlertCircle, CheckCircle2, TimerReset, MapPin } from "lucide-react";
+import { MessageCircle, Clock, AlertTriangle, CarFront, DollarSign, Plus, Navigation, Edit, AlertCircle, CheckCircle2, ClockArrowUp, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
 import { ReviewModal } from "./ReviewModal";
@@ -487,7 +487,7 @@ export const ActiveBookingBanner = () => {
                             onClick={() => setShowExtendDialog(true)}
                             disabled={loading}
                           >
-                            <TimerReset className="h-4 w-4" />
+                            <ClockArrowUp className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>

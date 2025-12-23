@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Calendar, XCircle, MessageCircle, Navigation, Edit, Star, TimerReset } from 'lucide-react';
+import { MapPin, Clock, Calendar, XCircle, MessageCircle, Navigation, Edit, Star, ClockArrowUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -351,7 +351,7 @@ const Activity = () => {
                             className="flex-1 hover:bg-green-50 hover:text-green-600 hover:border-green-300 transition-colors"
                             onClick={handleExtend}
                           >
-                            <TimerReset className="h-4 w-4" />
+                            <ClockArrowUp className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>Extend</TooltipContent>
@@ -529,7 +529,7 @@ const Activity = () => {
                       className="flex-1 hover:bg-green-50 hover:text-green-600 hover:border-green-300 transition-colors"
                       onClick={handleExtend}
                     >
-                      <TimerReset className="h-4 w-4 mr-2" />
+                      <ClockArrowUp className="h-4 w-4 mr-2" />
                       Extend
                     </Button>
                   )}
