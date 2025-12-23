@@ -17,7 +17,6 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { formatPhoneNumber } from '@/lib/utils';
 import { ImageCropDialog } from '@/components/profile/ImageCropDialog';
-import ModeSwitcher from '@/components/layout/ModeSwitcher';
 import { useMode } from '@/contexts/ModeContext';
 import { Skeleton } from '@/components/ui/skeleton';
 const profileSchema = z.object({
@@ -638,136 +637,130 @@ const Profile = () => {
         </div>
       )}
 
-      {/* Header with gradient background */}
-      <div className="bg-gradient-to-br from-primary via-primary to-primary/90 text-primary-foreground p-6 rounded-b-3xl shadow-lg">
-        <div className="flex justify-between items-start mb-6">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold">Profile</h1>
-            <ModeSwitcher variant="light" navigate={false} />
-          </div>
-          
-        </div>
-        
-        {/* Profile Info Card */}
-        <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-primary-foreground">
-          <div className="p-4">
-            <div className="flex items-center gap-4">
-              <Avatar className="h-20 w-20 border-3 border-white/30 shadow-lg flex-shrink-0">
-                <AvatarImage src={profile?.avatar_url} />
-                <AvatarFallback className="text-xl bg-white/20">{getInitials()}</AvatarFallback>
-              </Avatar>
+      {/* Page Subheading */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-foreground">Profile</h1>
+      </div>
+      
+      {/* Profile Info Card */}
+      <Card className="bg-gradient-to-br from-primary via-primary to-primary/90 text-primary-foreground border-0 shadow-lg rounded-2xl">
+        <div className="p-4">
+          <div className="flex items-center gap-4">
+            <Avatar className="h-20 w-20 border-3 border-white/30 shadow-lg flex-shrink-0">
+              <AvatarImage src={profile?.avatar_url} />
+              <AvatarFallback className="text-xl bg-white/20">{getInitials()}</AvatarFallback>
+            </Avatar>
+            
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <h2 className="text-xl font-bold">{getDisplayName()}</h2>
+                <Button variant="ghost" size="sm" onClick={handleEditClick} className="hover:bg-white/20 text-primary-foreground flex-shrink-0 h-8">
+                  <Edit className="h-3.5 w-3.5 mr-1" />
+                  Edit
+                </Button>
+              </div>
               
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <h2 className="text-xl font-bold">{getDisplayName()}</h2>
-                  <Button variant="ghost" size="sm" onClick={handleEditClick} className="hover:bg-white/20 text-primary-foreground flex-shrink-0 h-8">
-                    <Edit className="h-3.5 w-3.5 mr-1" />
-                    Edit
-                  </Button>
-                </div>
-                
-                <p className="text-primary-foreground/70 text-xs mb-1">Member since</p>
-                <p className="text-primary-foreground/90 text-sm font-medium mb-2">{getMemberSince()}</p>
-                
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 bg-white/20 px-2 py-1 rounded-full">
-                    <Star className="h-3.5 w-3.5 fill-yellow-300 text-yellow-300" />
-                    <span className="font-semibold text-xs">
-                      {mode === 'host' && hostRating 
-                        ? hostRating.average.toFixed(1) 
-                        : (profile?.rating ? profile.rating.toFixed(1) : 'New')}
-                    </span>
-                  </div>
-                  <span className="text-primary-foreground/70 text-xs">
+              <p className="text-primary-foreground/70 text-xs mb-1">Member since</p>
+              <p className="text-primary-foreground/90 text-sm font-medium mb-2">{getMemberSince()}</p>
+              
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 bg-white/20 px-2 py-1 rounded-full">
+                  <Star className="h-3.5 w-3.5 fill-yellow-300 text-yellow-300" />
+                  <span className="font-semibold text-xs">
                     {mode === 'host' && hostRating 
-                      ? `${hostRating.count} ${hostRating.count === 1 ? 'review' : 'reviews'}`
-                      : (profile?.review_count ? `${profile.review_count} ${profile.review_count === 1 ? 'review' : 'reviews'}` : 'No reviews yet')}
+                      ? hostRating.average.toFixed(1) 
+                      : (profile?.rating ? profile.rating.toFixed(1) : 'New')}
                   </span>
                 </div>
-                
-                {/* Email verification status */}
-                {profile?.email && (
-                  <div className="flex items-center flex-wrap gap-1.5 mt-2">
-                    <Mail className="h-3.5 w-3.5 text-primary-foreground/70" />
-                    <span className="text-xs text-primary-foreground/70 truncate max-w-[140px]">{profile.email}</span>
-                    {user?.email_confirmed_at ? (
-                      <div className="flex items-center gap-1 bg-green-500/20 text-green-200 px-1.5 py-0.5 rounded-full">
-                        <CheckCircle2 className="h-3 w-3" />
-                        <span className="text-[10px] font-medium">Verified</span>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-1 bg-yellow-500/20 text-yellow-200 px-1.5 py-0.5 rounded-full">
-                          <Clock className="h-3 w-3" />
-                          <span className="text-[10px] font-medium">Pending</span>
-                        </div>
-                        <button
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            if (isResendingEmail || resendCooldown > 0) return;
-                            setIsResendingEmail(true);
-                            try {
-                              const { error } = await supabase.auth.resend({
-                                type: 'signup',
-                                email: profile.email!,
-                              });
-                              if (error) throw error;
-                              toast.success('Verification email sent! Check your inbox.');
-                              setResendCooldown(60);
-                            } catch (error: any) {
-                              toast.error('Failed to resend: ' + error.message);
-                            } finally {
-                              setIsResendingEmail(false);
-                            }
-                          }}
-                          disabled={isResendingEmail || resendCooldown > 0}
-                          className="text-[10px] text-primary-foreground/80 hover:text-primary-foreground underline underline-offset-2 disabled:opacity-50 disabled:no-underline"
-                        >
-                          {isResendingEmail ? 'Sending...' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend'}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
-                
-                {/* Phone verification status */}
-                {(profile?.phone || user?.phone) && (
-                  <div className="flex items-center flex-wrap gap-1.5 mt-1">
-                    <Phone className="h-3.5 w-3.5 text-primary-foreground/70" />
-                    <span className="text-xs text-primary-foreground/70 truncate max-w-[140px]">
-                      {formatPhoneNumber(profile?.phone || user?.phone || '')}
-                    </span>
-                    {user?.phone_confirmed_at ? (
-                      <div className="flex items-center gap-1 bg-green-500/20 text-green-200 px-1.5 py-0.5 rounded-full">
-                        <CheckCircle2 className="h-3 w-3" />
-                        <span className="text-[10px] font-medium">Verified</span>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-1 bg-yellow-500/20 text-yellow-200 px-1.5 py-0.5 rounded-full">
-                          <Clock className="h-3 w-3" />
-                          <span className="text-[10px] font-medium">Unverified</span>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPhoneOtp('');
-                            setPhoneOtpSent(false);
-                            setIsPhoneVerifyDialogOpen(true);
-                          }}
-                          className="text-[10px] text-primary-foreground/80 hover:text-primary-foreground underline underline-offset-2"
-                        >
-                          Verify
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
+                <span className="text-primary-foreground/70 text-xs">
+                  {mode === 'host' && hostRating 
+                    ? `${hostRating.count} ${hostRating.count === 1 ? 'review' : 'reviews'}`
+                    : (profile?.review_count ? `${profile.review_count} ${profile.review_count === 1 ? 'review' : 'reviews'}` : 'No reviews yet')}
+                </span>
               </div>
+              
+              {/* Email verification status */}
+              {profile?.email && (
+                <div className="flex items-center flex-wrap gap-1.5 mt-2">
+                  <Mail className="h-3.5 w-3.5 text-primary-foreground/70" />
+                  <span className="text-xs text-primary-foreground/70 truncate max-w-[140px]">{profile.email}</span>
+                  {user?.email_confirmed_at ? (
+                    <div className="flex items-center gap-1 bg-green-500/20 text-green-200 px-1.5 py-0.5 rounded-full">
+                      <CheckCircle2 className="h-3 w-3" />
+                      <span className="text-[10px] font-medium">Verified</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-1 bg-yellow-500/20 text-yellow-200 px-1.5 py-0.5 rounded-full">
+                        <Clock className="h-3 w-3" />
+                        <span className="text-[10px] font-medium">Pending</span>
+                      </div>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (isResendingEmail || resendCooldown > 0) return;
+                          setIsResendingEmail(true);
+                          try {
+                            const { error } = await supabase.auth.resend({
+                              type: 'signup',
+                              email: profile.email!,
+                            });
+                            if (error) throw error;
+                            toast.success('Verification email sent! Check your inbox.');
+                            setResendCooldown(60);
+                          } catch (error: any) {
+                            toast.error('Failed to resend: ' + error.message);
+                          } finally {
+                            setIsResendingEmail(false);
+                          }
+                        }}
+                        disabled={isResendingEmail || resendCooldown > 0}
+                        className="text-[10px] text-primary-foreground/80 hover:text-primary-foreground underline underline-offset-2 disabled:opacity-50 disabled:no-underline"
+                      >
+                        {isResendingEmail ? 'Sending...' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+              
+              {/* Phone verification status */}
+              {(profile?.phone || user?.phone) && (
+                <div className="flex items-center flex-wrap gap-1.5 mt-1">
+                  <Phone className="h-3.5 w-3.5 text-primary-foreground/70" />
+                  <span className="text-xs text-primary-foreground/70 truncate max-w-[140px]">
+                    {formatPhoneNumber(profile?.phone || user?.phone || '')}
+                  </span>
+                  {user?.phone_confirmed_at ? (
+                    <div className="flex items-center gap-1 bg-green-500/20 text-green-200 px-1.5 py-0.5 rounded-full">
+                      <CheckCircle2 className="h-3 w-3" />
+                      <span className="text-[10px] font-medium">Verified</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-1 bg-yellow-500/20 text-yellow-200 px-1.5 py-0.5 rounded-full">
+                        <Clock className="h-3 w-3" />
+                        <span className="text-[10px] font-medium">Unverified</span>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPhoneOtp('');
+                          setPhoneOtpSent(false);
+                          setIsPhoneVerifyDialogOpen(true);
+                        }}
+                        className="text-[10px] text-primary-foreground/80 hover:text-primary-foreground underline underline-offset-2"
+                      >
+                        Verify
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
-        </Card>
-      </div>
+        </div>
+      </Card>
 
       <div className="px-4 pb-4 space-y-6">
         {/* Become a Host Widget */}
