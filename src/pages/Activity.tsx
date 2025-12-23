@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Calendar, XCircle, MessageCircle, Navigation, Edit, Star, AlarmClockPlus } from 'lucide-react';
+import { MapPin, Clock, Calendar, XCircle, MessageCircle, Navigation, Edit, Star, AlarmClockPlus, List, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -14,12 +14,17 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ReviewModal } from '@/components/booking/ReviewModal';
 import { ExtendParkingDialog } from '@/components/booking/ExtendParkingDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, isToday } from 'date-fns';
 
 const Activity = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { mode } = useMode();
   const [activeTab, setActiveTab] = useState('upcoming');
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -192,6 +197,38 @@ const Activity = () => {
   const now = new Date();
   const upcomingBookings = bookings.filter(b => new Date(b.end_at) >= now && b.status !== 'canceled');
   const pastBookings = bookings.filter(b => new Date(b.end_at) < now || b.status === 'canceled');
+
+  // Calendar view helpers
+  const calendarDays = useMemo(() => {
+    const start = startOfMonth(calendarMonth);
+    const end = endOfMonth(calendarMonth);
+    return eachDayOfInterval({ start, end });
+  }, [calendarMonth]);
+
+  const getBookingsForDate = (date: Date) => {
+    return bookings.filter(b => {
+      const bookingStart = new Date(b.start_at);
+      return isSameDay(bookingStart, date);
+    });
+  };
+
+  const bookingsForSelectedDate = selectedDate ? getBookingsForDate(selectedDate) : [];
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+      case 'paid':
+        return 'bg-green-500';
+      case 'pending':
+        return 'bg-yellow-500';
+      case 'completed':
+        return 'bg-blue-500';
+      case 'canceled':
+        return 'bg-red-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
   const BookingCard = ({
     booking,
     isPast = false
@@ -622,80 +659,214 @@ const Activity = () => {
   };
   return <div className="bg-background">
       <div className="p-4 space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold">{mode === 'host' ? 'Reservations' : 'My Reservations'}</h1>
-          <p className="text-sm text-muted-foreground">
-            {mode === 'host' ? 'Manage reservations at your spots' : 'View your parking reservations'}
-          </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">{mode === 'host' ? 'Reservations' : 'My Reservations'}</h1>
+            <p className="text-sm text-muted-foreground">
+              {mode === 'host' ? 'Manage reservations at your spots' : 'View your parking reservations'}
+            </p>
+          </div>
+          <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as 'list' | 'calendar')}>
+            <ToggleGroupItem value="list" aria-label="List view" className="px-3">
+              <List className="h-4 w-4" />
+            </ToggleGroupItem>
+            <ToggleGroupItem value="calendar" aria-label="Calendar view" className="px-3">
+              <CalendarDays className="h-4 w-4" />
+            </ToggleGroupItem>
+          </ToggleGroup>
         </div>
 
         {/* Active booking banner for quick management */}
         <ActiveBookingBanner />
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-            <TabsTrigger value="past">Past</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="upcoming" className="space-y-3 mt-4">
-            {loading ? <div className="space-y-3">
-                {[1, 2].map(i => <Card key={i}>
+        {viewMode === 'list' ? (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+              <TabsTrigger value="past">Past</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="upcoming" className="space-y-3 mt-4">
+              {loading ? <div className="space-y-3">
+                  {[1, 2].map(i => <Card key={i}>
+                      <CardContent className="p-4">
+                        <Skeleton className="h-20 w-full" />
+                      </CardContent>
+                    </Card>)}
+                </div> : upcomingBookings.length === 0 ? <Card>
+                  <CardContent className="p-8 text-center">
+                    <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="font-semibold mb-2">
+                      {mode === 'host' ? 'No upcoming reservations' : 'No upcoming bookings'}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {mode === 'host' ? 'Reservations for your spots will appear here' : 'Start exploring parking spots near you'}
+                    </p>
+                    {mode === 'driver' && <Button onClick={() => {
+                  const now = new Date();
+                  const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+                  
+                  if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                      (position) => {
+                        navigate(`/explore?lat=${position.coords.latitude}&lng=${position.coords.longitude}&start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
+                      },
+                      (error) => {
+                        console.error('Location error:', error);
+                        navigate(`/explore?start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
+                      }
+                    );
+                  } else {
+                    navigate(`/explore?start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
+                  }
+                }}>
+                        Find Parking
+                      </Button>}
+                  </CardContent>
+                </Card> : upcomingBookings.map(booking => <BookingCard key={booking.id} booking={booking} isPast={false} />)}
+            </TabsContent>
+            
+            <TabsContent value="past" className="space-y-3 mt-4">
+              {loading ? <div className="space-y-3">
+                  {[1, 2].map(i => <Card key={i}>
+                      <CardContent className="p-4">
+                        <Skeleton className="h-20 w-full" />
+                      </CardContent>
+                    </Card>)}
+                </div> : pastBookings.length === 0 ? <Card>
+                  <CardContent className="p-8 text-center">
+                    <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="font-semibold mb-2">No past bookings</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Your completed bookings will appear here
+                    </p>
+                  </CardContent>
+                </Card> : pastBookings.map(booking => <BookingCard key={booking.id} booking={booking} isPast={true} />)}
+            </TabsContent>
+          </Tabs>
+        ) : (
+          /* Calendar View */
+          <div className="space-y-4">
+            {/* Month Navigation */}
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" size="icon" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <h2 className="text-lg font-semibold">
+                {format(calendarMonth, 'MMMM yyyy')}
+              </h2>
+              <Button variant="ghost" size="icon" onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}>
+                <ChevronRight className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Calendar Grid */}
+            <Card>
+              <CardContent className="p-3">
+                {/* Day headers */}
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                    <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Calendar days */}
+                <div className="grid grid-cols-7 gap-1">
+                  {/* Empty cells for days before the first of the month */}
+                  {Array.from({ length: calendarDays[0]?.getDay() || 0 }).map((_, i) => (
+                    <div key={`empty-${i}`} className="aspect-square" />
+                  ))}
+
+                  {calendarDays.map(day => {
+                    const dayBookings = getBookingsForDate(day);
+                    const hasBookings = dayBookings.length > 0;
+                    const isSelected = selectedDate && isSameDay(day, selectedDate);
+                    const dayIsToday = isToday(day);
+
+                    return (
+                      <button
+                        key={day.toISOString()}
+                        onClick={() => setSelectedDate(isSelected ? null : day)}
+                        className={`
+                          aspect-square rounded-lg p-1 text-sm relative transition-colors
+                          ${isSelected ? 'bg-primary text-primary-foreground' : ''}
+                          ${dayIsToday && !isSelected ? 'border-2 border-primary' : ''}
+                          ${!isSelected ? 'hover:bg-accent' : ''}
+                        `}
+                      >
+                        <span className={dayIsToday && !isSelected ? 'font-bold' : ''}>
+                          {format(day, 'd')}
+                        </span>
+                        {hasBookings && (
+                          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
+                            {dayBookings.slice(0, 3).map((b, i) => (
+                              <span
+                                key={i}
+                                className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-primary-foreground' : getStatusColor(b.status)}`}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Selected Date Bookings */}
+            {selectedDate && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-lg">
+                  {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+                </h3>
+                {loading ? (
+                  <Card>
                     <CardContent className="p-4">
                       <Skeleton className="h-20 w-full" />
                     </CardContent>
-                  </Card>)}
-              </div> : upcomingBookings.length === 0 ? <Card>
-                <CardContent className="p-8 text-center">
-                  <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="font-semibold mb-2">
-                    {mode === 'host' ? 'No upcoming reservations' : 'No upcoming bookings'}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {mode === 'host' ? 'Reservations for your spots will appear here' : 'Start exploring parking spots near you'}
-                  </p>
-                  {mode === 'driver' && <Button onClick={() => {
-                const now = new Date();
-                const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-                
-                if (navigator.geolocation) {
-                  navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                      navigate(`/explore?lat=${position.coords.latitude}&lng=${position.coords.longitude}&start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
-                    },
-                    (error) => {
-                      console.error('Location error:', error);
-                      navigate(`/explore?start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
-                    }
-                  );
-                } else {
-                  navigate(`/explore?start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
-                }
-              }}>
-                      Find Parking
-                    </Button>}
-                </CardContent>
-              </Card> : upcomingBookings.map(booking => <BookingCard key={booking.id} booking={booking} isPast={false} />)}
-          </TabsContent>
-          
-          <TabsContent value="past" className="space-y-3 mt-4">
-            {loading ? <div className="space-y-3">
-                {[1, 2].map(i => <Card key={i}>
-                    <CardContent className="p-4">
-                      <Skeleton className="h-20 w-full" />
+                  </Card>
+                ) : bookingsForSelectedDate.length === 0 ? (
+                  <Card>
+                    <CardContent className="p-6 text-center">
+                      <p className="text-muted-foreground text-sm">No reservations on this date</p>
                     </CardContent>
-                  </Card>)}
-              </div> : pastBookings.length === 0 ? <Card>
-                <CardContent className="p-8 text-center">
-                  <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="font-semibold mb-2">No past bookings</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Your completed bookings will appear here
-                  </p>
-                </CardContent>
-              </Card> : pastBookings.map(booking => <BookingCard key={booking.id} booking={booking} isPast={true} />)}
-          </TabsContent>
-        </Tabs>
+                  </Card>
+                ) : (
+                  bookingsForSelectedDate.map(booking => (
+                    <BookingCard 
+                      key={booking.id} 
+                      booking={booking} 
+                      isPast={new Date(booking.end_at) < now || booking.status === 'canceled'} 
+                    />
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Legend */}
+            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                Active
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                Pending
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                Completed
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                Canceled
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Cancellation Confirmation Dialog */}
