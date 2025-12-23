@@ -272,14 +272,16 @@ const HostCalendar = () => {
           </Button>
         </div>
 
-        {/* Day Headers */}
-        <div className="grid grid-cols-7 gap-1 mb-2">
-          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
-            <div key={i} className="text-xs text-muted-foreground text-center font-medium py-1">
-              {viewMode === 'week' ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][i] : day}
-            </div>
-          ))}
-        </div>
+        {/* Day Headers - Month view only */}
+        {viewMode === 'month' && (
+          <div className="grid grid-cols-7 gap-1 mb-2">
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+              <div key={i} className="text-xs text-muted-foreground text-center font-medium py-1">
+                {day}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Calendar Grid */}
         {loading ? (
@@ -361,8 +363,8 @@ const HostCalendar = () => {
             })}
           </div>
         ) : (
-          // Week View
-          <div className="grid grid-cols-7 gap-1">
+          // Week View - Vertical layout for mobile
+          <div className="space-y-2">
             {weekDays.map((date, index) => {
               const { bookings: dayBookings, isUnavailable, rate, isPast, hasBookings } = getDateData(date);
               const isTodayDate = isToday(date);
@@ -372,58 +374,72 @@ const HostCalendar = () => {
                   key={index}
                   onClick={() => handleDayClick(date)}
                   className={cn(
-                    "min-h-[280px] p-2 rounded-lg border transition-all flex flex-col text-left",
+                    "w-full p-3 rounded-lg border transition-all flex items-start gap-3 text-left",
                     "hover:border-primary cursor-pointer",
-                    isTodayDate && "ring-2 ring-primary",
-                    isUnavailable && "bg-destructive/10",
-                    hasBookings && !isUnavailable && "bg-green-500/10",
-                    isPast && "bg-muted/50"
+                    isTodayDate && "ring-2 ring-primary bg-primary/5",
+                    isUnavailable && !isTodayDate && "bg-destructive/10",
+                    hasBookings && !isUnavailable && !isTodayDate && "bg-green-500/5",
+                    isPast && !isTodayDate && "bg-muted/30"
                   )}
                 >
-                  {/* Date */}
-                  <div className="text-center mb-2">
+                  {/* Date column */}
+                  <div className="flex flex-col items-center min-w-[50px]">
+                    <div className="text-xs text-muted-foreground font-medium">
+                      {format(date, 'EEE')}
+                    </div>
                     <div className={cn(
-                      "text-lg font-bold inline-flex items-center justify-center w-8 h-8 rounded-full",
+                      "text-xl font-bold flex items-center justify-center w-10 h-10 rounded-full",
                       isTodayDate && "bg-primary text-primary-foreground"
                     )}>
                       {format(date, 'd')}
                     </div>
+                    {rate !== null && !isUnavailable && (
+                      <div className="text-xs text-green-600 dark:text-green-400 font-semibold mt-1">
+                        ${rate}/hr
+                      </div>
+                    )}
                   </div>
                   
-                  {/* Rate */}
-                  {rate !== null && !isUnavailable && (
-                    <div className="text-xs text-green-600 dark:text-green-400 font-semibold text-center mb-2">
-                      ${rate}/hr
-                    </div>
-                  )}
-                  
-                  {/* Unavailable */}
-                  {isUnavailable && (
-                    <Badge variant="destructive" className="text-[10px] mb-2 justify-center">
-                      Blocked
-                    </Badge>
-                  )}
-                  
-                  {/* Bookings list */}
-                  <div className="flex-1 space-y-1.5 overflow-y-auto">
-                    {dayBookings.map((booking) => (
-                      <div
-                        key={booking.id}
-                        className={cn(
-                          "text-xs p-1.5 rounded",
-                          booking.status === 'completed' ? "bg-muted" :
-                          booking.status === 'active' ? "bg-primary/20" :
-                          "bg-blue-500/20"
+                  {/* Content column */}
+                  <div className="flex-1 min-w-0">
+                    {isUnavailable ? (
+                      <Badge variant="destructive" className="text-xs">
+                        Blocked
+                      </Badge>
+                    ) : dayBookings.length > 0 ? (
+                      <div className="space-y-1.5">
+                        {dayBookings.slice(0, 3).map((booking) => (
+                          <div
+                            key={booking.id}
+                            className={cn(
+                              "text-sm px-2 py-1.5 rounded-md flex items-center justify-between gap-2",
+                              booking.status === 'completed' ? "bg-muted" :
+                              booking.status === 'active' ? "bg-primary/20" :
+                              "bg-blue-500/15"
+                            )}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <User className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                              <span className="font-medium truncate">
+                                {booking.renter?.first_name || 'Guest'}
+                              </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground flex-shrink-0">
+                              {format(new Date(booking.start_at), 'h:mm a')}
+                            </div>
+                          </div>
+                        ))}
+                        {dayBookings.length > 3 && (
+                          <div className="text-xs text-muted-foreground pl-2">
+                            +{dayBookings.length - 3} more
+                          </div>
                         )}
-                      >
-                        <div className="font-medium truncate">
-                          {booking.renter?.first_name || 'Guest'}
-                        </div>
-                        <div className="text-muted-foreground">
-                          {format(new Date(booking.start_at), 'h:mm a')}
-                        </div>
                       </div>
-                    ))}
+                    ) : (
+                      <div className="text-sm text-muted-foreground py-1">
+                        {isPast ? 'No bookings' : 'Available'}
+                      </div>
+                    )}
                   </div>
                 </button>
               );
