@@ -36,6 +36,14 @@ interface MessagesContextType {
 
 const MessagesContext = createContext<MessagesContextType | null>(null);
 
+// Helper to format display name (First Name + Last Initial)
+const formatDisplayName = (firstName?: string | null, lastName?: string | null): string => {
+  const first = firstName?.trim() || '';
+  const lastInitial = lastName?.trim()?.[0] || '';
+  if (!first && !lastInitial) return 'Unknown User';
+  return lastInitial ? `${first} ${lastInitial}.` : first;
+};
+
 // Helper to format message preview
 const getMessagePreview = (msg: Message, currentUserId: string, senderName?: string): string => {
   const isMe = msg.sender_id === currentUserId;
@@ -101,7 +109,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const profile = profiles?.find(p => p.user_id === partnerId);
       const profileName = isSupportUser 
         ? 'Parkzy Support' 
-        : (profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown User' : 'Unknown User');
+        : (profile ? formatDisplayName(profile.first_name, profile.last_name) : 'Unknown User');
       const profileAvatar = isSupportUser
         ? '/parkzy-support-avatar.png'
         : profile?.avatar_url;
@@ -237,7 +245,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         .eq('user_id', partnerId)
         .maybeSingle();
       if (data) {
-        const name = `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'Unknown User';
+        const name = formatDisplayName(data.first_name, data.last_name);
         profileCacheRef.current.set(partnerId, { name, avatar_url: data.avatar_url || undefined });
         if (mountedRef.current) {
           setConversations(prev => prev.map(c => c.user_id === partnerId ? { ...c, name, avatar_url: data.avatar_url || undefined } : c));

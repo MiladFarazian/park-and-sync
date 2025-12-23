@@ -30,6 +30,14 @@ import {
 } from '@/components/ui/drawer';
 import RequireAuth from '@/components/auth/RequireAuth';
 
+// Helper to format display name (First Name + Last Initial)
+const formatDisplayName = (firstName?: string | null, lastName?: string | null): string => {
+  const first = firstName?.trim() || '';
+  const lastInitial = lastName?.trim()?.[0] || '';
+  if (!first && !lastInitial) return 'User';
+  return lastInitial ? `${first} ${lastInitial}.` : first;
+};
+
 // Memoized message item component for performance
 const MessageItem = memo(({ message, isMe }: { message: Message; isMe: boolean }) => {
   const isVideo = message.media_type?.startsWith('video/');
@@ -663,7 +671,7 @@ const MessagesContent = () => {
   
   // Use new user profile if starting a new conversation
   const displayName = selectedConvData?.name || 
-    (newUserProfile ? `${newUserProfile.first_name || ''} ${newUserProfile.last_name || ''}`.trim() || 'User' : 'User');
+    (newUserProfile ? formatDisplayName(newUserProfile.first_name, newUserProfile.last_name) : 'User');
   const displayAvatar = selectedConvData?.avatar_url || newUserProfile?.avatar_url;
 
   const ComposeContent = () => (
@@ -692,7 +700,7 @@ const MessagesContent = () => {
             </Avatar>
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sm truncate">
-                {`${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'User'}
+                {formatDisplayName(contact.first_name, contact.last_name)}
               </p>
               <p className="text-xs text-muted-foreground truncate">{contact.spot_title}</p>
             </div>
