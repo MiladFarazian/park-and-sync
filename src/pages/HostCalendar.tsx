@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowLeft, Calendar as CalendarIcon, LayoutGrid, Clock, DollarSign, User, MapPin, X, Ban, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addDays, addMonths, isSameDay, isBefore, startOfDay, isToday } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addDays, addMonths, addWeeks, isSameDay, isBefore, startOfDay, isToday, startOfWeek, endOfWeek } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface SpotWithRate {
   id: string;
@@ -23,37 +26,59 @@ interface BookingForCalendar {
   end_at: string;
   status: string;
   total_amount: number;
+  renter?: {
+    first_name: string | null;
+    last_name: string | null;
+  };
+  spot?: {
+    title: string;
+  };
 }
 
 interface CalendarOverride {
+  id?: string;
   spot_id: string;
   override_date: string;
   is_available: boolean;
   custom_rate?: number;
 }
 
+type ViewMode = 'month' | 'week';
+
 const HostCalendar = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [spots, setSpots] = useState<SpotWithRate[]>([]);
   const [bookings, setBookings] = useState<BookingForCalendar[]>([]);
   const [overrides, setOverrides] = useState<CalendarOverride[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [savingOverride, setSavingOverride] = useState(false);
 
   useEffect(() => {
     if (user) {
       fetchData();
     }
-  }, [user, currentMonth]);
+  }, [user, currentMonth, currentWeek, viewMode]);
 
   const fetchData = async () => {
     if (!user) return;
     
     try {
       setLoading(true);
-      const monthStart = startOfMonth(currentMonth);
-      const monthEnd = endOfMonth(currentMonth);
+      let rangeStart: Date, rangeEnd: Date;
+      
+      if (viewMode === 'month') {
+        rangeStart = startOfMonth(currentMonth);
+        rangeEnd = endOfMonth(currentMonth);
+      } else {
+        rangeStart = startOfWeek(currentWeek, { weekStartsOn: 0 });
+        rangeEnd = endOfWeek(currentWeek, { weekStartsOn: 0 });
+      }
 
       // Fetch host's spots
       const { data: spotsData, error: spotsError } = await supabase
@@ -71,13 +96,17 @@ const HostCalendar = () => {
 
       const spotIds = spotsData.map(s => s.id);
 
-      // Fetch bookings for the month
+      // Fetch bookings for the range with renter info
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
-        .select('id, spot_id, start_at, end_at, status, total_amount')
+        .select(`
+          id, spot_id, start_at, end_at, status, total_amount,
+          renter:profiles!bookings_renter_id_fkey(first_name, last_name),
+          spot:spots!bookings_spot_id_fkey(title)
+        `)
         .in('spot_id', spotIds)
-        .gte('start_at', monthStart.toISOString())
-        .lte('start_at', monthEnd.toISOString())
+        .gte('start_at', rangeStart.toISOString())
+        .lte('start_at', rangeEnd.toISOString())
         .in('status', ['pending', 'paid', 'active', 'completed']);
 
       if (bookingsError) throw bookingsError;
@@ -86,10 +115,10 @@ const HostCalendar = () => {
       // Fetch calendar overrides
       const { data: overridesData, error: overridesError } = await supabase
         .from('calendar_overrides')
-        .select('spot_id, override_date, is_available, custom_rate')
+        .select('id, spot_id, override_date, is_available, custom_rate')
         .in('spot_id', spotIds)
-        .gte('override_date', format(monthStart, 'yyyy-MM-dd'))
-        .lte('override_date', format(monthEnd, 'yyyy-MM-dd'));
+        .gte('override_date', format(rangeStart, 'yyyy-MM-dd'))
+        .lte('override_date', format(rangeEnd, 'yyyy-MM-dd'));
 
       if (overridesError) throw overridesError;
       setOverrides(overridesData || []);
@@ -101,7 +130,7 @@ const HostCalendar = () => {
     }
   };
 
-  // Generate calendar grid
+  // Generate calendar grid for month view
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(currentMonth);
@@ -136,6 +165,12 @@ const HostCalendar = () => {
     return days;
   }, [currentMonth]);
 
+  // Generate week days for week view
+  const weekDays = useMemo(() => {
+    const weekStart = startOfWeek(currentWeek, { weekStartsOn: 0 });
+    return eachDayOfInterval({ start: weekStart, end: addDays(weekStart, 6) });
+  }, [currentWeek]);
+
   // Get data for a specific date
   const getDateData = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -159,12 +194,61 @@ const HostCalendar = () => {
 
     return {
       bookings: dateBookings,
+      overrides: dateOverrides,
       isUnavailable: hasUnavailable,
       rate: displayRate,
       isPast,
       hasBookings: dateBookings.length > 0
     };
   };
+
+  const handleDayClick = (date: Date) => {
+    setSelectedDate(date);
+    setSheetOpen(true);
+  };
+
+  const toggleDateAvailability = async (spotId: string, date: Date, currentlyUnavailable: boolean) => {
+    if (!user) return;
+    
+    setSavingOverride(true);
+    const dateStr = format(date, 'yyyy-MM-dd');
+    
+    try {
+      if (currentlyUnavailable) {
+        // Remove the override to make it available
+        const { error } = await supabase
+          .from('calendar_overrides')
+          .delete()
+          .eq('spot_id', spotId)
+          .eq('override_date', dateStr)
+          .eq('is_available', false);
+          
+        if (error) throw error;
+        toast.success('Date is now available');
+      } else {
+        // Add override to make it unavailable
+        const { error } = await supabase
+          .from('calendar_overrides')
+          .upsert({
+            spot_id: spotId,
+            override_date: dateStr,
+            is_available: false
+          }, { onConflict: 'spot_id,override_date' });
+          
+        if (error) throw error;
+        toast.success('Date blocked successfully');
+      }
+      
+      await fetchData();
+    } catch (error) {
+      console.error('Error updating availability:', error);
+      toast.error('Failed to update availability');
+    } finally {
+      setSavingOverride(false);
+    }
+  };
+
+  const selectedDateData = selectedDate ? getDateData(selectedDate) : null;
 
   if (!user) {
     return (
@@ -180,31 +264,57 @@ const HostCalendar = () => {
   return (
     <div className="p-4 pb-24 space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/host-home')}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold">Calendar</h1>
-          <p className="text-sm text-muted-foreground">View bookings & availability</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/host-home')}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">Calendar</h1>
+            <p className="text-sm text-muted-foreground">View bookings & availability</p>
+          </div>
         </div>
+        
+        {/* View Toggle */}
+        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+          <TabsList className="h-9">
+            <TabsTrigger value="month" className="px-3">
+              <LayoutGrid className="h-4 w-4" />
+            </TabsTrigger>
+            <TabsTrigger value="week" className="px-3">
+              <CalendarIcon className="h-4 w-4" />
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
-      {/* Month Navigation */}
+      {/* Calendar Card */}
       <Card className="p-4">
+        {/* Navigation */}
         <div className="flex items-center justify-between mb-4">
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setCurrentMonth(addMonths(currentMonth, -1))}
+            onClick={() => viewMode === 'month' 
+              ? setCurrentMonth(addMonths(currentMonth, -1))
+              : setCurrentWeek(addWeeks(currentWeek, -1))
+            }
           >
             <ChevronLeft className="h-5 w-5" />
           </Button>
-          <h2 className="text-xl font-bold">{format(currentMonth, 'MMMM yyyy')}</h2>
+          <h2 className="text-xl font-bold">
+            {viewMode === 'month' 
+              ? format(currentMonth, 'MMMM yyyy')
+              : `${format(startOfWeek(currentWeek, { weekStartsOn: 0 }), 'MMM d')} - ${format(endOfWeek(currentWeek, { weekStartsOn: 0 }), 'MMM d, yyyy')}`
+            }
+          </h2>
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+            onClick={() => viewMode === 'month'
+              ? setCurrentMonth(addMonths(currentMonth, 1))
+              : setCurrentWeek(addWeeks(currentWeek, 1))
+            }
           >
             <ChevronRight className="h-5 w-5" />
           </Button>
@@ -214,30 +324,34 @@ const HostCalendar = () => {
         <div className="grid grid-cols-7 gap-1 mb-2">
           {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
             <div key={i} className="text-xs text-muted-foreground text-center font-medium py-1">
-              {day}
+              {viewMode === 'week' ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][i] : day}
             </div>
           ))}
         </div>
 
         {/* Calendar Grid */}
         {loading ? (
-          <div className="grid grid-cols-7 gap-1">
-            {Array.from({ length: 35 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-square" />
+          <div className={cn("grid grid-cols-7 gap-1", viewMode === 'week' && "min-h-[300px]")}>
+            {Array.from({ length: viewMode === 'month' ? 35 : 7 }).map((_, i) => (
+              <Skeleton key={i} className={viewMode === 'month' ? "aspect-square" : "h-[300px]"} />
             ))}
           </div>
-        ) : (
+        ) : viewMode === 'month' ? (
+          // Month View
           <div className="grid grid-cols-7 gap-1">
             {calendarDays.map(({ date, isCurrentMonth }, index) => {
               const { bookings: dayBookings, isUnavailable, rate, isPast, hasBookings } = getDateData(date);
               const isTodayDate = isToday(date);
               
               return (
-                <div
+                <button
                   key={index}
+                  onClick={() => isCurrentMonth && handleDayClick(date)}
+                  disabled={!isCurrentMonth}
                   className={cn(
-                    "aspect-square p-0.5 rounded-md border transition-all flex flex-col",
-                    !isCurrentMonth && "opacity-30",
+                    "aspect-square p-0.5 rounded-md border transition-all flex flex-col text-left",
+                    !isCurrentMonth && "opacity-30 cursor-default",
+                    isCurrentMonth && "hover:border-primary cursor-pointer",
                     isTodayDate && "ring-2 ring-primary",
                     isUnavailable && isCurrentMonth && "bg-destructive/10",
                     hasBookings && isCurrentMonth && !isUnavailable && "bg-green-500/10",
@@ -245,7 +359,7 @@ const HostCalendar = () => {
                   )}
                 >
                   {/* Date Number */}
-                  <div className="text-xs font-medium text-center">
+                  <div className="text-xs font-medium text-center w-full">
                     {format(date, 'd')}
                   </div>
                   
@@ -268,7 +382,7 @@ const HostCalendar = () => {
                       {/* Bookings */}
                       {dayBookings.length > 0 && (
                         <div className="space-y-0.5">
-                          {dayBookings.slice(0, 2).map((booking, i) => (
+                          {dayBookings.slice(0, 2).map((booking) => (
                             <div
                               key={booking.id}
                               className={cn(
@@ -290,7 +404,76 @@ const HostCalendar = () => {
                       )}
                     </div>
                   )}
-                </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          // Week View
+          <div className="grid grid-cols-7 gap-1">
+            {weekDays.map((date, index) => {
+              const { bookings: dayBookings, isUnavailable, rate, isPast, hasBookings } = getDateData(date);
+              const isTodayDate = isToday(date);
+              
+              return (
+                <button
+                  key={index}
+                  onClick={() => handleDayClick(date)}
+                  className={cn(
+                    "min-h-[280px] p-2 rounded-lg border transition-all flex flex-col text-left",
+                    "hover:border-primary cursor-pointer",
+                    isTodayDate && "ring-2 ring-primary",
+                    isUnavailable && "bg-destructive/10",
+                    hasBookings && !isUnavailable && "bg-green-500/10",
+                    isPast && "bg-muted/50"
+                  )}
+                >
+                  {/* Date */}
+                  <div className="text-center mb-2">
+                    <div className={cn(
+                      "text-lg font-bold inline-flex items-center justify-center w-8 h-8 rounded-full",
+                      isTodayDate && "bg-primary text-primary-foreground"
+                    )}>
+                      {format(date, 'd')}
+                    </div>
+                  </div>
+                  
+                  {/* Rate */}
+                  {rate !== null && !isUnavailable && (
+                    <div className="text-xs text-green-600 dark:text-green-400 font-semibold text-center mb-2">
+                      ${rate}/hr
+                    </div>
+                  )}
+                  
+                  {/* Unavailable */}
+                  {isUnavailable && (
+                    <Badge variant="destructive" className="text-[10px] mb-2 justify-center">
+                      Blocked
+                    </Badge>
+                  )}
+                  
+                  {/* Bookings list */}
+                  <div className="flex-1 space-y-1.5 overflow-y-auto">
+                    {dayBookings.map((booking) => (
+                      <div
+                        key={booking.id}
+                        className={cn(
+                          "text-xs p-1.5 rounded",
+                          booking.status === 'completed' ? "bg-muted" :
+                          booking.status === 'active' ? "bg-primary/20" :
+                          "bg-blue-500/20"
+                        )}
+                      >
+                        <div className="font-medium truncate">
+                          {booking.renter?.first_name || 'Guest'}
+                        </div>
+                        <div className="text-muted-foreground">
+                          {format(new Date(booking.start_at), 'h:mm a')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </button>
               );
             })}
           </div>
@@ -304,7 +487,7 @@ const HostCalendar = () => {
           </div>
           <div className="flex items-center gap-1">
             <span className="w-3 h-3 rounded bg-destructive/10 border" />
-            <span>Unavailable</span>
+            <span>Blocked</span>
           </div>
           <div className="flex items-center gap-1">
             <span className="w-3 h-3 rounded bg-muted/50 border" />
@@ -321,6 +504,141 @@ const HostCalendar = () => {
       >
         View All Reservations
       </Button>
+
+      {/* Day Detail Sheet */}
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent side="bottom" className="h-[85vh] rounded-t-xl">
+          <SheetHeader className="pb-4 border-b">
+            <SheetTitle className="flex items-center justify-between">
+              <span>{selectedDate ? format(selectedDate, 'EEEE, MMMM d, yyyy') : ''}</span>
+            </SheetTitle>
+          </SheetHeader>
+          
+          {selectedDate && selectedDateData && (
+            <div className="py-4 space-y-6 overflow-y-auto max-h-[calc(85vh-100px)]">
+              {/* Quick Stats */}
+              <div className="grid grid-cols-2 gap-3">
+                <Card className="p-3">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                    <DollarSign className="h-4 w-4" />
+                    <span>Rate</span>
+                  </div>
+                  <div className="text-lg font-bold">
+                    {selectedDateData.rate ? `$${selectedDateData.rate}/hr` : 'N/A'}
+                  </div>
+                </Card>
+                <Card className="p-3">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                    <CalendarIcon className="h-4 w-4" />
+                    <span>Bookings</span>
+                  </div>
+                  <div className="text-lg font-bold">
+                    {selectedDateData.bookings.length}
+                  </div>
+                </Card>
+              </div>
+
+              {/* Availability Management */}
+              <div>
+                <h3 className="font-semibold mb-3">Manage Availability</h3>
+                <div className="space-y-2">
+                  {spots.map(spot => {
+                    const spotOverride = selectedDateData.overrides.find(o => o.spot_id === spot.id && !o.is_available);
+                    const isBlocked = !!spotOverride;
+                    
+                    return (
+                      <Card key={spot.id} className="p-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{spot.title}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {isBlocked ? 'Currently blocked' : `$${spot.hourly_rate}/hr`}
+                            </div>
+                          </div>
+                          <Button
+                            variant={isBlocked ? "outline" : "destructive"}
+                            size="sm"
+                            disabled={savingOverride}
+                            onClick={() => toggleDateAvailability(spot.id, selectedDate, isBlocked)}
+                          >
+                            {isBlocked ? (
+                              <>
+                                <Check className="h-4 w-4 mr-1" />
+                                Unblock
+                              </>
+                            ) : (
+                              <>
+                                <Ban className="h-4 w-4 mr-1" />
+                                Block
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Bookings List */}
+              {selectedDateData.bookings.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-3">Bookings</h3>
+                  <div className="space-y-2">
+                    {selectedDateData.bookings.map(booking => (
+                      <Card 
+                        key={booking.id} 
+                        className="p-3 cursor-pointer hover:bg-accent/50 transition-colors"
+                        onClick={() => navigate(`/booking/${booking.id}`)}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium">
+                                {booking.renter?.first_name} {booking.renter?.last_name || ''}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Clock className="h-4 w-4" />
+                              <span>
+                                {format(new Date(booking.start_at), 'h:mm a')} - {format(new Date(booking.end_at), 'h:mm a')}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <MapPin className="h-4 w-4" />
+                              <span>{booking.spot?.title}</span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <Badge variant={
+                              booking.status === 'completed' ? 'secondary' :
+                              booking.status === 'active' ? 'default' :
+                              booking.status === 'pending' ? 'outline' : 'default'
+                            }>
+                              {booking.status}
+                            </Badge>
+                            <div className="text-sm font-semibold mt-1">
+                              ${booking.total_amount.toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedDateData.bookings.length === 0 && !selectedDateData.isUnavailable && (
+                <Card className="p-6 text-center text-muted-foreground">
+                  <CalendarIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No bookings for this day</p>
+                </Card>
+              )}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
