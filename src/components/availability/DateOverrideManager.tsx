@@ -327,37 +327,39 @@ export const DateOverrideManager = ({
       </div>
 
       {/* Quick Presets */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">Quick select:</span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-muted-foreground shrink-0">Quick:</span>
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={() => applyPreset('next7')}
-          className="h-7 text-xs"
+          className="h-7 text-xs px-2 flex-1"
         >
-          <Ban className="h-3 w-3 mr-1" />
-          Next 7 Days
+          <Ban className="h-3 w-3 sm:mr-1 shrink-0" />
+          <span className="hidden sm:inline">Next </span>7 Days
         </Button>
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={() => applyPreset('weekendsMonth')}
-          className="h-7 text-xs"
+          className="h-7 text-xs px-2 flex-1"
         >
-          <CalendarRange className="h-3 w-3 mr-1" />
-          Weekends ({format(previewMonth, 'MMM')})
+          <CalendarRange className="h-3 w-3 sm:mr-1 shrink-0" />
+          <span className="hidden sm:inline">Weekends</span>
+          <span className="sm:hidden">Wknd</span>
         </Button>
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={() => applyPreset('weekdaysMonth')}
-          className="h-7 text-xs"
+          className="h-7 text-xs px-2 flex-1"
         >
-          <Sparkles className="h-3 w-3 mr-1" />
-          Weekdays ({format(previewMonth, 'MMM')})
+          <Sparkles className="h-3 w-3 sm:mr-1 shrink-0" />
+          <span className="hidden sm:inline">Weekdays</span>
+          <span className="sm:hidden">M-F</span>
         </Button>
       </div>
 
