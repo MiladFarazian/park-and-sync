@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Upload, Trash2 } from "lucide-react";
+import { ArrowLeft, Upload, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,9 +9,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { useMode } from "@/contexts/ModeContext";
-import ModeSwitcher from "@/components/layout/ModeSwitcher";
-import parkzyLogo from "@/assets/parkzy-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { ImageCropDialog } from "@/components/profile/ImageCropDialog";
 
@@ -199,32 +196,17 @@ const ManageAccount = () => {
     return 'U';
   };
 
-  const { mode, setMode } = useMode();
-
-  const handleLogoClick = () => {
-    if (mode === 'host') {
-      setMode('driver');
-    }
-    navigate('/');
-  };
-
   return (
     <div className="bg-background">
-      {/* Header with logo and mode toggle */}
-      <div className="sticky top-0 z-50 bg-background border-b">
-        <div className="container max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <button onClick={handleLogoClick} className="flex items-center">
-            <img src={parkzyLogo} alt="Parkzy" className="h-8" />
-          </button>
-          <ModeSwitcher />
-        </div>
-      </div>
-
       <div className="container max-w-2xl mx-auto p-4 space-y-6 pb-20">
-        {/* Page subheading */}
-        <div>
-          <h1 className="text-2xl font-bold">Account</h1>
-          <p className="text-muted-foreground">Update your profile and settings</p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/profile')}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">Manage Account</h1>
+            <p className="text-muted-foreground">Update your profile and settings</p>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit}>
