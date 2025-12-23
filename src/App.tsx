@@ -14,6 +14,7 @@ import ListSpot from "./pages/ListSpot";
 import Activity from "./pages/Activity";
 import Dashboard from "./pages/Dashboard";
 import HostHome from "./pages/HostHome";
+import HostCalendar from "./pages/HostCalendar";
 import Messages from "./pages/Messages";
 import SearchResults from "./pages/SearchResults";
 import SpotDetail from "./pages/SpotDetail";
@@ -103,6 +104,7 @@ const App = () => {
                   <Route path="/activity" element={<Activity />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/host-home" element={<HostHome />} />
+                  <Route path="/host-calendar" element={<HostCalendar />} />
                   <Route path="/messages" element={<Messages />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/reviews" element={<Reviews />} />
