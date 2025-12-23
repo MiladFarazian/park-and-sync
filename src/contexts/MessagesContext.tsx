@@ -25,7 +25,7 @@ export interface Message {
   client_id?: string | null;
 }
 
-interface MessagesContextType {
+export interface MessagesContextType {
   conversations: Conversation[];
   loading: boolean;
   markAsRead: (senderId: string) => Promise<void>;
@@ -34,7 +34,7 @@ interface MessagesContextType {
   upsertConversationFromMessage: (msg: Message) => void;
 }
 
-const MessagesContext = createContext<MessagesContextType | null>(null);
+export const MessagesContext = createContext<MessagesContextType | null>(null);
 
 // Helper to format display name (First Name + Last Initial)
 const formatDisplayName = (firstName?: string | null, lastName?: string | null): string => {
