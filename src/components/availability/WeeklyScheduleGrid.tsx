@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Undo2, Briefcase, CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export interface AvailabilityRule {
   day_of_week: number;
@@ -66,12 +69,20 @@ export const WeeklyScheduleGrid = ({
     return initial;
   });
 
+  // History for undo
+  const [history, setHistory] = useState<boolean[][][]>([]);
+
   // Drag state
   const [isDragging, setIsDragging] = useState(false);
   const [dragMode, setDragMode] = useState<'add' | 'remove'>('add');
   const [dragStart, setDragStart] = useState<{ day: number; slot: number } | null>(null);
   const [dragEnd, setDragEnd] = useState<{ day: number; slot: number } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+
+  // Save current state to history
+  const saveToHistory = useCallback(() => {
+    setHistory(prev => [...prev, grid.map(row => [...row])]);
+  }, [grid]);
 
   // Get cells in drag range
   const getDragRange = useCallback(() => {
@@ -100,6 +111,7 @@ export const WeeklyScheduleGrid = ({
     const range = getDragRange();
     if (range.length === 0) return;
 
+    saveToHistory();
     setGrid(prev => {
       const newGrid = prev.map(row => [...row]);
       range.forEach(({ day, slot }) => {
@@ -107,7 +119,37 @@ export const WeeklyScheduleGrid = ({
       });
       return newGrid;
     });
-  }, [dragStart, getDragRange, dragMode]);
+  }, [dragStart, getDragRange, dragMode, saveToHistory]);
+
+  // Quick actions
+  const set9to5MF = () => {
+    saveToHistory();
+    const newGrid = Array.from({ length: 7 }, () => Array(TOTAL_SLOTS).fill(false));
+    for (let day = 1; day <= 5; day++) {
+      for (let slot = timeToSlot('09:00'); slot < timeToSlot('17:00'); slot++) {
+        newGrid[day][slot] = true;
+      }
+    }
+    setGrid(newGrid);
+    toast.success('Set Mon-Fri 9 AM - 5 PM');
+  };
+
+  const set24_7 = () => {
+    saveToHistory();
+    setGrid(Array.from({ length: 7 }, () => Array(TOTAL_SLOTS).fill(true)));
+    toast.success('Set available 24/7');
+  };
+
+  const undo = () => {
+    if (history.length === 0) {
+      toast.error('Nothing to undo');
+      return;
+    }
+    const previousState = history[history.length - 1];
+    setHistory(prev => prev.slice(0, -1));
+    setGrid(previousState);
+    toast.success('Undid last action');
+  };
 
   // Convert grid to rules
   useEffect(() => {
@@ -320,6 +362,41 @@ export const WeeklyScheduleGrid = ({
           </div>
         </div>
       </Card>
+
+      {/* Quick Actions - Below Grid */}
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="flex-1 h-9"
+          onClick={set24_7}
+        >
+          <CalendarClock className="h-4 w-4 mr-1.5" />
+          24/7
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="flex-1 h-9"
+          onClick={set9to5MF}
+        >
+          <Briefcase className="h-4 w-4 mr-1.5" />
+          M-F 9-5
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="flex-1 h-9"
+          onClick={undo}
+          disabled={history.length === 0}
+        >
+          <Undo2 className="h-4 w-4 mr-1.5" />
+          Undo
+        </Button>
+      </div>
     </div>
   );
 };
