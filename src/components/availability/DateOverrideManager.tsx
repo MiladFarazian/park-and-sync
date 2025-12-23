@@ -53,10 +53,10 @@ export const DateOverrideManager = ({
   const [overrides, setOverrides] = useState(groupByDate(initialOverrides));
   const [previewMonth, setPreviewMonth] = useState<Date>(new Date());
   
-  // Selected date for editing
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // Multi-select: selected dates for batch editing
+  const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
   
-  // Form state for the selected date
+  // Form state for the selected date(s)
   const [isAvailable, setIsAvailable] = useState(true);
   const [useCustomHours, setUseCustomHours] = useState(false);
   const [startTime, setStartTime] = useState('09:00');
@@ -126,57 +126,87 @@ export const DateOverrideManager = ({
     onChange?.(result);
   }, [overrides, onChange]);
 
-  // When selecting a date, load its existing data or reset form
+  // When clicking a date, toggle its selection
   const handleDateClick = (dateStr: string) => {
-    setSelectedDate(dateStr);
-    
-    const existing = overrides[dateStr];
-    if (existing) {
-      setIsAvailable(existing.is_available);
-      setUseCustomHours(!!(existing.start_time && existing.end_time));
-      setStartTime(existing.start_time || '09:00');
-      setEndTime(existing.end_time || '17:00');
-      setCustomRate(existing.custom_rate ?? null);
-    } else {
-      // Reset to defaults
-      setIsAvailable(true);
-      setUseCustomHours(false);
-      setStartTime('09:00');
-      setEndTime('17:00');
-      setCustomRate(null);
-    }
-  };
-
-  // Save the current form state for selected date
-  const saveOverride = () => {
-    if (!selectedDate) return;
-    
-    setOverrides(prev => ({
-      ...prev,
-      [selectedDate]: {
-        is_available: isAvailable,
-        start_time: useCustomHours ? startTime : undefined,
-        end_time: useCustomHours ? endTime : undefined,
-        custom_rate: isAvailable ? customRate : null
+    setSelectedDates(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(dateStr)) {
+        newSet.delete(dateStr);
+      } else {
+        newSet.add(dateStr);
       }
-    }));
-    
-    toast.success(isAvailable ? 'Date marked as available' : 'Date blocked');
-    setSelectedDate(null);
+      return newSet;
+    });
   };
 
-  // Remove an override
+  // Clear all selections
+  const clearSelection = () => {
+    setSelectedDates(new Set());
+    setIsAvailable(true);
+    setUseCustomHours(false);
+    setStartTime('09:00');
+    setEndTime('17:00');
+    setCustomRate(null);
+  };
+
+  // Save the current form state for all selected dates
+  const saveOverrides = () => {
+    if (selectedDates.size === 0) return;
+    
+    setOverrides(prev => {
+      const newOverrides = { ...prev };
+      selectedDates.forEach(dateStr => {
+        newOverrides[dateStr] = {
+          is_available: isAvailable,
+          start_time: useCustomHours ? startTime : undefined,
+          end_time: useCustomHours ? endTime : undefined,
+          custom_rate: isAvailable ? customRate : null
+        };
+      });
+      return newOverrides;
+    });
+    
+    const count = selectedDates.size;
+    toast.success(`${count} date${count > 1 ? 's' : ''} ${isAvailable ? 'marked as available' : 'blocked'}`);
+    clearSelection();
+  };
+
+  // Remove overrides for all selected dates
+  const removeSelectedOverrides = () => {
+    if (selectedDates.size === 0) return;
+    
+    setOverrides(prev => {
+      const newOverrides = { ...prev };
+      selectedDates.forEach(dateStr => {
+        delete newOverrides[dateStr];
+      });
+      return newOverrides;
+    });
+    
+    const count = selectedDates.size;
+    toast.success(`${count} override${count > 1 ? 's' : ''} removed`);
+    clearSelection();
+  };
+
+  // Remove a single override
   const removeOverride = (dateStr: string) => {
     const newOverrides = { ...overrides };
     delete newOverrides[dateStr];
     setOverrides(newOverrides);
     toast.success('Override removed');
-    if (selectedDate === dateStr) {
-      setSelectedDate(null);
-    }
+    setSelectedDates(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(dateStr);
+      return newSet;
+    });
   };
 
   const sortedDates = Object.keys(overrides).sort();
+  const selectedDatesArray = Array.from(selectedDates).sort();
+  const hasSelection = selectedDates.size > 0;
+
+  // Check if any selected dates have existing overrides
+  const selectedHaveOverrides = selectedDatesArray.some(date => overrides[date]);
 
   return (
     <div className="space-y-4">
@@ -207,6 +237,11 @@ export const DateOverrideManager = ({
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
+            {hasSelection && (
+              <Badge variant="secondary" className="text-xs">
+                {selectedDates.size} selected
+              </Badge>
+            )}
           </div>
           
           {/* Day headers */}
@@ -226,7 +261,7 @@ export const DateOverrideManager = ({
               const isAvailableOverride = availableDateSet.has(dateStr);
               const isPast = isBefore(date, startOfDay(new Date()));
               const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
-              const isSelected = selectedDate === dateStr;
+              const isSelected = selectedDates.has(dateStr);
               const isClickable = isCurrentMonth && !isPast;
               
               return (
@@ -240,16 +275,17 @@ export const DateOverrideManager = ({
                     !isCurrentMonth && "opacity-30",
                     isPast && "opacity-40 cursor-not-allowed",
                     isToday && "ring-1 ring-primary ring-offset-1 ring-offset-background",
-                    isSelected && "ring-2 ring-primary",
-                    isBlocked && "bg-destructive/20",
-                    isAvailableOverride && "bg-green-500/20",
-                    isClickable && !isBlocked && !isAvailableOverride && "hover:bg-muted cursor-pointer"
+                    isSelected && "ring-2 ring-primary bg-primary/10",
+                    !isSelected && isBlocked && "bg-destructive/20",
+                    !isSelected && isAvailableOverride && "bg-green-500/20",
+                    isClickable && !isBlocked && !isAvailableOverride && !isSelected && "hover:bg-muted cursor-pointer"
                   )}
                 >
                   <span className={cn(
                     "w-7 h-7 flex items-center justify-center rounded-full text-xs",
-                    isBlocked && "bg-destructive text-destructive-foreground font-medium",
-                    isAvailableOverride && "bg-green-500 text-white font-medium"
+                    !isSelected && isBlocked && "bg-destructive text-destructive-foreground font-medium",
+                    !isSelected && isAvailableOverride && "bg-green-500 text-white font-medium",
+                    isSelected && "bg-primary text-primary-foreground font-medium"
                   )}>
                     {format(date, 'd')}
                   </span>
@@ -261,33 +297,55 @@ export const DateOverrideManager = ({
           {/* Legend */}
           <div className="flex items-center justify-end gap-4 pt-3 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-primary" />
+              Selected
+            </div>
+            <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
-              Available override
+              Available
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-destructive" />
-              Unavailable override
+              Unavailable
             </div>
           </div>
+          
+          {/* Multi-select hint */}
+          {!hasSelection && (
+            <p className="text-xs text-muted-foreground text-center pt-2">
+              Click dates to select. Select multiple dates to apply the same settings.
+            </p>
+          )}
         </CardContent>
       </Card>
 
-      {/* Selected Date Editor */}
-      {selectedDate && (
+      {/* Selected Dates Editor */}
+      {hasSelection && (
         <Card className="border-primary/50">
           <CardContent className="p-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold">
-                {format(new Date(selectedDate + 'T00:00:00'), 'MMM d, yyyy')}
-              </h3>
+              <div>
+                <h3 className="font-semibold">
+                  {selectedDates.size === 1 
+                    ? format(new Date(selectedDatesArray[0] + 'T00:00:00'), 'MMM d, yyyy')
+                    : `${selectedDates.size} dates selected`
+                  }
+                </h3>
+                {selectedDates.size > 1 && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {selectedDatesArray.slice(0, 3).map(d => format(new Date(d + 'T00:00:00'), 'MMM d')).join(', ')}
+                    {selectedDates.size > 3 && ` +${selectedDates.size - 3} more`}
+                  </p>
+                )}
+              </div>
               <Button
                 type="button"
                 variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setSelectedDate(null)}
+                size="sm"
+                onClick={clearSelection}
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4 mr-1" />
+                Clear
               </Button>
             </div>
 
@@ -389,14 +447,14 @@ export const DateOverrideManager = ({
 
             {/* Save / Remove buttons */}
             <div className="flex gap-2 pt-2">
-              <Button onClick={saveOverride} className="flex-1">
-                Save Override
+              <Button onClick={saveOverrides} className="flex-1">
+                Apply to {selectedDates.size} Date{selectedDates.size > 1 ? 's' : ''}
               </Button>
-              {overrides[selectedDate] && (
+              {selectedHaveOverrides && (
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => removeOverride(selectedDate)}
+                  onClick={removeSelectedOverrides}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -407,7 +465,7 @@ export const DateOverrideManager = ({
       )}
 
       {/* List of existing overrides */}
-      {sortedDates.length > 0 && !selectedDate && (
+      {sortedDates.length > 0 && !hasSelection && (
         <div className="space-y-2">
           <Label className="text-sm text-muted-foreground">Existing Overrides</Label>
           <div className="flex flex-wrap gap-2">
@@ -445,10 +503,10 @@ export const DateOverrideManager = ({
       )}
 
       {/* Empty state hint */}
-      {sortedDates.length === 0 && !selectedDate && (
+      {sortedDates.length === 0 && !hasSelection && (
         <div className="text-center text-sm text-muted-foreground py-4">
           <CalendarIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
-          <p>Select a date above to add an override</p>
+          <p>Select dates above to add overrides</p>
         </div>
       )}
     </div>
