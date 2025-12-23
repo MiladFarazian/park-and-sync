@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Calendar, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { AvailabilityManager, AvailabilityRule } from '@/components/availability/AvailabilityManager';
+import { WeeklyScheduleGrid, AvailabilityRule } from '@/components/availability/WeeklyScheduleGrid';
 import { DateOverrideManager, DateOverride } from '@/components/availability/DateOverrideManager';
 
 const EditSpotAvailability = () => {
@@ -18,7 +18,7 @@ const EditSpotAvailability = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [spotTitle, setSpotTitle] = useState('');
   const [spotBaseRate, setSpotBaseRate] = useState(0);
-  const [activeTab, setActiveTab] = useState('weekly');
+  const [activeTab, setActiveTab] = useState('dates');
 
   const [user, setUser] = useState<any>(null);
 
@@ -228,29 +228,15 @@ const EditSpotAvailability = () => {
           <CardContent className="p-6">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="weekly" className="gap-2">
-                  <Clock className="h-4 w-4" />
-                  Weekly Schedule
-                </TabsTrigger>
                 <TabsTrigger value="dates" className="gap-2">
                   <Calendar className="h-4 w-4" />
                   Date Override
                 </TabsTrigger>
+                <TabsTrigger value="weekly" className="gap-2">
+                  <Clock className="h-4 w-4" />
+                  Weekly Schedule
+                </TabsTrigger>
               </TabsList>
-
-              <TabsContent value="weekly" className="space-y-4">
-                <div className="mb-4">
-                  <h3 className="font-semibold mb-1">Recurring Weekly Schedule</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Set your availability windows and custom pricing for each day.
-                  </p>
-                </div>
-                <AvailabilityManager
-                  initialRules={availabilityRules}
-                  onChange={setAvailabilityRules}
-                  baseRate={spotBaseRate}
-                />
-              </TabsContent>
 
               <TabsContent value="dates" className="space-y-4">
                 <div className="mb-4">
@@ -262,6 +248,20 @@ const EditSpotAvailability = () => {
                 <DateOverrideManager
                   initialOverrides={dateOverrides}
                   onChange={setDateOverrides}
+                  baseRate={spotBaseRate}
+                />
+              </TabsContent>
+
+              <TabsContent value="weekly" className="space-y-4">
+                <div className="mb-4">
+                  <h3 className="font-semibold mb-1">Recurring Weekly Schedule</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Drag to select your available hours for each day of the week.
+                  </p>
+                </div>
+                <WeeklyScheduleGrid
+                  initialRules={availabilityRules}
+                  onChange={setAvailabilityRules}
                   baseRate={spotBaseRate}
                 />
               </TabsContent>
