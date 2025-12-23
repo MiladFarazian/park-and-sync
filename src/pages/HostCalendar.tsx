@@ -497,33 +497,14 @@ const HostCalendar = () => {
 
               {/* Manage Availability Link */}
               {spots.length > 0 && (
-                <div className="space-y-2">
-                  {spots.map(spot => {
-                    const spotOverride = selectedDateData.overrides.find(o => o.spot_id === spot.id && !o.is_available);
-                    const isBlocked = !!spotOverride;
-                    
-                    return (
-                      <Card 
-                        key={spot.id} 
-                        className="p-3 cursor-pointer hover:bg-accent/50 transition-colors"
-                        onClick={() => navigate(`/edit-spot/${spot.id}/availability`)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-medium">{spot.title}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {isBlocked ? 'Blocked this day' : `$${spot.hourly_rate}/hr`}
-                            </div>
-                          </div>
-                          <Button variant="ghost" size="sm">
-                            <Settings className="h-4 w-4 mr-1" />
-                            Manage
-                          </Button>
-                        </div>
-                      </Card>
-                    );
-                  })}
-                </div>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => navigate(`/manage-availability?date=${format(selectedDate, 'yyyy-MM-dd')}`)}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Manage Availability for This Day
+                </Button>
               )}
 
               {/* Bookings List */}
