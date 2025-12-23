@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
 import EarningsAnalytics from '@/components/host/EarningsAnalytics';
 import RecentReviews from '@/components/host/RecentReviews';
+import UpcomingReservationsWidget from '@/components/host/UpcomingReservationsWidget';
 
 const HostHome = () => {
   const navigate = useNavigate();
@@ -191,7 +192,8 @@ const HostHome = () => {
 
       <ActiveBookingBanner />
 
-      {/* Stats Cards */}
+      {/* Upcoming Reservations Widget */}
+      <UpcomingReservationsWidget />
       <div className="grid grid-cols-1 gap-4 animate-fade-in">
         <Card className="p-6 bg-primary text-primary-foreground">
           <div className="space-y-2">

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Calendar, MessageCircle, User, List } from 'lucide-react';
+import { Home, Calendar, MessageCircle, User, List, CalendarDays } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useMode } from '@/contexts/ModeContext';
@@ -16,7 +16,7 @@ const BottomNavigation = () => {
     ? [
         { id: 'home', label: 'Home', icon: Home, path: '/host-home' },
         { id: 'listings', label: 'Listings', icon: List, path: '/dashboard' },
-        { id: 'reservations', label: 'Reservations', icon: Calendar, path: '/activity' },
+        { id: 'calendar', label: 'Calendar', icon: CalendarDays, path: '/host-calendar' },
         { id: 'messages', label: 'Messages', icon: MessageCircle, path: '/messages' },
         { id: 'account', label: 'Account', icon: User, path: '/profile' },
       ]
