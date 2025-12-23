@@ -5,8 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Calendar as CalendarIcon, Trash2, X, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react';
-import { format, isBefore, startOfDay, addMonths, startOfMonth, endOfMonth, getDay, addDays, eachDayOfInterval } from 'date-fns';
+import { Calendar as CalendarIcon, Trash2, X, ChevronLeft, ChevronRight, DollarSign, MousePointer, ArrowLeftRight } from 'lucide-react';
+import { format, isBefore, startOfDay, addMonths, startOfMonth, endOfMonth, getDay, addDays, eachDayOfInterval, isAfter, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { AvailabilityTimePicker } from './AvailabilityTimePicker';
@@ -25,6 +25,8 @@ interface DateOverrideManagerProps {
   onChange?: (overrides: DateOverride[]) => void;
   baseRate?: number;
 }
+
+type SelectionMode = 'click' | 'range';
 
 export const DateOverrideManager = ({ 
   initialOverrides = [], 
@@ -53,8 +55,14 @@ export const DateOverrideManager = ({
   const [overrides, setOverrides] = useState(groupByDate(initialOverrides));
   const [previewMonth, setPreviewMonth] = useState<Date>(new Date());
   
+  // Selection mode: click (toggle individual) or range (start → end)
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>('click');
+  
   // Multi-select: selected dates for batch editing
   const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
+  
+  // Range selection state
+  const [rangeStart, setRangeStart] = useState<string | null>(null);
   
   // Form state for the selected date(s)
   const [isAvailable, setIsAvailable] = useState(true);
@@ -126,27 +134,64 @@ export const DateOverrideManager = ({
     onChange?.(result);
   }, [overrides, onChange]);
 
-  // When clicking a date, toggle its selection
+  // Handle date click based on selection mode
   const handleDateClick = (dateStr: string) => {
-    setSelectedDates(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(dateStr)) {
-        newSet.delete(dateStr);
+    if (selectionMode === 'click') {
+      // Toggle individual date selection
+      setSelectedDates(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(dateStr)) {
+          newSet.delete(dateStr);
+        } else {
+          newSet.add(dateStr);
+        }
+        return newSet;
+      });
+    } else {
+      // Range mode
+      if (!rangeStart) {
+        // First click: set range start
+        setRangeStart(dateStr);
+        setSelectedDates(new Set([dateStr]));
       } else {
-        newSet.add(dateStr);
+        // Second click: complete the range
+        const start = parseISO(rangeStart);
+        const end = parseISO(dateStr);
+        
+        // Ensure start is before end
+        const [rangeStartDate, rangeEndDate] = isBefore(start, end) ? [start, end] : [end, start];
+        
+        // Get all dates in range (excluding past dates)
+        const today = startOfDay(new Date());
+        const datesInRange = eachDayOfInterval({ start: rangeStartDate, end: rangeEndDate })
+          .filter(date => !isBefore(date, today))
+          .map(date => format(date, 'yyyy-MM-dd'));
+        
+        setSelectedDates(new Set(datesInRange));
+        setRangeStart(null);
+        
+        if (datesInRange.length > 0) {
+          toast.success(`Selected ${datesInRange.length} dates`);
+        }
       }
-      return newSet;
-    });
+    }
   };
 
   // Clear all selections
   const clearSelection = () => {
     setSelectedDates(new Set());
+    setRangeStart(null);
     setIsAvailable(true);
     setUseCustomHours(false);
     setStartTime('09:00');
     setEndTime('17:00');
     setCustomRate(null);
+  };
+
+  // Switch selection mode
+  const switchMode = (mode: SelectionMode) => {
+    setSelectionMode(mode);
+    clearSelection();
   };
 
   // Save the current form state for all selected dates
@@ -208,8 +253,38 @@ export const DateOverrideManager = ({
   // Check if any selected dates have existing overrides
   const selectedHaveOverrides = selectedDatesArray.some(date => overrides[date]);
 
+  // Check if a date is in the pending range (between rangeStart and hovered date)
+  const isInPendingRange = (dateStr: string) => {
+    if (!rangeStart || selectionMode !== 'range') return false;
+    return selectedDates.has(dateStr);
+  };
+
   return (
     <div className="space-y-4">
+      {/* Selection Mode Toggle */}
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant={selectionMode === 'click' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => switchMode('click')}
+          className="flex-1"
+        >
+          <MousePointer className="h-4 w-4 mr-1.5" />
+          Click to Select
+        </Button>
+        <Button
+          type="button"
+          variant={selectionMode === 'range' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => switchMode('range')}
+          className="flex-1"
+        >
+          <ArrowLeftRight className="h-4 w-4 mr-1.5" />
+          Select Range
+        </Button>
+      </div>
+
       {/* Calendar */}
       <Card>
         <CardContent className="p-4">
@@ -237,11 +312,18 @@ export const DateOverrideManager = ({
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
-            {hasSelection && (
-              <Badge variant="secondary" className="text-xs">
-                {selectedDates.size} selected
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {rangeStart && selectionMode === 'range' && (
+                <Badge variant="outline" className="text-xs">
+                  Start: {format(parseISO(rangeStart), 'MMM d')}
+                </Badge>
+              )}
+              {hasSelection && (
+                <Badge variant="secondary" className="text-xs">
+                  {selectedDates.size} selected
+                </Badge>
+              )}
+            </div>
           </div>
           
           {/* Day headers */}
@@ -262,6 +344,7 @@ export const DateOverrideManager = ({
               const isPast = isBefore(date, startOfDay(new Date()));
               const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
               const isSelected = selectedDates.has(dateStr);
+              const isRangeStart = rangeStart === dateStr;
               const isClickable = isCurrentMonth && !isPast;
               
               return (
@@ -276,6 +359,7 @@ export const DateOverrideManager = ({
                     isPast && "opacity-40 cursor-not-allowed",
                     isToday && "ring-1 ring-primary ring-offset-1 ring-offset-background",
                     isSelected && "ring-2 ring-primary bg-primary/10",
+                    isRangeStart && "ring-2 ring-primary",
                     !isSelected && isBlocked && "bg-destructive/20",
                     !isSelected && isAvailableOverride && "bg-green-500/20",
                     isClickable && !isBlocked && !isAvailableOverride && !isSelected && "hover:bg-muted cursor-pointer"
@@ -285,7 +369,8 @@ export const DateOverrideManager = ({
                     "w-7 h-7 flex items-center justify-center rounded-full text-xs",
                     !isSelected && isBlocked && "bg-destructive text-destructive-foreground font-medium",
                     !isSelected && isAvailableOverride && "bg-green-500 text-white font-medium",
-                    isSelected && "bg-primary text-primary-foreground font-medium"
+                    isSelected && "bg-primary text-primary-foreground font-medium",
+                    isRangeStart && !isSelected && "bg-primary/50 text-primary-foreground font-medium"
                   )}>
                     {format(date, 'd')}
                   </span>
@@ -310,17 +395,25 @@ export const DateOverrideManager = ({
             </div>
           </div>
           
-          {/* Multi-select hint */}
-          {!hasSelection && (
+          {/* Selection hint */}
+          {!hasSelection && !rangeStart && (
             <p className="text-xs text-muted-foreground text-center pt-2">
-              Click dates to select. Select multiple dates to apply the same settings.
+              {selectionMode === 'click' 
+                ? 'Click dates to toggle selection'
+                : 'Click a start date, then click an end date'
+              }
+            </p>
+          )}
+          {selectionMode === 'range' && rangeStart && (
+            <p className="text-xs text-primary text-center pt-2 font-medium">
+              Now click an end date to complete the range
             </p>
           )}
         </CardContent>
       </Card>
 
       {/* Selected Dates Editor */}
-      {hasSelection && (
+      {hasSelection && !rangeStart && (
         <Card className="border-primary/50">
           <CardContent className="p-4 space-y-4">
             <div className="flex items-center justify-between">
@@ -503,7 +596,7 @@ export const DateOverrideManager = ({
       )}
 
       {/* Empty state hint */}
-      {sortedDates.length === 0 && !hasSelection && (
+      {sortedDates.length === 0 && !hasSelection && !rangeStart && (
         <div className="text-center text-sm text-muted-foreground py-4">
           <CalendarIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
           <p>Select dates above to add overrides</p>
