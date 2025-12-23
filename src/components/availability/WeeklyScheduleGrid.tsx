@@ -326,10 +326,26 @@ export const WeeklyScheduleGrid = ({
         </Button>
       </div>
 
-      {/* Instructions */}
-      <p className="text-xs text-muted-foreground">
-        Click and drag to select available hours. Click on selected cells to remove.
-      </p>
+      {/* Instructions & Legend */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <p className="text-xs text-muted-foreground">
+          Click and drag to select available hours. Click on selected cells to remove.
+        </p>
+        <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-primary" />
+            <span className="text-muted-foreground">Available</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-muted border border-border" />
+            <span className="text-muted-foreground">Unavailable</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-primary/70" />
+            <span className="text-muted-foreground">Selecting</span>
+          </div>
+        </div>
+      </div>
 
       {/* Grid Container */}
       <Card className="overflow-hidden">
