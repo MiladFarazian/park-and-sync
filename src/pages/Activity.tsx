@@ -623,7 +623,7 @@ const Activity = () => {
   return <div className="bg-background">
       <div className="p-4 space-y-4">
         <div>
-          <h1 className="text-2xl font-bold">{mode === 'host' ? 'Reservations' : 'My Bookings'}</h1>
+          <h1 className="text-2xl font-bold">{mode === 'host' ? 'Reservations' : 'My Reservations'}</h1>
           <p className="text-sm text-muted-foreground">
             {mode === 'host' ? 'Manage reservations at your spots' : 'View your parking reservations'}
           </p>
