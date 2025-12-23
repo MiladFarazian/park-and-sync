@@ -41,6 +41,7 @@ import EditSpot from "./pages/EditSpot";
 import Reviews from "./pages/Reviews";
 import AdminDashboard from "./pages/AdminDashboard";
 import ManageAvailabilitySelect from "./pages/ManageAvailabilitySelect";
+import BulkAvailabilityEditor from "./pages/BulkAvailabilityEditor";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ModeProvider } from "./contexts/ModeContext";
 import { MessagesProvider } from "./contexts/MessagesContext";
@@ -107,6 +108,7 @@ const App = () => {
                   <Route path="/host-home" element={<HostHome />} />
                   <Route path="/host-calendar" element={<HostCalendar />} />
                   <Route path="/manage-availability" element={<ManageAvailabilitySelect />} />
+                  <Route path="/manage-availability/bulk" element={<BulkAvailabilityEditor />} />
                   <Route path="/messages" element={<Messages />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/reviews" element={<Reviews />} />
