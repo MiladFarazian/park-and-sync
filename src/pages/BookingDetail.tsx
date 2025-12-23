@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { ExtendParkingDialog } from '@/components/booking/ExtendParkingDialog';
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, AlertTriangle, CheckCircle2, Copy, TimerReset, Flag } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, AlertTriangle, CheckCircle2, Copy, ClockArrowUp, Flag } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -585,7 +585,7 @@ const BookingDetailContent = () => {
               )}
               {canExtend && (
                 <Button size="sm" variant="outline" onClick={() => setShowExtendDialog(true)}>
-                  <TimerReset className="h-4 w-4 mr-1" />
+                  <ClockArrowUp className="h-4 w-4 mr-1" />
                   Extend
                 </Button>
               )}
@@ -651,7 +651,7 @@ const BookingDetailContent = () => {
             {extensionChargesToShow > 0.01 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground flex items-center gap-1">
-                  <TimerReset className="h-3 w-3" />
+                  <ClockArrowUp className="h-3 w-3" />
                   Extension Charges
                 </span>
                 <span className="font-medium">${extensionChargesToShow.toFixed(2)}</span>
