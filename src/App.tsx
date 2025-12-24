@@ -46,6 +46,7 @@ import SupportHome from "./pages/SupportHome";
 import SupportMessages from "./pages/SupportMessages";
 import SupportReservations from "./pages/SupportReservations";
 import SupportAccount from "./pages/SupportAccount";
+import SupportUserDetail from "./pages/SupportUserDetail";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ModeProvider } from "./contexts/ModeContext";
 import { MessagesProvider } from "./contexts/MessagesContext";
@@ -128,6 +129,7 @@ const App = () => {
                     <Route path="/support-messages" element={<SupportMessages />} />
                     <Route path="/support-reservations" element={<SupportReservations />} />
                     <Route path="/support-account" element={<SupportAccount />} />
+                    <Route path="/support-user/:userId" element={<SupportUserDetail />} />
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>
