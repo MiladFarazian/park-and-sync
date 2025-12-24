@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { Search, Send, Loader2, ArrowLeft, Paperclip, X, Check, CheckCheck, Shield } from 'lucide-react';
+import { Search, Send, Loader2, ArrowLeft, Paperclip, X, Check, CheckCheck, Shield, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
@@ -125,6 +125,7 @@ function SupportChatPane({
   onBack: () => void;
   userProfile: ConversationUser;
 }) {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [uploadingMedia, setUploadingMedia] = useState(false);
@@ -307,22 +308,32 @@ function SupportChatPane({
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="md:hidden" onClick={onBack}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <Avatar>
-            <AvatarImage src={userProfile.avatar_url || undefined} />
-            <AvatarFallback>
-              {formatDisplayName(userProfile.first_name, userProfile.last_name).split(' ').map(n => n[0]).join('')}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="font-semibold">
-              {formatDisplayName(userProfile.first_name, userProfile.last_name)}
-            </p>
-            <p className="text-xs text-muted-foreground">{userProfile.email}</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="md:hidden" onClick={onBack}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <Avatar>
+              <AvatarImage src={userProfile.avatar_url || undefined} />
+              <AvatarFallback>
+                {formatDisplayName(userProfile.first_name, userProfile.last_name).split(' ').map(n => n[0]).join('')}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-semibold">
+                {formatDisplayName(userProfile.first_name, userProfile.last_name)}
+              </p>
+              <p className="text-xs text-muted-foreground">{userProfile.email}</p>
+            </div>
           </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => navigate(`/support-user/${userId}`)}
+          >
+            <User className="h-4 w-4 mr-2" />
+            View Profile
+          </Button>
         </div>
       </div>
       

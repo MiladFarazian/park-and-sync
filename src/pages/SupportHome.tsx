@@ -12,7 +12,8 @@ import {
   Calendar,
   ChevronRight,
   Shield,
-  Clock
+  Clock,
+  User
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -22,6 +23,7 @@ interface Report {
   details: string | null;
   status: string;
   created_at: string;
+  reporter_id: string;
   spot: {
     id: string;
     title: string;
@@ -39,6 +41,7 @@ interface TowRequest {
   overstay_detected_at: string;
   start_at: string;
   end_at: string;
+  renter_id: string;
   spot: {
     id: string;
     title: string;
@@ -68,7 +71,7 @@ export default function SupportHome() {
       const { data, error } = await supabase
         .from('spot_reports')
         .select(`
-          id, reason, details, status, created_at,
+          id, reason, details, status, created_at, reporter_id,
           spot:spots!spot_reports_spot_id_fkey (id, title, address),
           reporter:profiles!spot_reports_reporter_id_fkey (first_name, last_name)
         `)
@@ -91,7 +94,7 @@ export default function SupportHome() {
       const { data, error } = await supabase
         .from('bookings')
         .select(`
-          id, overstay_action, overstay_detected_at, start_at, end_at,
+          id, overstay_action, overstay_detected_at, start_at, end_at, renter_id,
           spot:spots!bookings_spot_id_fkey (id, title, address),
           renter:profiles!bookings_renter_id_fkey (first_name, last_name)
         `)
@@ -218,21 +221,32 @@ export default function SupportHome() {
               {reports.map((report) => (
                 <div 
                   key={report.id}
-                  className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 cursor-pointer transition-colors"
-                  onClick={() => navigate(`/spot/${report.spot?.id}`)}
+                  className="p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="destructive" className="text-xs">
-                        {getReasonLabel(report.reason)}
-                      </Badge>
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1 cursor-pointer" onClick={() => navigate(`/spot/${report.spot?.id}`)}>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="destructive" className="text-xs">
+                          {getReasonLabel(report.reason)}
+                        </Badge>
+                      </div>
+                      <p className="font-medium truncate mt-1">{report.spot?.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Reported by {report.reporter?.first_name || 'Anonymous'} • {format(new Date(report.created_at), 'MMM d, h:mm a')}
+                      </p>
                     </div>
-                    <p className="font-medium truncate mt-1">{report.spot?.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Reported by {report.reporter?.first_name || 'Anonymous'} • {format(new Date(report.created_at), 'MMM d, h:mm a')}
-                    </p>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/support-user/${report.reporter_id}`);
+                      }}
+                    >
+                      <User className="h-4 w-4 mr-1" />
+                      Profile
+                    </Button>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 </div>
               ))}
             </div>
@@ -268,22 +282,33 @@ export default function SupportHome() {
               {towRequests.map((tow) => (
                 <div 
                   key={tow.id}
-                  className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 cursor-pointer transition-colors"
-                  onClick={() => navigate(`/booking/${tow.id}`)}
+                  className="p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <Badge className="bg-amber-500 text-white text-xs">
-                        <Clock className="h-3 w-3 mr-1" />
-                        Towing
-                      </Badge>
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1 cursor-pointer" onClick={() => navigate(`/booking/${tow.id}`)}>
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-amber-500 text-white text-xs">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Towing
+                        </Badge>
+                      </div>
+                      <p className="font-medium truncate mt-1">{tow.spot?.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {tow.renter?.first_name} {tow.renter?.last_name} • Detected {tow.overstay_detected_at ? format(new Date(tow.overstay_detected_at), 'MMM d, h:mm a') : 'Unknown'}
+                      </p>
                     </div>
-                    <p className="font-medium truncate mt-1">{tow.spot?.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {tow.renter?.first_name} {tow.renter?.last_name} • Detected {tow.overstay_detected_at ? format(new Date(tow.overstay_detected_at), 'MMM d, h:mm a') : 'Unknown'}
-                    </p>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/support-user/${tow.renter_id}`);
+                      }}
+                    >
+                      <User className="h-4 w-4 mr-1" />
+                      Profile
+                    </Button>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 </div>
               ))}
             </div>
