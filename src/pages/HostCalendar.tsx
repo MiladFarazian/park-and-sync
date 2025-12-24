@@ -45,8 +45,7 @@ interface CalendarOverride {
   custom_rate?: number;
 }
 
-type MainTab = 'calendar' | 'reservations';
-type ViewMode = 'month' | 'week';
+type ViewMode = 'month' | 'week' | 'reservations';
 
 const HostCalendar = () => {
   const navigate = useNavigate();
@@ -54,13 +53,10 @@ const HostCalendar = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  // Main tab state - calendar or reservations
-  const initialTab = searchParams.get('tab') === 'reservations' ? 'reservations' : 'calendar';
-  const [mainTab, setMainTab] = useState<MainTab>(initialTab);
-  
+  const initialViewMode = searchParams.get('tab') === 'reservations' ? 'reservations' : 'month';
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [currentWeek, setCurrentWeek] = useState(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
   const [spots, setSpots] = useState<SpotWithRate[]>([]);
   const [bookings, setBookings] = useState<BookingForCalendar[]>([]);
   const [allBookings, setAllBookings] = useState<any[]>([]);
@@ -76,9 +72,8 @@ const HostCalendar = () => {
   const [reviewBooking, setReviewBooking] = useState<any>(null);
   const [userReviews, setUserReviews] = useState<Set<string>>(new Set());
 
-  // Handle main tab change and update URL
-  const handleMainTabChange = (value: string) => {
-    setMainTab(value as MainTab);
+  const handleViewModeChange = (value: string) => {
+    setViewMode(value as ViewMode);
     if (value === 'reservations') {
       setSearchParams({ tab: 'reservations' });
     } else {
@@ -87,10 +82,10 @@ const HostCalendar = () => {
   };
 
   useEffect(() => {
-    // Sync tab from URL on mount/change
+    // Sync view mode from URL on mount/change
     const tabParam = searchParams.get('tab');
     if (tabParam === 'reservations') {
-      setMainTab('reservations');
+      setViewMode('reservations');
     }
   }, [searchParams]);
 
@@ -435,272 +430,260 @@ const HostCalendar = () => {
           <h1 className="text-2xl font-bold">Calendar</h1>
           <p className="text-sm text-muted-foreground">View bookings & availability</p>
         </div>
+        {/* View Toggle - Month / Week / Reservations */}
+        <Tabs value={viewMode} onValueChange={handleViewModeChange}>
+          <TabsList className="h-9">
+            <TabsTrigger value="month" className="px-3">
+              <LayoutGrid className="h-4 w-4" />
+            </TabsTrigger>
+            <TabsTrigger value="week" className="px-3">
+              <CalendarIcon className="h-4 w-4" />
+            </TabsTrigger>
+            <TabsTrigger value="reservations" className="px-3">
+              <List className="h-4 w-4" />
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
-      {/* Main Tabs: Calendar vs Reservations */}
-      <Tabs value={mainTab} onValueChange={handleMainTabChange}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="calendar" className="gap-2">
-            <CalendarIcon className="h-4 w-4" />
-            Calendar
-          </TabsTrigger>
-          <TabsTrigger value="reservations" className="gap-2">
-            <List className="h-4 w-4" />
-            Reservations
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Calendar Tab Content */}
-        <TabsContent value="calendar" className="mt-4 space-y-4">
-          {/* View Toggle */}
-          <div className="flex justify-end">
-            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-              <TabsList className="h-9">
-                <TabsTrigger value="month" className="px-3">
-                  <LayoutGrid className="h-4 w-4" />
-                </TabsTrigger>
-                <TabsTrigger value="week" className="px-3">
-                  <CalendarIcon className="h-4 w-4" />
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+      {/* Calendar Views (Month & Week) */}
+      {/* Calendar Views (Month & Week) */}
+      {(viewMode === 'month' || viewMode === 'week') && (
+        <Card className="p-4">
+          {/* Navigation */}
+          <div className="flex items-center justify-between mb-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => viewMode === 'month' 
+                ? setCurrentMonth(addMonths(currentMonth, -1))
+                : setCurrentWeek(addWeeks(currentWeek, -1))
+              }
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <h2 className="text-xl font-bold">
+              {viewMode === 'month' 
+                ? format(currentMonth, 'MMMM yyyy')
+                : `${format(startOfWeek(currentWeek, { weekStartsOn: 0 }), 'MMM d')} - ${format(endOfWeek(currentWeek, { weekStartsOn: 0 }), 'MMM d, yyyy')}`
+              }
+            </h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => viewMode === 'month'
+                ? setCurrentMonth(addMonths(currentMonth, 1))
+                : setCurrentWeek(addWeeks(currentWeek, 1))
+              }
+            >
+              <ChevronRight className="h-5 w-5" />
+            </Button>
           </div>
 
-          {/* Calendar Card */}
-          <Card className="p-4">
-            {/* Navigation */}
-            <div className="flex items-center justify-between mb-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => viewMode === 'month' 
-                  ? setCurrentMonth(addMonths(currentMonth, -1))
-                  : setCurrentWeek(addWeeks(currentWeek, -1))
-                }
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <h2 className="text-xl font-bold">
-                {viewMode === 'month' 
-                  ? format(currentMonth, 'MMMM yyyy')
-                  : `${format(startOfWeek(currentWeek, { weekStartsOn: 0 }), 'MMM d')} - ${format(endOfWeek(currentWeek, { weekStartsOn: 0 }), 'MMM d, yyyy')}`
-                }
-              </h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => viewMode === 'month'
-                  ? setCurrentMonth(addMonths(currentMonth, 1))
-                  : setCurrentWeek(addWeeks(currentWeek, 1))
-                }
-              >
-                <ChevronRight className="h-5 w-5" />
-              </Button>
+          {/* Day Headers - Month view only */}
+          {viewMode === 'month' && (
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+                <div key={i} className="text-xs text-muted-foreground text-center font-medium py-1">
+                  {day}
+                </div>
+              ))}
             </div>
+          )}
 
-            {/* Day Headers - Month view only */}
-            {viewMode === 'month' && (
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
-                  <div key={i} className="text-xs text-muted-foreground text-center font-medium py-1">
-                    {day}
-                  </div>
+          {/* Calendar Grid */}
+          {loading ? (
+            viewMode === 'month' ? (
+              <div className="grid grid-cols-7 gap-1">
+                {Array.from({ length: 35 }).map((_, i) => (
+                  <Skeleton key={i} className="aspect-square" />
                 ))}
               </div>
-            )}
-
-            {/* Calendar Grid */}
-            {loading ? (
-              viewMode === 'month' ? (
-                <div className="grid grid-cols-7 gap-1">
-                  {Array.from({ length: 35 }).map((_, i) => (
-                    <Skeleton key={i} className="aspect-square" />
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {Array.from({ length: 7 }).map((_, i) => (
-                    <Skeleton key={i} className="h-16 w-full rounded-lg" />
-                  ))}
-                </div>
-              )
-            ) : viewMode === 'month' ? (
-              // Month View
-              <div className="grid grid-cols-7 gap-1">
-                {calendarDays.map(({ date, isCurrentMonth }, index) => {
-                  const { bookings: dayBookings, isUnavailable, rate, isPast, hasBookings } = getDateData(date);
-                  const isTodayDate = isToday(date);
-                  
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => isCurrentMonth && handleDayClick(date)}
-                      disabled={!isCurrentMonth}
-                      className={cn(
-                        "aspect-square p-0.5 rounded-md border transition-all flex flex-col text-left",
-                        !isCurrentMonth && "opacity-30 cursor-default",
-                        isCurrentMonth && "hover:border-primary cursor-pointer",
-                        isTodayDate && "ring-2 ring-primary",
-                        isUnavailable && isCurrentMonth && "bg-destructive/10",
-                        hasBookings && isCurrentMonth && !isUnavailable && "bg-green-500/10",
-                        isPast && isCurrentMonth && "bg-muted/50"
-                      )}
-                    >
-                      {/* Date Number */}
-                      <div className="text-xs font-medium text-center w-full">
-                        {format(date, 'd')}
-                      </div>
-                      
-                      {isCurrentMonth && (
-                        <div className="flex-1 flex flex-col justify-between overflow-hidden">
-                          {/* Rate */}
-                          {rate !== null && !isUnavailable && (
-                            <div className="text-[10px] text-green-600 dark:text-green-400 font-semibold text-center truncate">
-                              ${rate}
-                            </div>
-                          )}
-                          
-                          {/* Unavailable indicator */}
-                          {isUnavailable && (
-                            <div className="text-[8px] text-destructive text-center leading-tight">
-                              Unavail.
-                            </div>
-                          )}
-                          
-                          {/* Bookings */}
-                          {dayBookings.length > 0 && (
-                            <div className="space-y-0.5">
-                              {dayBookings.slice(0, 2).map((booking) => (
-                                <div
-                                  key={booking.id}
-                                  className={cn(
-                                    "text-[8px] leading-tight text-center rounded px-0.5 truncate",
-                                    booking.status === 'completed' ? "bg-muted text-muted-foreground" :
-                                    booking.status === 'active' ? "bg-primary/20 text-primary" :
-                                    "bg-blue-500/20 text-blue-700 dark:text-blue-300"
-                                  )}
-                                >
-                                  {format(new Date(booking.start_at), 'ha')}
-                                </div>
-                              ))}
-                              {dayBookings.length > 2 && (
-                                <div className="text-[8px] text-muted-foreground text-center">
-                                  +{dayBookings.length - 2}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
             ) : (
-              // Week View - Vertical layout for mobile
               <div className="space-y-2">
-                {weekDays.map((date, index) => {
-                  const { bookings: dayBookings, isUnavailable, rate, isPast, hasBookings } = getDateData(date);
-                  const isTodayDate = isToday(date);
-                  
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => handleDayClick(date)}
-                      className={cn(
-                        "w-full p-3 rounded-lg border transition-all flex items-start gap-3 text-left",
-                        "hover:border-primary cursor-pointer",
-                        isTodayDate && "ring-2 ring-primary bg-primary/5",
-                        isUnavailable && !isTodayDate && "bg-destructive/10",
-                        hasBookings && !isUnavailable && !isTodayDate && "bg-green-500/5",
-                        isPast && !isTodayDate && "bg-muted/30"
-                      )}
-                    >
-                      {/* Date column */}
-                      <div className="flex flex-col items-center min-w-[50px]">
-                        <div className="text-xs text-muted-foreground font-medium">
-                          {format(date, 'EEE')}
-                        </div>
-                        <div className={cn(
-                          "text-xl font-bold flex items-center justify-center w-10 h-10 rounded-full",
-                          isTodayDate && "bg-primary text-primary-foreground"
-                        )}>
-                          {format(date, 'd')}
-                        </div>
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                ))}
+              </div>
+            )
+          ) : viewMode === 'month' ? (
+            // Month View
+            <div className="grid grid-cols-7 gap-1">
+              {calendarDays.map(({ date, isCurrentMonth }, index) => {
+                const { bookings: dayBookings, isUnavailable, rate, isPast, hasBookings } = getDateData(date);
+                const isTodayDate = isToday(date);
+                
+                return (
+                  <button
+                    key={index}
+                    onClick={() => isCurrentMonth && handleDayClick(date)}
+                    disabled={!isCurrentMonth}
+                    className={cn(
+                      "aspect-square p-0.5 rounded-md border transition-all flex flex-col text-left",
+                      !isCurrentMonth && "opacity-30 cursor-default",
+                      isCurrentMonth && "hover:border-primary cursor-pointer",
+                      isTodayDate && "ring-2 ring-primary",
+                      isUnavailable && isCurrentMonth && "bg-destructive/10",
+                      hasBookings && isCurrentMonth && !isUnavailable && "bg-green-500/10",
+                      isPast && isCurrentMonth && "bg-muted/50"
+                    )}
+                  >
+                    {/* Date Number */}
+                    <div className="text-xs font-medium text-center w-full">
+                      {format(date, 'd')}
+                    </div>
+                    
+                    {isCurrentMonth && (
+                      <div className="flex-1 flex flex-col justify-between overflow-hidden">
+                        {/* Rate */}
                         {rate !== null && !isUnavailable && (
-                          <div className="text-xs text-green-600 dark:text-green-400 font-semibold mt-1">
-                            ${rate}/hr
+                          <div className="text-[10px] text-green-600 dark:text-green-400 font-semibold text-center truncate">
+                            ${rate}
                           </div>
                         )}
-                      </div>
-                      
-                      {/* Content column */}
-                      <div className="flex-1 min-w-0">
-                        {isUnavailable ? (
-                          <Badge variant="destructive" className="text-xs">
-                            Blocked
-                          </Badge>
-                        ) : dayBookings.length > 0 ? (
-                          <div className="space-y-1.5">
-                            {dayBookings.slice(0, 3).map((booking) => (
+                        
+                        {/* Unavailable indicator */}
+                        {isUnavailable && (
+                          <div className="text-[8px] text-destructive text-center leading-tight">
+                            Unavail.
+                          </div>
+                        )}
+                        
+                        {/* Bookings */}
+                        {dayBookings.length > 0 && (
+                          <div className="space-y-0.5">
+                            {dayBookings.slice(0, 2).map((booking) => (
                               <div
                                 key={booking.id}
                                 className={cn(
-                                  "text-sm px-2 py-1.5 rounded-md flex items-center justify-between gap-2",
-                                  booking.status === 'completed' ? "bg-muted" :
-                                  booking.status === 'active' ? "bg-primary/20" :
-                                  "bg-blue-500/15"
+                                  "text-[8px] leading-tight text-center rounded px-0.5 truncate",
+                                  booking.status === 'completed' ? "bg-muted text-muted-foreground" :
+                                  booking.status === 'active' ? "bg-primary/20 text-primary" :
+                                  "bg-blue-500/20 text-blue-700 dark:text-blue-300"
                                 )}
                               >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <User className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                                  <span className="font-medium truncate">
-                                    {booking.renter?.first_name || 'Guest'}
-                                  </span>
-                                </div>
-                                <div className="text-xs text-muted-foreground flex-shrink-0">
-                                  {format(new Date(booking.start_at), 'h:mm a')}
-                                </div>
+                                {format(new Date(booking.start_at), 'ha')}
                               </div>
                             ))}
-                            {dayBookings.length > 3 && (
-                              <div className="text-xs text-muted-foreground pl-2">
-                                +{dayBookings.length - 3} more
+                            {dayBookings.length > 2 && (
+                              <div className="text-[8px] text-muted-foreground text-center">
+                                +{dayBookings.length - 2}
                               </div>
                             )}
                           </div>
-                        ) : (
-                          <div className="text-sm text-muted-foreground py-1">
-                            {isPast ? 'No bookings' : 'Available'}
-                          </div>
                         )}
                       </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Legend */}
-            <div className="flex flex-wrap items-center justify-center gap-3 mt-4 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded bg-green-500/20 border" />
-                <span>Booked</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded bg-destructive/10 border" />
-                <span>Blocked</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded bg-muted/50 border" />
-                <span>Past</span>
-              </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-          </Card>
-        </TabsContent>
+          ) : (
+            // Week View - Vertical layout for mobile
+            <div className="space-y-2">
+              {weekDays.map((date, index) => {
+                const { bookings: dayBookings, isUnavailable, rate, isPast, hasBookings } = getDateData(date);
+                const isTodayDate = isToday(date);
+                
+                return (
+                  <button
+                    key={index}
+                    onClick={() => handleDayClick(date)}
+                    className={cn(
+                      "w-full p-3 rounded-lg border transition-all flex items-start gap-3 text-left",
+                      "hover:border-primary cursor-pointer",
+                      isTodayDate && "ring-2 ring-primary bg-primary/5",
+                      isUnavailable && !isTodayDate && "bg-destructive/10",
+                      hasBookings && !isUnavailable && !isTodayDate && "bg-green-500/5",
+                      isPast && !isTodayDate && "bg-muted/30"
+                    )}
+                  >
+                    {/* Date column */}
+                    <div className="flex flex-col items-center min-w-[50px]">
+                      <div className="text-xs text-muted-foreground font-medium">
+                        {format(date, 'EEE')}
+                      </div>
+                      <div className={cn(
+                        "text-xl font-bold flex items-center justify-center w-10 h-10 rounded-full",
+                        isTodayDate && "bg-primary text-primary-foreground"
+                      )}>
+                        {format(date, 'd')}
+                      </div>
+                      {rate !== null && !isUnavailable && (
+                        <div className="text-xs text-green-600 dark:text-green-400 font-semibold mt-1">
+                          ${rate}/hr
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Content column */}
+                    <div className="flex-1 min-w-0">
+                      {isUnavailable ? (
+                        <Badge variant="destructive" className="text-xs">
+                          Blocked
+                        </Badge>
+                      ) : dayBookings.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {dayBookings.slice(0, 3).map((booking) => (
+                            <div
+                              key={booking.id}
+                              className={cn(
+                                "text-sm px-2 py-1.5 rounded-md flex items-center justify-between gap-2",
+                                booking.status === 'completed' ? "bg-muted" :
+                                booking.status === 'active' ? "bg-primary/20" :
+                                "bg-blue-500/15"
+                              )}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <User className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                <span className="font-medium truncate">
+                                  {booking.renter?.first_name || 'Guest'}
+                                </span>
+                              </div>
+                              <div className="text-xs text-muted-foreground flex-shrink-0">
+                                {format(new Date(booking.start_at), 'h:mm a')}
+                              </div>
+                            </div>
+                          ))}
+                          {dayBookings.length > 3 && (
+                            <div className="text-xs text-muted-foreground pl-2">
+                              +{dayBookings.length - 3} more
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground py-1">
+                          {isPast ? 'No bookings' : 'Available'}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-        {/* Reservations Tab Content */}
-        <TabsContent value="reservations" className="mt-4 space-y-4">
+          {/* Legend */}
+          <div className="flex flex-wrap items-center justify-center gap-3 mt-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded bg-green-500/20 border" />
+              <span>Booked</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded bg-destructive/10 border" />
+              <span>Blocked</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded bg-muted/50 border" />
+              <span>Past</span>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Reservations View */}
+      {viewMode === 'reservations' && (
+        <div className="space-y-4">
           <Tabs value={reservationsTab} onValueChange={(v) => setReservationsTab(v as 'upcoming' | 'past')}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="upcoming">
@@ -749,8 +732,8 @@ const HostCalendar = () => {
               )}
             </TabsContent>
           </Tabs>
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
 
       {/* Day Detail Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
