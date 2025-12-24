@@ -9,6 +9,8 @@ import NotificationPermissionBanner from './NotificationPermissionBanner';
 import { NotificationBell } from './NotificationBell';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useMode } from '@/contexts/ModeContext';
+import { useSupportRole } from '@/hooks/useSupportRole';
+import { Shield } from 'lucide-react';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -18,17 +20,23 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { mode, setMode } = useMode();
+  const { isSupport } = useSupportRole();
   const isHomePage = location.pathname === '/';
   
   // Pages that need full-width/height without container padding
   const isFullScreenPage =
     location.pathname === '/explore' ||
     location.pathname === '/messages' ||
+    location.pathname === '/support-messages' ||
     location.pathname === '/reviews';
   // Initialize notifications hook to set up realtime listeners
   useNotifications();
   
   const handleLogoClick = () => {
+    if (isSupport) {
+      navigate('/support-home');
+      return;
+    }
     if (mode === 'host') {
       setMode('driver');
     }
@@ -61,7 +69,14 @@ const AppLayout = ({ children }: AppLayoutProps) => {
               className="h-8 cursor-pointer" 
               onClick={handleLogoClick}
             />
-            <ModeSwitcher />
+            {isSupport ? (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                <Shield className="h-3.5 w-3.5" />
+                Support
+              </div>
+            ) : (
+              <ModeSwitcher />
+            )}
           </div>
           <div className="flex items-center gap-2">
             <NotificationBell />
