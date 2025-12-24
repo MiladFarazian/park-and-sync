@@ -432,36 +432,46 @@ const HostCalendar = () => {
           <p className="text-sm text-muted-foreground">View bookings & availability</p>
         </div>
         {/* View Toggle - Month / Week / Reservations */}
-        <TooltipProvider>
-          <Tabs value={viewMode} onValueChange={handleViewModeChange}>
-            <TabsList className="h-9">
+        <Tabs value={viewMode} onValueChange={handleViewModeChange}>
+          <TabsList className="h-9">
+            <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <TabsTrigger value="month" className="px-3">
-                    <LayoutGrid className="h-4 w-4" />
-                  </TabsTrigger>
+                  <span>
+                    <TabsTrigger value="month" className="px-3">
+                      <LayoutGrid className="h-4 w-4" />
+                    </TabsTrigger>
+                  </span>
                 </TooltipTrigger>
                 <TooltipContent>Month view</TooltipContent>
               </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <TabsTrigger value="week" className="px-3">
-                    <CalendarIcon className="h-4 w-4" />
-                  </TabsTrigger>
+                  <span>
+                    <TabsTrigger value="week" className="px-3">
+                      <CalendarIcon className="h-4 w-4" />
+                    </TabsTrigger>
+                  </span>
                 </TooltipTrigger>
                 <TooltipContent>Week view</TooltipContent>
               </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <TabsTrigger value="reservations" className="px-3">
-                    <List className="h-4 w-4" />
-                  </TabsTrigger>
+                  <span>
+                    <TabsTrigger value="reservations" className="px-3">
+                      <List className="h-4 w-4" />
+                    </TabsTrigger>
+                  </span>
                 </TooltipTrigger>
                 <TooltipContent>Reservations</TooltipContent>
               </Tooltip>
-            </TabsList>
-          </Tabs>
-        </TooltipProvider>
+            </TooltipProvider>
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* Calendar Views (Month & Week) */}
