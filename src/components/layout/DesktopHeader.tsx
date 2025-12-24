@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { User, Menu, MessageSquare, Calendar, Home, List } from 'lucide-react';
+import { User, Menu, MessageSquare, Calendar, Home, List, FileText, Headphones } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -15,6 +15,7 @@ import { NotificationBell } from './NotificationBell';
 import { useMode } from '@/contexts/ModeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMessages } from '@/hooks/useMessages';
+import { useSupportRole } from '@/hooks/useSupportRole';
 import { Badge } from '@/components/ui/badge';
 
 const DesktopHeader = () => {
@@ -22,8 +23,13 @@ const DesktopHeader = () => {
   const { mode, setMode } = useMode();
   const { user, signOut } = useAuth();
   const { totalUnreadCount } = useMessages();
+  const { isSupport } = useSupportRole();
 
   const handleLogoClick = () => {
+    if (isSupport) {
+      navigate('/support-home');
+      return;
+    }
     if (mode === 'host') {
       setMode('driver');
     }
@@ -32,19 +38,28 @@ const DesktopHeader = () => {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/');
+    navigate('/auth');
   };
 
-  const navItems = mode === 'host' 
-    ? [
-        { title: 'Dashboard', url: '/host-home', icon: Home },
-        { title: 'Listings', url: '/dashboard', icon: List },
-        { title: 'Calendar', url: '/host-calendar', icon: Calendar },
-      ]
-    : [
-        { title: 'Find Parking', url: '/explore', icon: null },
-        { title: 'My Reservations', url: '/activity', icon: null },
-      ];
+  // Support-specific navigation
+  const supportNavItems = [
+    { title: 'Dashboard', url: '/support-home', icon: Home },
+    { title: 'Reservations', url: '/support-reservations', icon: FileText },
+    { title: 'Messages', url: '/support-messages', icon: MessageSquare },
+  ];
+
+  const navItems = isSupport
+    ? supportNavItems
+    : mode === 'host' 
+      ? [
+          { title: 'Dashboard', url: '/host-home', icon: Home },
+          { title: 'Listings', url: '/dashboard', icon: List },
+          { title: 'Calendar', url: '/host-calendar', icon: Calendar },
+        ]
+      : [
+          { title: 'Find Parking', url: '/explore', icon: null },
+          { title: 'My Reservations', url: '/activity', icon: null },
+        ];
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -79,9 +94,18 @@ const DesktopHeader = () => {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-3">
-          <ModeSwitcher />
+          {/* Show mode switcher only for non-support users */}
+          {!isSupport && <ModeSwitcher />}
           
-          {user && (
+          {/* Show Support badge for support users */}
+          {isSupport && (
+            <Badge variant="secondary" className="gap-1">
+              <Headphones className="h-3 w-3" />
+              Support
+            </Badge>
+          )}
+          
+          {user && !isSupport && (
             <>
               <Button 
                 variant="ghost" 
@@ -116,36 +140,50 @@ const DesktopHeader = () => {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               {user ? (
-                <>
-                  <DropdownMenuItem onClick={() => navigate('/profile')}>
-                    My Account
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/activity')}>
-                    Reservations
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/messages')}>
-                    Messages
-                    {totalUnreadCount > 0 && (
-                      <Badge variant="destructive" className="ml-auto">
-                        {totalUnreadCount}
-                      </Badge>
+                isSupport ? (
+                  // Support user menu
+                  <>
+                    <DropdownMenuItem onClick={() => navigate('/support-account')}>
+                      Support Account
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut}>
+                      Sign Out
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  // Regular user menu
+                  <>
+                    <DropdownMenuItem onClick={() => navigate('/profile')}>
+                      My Account
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/activity')}>
+                      Reservations
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/messages')}>
+                      Messages
+                      {totalUnreadCount > 0 && (
+                        <Badge variant="destructive" className="ml-auto">
+                          {totalUnreadCount}
+                        </Badge>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {mode === 'driver' ? (
+                      <DropdownMenuItem onClick={() => navigate('/list-spot')}>
+                        List Your Spot
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                        Manage Listings
+                      </DropdownMenuItem>
                     )}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  {mode === 'driver' ? (
-                    <DropdownMenuItem onClick={() => navigate('/list-spot')}>
-                      List Your Spot
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut}>
+                      Sign Out
                     </DropdownMenuItem>
-                  ) : (
-                    <DropdownMenuItem onClick={() => navigate('/dashboard')}>
-                      Manage Listings
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut}>
-                    Sign Out
-                  </DropdownMenuItem>
-                </>
+                  </>
+                )
               ) : (
                 <>
                   <DropdownMenuItem onClick={() => navigate('/auth')}>
