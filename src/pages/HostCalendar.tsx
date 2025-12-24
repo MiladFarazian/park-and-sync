@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addDays, addMonths, addWeeks, isSameDay, isBefore, startOfDay, isToday, startOfWeek, endOfWeek } from 'date-fns';
@@ -431,19 +432,36 @@ const HostCalendar = () => {
           <p className="text-sm text-muted-foreground">View bookings & availability</p>
         </div>
         {/* View Toggle - Month / Week / Reservations */}
-        <Tabs value={viewMode} onValueChange={handleViewModeChange}>
-          <TabsList className="h-9">
-            <TabsTrigger value="month" className="px-3">
-              <LayoutGrid className="h-4 w-4" />
-            </TabsTrigger>
-            <TabsTrigger value="week" className="px-3">
-              <CalendarIcon className="h-4 w-4" />
-            </TabsTrigger>
-            <TabsTrigger value="reservations" className="px-3">
-              <List className="h-4 w-4" />
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <TooltipProvider>
+          <Tabs value={viewMode} onValueChange={handleViewModeChange}>
+            <TabsList className="h-9">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger value="month" className="px-3">
+                    <LayoutGrid className="h-4 w-4" />
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Month view</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger value="week" className="px-3">
+                    <CalendarIcon className="h-4 w-4" />
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Week view</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger value="reservations" className="px-3">
+                    <List className="h-4 w-4" />
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Reservations</TooltipContent>
+              </Tooltip>
+            </TabsList>
+          </Tabs>
+        </TooltipProvider>
       </div>
 
       {/* Calendar Views (Month & Week) */}
