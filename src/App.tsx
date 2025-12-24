@@ -49,6 +49,7 @@ import SupportAccount from "./pages/SupportAccount";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ModeProvider } from "./contexts/ModeContext";
 import { MessagesProvider } from "./contexts/MessagesContext";
+import { SupportRedirect } from "./components/auth/SupportRedirect";
 
 const queryClient = new QueryClient();
 
@@ -100,36 +101,38 @@ const App = () => {
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/privacy-security" element={<PrivacySecurity />} />
             <Route path="/*" element={
-              <AppLayout>
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/explore" element={<Explore />} />
-                  <Route path="/list-spot" element={<ListSpot />} />
-              <Route path="/edit-availability/:spotId" element={<EditSpotAvailability />} />
-              <Route path="/edit-spot/:spotId" element={<EditSpot />} />
-                  <Route path="/activity" element={<Activity />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/host-home" element={<HostHome />} />
-                  <Route path="/host-calendar" element={<HostCalendar />} />
-                  <Route path="/manage-availability" element={<ManageAvailabilitySelect />} />
-                  <Route path="/manage-availability/bulk" element={<BulkAvailabilityEditor />} />
-                  <Route path="/messages" element={<Messages />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/reviews" element={<Reviews />} />
-                  <Route path="/manage-account" element={<ManageAccount />} />
-                  <Route path="/book/:spotId" element={<Booking />} />
-                  <Route path="/booking/:bookingId" element={<BookingDetail />} />
-                  <Route path="/booking-confirmation/:bookingId" element={<BookingConfirmation />} />
-                  <Route path="/host-booking-confirmation/:bookingId" element={<HostBookingConfirmation />} />
-                  <Route path="/admin" element={<AdminDashboard />} />
-                  <Route path="/support-home" element={<SupportHome />} />
-                  <Route path="/support-messages" element={<SupportMessages />} />
-                  <Route path="/support-reservations" element={<SupportReservations />} />
-                  <Route path="/support-account" element={<SupportAccount />} />
-                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </AppLayout>
+              <SupportRedirect>
+                <AppLayout>
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/explore" element={<Explore />} />
+                    <Route path="/list-spot" element={<ListSpot />} />
+                    <Route path="/edit-availability/:spotId" element={<EditSpotAvailability />} />
+                    <Route path="/edit-spot/:spotId" element={<EditSpot />} />
+                    <Route path="/activity" element={<Activity />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/host-home" element={<HostHome />} />
+                    <Route path="/host-calendar" element={<HostCalendar />} />
+                    <Route path="/manage-availability" element={<ManageAvailabilitySelect />} />
+                    <Route path="/manage-availability/bulk" element={<BulkAvailabilityEditor />} />
+                    <Route path="/messages" element={<Messages />} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/reviews" element={<Reviews />} />
+                    <Route path="/manage-account" element={<ManageAccount />} />
+                    <Route path="/book/:spotId" element={<Booking />} />
+                    <Route path="/booking/:bookingId" element={<BookingDetail />} />
+                    <Route path="/booking-confirmation/:bookingId" element={<BookingConfirmation />} />
+                    <Route path="/host-booking-confirmation/:bookingId" element={<HostBookingConfirmation />} />
+                    <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="/support-home" element={<SupportHome />} />
+                    <Route path="/support-messages" element={<SupportMessages />} />
+                    <Route path="/support-reservations" element={<SupportReservations />} />
+                    <Route path="/support-account" element={<SupportAccount />} />
+                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </AppLayout>
+              </SupportRedirect>
             } />
           </Routes>
     </BrowserRouter>
