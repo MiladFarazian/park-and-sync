@@ -637,10 +637,6 @@ const Profile = () => {
         </div>
       )}
 
-      {/* Page Subheading */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Profile</h1>
-      </div>
       
       {/* Profile Info Card */}
       <Card className="bg-gradient-to-br from-primary via-primary to-primary/90 text-primary-foreground border-0 shadow-lg rounded-2xl">
