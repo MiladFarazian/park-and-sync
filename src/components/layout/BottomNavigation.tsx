@@ -1,9 +1,10 @@
 import React, { useContext } from 'react';
-import { Home, Calendar, MessageCircle, User, List, CalendarDays } from 'lucide-react';
+import { Home, Calendar, MessageCircle, User, List, CalendarDays, Shield } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useMode } from '@/contexts/ModeContext';
 import { Badge } from '@/components/ui/badge';
+import { useSupportRole } from '@/hooks/useSupportRole';
 
 // Import context directly for safe access
 import { MessagesContext, MessagesContextType } from '@/contexts/MessagesContext';
@@ -12,25 +13,36 @@ const BottomNavigation = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { mode } = useMode();
+  const { isSupport } = useSupportRole();
   
   // Use context directly with null check to prevent crashes
   const messagesContext = useContext<MessagesContextType | null>(MessagesContext);
   const totalUnreadCount = messagesContext?.totalUnreadCount ?? 0;
 
-  const tabs = mode === 'host' 
-    ? [
-        { id: 'home', label: 'Home', icon: Home, path: '/host-home' },
-        { id: 'listings', label: 'Listings', icon: List, path: '/dashboard' },
-        { id: 'calendar', label: 'Calendar', icon: CalendarDays, path: '/host-calendar' },
-        { id: 'messages', label: 'Messages', icon: MessageCircle, path: '/messages' },
-        { id: 'account', label: 'Account', icon: User, path: '/profile' },
-      ]
-    : [
-        { id: 'home', label: 'Home', icon: Home, path: '/' },
-        { id: 'reservations', label: 'Reservations', icon: Calendar, path: '/activity' },
-        { id: 'messages', label: 'Messages', icon: MessageCircle, path: '/messages' },
-        { id: 'account', label: 'Account', icon: User, path: '/profile' },
-      ];
+  // Support-specific tabs
+  const supportTabs = [
+    { id: 'home', label: 'Home', icon: Shield, path: '/support-home' },
+    { id: 'reservations', label: 'Reservations', icon: Calendar, path: '/support-reservations' },
+    { id: 'messages', label: 'Messages', icon: MessageCircle, path: '/support-messages' },
+    { id: 'account', label: 'Account', icon: User, path: '/support-account' },
+  ];
+
+  const hostTabs = [
+    { id: 'home', label: 'Home', icon: Home, path: '/host-home' },
+    { id: 'listings', label: 'Listings', icon: List, path: '/dashboard' },
+    { id: 'calendar', label: 'Calendar', icon: CalendarDays, path: '/host-calendar' },
+    { id: 'messages', label: 'Messages', icon: MessageCircle, path: '/messages' },
+    { id: 'account', label: 'Account', icon: User, path: '/profile' },
+  ];
+
+  const driverTabs = [
+    { id: 'home', label: 'Home', icon: Home, path: '/' },
+    { id: 'reservations', label: 'Reservations', icon: Calendar, path: '/activity' },
+    { id: 'messages', label: 'Messages', icon: MessageCircle, path: '/messages' },
+    { id: 'account', label: 'Account', icon: User, path: '/profile' },
+  ];
+
+  const tabs = isSupport ? supportTabs : (mode === 'host' ? hostTabs : driverTabs);
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50 pb-safe">

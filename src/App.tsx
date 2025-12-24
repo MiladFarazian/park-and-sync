@@ -42,6 +42,10 @@ import Reviews from "./pages/Reviews";
 import AdminDashboard from "./pages/AdminDashboard";
 import ManageAvailabilitySelect from "./pages/ManageAvailabilitySelect";
 import BulkAvailabilityEditor from "./pages/BulkAvailabilityEditor";
+import SupportHome from "./pages/SupportHome";
+import SupportMessages from "./pages/SupportMessages";
+import SupportReservations from "./pages/SupportReservations";
+import SupportAccount from "./pages/SupportAccount";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ModeProvider } from "./contexts/ModeContext";
 import { MessagesProvider } from "./contexts/MessagesContext";
@@ -118,6 +122,10 @@ const App = () => {
                   <Route path="/booking-confirmation/:bookingId" element={<BookingConfirmation />} />
                   <Route path="/host-booking-confirmation/:bookingId" element={<HostBookingConfirmation />} />
                   <Route path="/admin" element={<AdminDashboard />} />
+                  <Route path="/support-home" element={<SupportHome />} />
+                  <Route path="/support-messages" element={<SupportMessages />} />
+                  <Route path="/support-reservations" element={<SupportReservations />} />
+                  <Route path="/support-account" element={<SupportAccount />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
