@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, LayoutGrid, Clock, DollarSign, User, MapPin, Settings } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, LayoutGrid, Clock, DollarSign, User, MapPin, Settings, List, MessageCircle, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addDays, addMonths, addWeeks, isSameDay, isBefore, startOfDay, isToday, startOfWeek, endOfWeek } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { ReviewModal } from '@/components/booking/ReviewModal';
+import { useToast } from '@/hooks/use-toast';
 
 interface SpotWithRate {
   id: string;
@@ -31,6 +33,7 @@ interface BookingForCalendar {
   };
   spot?: {
     title: string;
+    address?: string;
   };
 }
 
@@ -42,24 +45,59 @@ interface CalendarOverride {
   custom_rate?: number;
 }
 
+type MainTab = 'calendar' | 'reservations';
 type ViewMode = 'month' | 'week';
 
 const HostCalendar = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { toast } = useToast();
   const { user } = useAuth();
+  
+  // Main tab state - calendar or reservations
+  const initialTab = searchParams.get('tab') === 'reservations' ? 'reservations' : 'calendar';
+  const [mainTab, setMainTab] = useState<MainTab>(initialTab);
+  
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [spots, setSpots] = useState<SpotWithRate[]>([]);
   const [bookings, setBookings] = useState<BookingForCalendar[]>([]);
+  const [allBookings, setAllBookings] = useState<any[]>([]);
   const [overrides, setOverrides] = useState<CalendarOverride[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reservationsLoading, setReservationsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [reservationsTab, setReservationsTab] = useState<'upcoming' | 'past'>('upcoming');
+  
+  // Review modal state
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewBooking, setReviewBooking] = useState<any>(null);
+  const [userReviews, setUserReviews] = useState<Set<string>>(new Set());
+
+  // Handle main tab change and update URL
+  const handleMainTabChange = (value: string) => {
+    setMainTab(value as MainTab);
+    if (value === 'reservations') {
+      setSearchParams({ tab: 'reservations' });
+    } else {
+      setSearchParams({});
+    }
+  };
+
+  useEffect(() => {
+    // Sync tab from URL on mount/change
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'reservations') {
+      setMainTab('reservations');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (user) {
       fetchData();
+      fetchAllReservations();
     }
   }, [user, currentMonth, currentWeek, viewMode]);
 
@@ -100,7 +138,7 @@ const HostCalendar = () => {
         .select(`
           id, spot_id, start_at, end_at, status, total_amount,
           renter:profiles!bookings_renter_id_fkey(first_name, last_name),
-          spot:spots!bookings_spot_id_fkey(title)
+          spot:spots!bookings_spot_id_fkey(title, address)
         `)
         .in('spot_id', spotIds)
         .gte('start_at', rangeStart.toISOString())
@@ -125,6 +163,52 @@ const HostCalendar = () => {
       console.error('Error fetching calendar data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAllReservations = async () => {
+    if (!user) return;
+    
+    try {
+      setReservationsLoading(true);
+      
+      // Fetch user's existing reviews
+      const { data: reviewsData } = await supabase
+        .from('reviews')
+        .select('booking_id')
+        .eq('reviewer_id', user.id);
+      
+      setUserReviews(new Set(reviewsData?.map(r => r.booking_id) || []));
+
+      // Fetch all bookings for host's spots
+      const { data: hostBookings, error: hostError } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          spots!inner (
+            title,
+            address,
+            host_id
+          ),
+          renter:renter_id (
+            first_name,
+            last_name
+          )
+        `)
+        .eq('spots.host_id', user.id)
+        .order('start_at', { ascending: false });
+
+      if (hostError) throw hostError;
+      setAllBookings((hostBookings || []).map(b => ({ ...b, userRole: 'host' })));
+    } catch (error) {
+      console.error('Error fetching reservations:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load reservations",
+        variant: "destructive"
+      });
+    } finally {
+      setReservationsLoading(false);
     }
   };
 
@@ -207,6 +291,131 @@ const HostCalendar = () => {
 
   const selectedDateData = selectedDate ? getDateData(selectedDate) : null;
 
+  // Reservations helpers
+  const now = new Date();
+  const upcomingBookings = allBookings.filter(b => new Date(b.end_at) >= now && b.status !== 'canceled');
+  const pastBookings = allBookings.filter(b => new Date(b.end_at) < now || b.status === 'canceled');
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const formatTime = (start: string, end: string) => {
+    const startTime = new Date(start).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit'
+    });
+    const endTime = new Date(end).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit'
+    });
+    return `${startTime} - ${endTime}`;
+  };
+
+  const getStatusColor = (status: string, isPast: boolean) => {
+    if (status === 'canceled') return 'bg-destructive/10 text-destructive border-destructive/20';
+    if (status === 'completed') {
+      return 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-500 border-green-200 dark:border-green-800';
+    }
+    if (isPast) return 'bg-muted text-muted-foreground border-border';
+    return 'bg-primary/10 text-primary border-primary/20';
+  };
+
+  const getStatusText = (status: string, isPast: boolean) => {
+    if (status === 'canceled') return 'Cancelled';
+    if (status === 'completed') return 'Completed';
+    if (status === 'paid') return isPast ? 'Completed' : 'Confirmed';
+    if (status === 'active') return 'Active';
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  const ReservationCard = ({ booking, isPast = false }: { booking: any; isPast?: boolean }) => {
+    const canReview = (booking.status === 'completed' || (isPast && booking.status === 'paid')) && 
+                      booking.status !== 'canceled' && 
+                      !userReviews.has(booking.id);
+
+    const handleReview = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const renter = booking.renter;
+      setReviewBooking({
+        ...booking,
+        revieweeId: booking.renter_id,
+        revieweeName: renter?.first_name ? `${renter.first_name} ${renter.last_name || ''}`.trim() : 'Guest',
+        reviewerRole: 'host'
+      });
+      setReviewModalOpen(true);
+    };
+
+    return (
+      <Card 
+        className="group cursor-pointer hover:shadow-elegant hover:border-primary/30 transition-all duration-300 overflow-hidden"
+        onClick={() => navigate(`/booking/${booking.id}`)}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors">
+                {booking.spots?.title || 'Parking Spot'}
+              </h3>
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
+                <User className="h-3.5 w-3.5 shrink-0" />
+                <span>{booking.renter?.first_name || 'Guest'} {booking.renter?.last_name?.[0] || ''}.</span>
+              </div>
+            </div>
+            <Badge 
+              className={`text-xs border ${getStatusColor(booking.status, isPast)}`}
+              variant="outline"
+            >
+              {getStatusText(booking.status, isPast)}
+            </Badge>
+          </div>
+
+          <div className="flex items-center gap-2 text-sm mb-3">
+            <div className="flex items-center gap-1.5 flex-1 bg-muted/50 rounded-md px-2 py-1.5">
+              <CalendarIcon className="h-3.5 w-3.5 text-primary shrink-0" />
+              <span className="font-medium truncate">{formatDate(booking.start_at)}</span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-1 bg-muted/50 rounded-md px-2 py-1.5">
+              <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
+              <span className="font-medium truncate text-xs">{formatTime(booking.start_at, booking.end_at)}</span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-lg font-bold text-primary">${Number(booking.total_amount).toFixed(2)}</span>
+            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/messages?userId=${booking.renter_id}`);
+                }}
+              >
+                <MessageCircle className="h-4 w-4" />
+              </Button>
+              {canReview && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="hover:bg-yellow-50 hover:text-yellow-600 hover:border-yellow-300"
+                  onClick={handleReview}
+                >
+                  <Star className="h-4 w-4 mr-1" />
+                  Review
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   if (!user) {
     return (
       <div className="p-4">
@@ -226,260 +435,322 @@ const HostCalendar = () => {
           <h1 className="text-2xl font-bold">Calendar</h1>
           <p className="text-sm text-muted-foreground">View bookings & availability</p>
         </div>
-        
-        {/* View Toggle */}
-        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-          <TabsList className="h-9">
-            <TabsTrigger value="month" className="px-3">
-              <LayoutGrid className="h-4 w-4" />
-            </TabsTrigger>
-            <TabsTrigger value="week" className="px-3">
-              <CalendarIcon className="h-4 w-4" />
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
       </div>
 
-      {/* Calendar Card */}
-      <Card className="p-4">
-        {/* Navigation */}
-        <div className="flex items-center justify-between mb-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => viewMode === 'month' 
-              ? setCurrentMonth(addMonths(currentMonth, -1))
-              : setCurrentWeek(addWeeks(currentWeek, -1))
-            }
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <h2 className="text-xl font-bold">
-            {viewMode === 'month' 
-              ? format(currentMonth, 'MMMM yyyy')
-              : `${format(startOfWeek(currentWeek, { weekStartsOn: 0 }), 'MMM d')} - ${format(endOfWeek(currentWeek, { weekStartsOn: 0 }), 'MMM d, yyyy')}`
-            }
-          </h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => viewMode === 'month'
-              ? setCurrentMonth(addMonths(currentMonth, 1))
-              : setCurrentWeek(addWeeks(currentWeek, 1))
-            }
-          >
-            <ChevronRight className="h-5 w-5" />
-          </Button>
-        </div>
+      {/* Main Tabs: Calendar vs Reservations */}
+      <Tabs value={mainTab} onValueChange={handleMainTabChange}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="calendar" className="gap-2">
+            <CalendarIcon className="h-4 w-4" />
+            Calendar
+          </TabsTrigger>
+          <TabsTrigger value="reservations" className="gap-2">
+            <List className="h-4 w-4" />
+            Reservations
+          </TabsTrigger>
+        </TabsList>
 
-        {/* Day Headers - Month view only */}
-        {viewMode === 'month' && (
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
-              <div key={i} className="text-xs text-muted-foreground text-center font-medium py-1">
-                {day}
-              </div>
-            ))}
+        {/* Calendar Tab Content */}
+        <TabsContent value="calendar" className="mt-4 space-y-4">
+          {/* View Toggle */}
+          <div className="flex justify-end">
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+              <TabsList className="h-9">
+                <TabsTrigger value="month" className="px-3">
+                  <LayoutGrid className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger value="week" className="px-3">
+                  <CalendarIcon className="h-4 w-4" />
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
-        )}
 
-        {/* Calendar Grid */}
-        {loading ? (
-          viewMode === 'month' ? (
-            <div className="grid grid-cols-7 gap-1">
-              {Array.from({ length: 35 }).map((_, i) => (
-                <Skeleton key={i} className="aspect-square" />
-              ))}
+          {/* Calendar Card */}
+          <Card className="p-4">
+            {/* Navigation */}
+            <div className="flex items-center justify-between mb-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => viewMode === 'month' 
+                  ? setCurrentMonth(addMonths(currentMonth, -1))
+                  : setCurrentWeek(addWeeks(currentWeek, -1))
+                }
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <h2 className="text-xl font-bold">
+                {viewMode === 'month' 
+                  ? format(currentMonth, 'MMMM yyyy')
+                  : `${format(startOfWeek(currentWeek, { weekStartsOn: 0 }), 'MMM d')} - ${format(endOfWeek(currentWeek, { weekStartsOn: 0 }), 'MMM d, yyyy')}`
+                }
+              </h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => viewMode === 'month'
+                  ? setCurrentMonth(addMonths(currentMonth, 1))
+                  : setCurrentWeek(addWeeks(currentWeek, 1))
+                }
+              >
+                <ChevronRight className="h-5 w-5" />
+              </Button>
             </div>
-          ) : (
-            <div className="space-y-2">
-              {Array.from({ length: 7 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full rounded-lg" />
-              ))}
-            </div>
-          )
-        ) : viewMode === 'month' ? (
-          // Month View
-          <div className="grid grid-cols-7 gap-1">
-            {calendarDays.map(({ date, isCurrentMonth }, index) => {
-              const { bookings: dayBookings, isUnavailable, rate, isPast, hasBookings } = getDateData(date);
-              const isTodayDate = isToday(date);
-              
-              return (
-                <button
-                  key={index}
-                  onClick={() => isCurrentMonth && handleDayClick(date)}
-                  disabled={!isCurrentMonth}
-                  className={cn(
-                    "aspect-square p-0.5 rounded-md border transition-all flex flex-col text-left",
-                    !isCurrentMonth && "opacity-30 cursor-default",
-                    isCurrentMonth && "hover:border-primary cursor-pointer",
-                    isTodayDate && "ring-2 ring-primary",
-                    isUnavailable && isCurrentMonth && "bg-destructive/10",
-                    hasBookings && isCurrentMonth && !isUnavailable && "bg-green-500/10",
-                    isPast && isCurrentMonth && "bg-muted/50"
-                  )}
-                >
-                  {/* Date Number */}
-                  <div className="text-xs font-medium text-center w-full">
-                    {format(date, 'd')}
+
+            {/* Day Headers - Month view only */}
+            {viewMode === 'month' && (
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+                  <div key={i} className="text-xs text-muted-foreground text-center font-medium py-1">
+                    {day}
                   </div>
+                ))}
+              </div>
+            )}
+
+            {/* Calendar Grid */}
+            {loading ? (
+              viewMode === 'month' ? (
+                <div className="grid grid-cols-7 gap-1">
+                  {Array.from({ length: 35 }).map((_, i) => (
+                    <Skeleton key={i} className="aspect-square" />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {Array.from({ length: 7 }).map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                  ))}
+                </div>
+              )
+            ) : viewMode === 'month' ? (
+              // Month View
+              <div className="grid grid-cols-7 gap-1">
+                {calendarDays.map(({ date, isCurrentMonth }, index) => {
+                  const { bookings: dayBookings, isUnavailable, rate, isPast, hasBookings } = getDateData(date);
+                  const isTodayDate = isToday(date);
                   
-                  {isCurrentMonth && (
-                    <div className="flex-1 flex flex-col justify-between overflow-hidden">
-                      {/* Rate */}
-                      {rate !== null && !isUnavailable && (
-                        <div className="text-[10px] text-green-600 dark:text-green-400 font-semibold text-center truncate">
-                          ${rate}
-                        </div>
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => isCurrentMonth && handleDayClick(date)}
+                      disabled={!isCurrentMonth}
+                      className={cn(
+                        "aspect-square p-0.5 rounded-md border transition-all flex flex-col text-left",
+                        !isCurrentMonth && "opacity-30 cursor-default",
+                        isCurrentMonth && "hover:border-primary cursor-pointer",
+                        isTodayDate && "ring-2 ring-primary",
+                        isUnavailable && isCurrentMonth && "bg-destructive/10",
+                        hasBookings && isCurrentMonth && !isUnavailable && "bg-green-500/10",
+                        isPast && isCurrentMonth && "bg-muted/50"
                       )}
+                    >
+                      {/* Date Number */}
+                      <div className="text-xs font-medium text-center w-full">
+                        {format(date, 'd')}
+                      </div>
                       
-                      {/* Unavailable indicator */}
-                      {isUnavailable && (
-                        <div className="text-[8px] text-destructive text-center leading-tight">
-                          Unavail.
-                        </div>
-                      )}
-                      
-                      {/* Bookings */}
-                      {dayBookings.length > 0 && (
-                        <div className="space-y-0.5">
-                          {dayBookings.slice(0, 2).map((booking) => (
-                            <div
-                              key={booking.id}
-                              className={cn(
-                                "text-[8px] leading-tight text-center rounded px-0.5 truncate",
-                                booking.status === 'completed' ? "bg-muted text-muted-foreground" :
-                                booking.status === 'active' ? "bg-primary/20 text-primary" :
-                                "bg-blue-500/20 text-blue-700 dark:text-blue-300"
-                              )}
-                            >
-                              {format(new Date(booking.start_at), 'ha')}
+                      {isCurrentMonth && (
+                        <div className="flex-1 flex flex-col justify-between overflow-hidden">
+                          {/* Rate */}
+                          {rate !== null && !isUnavailable && (
+                            <div className="text-[10px] text-green-600 dark:text-green-400 font-semibold text-center truncate">
+                              ${rate}
                             </div>
-                          ))}
-                          {dayBookings.length > 2 && (
-                            <div className="text-[8px] text-muted-foreground text-center">
-                              +{dayBookings.length - 2}
+                          )}
+                          
+                          {/* Unavailable indicator */}
+                          {isUnavailable && (
+                            <div className="text-[8px] text-destructive text-center leading-tight">
+                              Unavail.
+                            </div>
+                          )}
+                          
+                          {/* Bookings */}
+                          {dayBookings.length > 0 && (
+                            <div className="space-y-0.5">
+                              {dayBookings.slice(0, 2).map((booking) => (
+                                <div
+                                  key={booking.id}
+                                  className={cn(
+                                    "text-[8px] leading-tight text-center rounded px-0.5 truncate",
+                                    booking.status === 'completed' ? "bg-muted text-muted-foreground" :
+                                    booking.status === 'active' ? "bg-primary/20 text-primary" :
+                                    "bg-blue-500/20 text-blue-700 dark:text-blue-300"
+                                  )}
+                                >
+                                  {format(new Date(booking.start_at), 'ha')}
+                                </div>
+                              ))}
+                              {dayBookings.length > 2 && (
+                                <div className="text-[8px] text-muted-foreground text-center">
+                                  +{dayBookings.length - 2}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
                       )}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          // Week View - Vertical layout for mobile
-          <div className="space-y-2">
-            {weekDays.map((date, index) => {
-              const { bookings: dayBookings, isUnavailable, rate, isPast, hasBookings } = getDateData(date);
-              const isTodayDate = isToday(date);
-              
-              return (
-                <button
-                  key={index}
-                  onClick={() => handleDayClick(date)}
-                  className={cn(
-                    "w-full p-3 rounded-lg border transition-all flex items-start gap-3 text-left",
-                    "hover:border-primary cursor-pointer",
-                    isTodayDate && "ring-2 ring-primary bg-primary/5",
-                    isUnavailable && !isTodayDate && "bg-destructive/10",
-                    hasBookings && !isUnavailable && !isTodayDate && "bg-green-500/5",
-                    isPast && !isTodayDate && "bg-muted/30"
-                  )}
-                >
-                  {/* Date column */}
-                  <div className="flex flex-col items-center min-w-[50px]">
-                    <div className="text-xs text-muted-foreground font-medium">
-                      {format(date, 'EEE')}
-                    </div>
-                    <div className={cn(
-                      "text-xl font-bold flex items-center justify-center w-10 h-10 rounded-full",
-                      isTodayDate && "bg-primary text-primary-foreground"
-                    )}>
-                      {format(date, 'd')}
-                    </div>
-                    {rate !== null && !isUnavailable && (
-                      <div className="text-xs text-green-600 dark:text-green-400 font-semibold mt-1">
-                        ${rate}/hr
-                      </div>
-                    )}
-                  </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              // Week View - Vertical layout for mobile
+              <div className="space-y-2">
+                {weekDays.map((date, index) => {
+                  const { bookings: dayBookings, isUnavailable, rate, isPast, hasBookings } = getDateData(date);
+                  const isTodayDate = isToday(date);
                   
-                  {/* Content column */}
-                  <div className="flex-1 min-w-0">
-                    {isUnavailable ? (
-                      <Badge variant="destructive" className="text-xs">
-                        Blocked
-                      </Badge>
-                    ) : dayBookings.length > 0 ? (
-                      <div className="space-y-1.5">
-                        {dayBookings.slice(0, 3).map((booking) => (
-                          <div
-                            key={booking.id}
-                            className={cn(
-                              "text-sm px-2 py-1.5 rounded-md flex items-center justify-between gap-2",
-                              booking.status === 'completed' ? "bg-muted" :
-                              booking.status === 'active' ? "bg-primary/20" :
-                              "bg-blue-500/15"
-                            )}
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <User className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                              <span className="font-medium truncate">
-                                {booking.renter?.first_name || 'Guest'}
-                              </span>
-                            </div>
-                            <div className="text-xs text-muted-foreground flex-shrink-0">
-                              {format(new Date(booking.start_at), 'h:mm a')}
-                            </div>
-                          </div>
-                        ))}
-                        {dayBookings.length > 3 && (
-                          <div className="text-xs text-muted-foreground pl-2">
-                            +{dayBookings.length - 3} more
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => handleDayClick(date)}
+                      className={cn(
+                        "w-full p-3 rounded-lg border transition-all flex items-start gap-3 text-left",
+                        "hover:border-primary cursor-pointer",
+                        isTodayDate && "ring-2 ring-primary bg-primary/5",
+                        isUnavailable && !isTodayDate && "bg-destructive/10",
+                        hasBookings && !isUnavailable && !isTodayDate && "bg-green-500/5",
+                        isPast && !isTodayDate && "bg-muted/30"
+                      )}
+                    >
+                      {/* Date column */}
+                      <div className="flex flex-col items-center min-w-[50px]">
+                        <div className="text-xs text-muted-foreground font-medium">
+                          {format(date, 'EEE')}
+                        </div>
+                        <div className={cn(
+                          "text-xl font-bold flex items-center justify-center w-10 h-10 rounded-full",
+                          isTodayDate && "bg-primary text-primary-foreground"
+                        )}>
+                          {format(date, 'd')}
+                        </div>
+                        {rate !== null && !isUnavailable && (
+                          <div className="text-xs text-green-600 dark:text-green-400 font-semibold mt-1">
+                            ${rate}/hr
                           </div>
                         )}
                       </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground py-1">
-                        {isPast ? 'No bookings' : 'Available'}
+                      
+                      {/* Content column */}
+                      <div className="flex-1 min-w-0">
+                        {isUnavailable ? (
+                          <Badge variant="destructive" className="text-xs">
+                            Blocked
+                          </Badge>
+                        ) : dayBookings.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {dayBookings.slice(0, 3).map((booking) => (
+                              <div
+                                key={booking.id}
+                                className={cn(
+                                  "text-sm px-2 py-1.5 rounded-md flex items-center justify-between gap-2",
+                                  booking.status === 'completed' ? "bg-muted" :
+                                  booking.status === 'active' ? "bg-primary/20" :
+                                  "bg-blue-500/15"
+                                )}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <User className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                  <span className="font-medium truncate">
+                                    {booking.renter?.first_name || 'Guest'}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-muted-foreground flex-shrink-0">
+                                  {format(new Date(booking.start_at), 'h:mm a')}
+                                </div>
+                              </div>
+                            ))}
+                            {dayBookings.length > 3 && (
+                              <div className="text-xs text-muted-foreground pl-2">
+                                +{dayBookings.length - 3} more
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground py-1">
+                            {isPast ? 'No bookings' : 'Available'}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
-        {/* Legend */}
-        <div className="flex flex-wrap items-center justify-center gap-3 mt-4 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded bg-green-500/20 border" />
-            <span>Booked</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded bg-destructive/10 border" />
-            <span>Blocked</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded bg-muted/50 border" />
-            <span>Past</span>
-          </div>
-        </div>
-      </Card>
+            {/* Legend */}
+            <div className="flex flex-wrap items-center justify-center gap-3 mt-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded bg-green-500/20 border" />
+                <span>Booked</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded bg-destructive/10 border" />
+                <span>Blocked</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded bg-muted/50 border" />
+                <span>Past</span>
+              </div>
+            </div>
+          </Card>
+        </TabsContent>
 
-      {/* Quick link to Activity */}
-      <Button 
-        variant="outline" 
-        className="w-full"
-        onClick={() => navigate('/activity')}
-      >
-        View All Reservations
-      </Button>
+        {/* Reservations Tab Content */}
+        <TabsContent value="reservations" className="mt-4 space-y-4">
+          <Tabs value={reservationsTab} onValueChange={(v) => setReservationsTab(v as 'upcoming' | 'past')}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="upcoming">
+                Upcoming ({upcomingBookings.length})
+              </TabsTrigger>
+              <TabsTrigger value="past">
+                Past ({pastBookings.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="upcoming" className="mt-4 space-y-3">
+              {reservationsLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <Card key={i} className="p-4">
+                    <Skeleton className="h-20 w-full" />
+                  </Card>
+                ))
+              ) : upcomingBookings.length === 0 ? (
+                <Card className="p-8 text-center">
+                  <CalendarIcon className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                  <p className="text-muted-foreground">No upcoming reservations</p>
+                </Card>
+              ) : (
+                upcomingBookings.map((booking) => (
+                  <ReservationCard key={booking.id} booking={booking} />
+                ))
+              )}
+            </TabsContent>
+
+            <TabsContent value="past" className="mt-4 space-y-3">
+              {reservationsLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <Card key={i} className="p-4">
+                    <Skeleton className="h-20 w-full" />
+                  </Card>
+                ))
+              ) : pastBookings.length === 0 ? (
+                <Card className="p-8 text-center">
+                  <CalendarIcon className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                  <p className="text-muted-foreground">No past reservations</p>
+                </Card>
+              ) : (
+                pastBookings.map((booking) => (
+                  <ReservationCard key={booking.id} booking={booking} isPast />
+                ))
+              )}
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+      </Tabs>
 
       {/* Day Detail Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
@@ -585,6 +856,25 @@ const HostCalendar = () => {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Review Modal */}
+      <ReviewModal
+        open={reviewModalOpen}
+        onOpenChange={(open) => {
+          setReviewModalOpen(open);
+          if (!open) setReviewBooking(null);
+        }}
+        bookingId={reviewBooking?.id || ''}
+        revieweeId={reviewBooking?.revieweeId || ''}
+        revieweeName={reviewBooking?.revieweeName || ''}
+        reviewerRole={reviewBooking?.reviewerRole || 'host'}
+        onReviewSubmitted={() => {
+          if (reviewBooking) {
+            setUserReviews(prev => new Set([...prev, reviewBooking.id]));
+          }
+          fetchAllReservations();
+        }}
+      />
     </div>
   );
 };

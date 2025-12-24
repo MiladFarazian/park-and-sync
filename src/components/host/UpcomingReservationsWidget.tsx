@@ -146,7 +146,7 @@ const UpcomingReservationsWidget = () => {
   return (
     <Card 
       className="p-4 cursor-pointer hover:bg-muted/50 transition-colors group"
-      onClick={() => navigate('/activity')}
+      onClick={() => navigate('/host-calendar?tab=reservations')}
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">

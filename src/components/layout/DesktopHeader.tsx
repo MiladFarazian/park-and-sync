@@ -39,7 +39,7 @@ const DesktopHeader = () => {
     ? [
         { title: 'Dashboard', url: '/host-home', icon: Home },
         { title: 'Listings', url: '/dashboard', icon: List },
-        { title: 'Reservations', url: '/activity', icon: Calendar },
+        { title: 'Calendar', url: '/host-calendar', icon: Calendar },
       ]
     : [
         { title: 'Find Parking', url: '/explore', icon: null },
