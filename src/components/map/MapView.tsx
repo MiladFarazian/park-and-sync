@@ -1198,8 +1198,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                   className="flex-[0_0_100%] min-w-0"
                 >
                   <Card className={`p-4 bg-background/95 backdrop-blur-sm transition-all duration-200 ${
-                    isCurrentSlide ? 'ring-2 ring-primary/30 shadow-lg' : ''
-                  } ${isAnimating ? 'animate-selection-pulse' : ''}`}>
+                    isAnimating ? 'animate-selection-pulse' : ''
+                  }`}>
                     <div className="flex gap-3">
                       <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0">
                         <img 
