@@ -49,6 +49,9 @@ const Explore = () => {
     adaAccessible: false,
     vehicleSize: null,
   });
+  
+  // Request ID guard to prevent stale responses from overwriting newer ones
+  const latestRequestIdRef = useRef(0);
 
   // Ensure end time is always after start time
   const validateAndSetTimes = (newStartTime: Date, newEndTime: Date | null) => {
@@ -378,46 +381,56 @@ const Explore = () => {
     setShowSuggestions(false);
   };
   const fetchNearbySpots = async (center = searchLocation, radius = 15000, isInitialLoad = true) => {
+    // Increment request ID and capture it for this request
+    const requestId = ++latestRequestIdRef.current;
+    
     try {
+      // Only show loading spinner on initial load
       if (isInitialLoad) {
         setLoading(true);
       }
+      // Note: We do NOT clear parkingSpots here - "stale-while-revalidate" behavior
 
-      // Use provided times or default to now + 24 hours
-      const start = startTime || new Date();
-      const end = endTime || new Date(Date.now() + 24 * 60 * 60 * 1000);
-      const { data, error } = await supabase.functions.invoke('search-spots', {
+      // Use search-spots-lite for fast map pin loading
+      const { data, error } = await supabase.functions.invoke('search-spots-lite', {
         body: {
           latitude: center.lat,
           longitude: center.lng,
           radius: Math.ceil(radius),
-          // Dynamic radius based on viewport
-          start_time: start.toISOString(),
-          end_time: end.toISOString()
+          limit: 500 // Limit results at low zoom
         }
       });
+      
+      // Check if this request is still the latest one
+      if (requestId !== latestRequestIdRef.current) {
+        console.log('[Explore] Discarding stale response', { requestId, latest: latestRequestIdRef.current });
+        return;
+      }
+      
       if (error) {
         console.error('Search error:', error);
         return;
       }
+      
       const transformedSpots = data.spots?.map((spot: any) => ({
         id: spot.id,
         title: spot.title,
         category: spot.category,
         address: spot.address,
-        hourlyRate: spot.driver_hourly_rate || parseFloat(spot.hourly_rate), // Use driver price from backend
+        hourlyRate: spot.hourly_rate, // Already includes platform fee from lite endpoint
         rating: spot.spot_rating || 0,
         reviews: spot.spot_review_count || 0,
         lat: parseFloat(spot.latitude),
         lng: parseFloat(spot.longitude),
-        imageUrl: spot.spot_photos?.find((photo: any) => photo.is_primary)?.url || spot.spot_photos?.[0]?.url,
+        imageUrl: spot.primary_photo_url,
         distance: spot.distance ? `${(spot.distance / 1000).toFixed(1)} km` : undefined,
         amenities: [...(spot.has_ev_charging ? ['EV Charging'] : []), ...(spot.is_covered ? ['Covered'] : []), ...(spot.is_secure ? ['Secure'] : []), ...(spot.is_ada_accessible ? ['ADA Accessible'] : [])],
         hostId: spot.host_id,
         sizeConstraints: spot.size_constraints || [],
-        userBooking: spot.user_booking || null,
+        userBooking: null, // Not available in lite endpoint
         instantBook: spot.instant_book !== false
       })) || [];
+      
       setParkingSpots(transformedSpots);
     } catch (err) {
       console.error('Unexpected error:', err);
@@ -427,17 +440,18 @@ const Explore = () => {
       }
     }
   };
+  
   const handleMapMove = (center: {
     lat: number;
     lng: number;
   }, radiusMeters: number) => {
-    // Debounce map movement to avoid too many requests
+    // Debounce map movement - reduced from 800ms to 300ms for responsiveness
     if (fetchTimeoutRef.current) {
       clearTimeout(fetchTimeoutRef.current);
     }
     fetchTimeoutRef.current = setTimeout(() => {
       fetchNearbySpots(center, radiusMeters, false); // Don't show loading on map movement
-    }, 800); // Longer debounce to reduce requests
+    }, 300);
   };
   const handleDateTimeUpdate = (newStartTime?: Date, newEndTime?: Date) => {
     const effectiveStartTime = newStartTime || startTime;
@@ -610,7 +624,8 @@ const Explore = () => {
             onMapMove={handleMapMove}
             searchQuery={searchQuery}
             exploreParams={exploreParams}
-            highlightedSpotId={hoveredSpotId || selectedSpotId || undefined}
+            highlightedSpotId={hoveredSpotId}
+            selectedSpotId={selectedSpotId}
             onSpotHover={setHoveredSpotId}
             hideCarousel={true}
           />
@@ -758,6 +773,7 @@ const Explore = () => {
         onMapMove={handleMapMove}
         searchQuery={searchQuery}
         exploreParams={exploreParams}
+        selectedSpotId={selectedSpotId}
       />
 
       {/* Mobile Time Pickers */}

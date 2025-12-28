@@ -48,6 +48,7 @@ interface MapViewProps {
     q?: string;
   };
   highlightedSpotId?: string | null;
+  selectedSpotId?: string | null; // For selected spot visual differentiation
   onSpotHover?: (spotId: string | null) => void;
   hideCarousel?: boolean;
 }
@@ -70,7 +71,7 @@ const calculateWalkTime = (distanceMiles: number): number => {
   return Math.round((distanceMiles / 3) * 60);
 };
 
-const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, onMapMove, searchQuery, exploreParams, highlightedSpotId, onSpotHover, hideCarousel }: MapViewProps) => {
+const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, onMapMove, searchQuery, exploreParams, highlightedSpotId, selectedSpotId: propSelectedSpotId, onSpotHover, hideCarousel }: MapViewProps) => {
   const navigate = useNavigate();
   const { mode, setMode } = useMode();
   const { user } = useAuth();
@@ -761,18 +762,52 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         paint: {
           'circle-radius': [
             'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            28, // Larger glow for selected
             ['boolean', ['feature-state', 'hover'], false],
             22,
             0
           ],
-          'circle-color': 'hsl(250, 100%, 65%)',
+          'circle-color': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            'hsl(140, 80%, 50%)', // Green glow for selected
+            'hsl(250, 100%, 65%)' // Blue glow for hover
+          ],
           'circle-opacity': [
             'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            0.4,
             ['boolean', ['feature-state', 'hover'], false],
             0.25,
             0
           ],
           'circle-translate': [0, -20] // Offset to align with pin head
+        }
+      } as any);
+      
+      // Add selected spot highlight ring (renders above highlight glow)
+      (map.current as any).addLayer({
+        id: 'spots-selected-ring',
+        type: 'circle',
+        source: sourceId,
+        filter: ['!', ['has', 'point_count']],
+        paint: {
+          'circle-radius': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            18,
+            0
+          ],
+          'circle-color': 'transparent',
+          'circle-stroke-width': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            3,
+            0
+          ],
+          'circle-stroke-color': 'hsl(140, 80%, 45%)',
+          'circle-translate': [0, -20]
         }
       } as any);
 
@@ -784,9 +819,24 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         filter: ['!', ['has', 'point_count']],
         layout: {
           'icon-image': pinImageId,
-          'icon-size': 1.5,
+          'icon-size': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            1.8, // Larger for selected
+            ['boolean', ['feature-state', 'hover'], false],
+            1.6, // Slightly larger for hover
+            1.5  // Default size
+          ],
           'icon-allow-overlap': true,
-          'icon-anchor': 'bottom'
+          'icon-anchor': 'bottom',
+          'symbol-sort-key': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            2, // Selected on top
+            ['boolean', ['feature-state', 'hover'], false],
+            1, // Hovered next
+            0  // Others at bottom
+          ]
         },
         paint: {
           'icon-opacity': 0.95
@@ -801,13 +851,28 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         filter: ['!', ['has', 'point_count']],
         layout: {
           'text-field': ['get', 'price'],
-          'text-size': 11,
+          'text-size': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            13, // Larger text for selected
+            11
+          ],
           'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
           'text-allow-overlap': true,
-          'text-offset': [0, -2.8]
+          'text-offset': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            ['literal', [0, -3.2]], // Adjust offset for larger pin
+            ['literal', [0, -2.8]]
+          ]
         },
         paint: {
-          'text-color': 'hsl(250, 100%, 65%)',
+          'text-color': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            'hsl(140, 70%, 35%)', // Green text for selected
+            'hsl(250, 100%, 65%)'
+          ],
           'text-halo-color': '#ffffff',
           'text-halo-width': 0.5,
           'text-opacity': 1
@@ -980,6 +1045,34 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
 
     prevHighlightedRef.current = highlightedSpotId || null;
   }, [highlightedSpotId, mapReady]);
+
+  // Update feature-state when propSelectedSpotId changes (from parent component)
+  const prevSelectedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!map.current || !mapReady) return;
+    
+    const sourceId = 'spots-source';
+    const source = map.current.getSource(sourceId);
+    if (!source) return;
+
+    // Remove selected state from previous spot
+    if (prevSelectedRef.current) {
+      map.current.setFeatureState(
+        { source: sourceId, id: prevSelectedRef.current },
+        { selected: false }
+      );
+    }
+
+    // Add selected state to new spot
+    if (propSelectedSpotId) {
+      map.current.setFeatureState(
+        { source: sourceId, id: propSelectedSpotId },
+        { selected: true }
+      );
+    }
+
+    prevSelectedRef.current = propSelectedSpotId || null;
+  }, [propSelectedSpotId, mapReady]);
 
   const handleSpotClick = (spot: Spot) => {
     setSelectedSpot(spot);
