@@ -1,0 +1,234 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import Stripe from "https://esm.sh/stripe@18.5.0";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface GuestBookingRequest {
+  spot_id: string;
+  start_at: string;
+  end_at: string;
+  guest_full_name: string;
+  guest_email?: string;
+  guest_phone?: string;
+  guest_car_model: string;
+  guest_license_plate?: string;
+  will_use_ev_charging?: boolean;
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    // Create admin client for operations
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { 
+      spot_id, 
+      start_at, 
+      end_at, 
+      guest_full_name,
+      guest_email,
+      guest_phone,
+      guest_car_model,
+      guest_license_plate,
+      will_use_ev_charging 
+    }: GuestBookingRequest = await req.json();
+
+    console.log('Creating guest booking:', { spot_id, start_at, end_at, guest_full_name, guest_email, guest_phone });
+
+    // Validate required fields
+    if (!guest_full_name?.trim()) {
+      return new Response(JSON.stringify({ error: 'Full name is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!guest_email?.trim() && !guest_phone?.trim()) {
+      return new Response(JSON.stringify({ error: 'Email or phone is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!guest_car_model?.trim()) {
+      return new Response(JSON.stringify({ error: 'Vehicle model is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const useEvCharging = will_use_ev_charging || false;
+
+    // Check availability using admin client
+    console.log('Checking spot availability...');
+    const { data: isAvailable, error: availabilityError } = await supabaseAdmin.rpc('check_spot_availability', {
+      p_spot_id: spot_id,
+      p_start_at: start_at,
+      p_end_at: end_at,
+    });
+
+    if (availabilityError) {
+      console.error('Availability check error:', availabilityError);
+      throw availabilityError;
+    }
+
+    if (!isAvailable) {
+      console.error('Spot is not available:', { spot_id, start_at, end_at });
+      return new Response(JSON.stringify({ 
+        error: 'Spot is not available for the requested time' 
+      }), {
+        status: 409,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Get spot details for pricing
+    const { data: spot, error: spotError } = await supabaseAdmin
+      .from('spots')
+      .select('*, host_id, instant_book, has_ev_charging, ev_charging_premium_per_hour')
+      .eq('id', spot_id)
+      .single();
+
+    if (spotError || !spot) {
+      throw new Error('Spot not found');
+    }
+
+    // Validate EV charging request
+    if (useEvCharging && !spot.has_ev_charging) {
+      console.error('EV charging requested but spot does not support it');
+      return new Response(JSON.stringify({ 
+        error: 'This spot does not offer EV charging' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Calculate pricing (same as authenticated booking)
+    const startDate = new Date(start_at);
+    const endDate = new Date(end_at);
+    const totalHours = Math.round(((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)) * 100) / 100;
+    const hostHourlyRate = parseFloat(spot.hourly_rate);
+    const hostEarnings = Math.round(totalHours * hostHourlyRate * 100) / 100;
+    
+    const upcharge = Math.max(hostHourlyRate * 0.20, 1.00);
+    const driverHourlyRate = hostHourlyRate + upcharge;
+    const driverSubtotal = Math.round(driverHourlyRate * totalHours * 100) / 100;
+    
+    const serviceFee = Math.round(Math.max(hostEarnings * 0.20, 1.00) * 100) / 100;
+    
+    const evChargingPremium = spot.ev_charging_premium_per_hour || 0;
+    const evChargingFee = useEvCharging ? Math.round(evChargingPremium * totalHours * 100) / 100 : 0;
+    
+    const subtotal = driverSubtotal;
+    const platformFee = serviceFee;
+    const totalAmount = Math.round((driverSubtotal + serviceFee + evChargingFee) * 100) / 100;
+    
+    console.log('Pricing calculated:', { totalHours, hostHourlyRate, hostEarnings, driverSubtotal, serviceFee, evChargingFee, totalAmount });
+
+    // Initialize Stripe
+    const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');
+    if (!stripeSecret) {
+      throw new Error('Stripe secret key not configured');
+    }
+    const stripe = new Stripe(stripeSecret, { apiVersion: '2025-08-27.basil' });
+
+    // Generate guest access token
+    const guestAccessToken = crypto.randomUUID();
+    const bookingId = crypto.randomUUID();
+    
+    // Create pending booking for guest
+    const { data: booking, error: bookingError } = await supabaseAdmin
+      .from('bookings')
+      .insert({
+        id: bookingId,
+        spot_id,
+        renter_id: spot.host_id, // Use host_id as placeholder for guest bookings (required field)
+        start_at,
+        end_at,
+        status: 'pending',
+        hourly_rate: spot.hourly_rate,
+        total_hours: totalHours,
+        subtotal,
+        platform_fee: platformFee,
+        total_amount: totalAmount,
+        host_earnings: hostEarnings,
+        will_use_ev_charging: useEvCharging,
+        ev_charging_fee: evChargingFee,
+        is_guest: true,
+        guest_full_name: guest_full_name.trim(),
+        guest_email: guest_email?.trim() || null,
+        guest_phone: guest_phone?.trim() || null,
+        guest_car_model: guest_car_model.trim(),
+        guest_license_plate: guest_license_plate?.trim() || null,
+        guest_access_token: guestAccessToken,
+      })
+      .select()
+      .single();
+
+    if (bookingError) {
+      console.error('Guest booking creation error:', bookingError);
+      throw bookingError;
+    }
+
+    console.log('Guest booking created:', booking.id);
+
+    // Create PaymentIntent for the guest (no customer ID)
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(totalAmount * 100),
+      currency: 'usd',
+      metadata: {
+        booking_id: booking.id,
+        spot_id,
+        host_id: spot.host_id,
+        is_guest: 'true',
+        guest_email: guest_email || '',
+        guest_phone: guest_phone || '',
+        guest_access_token: guestAccessToken,
+      },
+      description: `Parking at ${spot.title} - Guest: ${guest_full_name}`,
+    });
+
+    console.log('PaymentIntent created for guest:', paymentIntent.id);
+
+    // Update booking with payment intent ID
+    await supabaseAdmin
+      .from('bookings')
+      .update({ stripe_payment_intent_id: paymentIntent.id })
+      .eq('id', booking.id);
+
+    // Return client secret for Stripe Elements
+    return new Response(JSON.stringify({
+      client_secret: paymentIntent.client_secret,
+      booking_id: booking.id,
+      guest_access_token: guestAccessToken,
+      pricing: {
+        subtotal,
+        platform_fee: platformFee,
+        ev_charging_fee: evChargingFee,
+        total_amount: totalAmount,
+        total_hours: totalHours,
+      }
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('Guest booking error:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
