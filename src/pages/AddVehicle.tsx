@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,8 +16,12 @@ import RequireAuth from "@/components/auth/RequireAuth";
 
 const AddVehicleContent = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Get return path from location state or default to my-vehicles
+  const returnTo = location.state?.returnTo || '/my-vehicles';
   const [formData, setFormData] = useState({
     license_plate: "",
     make: "",
@@ -54,7 +58,7 @@ const AddVehicleContent = () => {
       if (error) throw error;
 
       toast.success("Vehicle added successfully");
-      navigate("/my-vehicles");
+      navigate(returnTo);
     } catch (error: any) {
       toast.error(error.message || "Failed to add vehicle");
     } finally {
@@ -66,7 +70,7 @@ const AddVehicleContent = () => {
     <div className="h-full overflow-y-auto">
       <div className="container max-w-2xl mx-auto p-4 space-y-6 pb-24">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/my-vehicles')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate(returnTo)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
@@ -187,7 +191,7 @@ const AddVehicleContent = () => {
                 type="button"
                 variant="outline"
                 className="flex-1"
-                onClick={() => navigate('/my-vehicles')}
+                onClick={() => navigate(returnTo)}
               >
                 Cancel
               </Button>

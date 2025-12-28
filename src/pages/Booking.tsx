@@ -936,7 +936,7 @@ const BookingContent = () => {
                   <Button
                     variant="outline"
                     className="w-full"
-                    onClick={() => navigate('/add-vehicle')}
+                    onClick={() => navigate('/add-vehicle', { state: { returnTo: `${location.pathname}${location.search}` } })}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Add New Vehicle
