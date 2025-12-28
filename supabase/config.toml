@@ -65,3 +65,15 @@ verify_jwt = true
 
 [functions.expire-pending-bookings]
 verify_jwt = false
+
+[functions.create-guest-booking]
+verify_jwt = false
+
+[functions.get-guest-booking]
+verify_jwt = false
+
+[functions.cancel-guest-booking]
+verify_jwt = false
+
+[functions.send-guest-booking-confirmation]
+verify_jwt = false

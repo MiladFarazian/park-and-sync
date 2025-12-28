@@ -113,10 +113,18 @@ export type Database = {
           end_at: string
           ev_charging_fee: number | null
           extension_charges: number | null
+          guest_access_token: string | null
+          guest_car_model: string | null
+          guest_email: string | null
+          guest_full_name: string | null
+          guest_license_plate: string | null
+          guest_phone: string | null
+          guest_user_id: string | null
           host_earnings: number | null
           hourly_rate: number
           id: string
           idempotency_key: string | null
+          is_guest: boolean | null
           original_total_amount: number | null
           overstay_action: string | null
           overstay_charge_amount: number | null
@@ -147,10 +155,18 @@ export type Database = {
           end_at: string
           ev_charging_fee?: number | null
           extension_charges?: number | null
+          guest_access_token?: string | null
+          guest_car_model?: string | null
+          guest_email?: string | null
+          guest_full_name?: string | null
+          guest_license_plate?: string | null
+          guest_phone?: string | null
+          guest_user_id?: string | null
           host_earnings?: number | null
           hourly_rate: number
           id?: string
           idempotency_key?: string | null
+          is_guest?: boolean | null
           original_total_amount?: number | null
           overstay_action?: string | null
           overstay_charge_amount?: number | null
@@ -181,10 +197,18 @@ export type Database = {
           end_at?: string
           ev_charging_fee?: number | null
           extension_charges?: number | null
+          guest_access_token?: string | null
+          guest_car_model?: string | null
+          guest_email?: string | null
+          guest_full_name?: string | null
+          guest_license_plate?: string | null
+          guest_phone?: string | null
+          guest_user_id?: string | null
           host_earnings?: number | null
           hourly_rate?: number
           id?: string
           idempotency_key?: string | null
+          is_guest?: boolean | null
           original_total_amount?: number | null
           overstay_action?: string | null
           overstay_charge_amount?: number | null

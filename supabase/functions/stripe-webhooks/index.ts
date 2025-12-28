@@ -72,9 +72,9 @@ serve(async (req) => {
 async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   console.log('Payment succeeded:', paymentIntent.id);
 
-  // Prefer explicit booking_id from metadata when available
   const metadata = (paymentIntent.metadata || {}) as Record<string, string>;
   const bookingIdFromMetadata = metadata.booking_id;
+  const isGuestBooking = metadata.is_guest === 'true';
 
   let booking: any = null;
   let bookingError: any = null;
@@ -83,7 +83,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     if (bookingIdFromMetadata) {
       const { data, error } = await supabase
         .from('bookings')
-        .select('id, status, host_earnings, renter_id, spot_id, spots!inner(host_id, title, address)')
+        .select('id, status, host_earnings, renter_id, spot_id, is_guest, guest_full_name, guest_email, guest_phone, guest_access_token, spots!inner(host_id, title, address)')
         .eq('id', bookingIdFromMetadata)
         .single();
 
@@ -92,7 +92,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     } else {
       const { data, error } = await supabase
         .from('bookings')
-        .select('id, status, host_earnings, renter_id, spot_id, spots!inner(host_id, title, address)')
+        .select('id, status, host_earnings, renter_id, spot_id, is_guest, guest_full_name, guest_email, guest_phone, guest_access_token, spots!inner(host_id, title, address)')
         .eq('stripe_payment_intent_id', paymentIntent.id)
         .single();
 
@@ -136,31 +136,83 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
 
   console.log('Booking activated from payment_intent.succeeded:', booking.id);
 
-  // Send confirmation notification to renter
-  const renterNotification = {
-    user_id: booking.renter_id,
-    type: 'booking',
-    title: 'Payment Successful',
-    message: `Your booking at ${(booking.spots as any).address} is now confirmed!`,
-    related_id: booking.id,
-  };
-
-  await supabase.from('notifications').insert(renterNotification);
-
-  // Notify host about new booking
-  const hostNotification = {
-    user_id: hostId,
-    type: 'booking',
-    title: 'New Booking Received',
-    message: `A driver has booked your spot at ${(booking.spots as any).address}`,
-    related_id: `host-booking-confirmation/${booking.id}`,
-  };
-  await supabase.from('notifications').insert(hostNotification);
-
-  // Credit host's balance (idempotent because we only do this when booking was not active)
   const hostId = (booking.spots as any).host_id;
   const hostEarnings = booking.host_earnings || 0;
 
+  // Handle guest vs authenticated booking notifications
+  if (booking.is_guest) {
+    console.log('Processing guest booking confirmation:', booking.id);
+    
+    // Notify host about new guest booking
+    const hostNotification = {
+      user_id: hostId,
+      type: 'booking_host',
+      title: 'New Guest Booking',
+      message: `${booking.guest_full_name} has booked your spot at ${(booking.spots as any).address}`,
+      related_id: `host-booking-confirmation/${booking.id}`,
+    };
+    await supabase.from('notifications').insert(hostNotification);
+
+    // Send confirmation email to guest
+    if (booking.guest_email) {
+      try {
+        const appUrl = Deno.env.get('APP_URL') || 'https://parkzy.lovable.app';
+        const guestBookingUrl = `${appUrl}/guest-booking/${booking.id}?token=${booking.guest_access_token}`;
+        
+        // Get host profile for email
+        const { data: hostProfile } = await supabase
+          .from('profiles')
+          .select('first_name, email')
+          .eq('user_id', hostId)
+          .single();
+
+        await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-guest-booking-confirmation`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({
+            guestEmail: booking.guest_email,
+            guestName: booking.guest_full_name,
+            hostName: hostProfile?.first_name || 'Host',
+            hostEmail: hostProfile?.email,
+            spotTitle: (booking.spots as any).title,
+            spotAddress: (booking.spots as any).address,
+            startAt: booking.start_at,
+            endAt: booking.end_at,
+            totalAmount: booking.total_amount,
+            bookingId: booking.id,
+            guestAccessToken: booking.guest_access_token,
+          }),
+        });
+        console.log('Guest confirmation email sent');
+      } catch (emailError) {
+        console.error('Failed to send guest confirmation email:', emailError);
+      }
+    }
+  } else {
+    // Regular authenticated booking - existing logic
+    const renterNotification = {
+      user_id: booking.renter_id,
+      type: 'booking',
+      title: 'Payment Successful',
+      message: `Your booking at ${(booking.spots as any).address} is now confirmed!`,
+      related_id: booking.id,
+    };
+    await supabase.from('notifications').insert(renterNotification);
+
+    const hostNotification = {
+      user_id: hostId,
+      type: 'booking_host',
+      title: 'New Booking Received',
+      message: `A driver has booked your spot at ${(booking.spots as any).address}`,
+      related_id: `host-booking-confirmation/${booking.id}`,
+    };
+    await supabase.from('notifications').insert(hostNotification);
+  }
+
+  // Credit host's balance
   if (hostEarnings > 0) {
     const { error: balanceError } = await supabase.rpc('increment_balance', {
       user_id: hostId,
