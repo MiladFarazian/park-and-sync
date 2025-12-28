@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { ExtendParkingDialog } from '@/components/booking/ExtendParkingDialog';
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, AlertTriangle, CheckCircle2, Copy, AlarmClockPlus, Flag } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, AlertTriangle, CheckCircle2, Copy, AlarmClockPlus, Flag, Zap } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -37,6 +37,8 @@ interface BookingDetails {
   renter_id: string;
   original_total_amount: number | null;
   extension_charges: number | null;
+  will_use_ev_charging: boolean | null;
+  ev_charging_fee: number | null;
   spots: {
     id: string;
     title: string;
@@ -44,6 +46,8 @@ interface BookingDetails {
     host_id: string;
     description: string | null;
     access_notes: string | null;
+    has_ev_charging: boolean | null;
+    ev_charging_instructions: string | null;
   };
   profiles: {
     first_name: string;
@@ -118,7 +122,9 @@ const BookingDetailContent = () => {
           cancellation_reason,
           original_total_amount,
           extension_charges,
-          spots!inner(id, title, address, host_id, description, access_notes),
+          will_use_ev_charging,
+          ev_charging_fee,
+          spots!inner(id, title, address, host_id, description, access_notes, has_ev_charging, ev_charging_instructions),
           profiles!bookings_renter_id_fkey(first_name, last_name, avatar_url)
         `)
         .eq('id', bookingId)
@@ -562,6 +568,19 @@ const BookingDetailContent = () => {
             </div>
           )}
 
+          {/* EV Charging Instructions */}
+          {booking.will_use_ev_charging && booking.spots.ev_charging_instructions && (
+            <div className="pt-2 border-t border-green-200 bg-green-50/50 -mx-4 px-4 pb-2 rounded-b-lg">
+              <div className="flex items-start gap-2 pt-2">
+                <Zap className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h4 className="text-sm font-semibold text-green-800 mb-1">EV Charging Instructions</h4>
+                  <p className="text-sm text-green-700">{booking.spots.ev_charging_instructions}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <Button variant="outline" className="w-full" onClick={handleGetDirections}>
             <Navigation className="h-4 w-4 mr-2" />
             Get Directions
@@ -648,6 +667,15 @@ const BookingDetailContent = () => {
               <span className="text-muted-foreground">Service fee</span>
               <span className="font-medium">${booking.platform_fee.toFixed(2)}</span>
             </div>
+            {(booking.ev_charging_fee ?? 0) > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <Zap className="h-3 w-3 text-green-500" />
+                  EV Charging
+                </span>
+                <span className="font-medium">${(booking.ev_charging_fee ?? 0).toFixed(2)}</span>
+              </div>
+            )}
             {extensionChargesToShow > 0.01 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground flex items-center gap-1">
