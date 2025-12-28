@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -18,9 +18,13 @@ import RequireAuth from "@/components/auth/RequireAuth";
 
 const EditVehicleContent = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Get return path from location state or default to my-vehicles
+  const returnTo = location.state?.returnTo || '/my-vehicles';
   const [formData, setFormData] = useState({
     license_plate: "",
     make: "",
@@ -92,7 +96,7 @@ const EditVehicleContent = () => {
       if (error) throw error;
 
       toast.success("Vehicle updated successfully");
-      navigate("/my-vehicles");
+      navigate(returnTo);
     } catch (error: any) {
       toast.error(error.message || "Failed to update vehicle");
     } finally {
@@ -105,11 +109,11 @@ const EditVehicleContent = () => {
       <div className="h-full overflow-y-auto">
         <div className="container max-w-2xl mx-auto p-4 space-y-6 pb-24">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/my-vehicles')}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <Skeleton className="h-8 w-32 mb-1" />
+          <Button variant="ghost" size="icon" onClick={() => navigate(returnTo)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <Skeleton className="h-8 w-32 mb-1" />
               <Skeleton className="h-4 w-48" />
             </div>
           </div>
@@ -130,7 +134,7 @@ const EditVehicleContent = () => {
     <div className="h-full overflow-y-auto">
       <div className="container max-w-2xl mx-auto p-4 space-y-6 pb-24">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/my-vehicles')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate(returnTo)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
@@ -251,7 +255,7 @@ const EditVehicleContent = () => {
                 type="button"
                 variant="outline"
                 className="flex-1"
-                onClick={() => navigate('/my-vehicles')}
+                onClick={() => navigate(returnTo)}
               >
                 Cancel
               </Button>

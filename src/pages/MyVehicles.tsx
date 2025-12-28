@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Plus, Car, MoreVertical, Pencil, Trash2, Star, Truck, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -138,11 +138,19 @@ const SwipeableCard = ({ children, onDelete, disabled }: SwipeableCardProps) => 
 
 const MyVehiclesContent = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [vehicleToDelete, setVehicleToDelete] = useState<string | null>(null);
+  
+  // Get return path from location state or default to profile
+  const returnTo = location.state?.returnTo || '/profile';
+  
+  // Current path to pass to add/edit vehicle pages so they return here
+  const currentPath = location.pathname + (location.state?.returnTo ? '' : '');
+  const vehicleReturnState = { returnTo: location.state?.returnTo || location.pathname };
 
   const { data: vehicles, isLoading } = useQuery({
     queryKey: ["vehicles", user?.id],
@@ -271,7 +279,7 @@ const MyVehiclesContent = () => {
                       <DropdownMenuSeparator />
                     </>
                   )}
-                  <DropdownMenuItem onClick={() => navigate(`/edit-vehicle/${vehicle.id}`)}>
+                  <DropdownMenuItem onClick={() => navigate(`/edit-vehicle/${vehicle.id}`, { state: vehicleReturnState })}>
                     <Pencil className="h-4 w-4 mr-2" />
                     Edit
                   </DropdownMenuItem>
@@ -320,14 +328,14 @@ const MyVehiclesContent = () => {
       <div className="container max-w-2xl mx-auto p-4 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/profile')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate(returnTo)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-bold tracking-tight">My Vehicles</h1>
             <p className="text-sm text-muted-foreground">Manage your registered vehicles</p>
           </div>
-          <Button onClick={() => navigate("/add-vehicle")} size="sm">
+          <Button onClick={() => navigate("/add-vehicle", { state: vehicleReturnState })} size="sm">
             <Plus className="h-4 w-4 mr-2" />
             Add
           </Button>
@@ -363,7 +371,7 @@ const MyVehiclesContent = () => {
             <p className="text-sm text-muted-foreground mb-4">
               Add your first vehicle to get started with bookings
             </p>
-            <Button onClick={() => navigate("/add-vehicle")}>
+            <Button onClick={() => navigate("/add-vehicle", { state: vehicleReturnState })}>
               <Plus className="h-4 w-4 mr-2" />
               Add Vehicle
             </Button>
