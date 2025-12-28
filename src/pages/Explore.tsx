@@ -88,6 +88,9 @@ const Explore = () => {
   // Guard to prevent duplicate initial fetches
   const didInitialFetchRef = useRef(false);
 
+  // Ignore the first onMapMove fired by Mapbox on initial idle
+  const ignoreFirstMapMoveRef = useRef(true);
+
   // Ensure end time is always after start time
   const validateAndSetTimes = (newStartTime: Date, newEndTime: Date | null) => {
     let validatedEndTime = newEndTime;
@@ -508,6 +511,12 @@ const Explore = () => {
     lat: number;
     lng: number;
   }, radiusMeters: number) => {
+    // Ignore the first automatic map move fired on initial load
+    if (ignoreFirstMapMoveRef.current) {
+      ignoreFirstMapMoveRef.current = false;
+      return;
+    }
+
     // Debounce map movement - reduced from 800ms to 300ms for responsiveness
     if (fetchTimeoutRef.current) {
       clearTimeout(fetchTimeoutRef.current);
