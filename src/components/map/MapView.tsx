@@ -106,6 +106,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
   const [mapReady, setMapReady] = useState(false);
   const [sortedSpots, setSortedSpots] = useState<Spot[]>([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [animatingSlideIndex, setAnimatingSlideIndex] = useState<number | null>(null);
   
   // Embla carousel for swipeable spot cards
   const [emblaRef, emblaApi] = useEmblaCarousel({ 
@@ -153,6 +154,11 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     if (!emblaApi) return;
     const index = emblaApi.selectedScrollSnap();
     setCurrentSlideIndex(index);
+    
+    // Trigger pulse animation for 3 seconds
+    setAnimatingSlideIndex(index);
+    setTimeout(() => setAnimatingSlideIndex(null), 3000);
+    
     if (sortedSpots[index]) {
       setSelectedSpot(sortedSpots[index]);
       setUserSelectedSpot(true);
@@ -1185,14 +1191,15 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
             <div className="flex gap-3">
               {sortedSpots.map((spot, index) => {
                 const isCurrentSlide = index === currentSlideIndex;
+                const isAnimating = index === animatingSlideIndex;
                 return (
                 <div 
                   key={spot.id} 
                   className="flex-[0_0_100%] min-w-0"
                 >
                   <Card className={`p-4 bg-background/95 backdrop-blur-sm transition-all duration-200 ${
-                    isCurrentSlide ? 'ring-2 ring-primary/30 shadow-lg animate-selection-pulse' : ''
-                  }`}>
+                    isCurrentSlide ? 'ring-2 ring-primary/30 shadow-lg' : ''
+                  } ${isAnimating ? 'animate-selection-pulse' : ''}`}>
                     <div className="flex gap-3">
                       <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0">
                         <img 
