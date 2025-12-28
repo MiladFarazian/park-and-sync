@@ -67,7 +67,9 @@ serve(async (req) => {
           title,
           address,
           hourly_rate,
-          host_id
+          host_id,
+          has_ev_charging,
+          ev_charging_premium_per_hour
         )
       `)
       .eq('id', bookingId)
@@ -142,14 +144,30 @@ serve(async (req) => {
       throw new Error(`Another guest has booked this spot soon. You can extend by up to ${maxExtensionText}.`);
     }
 
-    // Calculate extension cost with invisible upcharge + visible service fee
+    // Calculate extension cost with invisible upcharge + visible service fee + EV charging
     const hostHourlyRate = booking.spots.hourly_rate;
     const hostEarnings = hostHourlyRate * extensionHours;
     const upcharge = Math.max(hostHourlyRate * 0.20, 1.00);
     const driverHourlyRate = hostHourlyRate + upcharge;
     const driverSubtotal = Math.round(driverHourlyRate * extensionHours * 100) / 100;
     const serviceFee = Math.round(Math.max(hostEarnings * 0.20, 1.00) * 100) / 100;
-    const extensionCost = Math.round((driverSubtotal + serviceFee) * 100) / 100;
+    
+    // Calculate EV charging fee for extension if booking has EV charging enabled
+    const evChargingFeeExtension = booking.will_use_ev_charging && booking.spots.ev_charging_premium_per_hour
+      ? Math.round(booking.spots.ev_charging_premium_per_hour * extensionHours * 100) / 100
+      : 0;
+    
+    const extensionCost = Math.round((driverSubtotal + serviceFee + evChargingFeeExtension) * 100) / 100;
+    
+    console.log('Extension pricing:', { 
+      hostHourlyRate, 
+      extensionHours, 
+      driverSubtotal, 
+      serviceFee, 
+      evChargingFeeExtension,
+      extensionCost,
+      willUseEvCharging: booking.will_use_ev_charging
+    });
 
     // Initialize Stripe
     const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');
