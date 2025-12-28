@@ -760,33 +760,27 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         source: sourceId,
         filter: ['!', ['has', 'point_count']],
         paint: {
+          // Hover-only subtle glow (no glow for selected - we use ring instead)
           'circle-radius': [
             'case',
             ['boolean', ['feature-state', 'selected'], false],
-            28, // Larger glow for selected
+            0, // No filled glow for selected
             ['boolean', ['feature-state', 'hover'], false],
-            22,
+            14, // Subtle glow for hover
             0
           ],
-          'circle-color': [
-            'case',
-            ['boolean', ['feature-state', 'selected'], false],
-            'hsl(140, 80%, 50%)', // Green glow for selected
-            'hsl(250, 100%, 65%)' // Blue glow for hover
-          ],
+          'circle-color': 'hsl(250, 100%, 70%)', // Parkzy purple for hover
           'circle-opacity': [
             'case',
-            ['boolean', ['feature-state', 'selected'], false],
-            0.4,
             ['boolean', ['feature-state', 'hover'], false],
-            0.25,
+            0.2,
             0
           ],
           'circle-translate': [0, -20] // Offset to align with pin head
         }
       } as any);
       
-      // Add selected spot highlight ring (renders above highlight glow)
+      // Add selected spot highlight ring - clean outline, no filled circle
       (map.current as any).addLayer({
         id: 'spots-selected-ring',
         type: 'circle',
@@ -796,17 +790,17 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           'circle-radius': [
             'case',
             ['boolean', ['feature-state', 'selected'], false],
-            18,
+            16, // Clean ring around pin head
             0
           ],
           'circle-color': 'transparent',
           'circle-stroke-width': [
             'case',
             ['boolean', ['feature-state', 'selected'], false],
-            3,
+            2.5,
             0
           ],
-          'circle-stroke-color': 'hsl(140, 80%, 45%)',
+          'circle-stroke-color': 'hsl(250, 100%, 65%)', // Parkzy purple ring
           'circle-translate': [0, -20]
         }
       } as any);
@@ -847,7 +841,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           'text-color': [
             'case',
             ['boolean', ['feature-state', 'selected'], false],
-            'hsl(140, 70%, 35%)', // Green text for selected
+            'hsl(250, 60%, 45%)', // Darker purple text for selected
             'hsl(250, 100%, 65%)'
           ],
           'text-halo-color': '#ffffff',

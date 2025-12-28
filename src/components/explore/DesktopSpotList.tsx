@@ -309,9 +309,13 @@ const DesktopSpotList = ({
                 <div
                   key={spot.id}
                   className={`p-4 cursor-pointer transition-all duration-200 ${
-                    isSelected ? 'bg-primary/5 border-l-4 border-l-primary' : ''
+                    isSelected 
+                      ? 'bg-primary/10 border-l-4 border-l-primary ring-1 ring-primary/20 shadow-sm' 
+                      : ''
                   } ${
-                    isHovered && !isSelected ? 'bg-muted/70 scale-[1.01]' : 'hover:bg-muted/50'
+                    isHovered && !isSelected 
+                      ? 'bg-muted/70 scale-[1.01]' 
+                      : !isSelected ? 'hover:bg-muted/50' : ''
                   }`}
                   onMouseEnter={() => onSpotHover?.(spot.id)}
                   onMouseLeave={() => onSpotHover?.(null)}
