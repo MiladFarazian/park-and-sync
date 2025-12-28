@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2, Search, X, MapPin, Calendar, Clock, ArrowRight, Navigation } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -10,12 +10,44 @@ import { format, isToday } from 'date-fns';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { useIsMobile } from '@/hooks/use-mobile';
 
+// Session cache utilities for instant back/forward navigation
+const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+
+const getCacheKey = (lat: number, lng: number): string => 
+  `explore-spots-${lat.toFixed(3)}-${lng.toFixed(3)}`;
+
+const getCachedSpots = (key: string): any[] | null => {
+  try {
+    const cached = sessionStorage.getItem(key);
+    if (!cached) return null;
+    const { data, timestamp } = JSON.parse(cached);
+    if (Date.now() - timestamp > CACHE_EXPIRY_MS) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+};
+
+const setCachedSpots = (key: string, spots: any[]): void => {
+  try {
+    sessionStorage.setItem(key, JSON.stringify({
+      data: spots,
+      timestamp: Date.now()
+    }));
+  } catch {
+    // Ignore storage errors
+  }
+};
+
 const Explore = () => {
   const isMobile = useIsMobile();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [spotsLoading, setSpotsLoading] = useState(true);
 
   // Physical device location (blue dot)
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -52,6 +84,9 @@ const Explore = () => {
   
   // Request ID guard to prevent stale responses from overwriting newer ones
   const latestRequestIdRef = useRef(0);
+  
+  // Guard to prevent duplicate initial fetches
+  const didInitialFetchRef = useRef(false);
 
   // Ensure end time is always after start time
   const validateAndSetTimes = (newStartTime: Date, newEndTime: Date | null) => {
@@ -101,9 +136,16 @@ const Explore = () => {
     return null;
   };
 
-  // Initial load effect - runs once when component mounts or when URL params change
+  // Fetch Mapbox token once on mount
   useEffect(() => {
     fetchMapboxToken();
+  }, []);
+
+  // Initial load effect - runs once when mapbox token is ready
+  useEffect(() => {
+    if (!mapboxToken) return;
+    if (didInitialFetchRef.current) return;
+    didInitialFetchRef.current = true;
 
     // Check for URL parameters
     const lat = searchParams.get('lat');
@@ -111,6 +153,12 @@ const Explore = () => {
     const start = searchParams.get('start');
     const end = searchParams.get('end');
     const query = searchParams.get('q');
+
+    // Parse times first
+    const startDate = start ? new Date(start) : new Date();
+    const endDate = end ? new Date(end) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+    if (start) setStartTime(startDate);
+    if (end) setEndTime(endDate);
 
     // If URL has a lat/lng, treat that as the desired search location
     if (lat && lng) {
@@ -122,27 +170,40 @@ const Explore = () => {
 
       if (query) {
         setSearchQuery(query);
-      } else if (mapboxToken) {
+      } else {
         // Get address label for the desired location
         reverseGeocode(desired.lat, desired.lng).then(address => {
           if (address) setSearchQuery(address);
         });
       }
 
-      // Fetch spots for the initial desired location
-      const startDate = start ? new Date(start) : new Date();
-      const endDate = end ? new Date(end) : new Date(Date.now() + 24 * 60 * 60 * 1000);
-      if (start) setStartTime(startDate);
-      if (end) setEndTime(endDate);
-      fetchNearbySpots(desired, 15000, true);
+      // Check cache first for instant render
+      const cacheKey = getCacheKey(desired.lat, desired.lng);
+      const cachedSpots = getCachedSpots(cacheKey);
+      if (cachedSpots) {
+        setParkingSpots(cachedSpots);
+        setSpotsLoading(false);
+        // Still fetch fresh data in background
+        fetchNearbySpots(desired, 15000, false);
+      } else {
+        fetchNearbySpots(desired, 15000, true);
+      }
     } else {
       // No URL lat/lng: use default search location
-      fetchNearbySpots(searchLocation, 15000, true);
       setSearchQuery('University Park, Los Angeles');
-      if (start) setStartTime(new Date(start));
-      if (end) setEndTime(new Date(end));
+      
+      // Check cache first
+      const cacheKey = getCacheKey(searchLocation.lat, searchLocation.lng);
+      const cachedSpots = getCachedSpots(cacheKey);
+      if (cachedSpots) {
+        setParkingSpots(cachedSpots);
+        setSpotsLoading(false);
+        fetchNearbySpots(searchLocation, 15000, false);
+      } else {
+        fetchNearbySpots(searchLocation, 15000, true);
+      }
     }
-  }, [searchParams, mapboxToken]);
+  }, [mapboxToken]);
 
   // Continuously watch and update the user's physical location (blue dot marker)
   useEffect(() => {
@@ -380,14 +441,14 @@ const Explore = () => {
     setSuggestions([]);
     setShowSuggestions(false);
   };
-  const fetchNearbySpots = async (center = searchLocation, radius = 15000, isInitialLoad = true) => {
+  const fetchNearbySpots = useCallback(async (center = searchLocation, radius = 15000, isInitialLoad = true) => {
     // Increment request ID and capture it for this request
     const requestId = ++latestRequestIdRef.current;
     
     try {
-      // Only show loading spinner on initial load
-      if (isInitialLoad) {
-        setLoading(true);
+      // Only show loading spinner on initial load when no cached data
+      if (isInitialLoad && parkingSpots.length === 0) {
+        setSpotsLoading(true);
       }
       // Note: We do NOT clear parkingSpots here - "stale-while-revalidate" behavior
 
@@ -432,14 +493,16 @@ const Explore = () => {
       })) || [];
       
       setParkingSpots(transformedSpots);
+      
+      // Cache the results for instant back/forward navigation
+      const cacheKey = getCacheKey(center.lat, center.lng);
+      setCachedSpots(cacheKey, transformedSpots);
     } catch (err) {
       console.error('Unexpected error:', err);
     } finally {
-      if (isInitialLoad) {
-        setLoading(false);
-      }
+      setSpotsLoading(false);
     }
-  };
+  }, [searchLocation, parkingSpots.length]);
   
   const handleMapMove = (center: {
     lat: number;
@@ -472,17 +535,6 @@ const Explore = () => {
   const formatDateDisplay = (date: Date) => {
     return isToday(date) ? 'Today' : format(date, 'MMM dd');
   };
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-64px)]">
-        <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
-          <p className="text-muted-foreground">Loading map...</p>
-        </div>
-      </div>
-    );
-  }
-
   const exploreParams = {
     lat: searchLocation.lat.toString(),
     lng: searchLocation.lng.toString(),
@@ -509,13 +561,24 @@ const Explore = () => {
             filters={filters}
             onFiltersChange={setFilters}
             exploreParams={exploreParams}
+            isLoading={spotsLoading}
           />
         </div>
 
         {/* Right Panel - Map */}
         <div className="flex-1 relative">
+          {/* Non-blocking loading indicator */}
+          {spotsLoading && (
+            <div className="absolute top-4 right-4 z-20">
+              <div className="bg-background/95 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                <span className="text-xs text-muted-foreground">Updating spots…</span>
+              </div>
+            </div>
+          )}
+          
           {/* Search Bar */}
-          <div className="absolute top-4 left-4 right-4 z-10">
+          <div className="absolute top-4 left-4 right-20 z-10">
             <div className="max-w-lg">
               <div className="relative flex gap-2">
                 <div className="relative flex-1">
@@ -666,6 +729,16 @@ const Explore = () => {
   // Mobile Layout: Full-screen map with overlay controls
   return (
     <div className="h-full overflow-hidden relative">
+      {/* Non-blocking loading indicator for mobile */}
+      {spotsLoading && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20">
+          <div className="bg-background/95 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2">
+            <Loader2 className="h-3 w-3 animate-spin text-primary" />
+            <span className="text-xs text-muted-foreground">Loading spots…</span>
+          </div>
+        </div>
+      )}
+      
       <div className="absolute top-4 left-4 right-4 z-10 space-y-2">
         <div className="relative max-w-md mx-auto">
           <div className="relative flex gap-2">

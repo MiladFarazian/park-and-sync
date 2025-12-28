@@ -63,7 +63,33 @@ interface DesktopSpotListProps {
     end?: string;
     q?: string;
   };
+  isLoading?: boolean;
 }
+
+// Skeleton component for loading state
+const SpotSkeleton = () => (
+  <div className="p-4 animate-pulse">
+    <div className="flex gap-4">
+      <div className="w-24 h-24 rounded-lg bg-muted flex-shrink-0" />
+      <div className="flex-1 space-y-2">
+        <div className="flex justify-between">
+          <div className="h-4 bg-muted rounded w-2/3" />
+          <div className="h-5 bg-muted rounded w-16" />
+        </div>
+        <div className="h-3 bg-muted rounded w-1/3" />
+        <div className="h-3 bg-muted rounded w-1/2" />
+        <div className="flex gap-2 mt-2">
+          <div className="h-6 bg-muted rounded w-16" />
+          <div className="h-6 bg-muted rounded w-16" />
+        </div>
+        <div className="flex gap-2 mt-2">
+          <div className="h-8 bg-muted rounded flex-1" />
+          <div className="h-8 bg-muted rounded flex-1" />
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 // Calculate distance between two coordinates using Haversine formula (returns miles)
 const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
@@ -102,6 +128,7 @@ const DesktopSpotList = ({
   filters,
   onFiltersChange,
   exploreParams,
+  isLoading = false,
 }: DesktopSpotListProps) => {
   const navigate = useNavigate();
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -301,7 +328,14 @@ const DesktopSpotList = ({
 
       {/* Spot List */}
       <div className="flex-1 overflow-y-auto">
-        {sortedSpots.length === 0 ? (
+        {/* Loading skeleton state */}
+        {isLoading && spots.length === 0 ? (
+          <div className="divide-y">
+            {[...Array(5)].map((_, i) => (
+              <SpotSkeleton key={i} />
+            ))}
+          </div>
+        ) : sortedSpots.length === 0 ? (
           <div className="flex items-center justify-center h-full p-8 text-center">
             <div>
               <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
