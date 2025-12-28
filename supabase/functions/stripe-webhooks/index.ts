@@ -83,7 +83,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     if (bookingIdFromMetadata) {
       const { data, error } = await supabase
         .from('bookings')
-        .select('id, status, host_earnings, renter_id, spot_id, is_guest, guest_full_name, guest_email, guest_phone, guest_access_token, spots!inner(host_id, title, address)')
+        .select('id, status, host_earnings, renter_id, spot_id, start_at, end_at, total_amount, is_guest, guest_full_name, guest_email, guest_phone, guest_access_token, spots!inner(host_id, title, address)')
         .eq('id', bookingIdFromMetadata)
         .single();
 
@@ -92,7 +92,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     } else {
       const { data, error } = await supabase
         .from('bookings')
-        .select('id, status, host_earnings, renter_id, spot_id, is_guest, guest_full_name, guest_email, guest_phone, guest_access_token, spots!inner(host_id, title, address)')
+        .select('id, status, host_earnings, renter_id, spot_id, start_at, end_at, total_amount, is_guest, guest_full_name, guest_email, guest_phone, guest_access_token, spots!inner(host_id, title, address)')
         .eq('stripe_payment_intent_id', paymentIntent.id)
         .single();
 
