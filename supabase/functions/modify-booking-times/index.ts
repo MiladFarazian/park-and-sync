@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     // Fetch the booking
     const { data: booking, error: bookingError } = await supabaseClient
       .from('bookings')
-      .select('*, spots!inner(hourly_rate, host_id)')
+      .select('*, spots!inner(hourly_rate, host_id, has_ev_charging, ev_charging_premium_per_hour)')
       .eq('id', bookingId)
       .single();
 
@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
       throw new Error('Spot is not available for the requested times');
     }
 
-    // Calculate new costs with invisible upcharge + visible service fee
+    // Calculate new costs with invisible upcharge + visible service fee + EV charging
     const durationMs = newEnd.getTime() - newStart.getTime();
     const newTotalHours = durationMs / (1000 * 60 * 60);
     const hostHourlyRate = booking.spots.hourly_rate;
@@ -97,8 +97,14 @@ Deno.serve(async (req) => {
     const driverHourlyRate = hostHourlyRate + upcharge;
     const driverSubtotal = Math.round(driverHourlyRate * newTotalHours * 100) / 100;
     const newPlatformFee = Math.round(Math.max(hostEarnings * 0.20, 1.00) * 100) / 100;
+    
+    // Calculate EV charging fee if booking has EV charging enabled
+    const newEvChargingFee = booking.will_use_ev_charging && booking.spots.ev_charging_premium_per_hour
+      ? Math.round(booking.spots.ev_charging_premium_per_hour * newTotalHours * 100) / 100
+      : 0;
+    
     const newSubtotal = driverSubtotal;
-    const newTotalAmount = Math.round((driverSubtotal + newPlatformFee) * 100) / 100;
+    const newTotalAmount = Math.round((driverSubtotal + newPlatformFee + newEvChargingFee) * 100) / 100;
 
     const priceDifference = newTotalAmount - booking.total_amount;
     const absoluteDifference = Math.abs(priceDifference);
@@ -109,6 +115,8 @@ Deno.serve(async (req) => {
       hostHourlyRate,
       oldTotalAmount: booking.total_amount,
       newTotalAmount,
+      newEvChargingFee,
+      willUseEvCharging: booking.will_use_ev_charging,
       priceDifference,
       willCharge: priceDifference > 0,
       willRefund: priceDifference < 0
@@ -191,6 +199,7 @@ Deno.serve(async (req) => {
         total_hours: newTotalHours,
         subtotal: newSubtotal,
         platform_fee: newPlatformFee,
+        ev_charging_fee: newEvChargingFee,
         total_amount: newTotalAmount,
         updated_at: new Date().toISOString()
       })
