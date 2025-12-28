@@ -14,6 +14,7 @@ interface BookingRequest {
   vehicle_id?: string;
   hold_id?: string;
   idempotency_key?: string;
+  will_use_ev_charging?: boolean;
 }
 
 serve(async (req) => {
@@ -55,10 +56,13 @@ serve(async (req) => {
       end_at, 
       vehicle_id, 
       hold_id,
-      idempotency_key 
+      idempotency_key,
+      will_use_ev_charging 
     }: BookingRequest = await req.json();
 
-    console.log('Creating booking:', { spot_id, start_at, end_at, user_id: userData.user.id });
+    const useEvCharging = will_use_ev_charging || false;
+
+    console.log('Creating booking:', { spot_id, start_at, end_at, user_id: userData.user.id, useEvCharging });
 
     // Re-check availability before proceeding
     console.log('Re-checking spot availability...');
@@ -120,12 +124,23 @@ serve(async (req) => {
     // Get spot details for pricing
     const { data: spot, error: spotError } = await supabase
       .from('spots')
-      .select('*, host_id, instant_book')
+      .select('*, host_id, instant_book, has_ev_charging, ev_charging_premium_per_hour')
       .eq('id', spot_id)
       .single();
 
     if (spotError || !spot) {
       throw new Error('Spot not found');
+    }
+
+    // Validate EV charging request
+    if (useEvCharging && !spot.has_ev_charging) {
+      console.error('EV charging requested but spot does not support it');
+      return new Response(JSON.stringify({ 
+        error: 'This spot does not offer EV charging' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const isInstantBook = spot.instant_book !== false; // Default to true for backwards compatibility
@@ -140,6 +155,7 @@ serve(async (req) => {
     // Calculate pricing
     // - Driver sees upcharged rate (host rate + 20% or $1 min) as "Host Rate"
     // - Service fee is separate and visible (20% of host earnings or $1 min)
+    // - EV charging fee is optional
     const startDate = new Date(start_at);
     const endDate = new Date(end_at);
     // Calculate actual hours as decimal (e.g., 0.5 for 30 minutes)
@@ -155,11 +171,15 @@ serve(async (req) => {
     // Visible service fee
     const serviceFee = Math.round(Math.max(hostEarnings * 0.20, 1.00) * 100) / 100;
     
+    // EV charging fee
+    const evChargingPremium = spot.ev_charging_premium_per_hour || 0;
+    const evChargingFee = useEvCharging ? Math.round(evChargingPremium * totalHours * 100) / 100 : 0;
+    
     const subtotal = driverSubtotal; // What driver sees as rate × hours
     const platformFee = serviceFee; // Visible service fee
-    const totalAmount = Math.round((driverSubtotal + serviceFee) * 100) / 100;
+    const totalAmount = Math.round((driverSubtotal + serviceFee + evChargingFee) * 100) / 100;
     
-    console.log('Pricing calculated:', { totalHours, hostHourlyRate, hostEarnings, driverSubtotal, serviceFee, totalAmount });
+    console.log('Pricing calculated:', { totalHours, hostHourlyRate, hostEarnings, driverSubtotal, serviceFee, evChargingFee, totalAmount });
 
     // Initialize Stripe
     const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');
@@ -264,7 +284,9 @@ serve(async (req) => {
         platform_fee: platformFee,
         total_amount: totalAmount,
         host_earnings: hostEarnings,
-        idempotency_key: idempotency_key || crypto.randomUUID()
+        idempotency_key: idempotency_key || crypto.randomUUID(),
+        will_use_ev_charging: useEvCharging,
+        ev_charging_fee: evChargingFee,
       })
       .select()
       .single();

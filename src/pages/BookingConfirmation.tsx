@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Clock, MapPin, Star, MessageCircle, Car, Calendar, XCircle, Navigation, Copy, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, MapPin, Star, MessageCircle, Car, Calendar, XCircle, Navigation, Copy, AlertTriangle, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -371,6 +371,21 @@ const BookingConfirmationContent = () => {
             <div className="mt-4 pt-4 border-t">
               <h4 className="text-sm font-semibold mb-2">Access Instructions</h4>
               <p className="text-sm text-muted-foreground">{spot.access_notes}</p>
+            </div>
+          )}
+          
+          {/* EV Charging Instructions */}
+          {booking.will_use_ev_charging && spot?.ev_charging_instructions && (
+            <div className="mt-4 pt-4 border-t">
+              <div className="p-3 rounded-lg border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10">
+                <div className="flex items-start gap-3">
+                  <Zap className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-semibold text-green-800 dark:text-green-300">Charging Instructions</h4>
+                    <p className="text-sm text-green-700 dark:text-green-400 mt-1">{spot.ev_charging_instructions}</p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
           
