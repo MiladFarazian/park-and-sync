@@ -30,6 +30,8 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: any }>;
+  refreshProfile: () => Promise<void>;
+  ensureProfileExists: () => Promise<{ error: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -61,6 +63,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return null;
     }
     return data;
+  };
+
+  // Ensure a profile exists for the current user (upsert pattern)
+  const ensureProfileExistsForUser = async (userId: string, email?: string | null, phone?: string | null) => {
+    console.log('[Auth] Ensuring profile exists for user:', userId);
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({
+        user_id: userId,
+        email: email || null,
+        phone: phone || null,
+      }, { 
+        onConflict: 'user_id',
+        ignoreDuplicates: false 
+      });
+    
+    if (error) {
+      console.error('[Auth] Error ensuring profile exists:', error);
+    }
+    return { error };
   };
 
   useEffect(() => {
@@ -202,12 +224,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) return { error: new Error('No user logged in') };
 
+    console.log('[Auth] Updating profile for user:', user.id, updates);
+    
+    // Use upsert instead of update to handle cases where profile doesn't exist
     const { error } = await supabase
       .from('profiles')
-      .update(updates)
-      .eq('user_id', user.id);
+      .upsert({
+        user_id: user.id,
+        ...updates,
+        updated_at: new Date().toISOString(),
+      }, { 
+        onConflict: 'user_id' 
+      });
 
     if (error) {
+      console.error('[Auth] Profile update failed:', error);
       toast({
         title: "Profile Update Failed",
         description: error.message,
@@ -226,6 +257,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error };
   };
 
+  const refreshProfile = async () => {
+    if (!user) return;
+    console.log('[Auth] Refreshing profile for user:', user.id);
+    const profileData = await fetchProfile(user.id);
+    setProfile(profileData);
+  };
+
+  const ensureProfileExists = async () => {
+    if (!user) return { error: new Error('No user logged in') };
+    return ensureProfileExistsForUser(user.id, user.email, user.phone);
+  };
+
   const value = {
     user,
     session,
@@ -235,6 +278,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signIn,
     signOut,
     updateProfile,
+    refreshProfile,
+    ensureProfileExists,
   };
 
   return (

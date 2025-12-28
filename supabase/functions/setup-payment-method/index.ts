@@ -32,32 +32,58 @@ serve(async (req) => {
     // Authenticate user
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
-    if (userError || !user?.email) {
+    if (userError || !user) {
       throw new Error('User not authenticated');
     }
+
+    console.log('[setup-payment-method] Processing for user:', user.id, 'email:', user.email, 'phone:', user.phone);
 
     const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
       apiVersion: '2025-08-27.basil',
     });
 
-    // Check if customer exists
-    const customers = await stripe.customers.list({
-      email: user.email,
-      limit: 1,
-    });
+    let customerId: string | undefined;
 
-    let customerId: string;
-    if (customers.data.length > 0) {
-      customerId = customers.data[0].id;
-    } else {
-      // Create new customer
-      const customer = await stripe.customers.create({
+    // Try to find existing customer by email first
+    if (user.email) {
+      const customers = await stripe.customers.list({
         email: user.email,
+        limit: 1,
+      });
+      if (customers.data.length > 0) {
+        customerId = customers.data[0].id;
+        console.log('[setup-payment-method] Found existing customer by email:', customerId);
+      }
+    }
+
+    // If no customer found by email, search by user_id in metadata
+    if (!customerId) {
+      try {
+        const searchResult = await stripe.customers.search({
+          query: `metadata['supabase_user_id']:'${user.id}'`,
+        });
+        if (searchResult.data.length > 0) {
+          customerId = searchResult.data[0].id;
+          console.log('[setup-payment-method] Found existing customer by metadata:', customerId);
+        }
+      } catch (searchError) {
+        console.log('[setup-payment-method] Customer search failed, will create new:', searchError);
+      }
+    }
+
+    // Create new customer if none found
+    if (!customerId) {
+      console.log('[setup-payment-method] Creating new customer');
+      const customer = await stripe.customers.create({
+        email: user.email || undefined,
+        phone: user.phone || undefined,
+        name: user.email || user.phone || undefined,
         metadata: {
           supabase_user_id: user.id,
         },
       });
       customerId = customer.id;
+      console.log('[setup-payment-method] Created new customer:', customerId);
     }
 
     // Create setup intent for adding payment method
