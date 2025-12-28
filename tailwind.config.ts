@@ -122,6 +122,20 @@ export default {
             transform: "translateY(10px) translateX(-15px)",
           },
         },
+        "selection-pulse": {
+          "0%": {
+            transform: "scale(1)",
+            boxShadow: "0 0 0 0 hsl(250 100% 65% / 0.3)",
+          },
+          "50%": {
+            transform: "scale(1.01)",
+            boxShadow: "0 0 0 4px hsl(250 100% 65% / 0.1)",
+          },
+          "100%": {
+            transform: "scale(1)",
+            boxShadow: "0 0 0 0 hsl(250 100% 65% / 0)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -130,6 +144,7 @@ export default {
         "fade-in": "fade-in 0.2s ease-out",
         "gradient-shift": "gradient-shift 8s ease-in-out infinite",
         "float": "float 12s ease-in-out infinite",
+        "selection-pulse": "selection-pulse 0.4s ease-out",
       },
     },
   },

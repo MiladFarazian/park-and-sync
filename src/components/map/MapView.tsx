@@ -781,9 +781,9 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         }
       } as any);
       
-      // Add selected spot highlight ring - clean outline, no filled circle
+      // Add selected spot pulse animation layer (replaces ring)
       (map.current as any).addLayer({
-        id: 'spots-selected-ring',
+        id: 'spots-selected-pulse',
         type: 'circle',
         source: sourceId,
         filter: ['!', ['has', 'point_count']],
@@ -791,20 +791,63 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           'circle-radius': [
             'case',
             ['boolean', ['feature-state', 'selected'], false],
-            16, // Clean ring around pin head
+            20,
             0
           ],
-          'circle-color': 'transparent',
-          'circle-stroke-width': [
+          'circle-color': 'hsl(250, 100%, 65%)', // Parkzy purple
+          'circle-opacity': [
             'case',
             ['boolean', ['feature-state', 'selected'], false],
-            2.5,
+            0.3,
             0
           ],
-          'circle-stroke-color': 'hsl(250, 100%, 65%)', // Parkzy purple ring
           'circle-translate': [0, -20]
         }
       } as any);
+      
+      // Start pulse animation for selected spots
+      let selectedPulseFrame: number;
+      let selectedPulseDirection = 1;
+      let selectedPulseRadius = 16;
+      const selectedMinRadius = 14;
+      const selectedMaxRadius = 22;
+      const selectedPulseSpeed = 0.15;
+      
+      const animateSelectedPulse = () => {
+        if (!map.current) return;
+        
+        selectedPulseRadius += selectedPulseDirection * selectedPulseSpeed;
+        if (selectedPulseRadius >= selectedMaxRadius) {
+          selectedPulseDirection = -1;
+        } else if (selectedPulseRadius <= selectedMinRadius) {
+          selectedPulseDirection = 1;
+        }
+        
+        try {
+          (map.current as any).setPaintProperty('spots-selected-pulse', 'circle-radius', [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            selectedPulseRadius,
+            0
+          ]);
+          
+          // Fade opacity as it expands
+          const opacityRange = (selectedPulseRadius - selectedMinRadius) / (selectedMaxRadius - selectedMinRadius);
+          const opacity = 0.35 - (opacityRange * 0.2);
+          (map.current as any).setPaintProperty('spots-selected-pulse', 'circle-opacity', [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            opacity,
+            0
+          ]);
+        } catch (e) {
+          // Layer might not exist yet
+        }
+        
+        selectedPulseFrame = requestAnimationFrame(animateSelectedPulse);
+      };
+      
+      animateSelectedPulse();
 
       // Add unclustered point layer (individual pins)
       // Note: icon-size is a layout property so can't use feature-state
