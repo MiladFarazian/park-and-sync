@@ -50,6 +50,7 @@ interface MapViewProps {
   highlightedSpotId?: string | null;
   selectedSpotId?: string | null; // For selected spot visual differentiation
   onSpotHover?: (spotId: string | null) => void;
+  onSpotSelect?: (spotId: string) => void; // Callback when a marker is clicked
   hideCarousel?: boolean;
 }
 
@@ -71,7 +72,7 @@ const calculateWalkTime = (distanceMiles: number): number => {
   return Math.round((distanceMiles / 3) * 60);
 };
 
-const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, onMapMove, searchQuery, exploreParams, highlightedSpotId, selectedSpotId: propSelectedSpotId, onSpotHover, hideCarousel }: MapViewProps) => {
+const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, onMapMove, searchQuery, exploreParams, highlightedSpotId, selectedSpotId: propSelectedSpotId, onSpotHover, onSpotSelect, hideCarousel }: MapViewProps) => {
   const navigate = useNavigate();
   const { mode, setMode } = useMode();
   const { user } = useAuth();
@@ -902,6 +903,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           console.log('[MapView] Setting selected spot:', spot.id);
           setUserSelectedSpot(true); // Mark that user manually selected a spot
           setSelectedSpot(spot);
+          // Notify parent of selection
+          onSpotSelect?.(spot.id);
           // Scroll carousel to this spot
           scrollToSpot(spot.id);
         } else {

@@ -627,6 +627,7 @@ const Explore = () => {
             highlightedSpotId={hoveredSpotId}
             selectedSpotId={selectedSpotId}
             onSpotHover={setHoveredSpotId}
+            onSpotSelect={setSelectedSpotId}
             hideCarousel={true}
           />
         </div>
