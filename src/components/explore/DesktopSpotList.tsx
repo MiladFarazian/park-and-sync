@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Star, MapPin, Footprints, Umbrella, Zap, Shield, Car, X, BoltIcon, Clock, Accessibility } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -104,6 +104,19 @@ const DesktopSpotList = ({
   exploreParams,
 }: DesktopSpotListProps) => {
   const navigate = useNavigate();
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const listContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to selected card when selection changes
+  useEffect(() => {
+    if (selectedSpotId && cardRefs.current.has(selectedSpotId)) {
+      const cardElement = cardRefs.current.get(selectedSpotId);
+      cardElement?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
+  }, [selectedSpotId]);
 
   const toggleFilter = (key: keyof Omit<SpotFilters, 'vehicleSize'>) => {
     onFiltersChange({ ...filters, [key]: !filters[key] });
@@ -308,9 +321,13 @@ const DesktopSpotList = ({
               return (
                 <div
                   key={spot.id}
+                  ref={(el) => {
+                    if (el) cardRefs.current.set(spot.id, el);
+                    else cardRefs.current.delete(spot.id);
+                  }}
                   className={`p-4 cursor-pointer transition-all duration-200 ${
                     isSelected 
-                      ? 'bg-primary/10 border-l-4 border-l-primary ring-1 ring-primary/20 shadow-sm' 
+                      ? 'bg-primary/10 border-l-4 border-l-primary ring-1 ring-primary/20 shadow-sm animate-[selection-pulse_0.4s_ease-out]' 
                       : ''
                   } ${
                     isHovered && !isSelected 
