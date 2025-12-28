@@ -812,6 +812,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       } as any);
 
       // Add unclustered point layer (individual pins)
+      // Note: icon-size is a layout property so can't use feature-state
+      // We'll use paint property icon-opacity for visual feedback instead
       (map.current as any).addLayer({
         id: circleId,
         type: 'symbol',
@@ -819,24 +821,9 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         filter: ['!', ['has', 'point_count']],
         layout: {
           'icon-image': pinImageId,
-          'icon-size': [
-            'case',
-            ['boolean', ['feature-state', 'selected'], false],
-            1.8, // Larger for selected
-            ['boolean', ['feature-state', 'hover'], false],
-            1.6, // Slightly larger for hover
-            1.5  // Default size
-          ],
+          'icon-size': 1.5,
           'icon-allow-overlap': true,
-          'icon-anchor': 'bottom',
-          'symbol-sort-key': [
-            'case',
-            ['boolean', ['feature-state', 'selected'], false],
-            2, // Selected on top
-            ['boolean', ['feature-state', 'hover'], false],
-            1, // Hovered next
-            0  // Others at bottom
-          ]
+          'icon-anchor': 'bottom'
         },
         paint: {
           'icon-opacity': 0.95
@@ -851,20 +838,10 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         filter: ['!', ['has', 'point_count']],
         layout: {
           'text-field': ['get', 'price'],
-          'text-size': [
-            'case',
-            ['boolean', ['feature-state', 'selected'], false],
-            13, // Larger text for selected
-            11
-          ],
+          'text-size': 11,
           'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
           'text-allow-overlap': true,
-          'text-offset': [
-            'case',
-            ['boolean', ['feature-state', 'selected'], false],
-            ['literal', [0, -3.2]], // Adjust offset for larger pin
-            ['literal', [0, -2.8]]
-          ]
+          'text-offset': [0, -2.8]
         },
         paint: {
           'text-color': [
