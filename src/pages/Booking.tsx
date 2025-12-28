@@ -20,6 +20,9 @@ import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { calculateDriverPrice, calculateBookingTotal } from '@/lib/pricing';
 import RequireAuth from '@/components/auth/RequireAuth';
+import GuestBookingForm from '@/components/booking/GuestBookingForm';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
 
 interface PaymentMethod {
   id: string;
@@ -1211,7 +1214,185 @@ const BookingContent = () => {
   );
 };
 
+// Stripe promise for guest checkout
+const getStripePromise = async () => {
+  const { data } = await supabase.functions.invoke('get-stripe-publishable-key');
+  if (data?.publishableKey) {
+    return loadStripe(data.publishableKey);
+  }
+  return null;
+};
+
+// Guest Booking Page Component
+const GuestBookingPage = () => {
+  const { spotId } = useParams<{ spotId: string }>();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  
+  const [spot, setSpot] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [stripePromise, setStripePromise] = useState<Promise<any> | null>(null);
+  
+  // Get times from URL params or use defaults
+  const getInitialTimes = () => {
+    const start = searchParams.get('start');
+    const end = searchParams.get('end');
+    
+    if (start && end) {
+      return { start: new Date(start), end: new Date(end) };
+    }
+    
+    const defaultStart = addHours(new Date(), 1);
+    const defaultEnd = addHours(defaultStart, 2);
+    return { start: defaultStart, end: defaultEnd };
+  };
+  
+  const initialTimes = getInitialTimes();
+  const [startDateTime] = useState<Date>(initialTimes.start);
+  const [endDateTime] = useState<Date>(initialTimes.end);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!spotId) return;
+      
+      try {
+        // Fetch spot
+        const { data: spotData, error } = await supabase
+          .from('spots')
+          .select(`*, spot_photos(url, is_primary)`)
+          .eq('id', spotId)
+          .eq('status', 'active')
+          .single();
+
+        if (error || !spotData) {
+          toast({ title: "Spot not available", description: "This spot is not available for booking", variant: "destructive" });
+          navigate('/explore');
+          return;
+        }
+
+        setSpot(spotData);
+        
+        // Initialize Stripe
+        const promise = getStripePromise();
+        setStripePromise(promise);
+      } catch (err) {
+        console.error('Error:', err);
+        navigate('/explore');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [spotId, navigate, toast]);
+
+  const calculateTotal = () => {
+    if (!startDateTime || !endDateTime || !spot) return null;
+    
+    const minutes = differenceInMinutes(endDateTime, startDateTime);
+    const hours = minutes / 60;
+    if (hours <= 0) return null;
+
+    const { driverHourlyRate, driverSubtotal, serviceFee, driverTotal } = calculateBookingTotal(
+      spot.hourly_rate, 
+      hours,
+      0, // EV premium
+      false // Use EV charging
+    );
+
+    return {
+      hours,
+      driverHourlyRate,
+      subtotal: driverSubtotal,
+      serviceFee,
+      total: driverTotal,
+    };
+  };
+
+  const pricing = calculateTotal();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!spot || !pricing || !stripePromise) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-muted-foreground">Unable to load booking information</p>
+      </div>
+    );
+  }
+
+  const primaryPhoto = spot.spot_photos?.find((p: any) => p.is_primary)?.url || spot.spot_photos?.[0]?.url;
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-background border-b">
+        <div className="flex items-center gap-4 p-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-lg font-semibold">Guest Checkout</h1>
+        </div>
+      </div>
+
+      <div className="max-w-lg mx-auto p-4 space-y-6 pb-8">
+        {/* Spot Summary */}
+        <Card className="p-4">
+          <div className="flex gap-4">
+            {primaryPhoto && (
+              <img 
+                src={primaryPhoto} 
+                alt={spot.title} 
+                className="w-20 h-20 object-cover rounded-lg"
+              />
+            )}
+            <div className="flex-1 min-w-0">
+              <h2 className="font-semibold truncate">{spot.title}</h2>
+              <p className="text-sm text-muted-foreground truncate flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                {spot.address}
+              </p>
+              <div className="flex items-center gap-2 mt-2 text-sm">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span>{format(startDateTime, 'MMM d, h:mm a')} - {format(endDateTime, 'h:mm a')}</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Guest Booking Form with Stripe Elements */}
+        <Elements stripe={stripePromise}>
+          <GuestBookingForm
+            spot={spot}
+            startDateTime={startDateTime}
+            endDateTime={endDateTime}
+            totalHours={pricing.hours}
+            subtotal={pricing.subtotal}
+            serviceFee={pricing.serviceFee}
+            totalAmount={pricing.total}
+          />
+        </Elements>
+      </div>
+    </div>
+  );
+};
+
 const Booking = () => {
+  const [searchParams] = useSearchParams();
+  const isGuestMode = searchParams.get('guest') === 'true';
+
+  // If guest mode, don't require auth
+  if (isGuestMode) {
+    return <GuestBookingPage />;
+  }
+
   return (
     <RequireAuth feature="booking">
       <BookingContent />

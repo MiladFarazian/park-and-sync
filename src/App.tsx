@@ -47,6 +47,7 @@ import SupportMessages from "./pages/SupportMessages";
 import SupportReservations from "./pages/SupportReservations";
 import SupportAccount from "./pages/SupportAccount";
 import SupportUserDetail from "./pages/SupportUserDetail";
+import GuestBookingDetail from "./pages/GuestBookingDetail";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ModeProvider } from "./contexts/ModeContext";
 import { MessagesProvider } from "./contexts/MessagesContext";
@@ -94,6 +95,7 @@ const App = () => {
             <Route path="/embedded-checkout/:bookingId" element={<EmbeddedCheckout />} />
             <Route path="/search-results" element={<SearchResults />} />
             <Route path="/spot/:id" element={<div className="h-screen overflow-y-auto bg-background"><SpotDetail /></div>} />
+            <Route path="/guest-booking/:bookingId" element={<GuestBookingDetail />} />
             <Route path="/personal-information" element={<PersonalInformation />} />
             <Route path="/my-vehicles" element={<MyVehicles />} />
             <Route path="/add-vehicle" element={<AddVehicle />} />
