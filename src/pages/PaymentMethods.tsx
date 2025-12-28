@@ -2,10 +2,13 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CreditCard, Plus, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useAuth } from "@/contexts/AuthContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Elements, CardElement, PaymentRequestButtonElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe, PaymentRequest } from "@stripe/stripe-js";
@@ -191,16 +194,120 @@ const AddCardForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel:
   );
 };
 
+// Inline profile completion form for phone-only users
+const ProfileCompletionForm = ({ 
+  onComplete, 
+  onCancel 
+}: { 
+  onComplete: () => void; 
+  onCancel: () => void;
+}) => {
+  const { profile, updateProfile, refreshProfile } = useAuth();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    first_name: profile?.first_name || '',
+    last_name: profile?.last_name || '',
+    email: profile?.email || '',
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.email.trim()) {
+      toast({
+        title: "Email required",
+        description: "Please enter your email address to add a payment method",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    console.log('[PaymentMethods] Saving profile:', formData);
+
+    const { error } = await updateProfile({
+      first_name: formData.first_name.trim() || null,
+      last_name: formData.last_name.trim() || null,
+      email: formData.email.trim(),
+    } as any);
+
+    if (error) {
+      console.error('[PaymentMethods] Profile save failed:', error);
+      toast({
+        title: "Failed to save profile",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
+    console.log('[PaymentMethods] Profile saved successfully');
+    await refreshProfile();
+    setLoading(false);
+    onComplete();
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="email">Email Address *</Label>
+        <Input
+          id="email"
+          type="email"
+          value={formData.email}
+          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+          placeholder="your@email.com"
+          required
+        />
+        <p className="text-xs text-muted-foreground">Required for payment receipts</p>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="first_name">First Name</Label>
+          <Input
+            id="first_name"
+            value={formData.first_name}
+            onChange={(e) => setFormData(prev => ({ ...prev, first_name: e.target.value }))}
+            placeholder="First name"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="last_name">Last Name</Label>
+          <Input
+            id="last_name"
+            value={formData.last_name}
+            onChange={(e) => setFormData(prev => ({ ...prev, last_name: e.target.value }))}
+            placeholder="Last name"
+          />
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
+          Cancel
+        </Button>
+        <Button type="submit" disabled={loading} className="flex-1">
+          {loading ? "Saving..." : "Save & Continue"}
+        </Button>
+      </div>
+    </form>
+  );
+};
+
 const PaymentMethodsContent = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
+  const { profile, refreshProfile } = useAuth();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddCard, setShowAddCard] = useState(false);
+  const [showProfileForm, setShowProfileForm] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [autoOpenHandled, setAutoOpenHandled] = useState(false);
+  const [pendingAddCard, setPendingAddCard] = useState(false);
 
   const handleBack = () => {
     const returnTo = searchParams.get('returnTo');
@@ -221,9 +328,10 @@ const PaymentMethodsContent = () => {
     try {
       setLoading(true);
       
-      // Check if user has email
+      // Check if user has email from profile or auth
       const { data: { user } } = await supabase.auth.getUser();
-      setUserEmail(user?.email || null);
+      const email = profile?.email || user?.email || null;
+      setUserEmail(email);
       
       const { data, error } = await supabase.functions.invoke('get-payment-methods');
       
@@ -257,18 +365,31 @@ const PaymentMethodsContent = () => {
 
   useEffect(() => {
     fetchPaymentMethods();
-  }, []);
+  }, [profile?.email]);
 
   const handleAddCardClick = () => {
-    if (!userEmail) {
-      toast({
-        title: "Email required",
-        description: "Please add an email address to your account first to add payment methods",
-      });
-      navigate('/manage-account');
+    // Check if profile has email
+    const email = profile?.email || userEmail;
+    if (!email) {
+      console.log('[PaymentMethods] No email found, showing profile form');
+      setPendingAddCard(true);
+      setShowProfileForm(true);
       return;
     }
     setShowAddCard(true);
+  };
+
+  const handleProfileComplete = async () => {
+    console.log('[PaymentMethods] Profile completed, refreshing...');
+    await refreshProfile();
+    await fetchPaymentMethods();
+    setShowProfileForm(false);
+    
+    // If user was trying to add a card, proceed
+    if (pendingAddCard) {
+      setPendingAddCard(false);
+      setShowAddCard(true);
+    }
   };
 
   useEffect(() => {
@@ -280,7 +401,7 @@ const PaymentMethodsContent = () => {
 
     setAutoOpenHandled(true);
     handleAddCardClick();
-  }, [autoOpenHandled, loading, searchParams, userEmail]);
+  }, [autoOpenHandled, loading, searchParams, userEmail, profile?.email]);
 
   const handleAddSuccess = () => {
     setShowAddCard(false);
@@ -461,6 +582,27 @@ const PaymentMethodsContent = () => {
                 onCancel={() => setShowAddCard(false)}
               />
             </Elements>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showProfileForm} onOpenChange={(open) => {
+          setShowProfileForm(open);
+          if (!open) setPendingAddCard(false);
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Complete Your Profile</DialogTitle>
+              <DialogDescription>
+                Please add your email address to continue with payment setup.
+              </DialogDescription>
+            </DialogHeader>
+            <ProfileCompletionForm 
+              onComplete={handleProfileComplete}
+              onCancel={() => {
+                setShowProfileForm(false);
+                setPendingAddCard(false);
+              }}
+            />
           </DialogContent>
         </Dialog>
       </div>
