@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Heart, Share, Star, MapPin, Calendar, Navigation, MessageCircle, Phone, Camera, Clock, Shield, Zap, Loader2, Pencil, ChevronLeft, ChevronRight, Flag, BoltIcon, Accessibility } from 'lucide-react';
+import { ArrowLeft, Heart, Share, Star, MapPin, Calendar, Navigation, MessageCircle, Phone, Camera, Clock, Shield, Zap, Loader2, Pencil, ChevronLeft, ChevronRight, Flag, BoltIcon, Accessibility, User, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -69,6 +69,7 @@ const SpotDetail = () => {
   const [reportDetails, setReportDetails] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
   const [userBooking, setUserBooking] = useState<{ id: string; start_at: string; end_at: string; status: string } | null>(null);
+  const [guestBookingModalOpen, setGuestBookingModalOpen] = useState(false);
 
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) => 
@@ -254,6 +255,12 @@ const SpotDetail = () => {
       return;
     }
     
+    // If user is not authenticated, show guest booking modal
+    if (!user) {
+      setGuestBookingModalOpen(true);
+      return;
+    }
+    
     // Get start/end times from URL params if they exist
     const start = searchParams.get('start');
     const end = searchParams.get('end');
@@ -262,6 +269,25 @@ const SpotDetail = () => {
     if (end) params.set('end', end);
     
     navigate(`/book/${spot.id}${params.toString() ? `?${params.toString()}` : ''}`);
+  };
+
+  const handleGuestBooking = () => {
+    setGuestBookingModalOpen(false);
+    const start = searchParams.get('start');
+    const end = searchParams.get('end');
+    const params = new URLSearchParams();
+    if (start) params.set('start', start);
+    if (end) params.set('end', end);
+    params.set('guest', 'true');
+    
+    navigate(`/book/${spot.id}?${params.toString()}`);
+  };
+
+  const handleLoginToBook = () => {
+    setGuestBookingModalOpen(false);
+    // Store the return URL so user comes back after login
+    const returnUrl = `/spot/${id}${window.location.search}`;
+    navigate(`/auth?returnUrl=${encodeURIComponent(returnUrl)}`);
   };
 
   const handleMessageHost = () => {
@@ -1189,6 +1215,43 @@ const SpotDetail = () => {
                 )}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Guest Booking Modal */}
+      <Dialog open={guestBookingModalOpen} onOpenChange={setGuestBookingModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>How would you like to book?</DialogTitle>
+            <DialogDescription>
+              Choose to continue as a guest or sign in for faster checkout
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-4">
+            <Button
+              onClick={handleGuestBooking}
+              className="w-full h-14 justify-start gap-3"
+              size="lg"
+            >
+              <User className="h-5 w-5" />
+              <div className="flex flex-col items-start">
+                <span className="font-medium">Continue as Guest</span>
+                <span className="text-xs opacity-80">No account required</span>
+              </div>
+            </Button>
+            <Button
+              onClick={handleLoginToBook}
+              variant="outline"
+              className="w-full h-14 justify-start gap-3"
+              size="lg"
+            >
+              <LogIn className="h-5 w-5" />
+              <div className="flex flex-col items-start">
+                <span className="font-medium">Log in or Sign up</span>
+                <span className="text-xs text-muted-foreground">Faster checkout & manage bookings</span>
+              </div>
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
