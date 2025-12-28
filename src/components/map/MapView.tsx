@@ -805,16 +805,38 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         }
       } as any);
       
-      // Start pulse animation for selected spots
+      // Start pulse animation for selected spots (stops after 3 seconds)
       let selectedPulseFrame: number;
       let selectedPulseDirection = 1;
       let selectedPulseRadius = 16;
       const selectedMinRadius = 14;
       const selectedMaxRadius = 22;
       const selectedPulseSpeed = 0.15;
+      let pulseStartTime = Date.now();
+      const pulseDuration = 3000; // 3 seconds
       
       const animateSelectedPulse = () => {
         if (!map.current) return;
+        
+        // Stop animation after 3 seconds
+        if (Date.now() - pulseStartTime > pulseDuration) {
+          // Set final static state
+          try {
+            (map.current as any).setPaintProperty('spots-selected-pulse', 'circle-radius', [
+              'case',
+              ['boolean', ['feature-state', 'selected'], false],
+              16,
+              0
+            ]);
+            (map.current as any).setPaintProperty('spots-selected-pulse', 'circle-opacity', [
+              'case',
+              ['boolean', ['feature-state', 'selected'], false],
+              0.25,
+              0
+            ]);
+          } catch (e) {}
+          return; // Stop the animation loop
+        }
         
         selectedPulseRadius += selectedPulseDirection * selectedPulseSpeed;
         if (selectedPulseRadius >= selectedMaxRadius) {
@@ -848,6 +870,15 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       };
       
       animateSelectedPulse();
+      
+      // Restart pulse animation when selection changes
+      const restartPulse = () => {
+        pulseStartTime = Date.now();
+        selectedPulseRadius = 16;
+        selectedPulseDirection = 1;
+        cancelAnimationFrame(selectedPulseFrame);
+        animateSelectedPulse();
+      };
 
       // Add unclustered point layer (individual pins)
       // Note: icon-size is a layout property so can't use feature-state
@@ -1152,12 +1183,16 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           {/* Carousel */}
           <div ref={emblaRef} className="overflow-hidden px-4">
             <div className="flex gap-3">
-              {sortedSpots.map((spot, index) => (
+              {sortedSpots.map((spot, index) => {
+                const isCurrentSlide = index === currentSlideIndex;
+                return (
                 <div 
                   key={spot.id} 
                   className="flex-[0_0_100%] min-w-0"
                 >
-                  <Card className="p-4 bg-background/95 backdrop-blur-sm">
+                  <Card className={`p-4 bg-background/95 backdrop-blur-sm transition-all duration-200 ${
+                    isCurrentSlide ? 'ring-2 ring-primary/30 shadow-lg animate-selection-pulse' : ''
+                  }`}>
                     <div className="flex gap-3">
                       <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0">
                         <img 
@@ -1255,7 +1290,9 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                     </div>
                   </Card>
                 </div>
-              ))}
+              );
+              })}
+
             </div>
           </div>
         </div>
