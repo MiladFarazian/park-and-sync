@@ -226,6 +226,10 @@ const EditSpot = () => {
     progress: number;
   }[]>([]);
   
+  // EV Charging state
+  const [evChargingInstructions, setEvChargingInstructions] = useState('');
+  const [evChargingPremium, setEvChargingPremium] = useState('0');
+  
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -332,6 +336,10 @@ const EditSpot = () => {
         if (spotData.is_ada_accessible) amenities.push('ada');
         setSelectedAmenities(amenities);
         setInstantBook(spotData.instant_book !== false); // Default to true if null/undefined
+        
+        // Load EV charging settings
+        setEvChargingInstructions(spotData.ev_charging_instructions || '');
+        setEvChargingPremium(spotData.ev_charging_premium_per_hour?.toString() || '0');
         const {
           data: photosData,
           error: photosError
@@ -653,6 +661,7 @@ const EditSpot = () => {
       }
 
       // Step 4: Update spot details
+      const hasEvCharging = selectedAmenities.includes('ev');
       const updateData = {
         category: data.category,
         title: data.category,
@@ -665,8 +674,10 @@ const EditSpot = () => {
         instant_book: instantBook,
         is_covered: selectedAmenities.includes('covered'),
         is_secure: selectedAmenities.includes('security'),
-        has_ev_charging: selectedAmenities.includes('ev'),
+        has_ev_charging: hasEvCharging,
         is_ada_accessible: selectedAmenities.includes('ada'),
+        ev_charging_instructions: hasEvCharging ? evChargingInstructions : null,
+        ev_charging_premium_per_hour: hasEvCharging ? parseFloat(evChargingPremium) || 0 : 0,
         updated_at: new Date().toISOString()
       };
       const {
@@ -804,6 +815,53 @@ const EditSpot = () => {
                   })}
                   </div>
                 </div>
+
+                {/* EV Charging Configuration (only shown if EV amenity is selected) */}
+                {selectedAmenities.includes('ev') && (
+                  <Card className="p-4 border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <Zap className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        <h3 className="font-semibold text-green-800 dark:text-green-300">EV Charging Settings</h3>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="evPremium">EV Charging Premium ($/hour)</Label>
+                        <div className="relative mt-1.5">
+                          <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            id="evPremium"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            value={evChargingPremium}
+                            onChange={(e) => setEvChargingPremium(e.target.value)}
+                            className="pl-10"
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Additional charge per hour when driver uses EV charging
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="evInstructions">Charging Instructions</Label>
+                        <Textarea
+                          id="evInstructions"
+                          placeholder="e.g., Use outlet on left wall, Level 2 charger requires app, Max 2 hours charging..."
+                          rows={3}
+                          value={evChargingInstructions}
+                          onChange={(e) => setEvChargingInstructions(e.target.value)}
+                          className="mt-1.5 resize-none"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          These instructions will be shown to drivers who opt-in to EV charging
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
 
                 {/* Instant Book Toggle */}
                 <div className="p-4 rounded-lg border bg-muted/30">

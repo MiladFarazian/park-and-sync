@@ -1,10 +1,11 @@
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle, Loader2, Info } from 'lucide-react';
+import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle, Loader2, Info, Zap } from 'lucide-react';
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -58,6 +59,9 @@ const BookingContent = () => {
   const [serverAvailable, setServerAvailable] = useState<{ ok: boolean; reason?: string }>({ ok: true });
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  
+  // EV Charging state
+  const [useEvCharging, setUseEvCharging] = useState(false);
   
   // Get times from URL params or use defaults (1 hour from now + 2 hours duration)
   const getInitialTimes = () => {
@@ -448,16 +452,23 @@ const BookingContent = () => {
       return null;
     }
 
-    // Use new pricing: driver sees upcharged rate + service fee
-    const { driverHourlyRate, driverSubtotal, serviceFee, driverTotal } = calculateBookingTotal(spot.hourly_rate, hours);
+    // Use new pricing: driver sees upcharged rate + service fee + optional EV fee
+    const evPremium = spot.ev_charging_premium_per_hour || 0;
+    const { driverHourlyRate, driverSubtotal, serviceFee, evChargingFee, driverTotal } = calculateBookingTotal(
+      spot.hourly_rate, 
+      hours,
+      evPremium,
+      useEvCharging
+    );
 
-    console.log('Pricing:', { hours, driverHourlyRate, driverSubtotal, serviceFee, driverTotal });
+    console.log('Pricing:', { hours, driverHourlyRate, driverSubtotal, serviceFee, evChargingFee, driverTotal });
 
     return {
       hours: hours.toFixed(2),
       driverHourlyRate: driverHourlyRate.toFixed(2),
       subtotal: driverSubtotal.toFixed(2),
       serviceFee: serviceFee.toFixed(2),
+      evChargingFee: evChargingFee.toFixed(2),
       total: driverTotal.toFixed(2),
     };
   };
@@ -641,6 +652,7 @@ const BookingContent = () => {
           end_at: endAt.toISOString(),
           vehicle_id: selectedVehicle?.id,
           hold_id: holdData?.hold_id,
+          will_use_ev_charging: useEvCharging,
         },
       });
 
@@ -1049,6 +1061,28 @@ const BookingContent = () => {
           )}
         </Card>
 
+        {/* EV Charging Option (only if spot supports it) */}
+        {spot?.has_ev_charging && (
+          <Card className="p-4 border-green-200 dark:border-green-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                  <Zap className="h-5 w-5 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <p className="font-medium">Add EV Charging</p>
+                  <p className="text-sm text-muted-foreground">
+                    +${(spot.ev_charging_premium_per_hour || 0).toFixed(2)}/hour
+                  </p>
+                </div>
+              </div>
+              <Switch 
+                checked={useEvCharging} 
+                onCheckedChange={setUseEvCharging}
+              />
+            </div>
+          </Card>
+        )}
 
         {/* Price Breakdown Card */}
         {pricing && (
@@ -1077,6 +1111,15 @@ const BookingContent = () => {
                 </TooltipProvider>
                 <span className="font-medium">${pricing.serviceFee}</span>
               </div>
+              {useEvCharging && parseFloat(pricing.evChargingFee) > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <Zap className="h-3 w-3 text-green-600" />
+                    EV charging
+                  </span>
+                  <span className="font-medium">${pricing.evChargingFee}</span>
+                </div>
+              )}
               <Separator />
               <div className="flex justify-between text-lg">
                 <span className="font-bold">Total</span>

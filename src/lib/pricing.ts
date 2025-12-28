@@ -18,30 +18,46 @@ export function calculateServiceFee(hostEarnings: number): number {
 }
 
 /**
+ * Calculate EV charging fee based on premium per hour and hours.
+ */
+export function calculateEvChargingFee(premiumPerHour: number, hours: number): number {
+  return Math.round(premiumPerHour * hours * 100) / 100;
+}
+
+/**
  * Calculate total booking cost for driver.
  * - driverSubtotal: driver_rate × hours (includes invisible upcharge)
  * - serviceFee: 20% of host earnings or $1 min (visible to driver)
- * - driverTotal: driverSubtotal + serviceFee
+ * - evChargingFee: optional EV charging premium
+ * - driverTotal: driverSubtotal + serviceFee + evChargingFee
  * - hostEarnings: what the host actually earns (their rate × hours)
  */
-export function calculateBookingTotal(hostHourlyRate: number, hours: number): {
+export function calculateBookingTotal(
+  hostHourlyRate: number, 
+  hours: number,
+  evChargingPremiumPerHour: number = 0,
+  willUseEvCharging: boolean = false
+): {
   hostEarnings: number;
   driverHourlyRate: number;
   driverSubtotal: number;
   serviceFee: number;
+  evChargingFee: number;
   driverTotal: number;
 } {
   const hostEarnings = hostHourlyRate * hours;
   const driverHourlyRate = calculateDriverPrice(hostHourlyRate);
   const driverSubtotal = Math.round(driverHourlyRate * hours * 100) / 100;
   const serviceFee = calculateServiceFee(hostEarnings);
-  const driverTotal = Math.round((driverSubtotal + serviceFee) * 100) / 100;
+  const evChargingFee = willUseEvCharging ? calculateEvChargingFee(evChargingPremiumPerHour, hours) : 0;
+  const driverTotal = Math.round((driverSubtotal + serviceFee + evChargingFee) * 100) / 100;
   
   return {
     hostEarnings,
     driverHourlyRate,
     driverSubtotal,
     serviceFee,
+    evChargingFee,
     driverTotal,
   };
 }
