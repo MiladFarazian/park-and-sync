@@ -174,6 +174,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
           },
           body: JSON.stringify({
             guestEmail: booking.guest_email,
+            guestPhone: booking.guest_phone,
             guestName: booking.guest_full_name,
             hostName: hostProfile?.first_name || 'Host',
             hostEmail: hostProfile?.email,
@@ -186,7 +187,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
             guestAccessToken: booking.guest_access_token,
           }),
         });
-        console.log('Guest confirmation email sent');
+        console.log('Guest confirmation (email/SMS) sent');
       } catch (emailError) {
         console.error('Failed to send guest confirmation email:', emailError);
       }
