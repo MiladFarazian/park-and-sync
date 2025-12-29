@@ -77,3 +77,6 @@ verify_jwt = false
 
 [functions.send-guest-booking-confirmation]
 verify_jwt = false
+
+[functions.link-guest-bookings]
+verify_jwt = false

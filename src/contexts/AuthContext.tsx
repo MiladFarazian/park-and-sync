@@ -26,7 +26,7 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
-  signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, firstName?: string, lastName?: string, phone?: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: any }>;
@@ -162,10 +162,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
+  const signUp = async (email: string, password: string, firstName?: string, lastName?: string, phone?: string) => {
     const redirectUrl = `${window.location.origin}/email-confirmation`;
     
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -188,6 +188,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         title: "Sign Up Successful",
         description: "Please check your email to verify your account.",
       });
+
+      // Link any guest bookings to the new user
+      if (data.user) {
+        try {
+          const { data: linkData, error: linkError } = await supabase.functions.invoke('link-guest-bookings', {
+            body: { 
+              user_id: data.user.id, 
+              email,
+              phone 
+            }
+          });
+          
+          if (linkError) {
+            console.error('Error linking guest bookings:', linkError);
+          } else if (linkData?.linked_count > 0) {
+            toast({
+              title: "Bookings Linked",
+              description: `${linkData.linked_count} previous booking(s) have been linked to your account.`,
+            });
+          }
+        } catch (err) {
+          console.error('Failed to link guest bookings:', err);
+        }
+      }
     }
 
     return { error };
