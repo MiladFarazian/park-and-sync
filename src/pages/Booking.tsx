@@ -21,6 +21,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { calculateDriverPrice, calculateBookingTotal } from '@/lib/pricing';
 import RequireAuth from '@/components/auth/RequireAuth';
 import GuestBookingForm from '@/components/booking/GuestBookingForm';
+import CompleteProfileStep from '@/components/auth/CompleteProfileStep';
+import { useAuth } from '@/contexts/AuthContext';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 
@@ -38,6 +40,7 @@ const BookingContent = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { profile, refreshProfile, user } = useAuth();
 
   const paymentMethodsReturnTo = `${location.pathname}${location.search}`;
   const goToPaymentMethods = (options?: { add?: boolean }) => {
@@ -62,9 +65,13 @@ const BookingContent = () => {
   const [serverAvailable, setServerAvailable] = useState<{ ok: boolean; reason?: string }>({ ok: true });
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const [showProfileComplete, setShowProfileComplete] = useState(false);
   
   // EV Charging state
   const [useEvCharging, setUseEvCharging] = useState(false);
+  
+  // Check if profile is incomplete (needs name, email, phone_verified)
+  const isProfileIncomplete = !profile?.first_name || !profile?.email || !profile?.phone_verified;
   
   // Get times from URL params or use defaults (1 hour from now + 2 hours duration)
   const getInitialTimes = () => {
@@ -968,8 +975,32 @@ const BookingContent = () => {
           )}
         </Card>
 
+        {/* Complete Profile Step - shown if profile is incomplete */}
+        {isProfileIncomplete && (
+          <Card className="p-4 border-primary/50 bg-primary/5">
+            <div className="space-y-4">
+              <div className="text-center">
+                <h3 className="font-bold text-lg">One more step</h3>
+                <p className="text-sm text-muted-foreground">
+                  We'll email your receipt and booking details.
+                </p>
+              </div>
+              <CompleteProfileStep 
+                phone={user?.phone || profile?.phone || ''} 
+                onComplete={async () => {
+                  await refreshProfile();
+                  toast({
+                    title: 'Profile updated',
+                    description: 'You can now proceed with payment.'
+                  });
+                }}
+              />
+            </div>
+          </Card>
+        )}
+
         {/* Payment Method Card */}
-        <Card className="p-4">
+        <Card className={`p-4 ${isProfileIncomplete ? 'opacity-50 pointer-events-none' : ''}`}>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-lg">Payment Method</h3>
             <Dialog open={editPaymentOpen} onOpenChange={setEditPaymentOpen}>
@@ -1146,7 +1177,7 @@ const BookingContent = () => {
             className="w-full h-14 text-lg"
             size="lg"
             onClick={handleBooking}
-            disabled={!startDateTime || !endDateTime || !pricing || !selectedVehicle || !selectedPaymentMethod || bookingLoading || isOwnSpot || !isTimeValid || !serverAvailable.ok || checkingAvailability}
+            disabled={!startDateTime || !endDateTime || !pricing || !selectedVehicle || !selectedPaymentMethod || bookingLoading || isOwnSpot || !isTimeValid || !serverAvailable.ok || checkingAvailability || isProfileIncomplete}
           >
             {bookingLoading ? (
               <>
@@ -1173,7 +1204,12 @@ const BookingContent = () => {
               {serverAvailable.reason}
             </p>
           )}
-          {(!selectedVehicle || !selectedPaymentMethod) && (
+          {isProfileIncomplete && (
+            <p className="text-center text-xs text-destructive">
+              Please complete your profile details above to continue
+            </p>
+          )}
+          {!isProfileIncomplete && (!selectedVehicle || !selectedPaymentMethod) && (
             <p className="text-center text-xs text-muted-foreground">
               Please add a vehicle and payment method to continue
             </p>

@@ -26,10 +26,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import CompleteProfileStep from '@/components/auth/CompleteProfileStep';
 
 const REMEMBER_ME_KEY = 'parkzy_remember_me';
 
 type AuthMethod = 'phone' | 'email';
+type AuthStep = 'auth' | 'complete-profile';
 
 const COUNTRY_CODES = [
   { code: '+1', country: 'US', flag: '🇺🇸' },
@@ -65,6 +67,7 @@ const Auth = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [authMethod, setAuthMethod] = useState<AuthMethod>('phone');
+  const [authStep, setAuthStep] = useState<AuthStep>('auth');
   const [otpSent, setOtpSent] = useState(false);
   const [countryCode, setCountryCode] = useState('+1');
   const [rememberMe, setRememberMe] = useState(true);
@@ -77,12 +80,15 @@ const Auth = () => {
   const [resetCooldown, setResetCooldown] = useState(0);
   const [showSignInPassword, setShowSignInPassword] = useState(false);
   const [showSignUpPassword, setShowSignUpPassword] = useState(false);
+  const [verifiedPhone, setVerifiedPhone] = useState('');
   
   // Check for guest conversion params
   const isGuestConversion = searchParams.get('convert') === 'true';
   const prefillEmail = searchParams.get('email') || '';
   const prefillFirstName = searchParams.get('firstName') || '';
   const prefillLastName = searchParams.get('lastName') || '';
+  // Check for return URL (e.g., from booking page)
+  const returnTo = searchParams.get('returnTo') || '/';
   
   const [phoneData, setPhoneData] = useState({
     phone: '',
@@ -174,7 +180,7 @@ const Auth = () => {
     
     const formattedPhone = getFullPhoneNumber();
     
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       phone: formattedPhone,
       token: phoneData.otp,
       type: 'sms'
@@ -191,10 +197,37 @@ const Auth = () => {
         description: errorMessage,
         variant: "destructive"
       });
+      setLoading(false);
+      return;
+    }
+    
+    // OTP verified successfully - check if user has completed profile
+    if (data.user) {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('first_name, email, phone_verified')
+        .eq('user_id', data.user.id)
+        .single();
+      
+      // If profile is incomplete (no name or email), show complete profile step
+      if (!profileData?.first_name || !profileData?.email) {
+        setVerifiedPhone(formattedPhone);
+        setAuthStep('complete-profile');
+        setLoading(false);
+        return;
+      }
+      
+      // Profile complete, navigate to destination
+      navigate(returnTo);
     } else {
-      navigate('/');
+      navigate(returnTo);
     }
     setLoading(false);
+  };
+
+  const handleProfileComplete = () => {
+    // Navigate to the return URL or home after profile completion
+    navigate(returnTo);
   };
 
   const handleGoogleSignIn = async () => {
@@ -428,6 +461,12 @@ const Auth = () => {
 
         {/* Form Container */}
         <div className="flex-1 flex flex-col justify-center px-6 py-8 lg:px-16">
+          {authStep === 'complete-profile' ? (
+            <CompleteProfileStep 
+              phone={verifiedPhone} 
+              onComplete={handleProfileComplete}
+            />
+          ) : (
           <div className="w-full max-w-md mx-auto space-y-8">
             {/* Header */}
             <div className="text-center lg:text-left">
@@ -855,6 +894,7 @@ const Auth = () => {
               </button>
             </p>
           </div>
+          )}
         </div>
       </div>
 
