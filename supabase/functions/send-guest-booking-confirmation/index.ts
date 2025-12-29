@@ -10,6 +10,7 @@ const corsHeaders = {
 
 interface GuestBookingConfirmationRequest {
   guestEmail: string;
+  guestPhone: string;
   guestName: string;
   hostName: string;
   hostEmail?: string;
@@ -22,6 +23,57 @@ interface GuestBookingConfirmationRequest {
   guestAccessToken: string;
 }
 
+// Helper function to send SMS via Twilio
+async function sendTwilioSMS(to: string, body: string): Promise<{ success: boolean; error?: string }> {
+  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+  const fromNumber = Deno.env.get("TWILIO_PHONE_NUMBER");
+
+  if (!accountSid || !authToken || !fromNumber) {
+    console.error("Twilio credentials not configured");
+    return { success: false, error: "Twilio not configured" };
+  }
+
+  // Format phone number - ensure it has country code
+  let formattedPhone = to.replace(/\D/g, ''); // Remove non-digits
+  if (formattedPhone.length === 10) {
+    formattedPhone = `+1${formattedPhone}`; // Assume US if 10 digits
+  } else if (!formattedPhone.startsWith('+')) {
+    formattedPhone = `+${formattedPhone}`;
+  }
+
+  try {
+    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+    const credentials = btoa(`${accountSid}:${authToken}`);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${credentials}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        To: formattedPhone,
+        From: fromNumber,
+        Body: body,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error("Twilio SMS error:", result);
+      return { success: false, error: result.message || "Failed to send SMS" };
+    }
+
+    console.log("Twilio SMS sent successfully:", result.sid);
+    return { success: true };
+  } catch (error) {
+    console.error("Twilio SMS exception:", error);
+    return { success: false, error: error.message };
+  }
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -30,6 +82,7 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const {
       guestEmail,
+      guestPhone,
       guestName,
       hostName,
       hostEmail,
@@ -42,8 +95,19 @@ const handler = async (req: Request): Promise<Response> => {
       guestAccessToken,
     }: GuestBookingConfirmationRequest = await req.json();
 
-    const startDate = new Date(startAt).toLocaleString();
-    const endDate = new Date(endAt).toLocaleString();
+    const startDate = new Date(startAt).toLocaleString('en-US', { 
+      weekday: 'short', 
+      month: 'short', 
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true 
+    });
+    const endDate = new Date(endAt).toLocaleString('en-US', { 
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true 
+    });
 
     const encodedAddress = encodeURIComponent(spotAddress);
     const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
@@ -54,6 +118,31 @@ const handler = async (req: Request): Promise<Response> => {
     const hostBookingUrl = `${appUrl}/host-booking-confirmation/${bookingId}`;
 
     const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'Parkzy <onboarding@resend.dev>';
+
+    let emailSent = false;
+    let smsSent = false;
+
+    // Send SMS to guest if phone provided
+    if (guestPhone && guestPhone.length >= 10) {
+      const smsBody = `✅ Parkzy Booking Confirmed!
+
+Hi ${guestName}, your parking is secured!
+
+📍 ${spotTitle}
+📫 ${spotAddress}
+🕐 ${startDate} - ${endDate}
+💳 $${totalAmount.toFixed(2)} paid
+
+View booking: ${guestBookingUrl}
+
+Get directions: ${directionsUrl}`;
+
+      const smsResult = await sendTwilioSMS(guestPhone, smsBody);
+      smsSent = smsResult.success;
+      if (!smsResult.success) {
+        console.error("Failed to send SMS:", smsResult.error);
+      }
+    }
 
     // Send email to guest
     if (guestEmail && guestEmail.includes('@')) {
@@ -183,6 +272,7 @@ const handler = async (req: Request): Promise<Response> => {
         `,
       });
 
+      emailSent = !guestEmailResponse.error;
       console.log("Guest confirmation email sent:", guestEmailResponse);
     }
 
@@ -292,7 +382,12 @@ const handler = async (req: Request): Promise<Response> => {
       console.log("Host notification email sent:", hostEmailResponse);
     }
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ 
+      success: true, 
+      emailSent, 
+      smsSent,
+      message: smsSent ? 'SMS confirmation sent' : emailSent ? 'Email confirmation sent' : 'No confirmation sent'
+    }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
