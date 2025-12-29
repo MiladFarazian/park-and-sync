@@ -196,7 +196,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             body: { 
               user_id: data.user.id, 
               email,
-              phone 
+              phone,
+              first_name: firstName
             }
           });
           
