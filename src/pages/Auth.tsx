@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -60,6 +60,7 @@ const isValidPhoneNumber = (phone: string): boolean => {
 
 const Auth = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { signIn, signUp } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -77,6 +78,12 @@ const Auth = () => {
   const [showSignInPassword, setShowSignInPassword] = useState(false);
   const [showSignUpPassword, setShowSignUpPassword] = useState(false);
   
+  // Check for guest conversion params
+  const isGuestConversion = searchParams.get('convert') === 'true';
+  const prefillEmail = searchParams.get('email') || '';
+  const prefillFirstName = searchParams.get('firstName') || '';
+  const prefillLastName = searchParams.get('lastName') || '';
+  
   const [phoneData, setPhoneData] = useState({
     phone: '',
     otp: ''
@@ -88,11 +95,24 @@ const Auth = () => {
   });
   
   const [signUpData, setSignUpData] = useState({
-    email: '',
+    email: prefillEmail,
     password: '',
-    firstName: '',
-    lastName: ''
+    firstName: prefillFirstName,
+    lastName: prefillLastName
   });
+
+  // Pre-fill form and switch to email auth for guest conversion
+  useEffect(() => {
+    if (isGuestConversion && prefillEmail) {
+      setAuthMethod('email');
+      setSignUpData(prev => ({
+        ...prev,
+        email: prefillEmail,
+        firstName: prefillFirstName,
+        lastName: prefillLastName
+      }));
+    }
+  }, [isGuestConversion, prefillEmail, prefillFirstName, prefillLastName]);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhoneNumber(e.target.value);

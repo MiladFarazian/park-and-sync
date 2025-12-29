@@ -269,7 +269,21 @@ const GuestBookingDetail = () => {
           <p className="text-sm text-muted-foreground mb-3">
             Sign up to manage all your bookings, save payment methods, and book faster next time.
           </p>
-          <Button variant="outline" onClick={() => navigate('/auth')}>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              // Pass guest info to pre-fill signup form
+              const params = new URLSearchParams();
+              if (booking.guest_email) params.set('email', booking.guest_email);
+              if (booking.guest_full_name) {
+                const nameParts = booking.guest_full_name.split(' ');
+                if (nameParts[0]) params.set('firstName', nameParts[0]);
+                if (nameParts.length > 1) params.set('lastName', nameParts.slice(1).join(' '));
+              }
+              params.set('convert', 'true');
+              navigate(`/auth?${params.toString()}`);
+            }}
+          >
             Create Free Account
           </Button>
         </Card>
