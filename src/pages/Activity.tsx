@@ -237,6 +237,7 @@ const Activity = () => {
     isPast?: boolean;
   }) => {
     const isHost = booking.userRole === 'host';
+    const isLinkedGuestBooking = booking.is_guest && booking.guest_user_id;
     const otherPartyId = isHost ? booking.renter_id : booking.spots?.host_id;
     const canExtend = !isPast && booking.status !== 'canceled' && booking.userRole === 'renter';
     
@@ -337,6 +338,11 @@ const Activity = () => {
                   {isHost && (
                     <Badge variant="outline" className="text-xs border-primary/20 bg-primary/5">
                       Host
+                    </Badge>
+                  )}
+                  {isLinkedGuestBooking && !isHost && (
+                    <Badge variant="outline" className="text-xs border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                      Linked
                     </Badge>
                   )}
                 </div>
@@ -491,6 +497,11 @@ const Activity = () => {
                     {isHost && (
                       <Badge variant="outline" className="text-xs shrink-0 border-primary/20 bg-primary/5">
                         As Host
+                      </Badge>
+                    )}
+                    {isLinkedGuestBooking && !isHost && (
+                      <Badge variant="outline" className="text-xs shrink-0 border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                        Linked Guest Booking
                       </Badge>
                     )}
                   </div>
