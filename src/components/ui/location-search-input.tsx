@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, X, Navigation, MapPin, Loader2, Clock, Star } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface LocationSearchInputProps {
   value: string;
@@ -31,7 +32,9 @@ interface RecentSearch {
 }
 
 interface FavoriteLocation {
+  id?: string; // Database ID for synced favorites
   name: string;
+  address: string;
   lat: number;
   lng: number;
 }
@@ -86,12 +89,17 @@ const addToSearchHistory = (location: { name: string; lat: number; lng: number }
   saveSearchHistory(newHistory);
 };
 
-// Helper to load favorites from localStorage
-const loadFavorites = (): FavoriteLocation[] => {
+// Helper to load favorites from localStorage (for guests)
+const loadLocalFavorites = (): FavoriteLocation[] => {
   try {
     const stored = localStorage.getItem(FAVORITES_STORAGE_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // Ensure address field exists for older data
+      return parsed.map((fav: any) => ({
+        ...fav,
+        address: fav.address || fav.name
+      }));
     }
   } catch (e) {
     // Ignore parse errors
@@ -99,8 +107,8 @@ const loadFavorites = (): FavoriteLocation[] => {
   return [];
 };
 
-// Helper to save favorites to localStorage
-const saveFavorites = (favorites: FavoriteLocation[]) => {
+// Helper to save favorites to localStorage (for guests)
+const saveLocalFavorites = (favorites: FavoriteLocation[]) => {
   try {
     localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favorites));
   } catch (e) {
@@ -111,20 +119,6 @@ const saveFavorites = (favorites: FavoriteLocation[]) => {
 // Check if a location is favorited
 const isFavorite = (name: string, favorites: FavoriteLocation[]): boolean => {
   return favorites.some(fav => fav.name === name);
-};
-
-// Toggle favorite status
-const toggleFavorite = (location: { name: string; lat: number; lng: number }): FavoriteLocation[] => {
-  const favorites = loadFavorites();
-  const exists = favorites.some(fav => fav.name === location.name);
-  
-  if (exists) {
-    // Remove from favorites
-    return favorites.filter(fav => fav.name !== location.name);
-  } else {
-    // Add to favorites (at the beginning, limited to max)
-    return [{ name: location.name, lat: location.lat, lng: location.lng }, ...favorites].slice(0, MAX_FAVORITES);
-  }
 };
 
 // Popular POIs by region
@@ -212,6 +206,7 @@ const LocationSearchInput = ({
   isUsingCurrentLocation = false,
   showPopularPOIs = false,
 }: LocationSearchInputProps) => {
+  const { user } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [mapboxToken, setMapboxToken] = useState('');
@@ -220,6 +215,7 @@ const LocationSearchInput = ({
   const [detectedRegion, setDetectedRegion] = useState<string>('default');
   const [searchHistory, setSearchHistory] = useState<RecentSearch[]>([]);
   const [favorites, setFavorites] = useState<FavoriteLocation[]>([]);
+  const [isSyncingFavorites, setIsSyncingFavorites] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const sessionTokenRef = useRef<string>(crypto.randomUUID());
   const inputRef = useRef<HTMLInputElement>(null);
@@ -227,11 +223,185 @@ const LocationSearchInput = ({
   const blurTimeoutRef = useRef<NodeJS.Timeout>();
   const ignoreBlurRef = useRef(false);
 
-  // Load search history and favorites on mount
+  // Load favorites from database for logged-in users, localStorage for guests
+  const loadFavorites = useCallback(async () => {
+    if (user) {
+      try {
+        const { data, error } = await supabase
+          .from('favorite_locations')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        const dbFavorites: FavoriteLocation[] = (data || []).map(row => ({
+          id: row.id,
+          name: row.name,
+          address: row.address,
+          lat: row.latitude,
+          lng: row.longitude
+        }));
+        
+        setFavorites(dbFavorites);
+        
+        // Also sync to localStorage as backup
+        saveLocalFavorites(dbFavorites);
+      } catch (error) {
+        console.error('Error loading favorites from database:', error);
+        // Fall back to localStorage
+        setFavorites(loadLocalFavorites());
+      }
+    } else {
+      setFavorites(loadLocalFavorites());
+    }
+  }, [user]);
+
+  // Add favorite to database or localStorage
+  const addFavorite = useCallback(async (location: { name: string; lat: number; lng: number }) => {
+    const newFavorite: FavoriteLocation = {
+      name: location.name,
+      address: location.name,
+      lat: location.lat,
+      lng: location.lng
+    };
+
+    if (user) {
+      setIsSyncingFavorites(true);
+      try {
+        const { data, error } = await supabase
+          .from('favorite_locations')
+          .insert({
+            user_id: user.id,
+            name: location.name,
+            address: location.name,
+            latitude: location.lat,
+            longitude: location.lng
+          })
+          .select()
+          .single();
+        
+        if (error) {
+          // Check if it's a duplicate error
+          if (error.code === '23505') {
+            // Location already favorited, just reload
+            await loadFavorites();
+            return;
+          }
+          throw error;
+        }
+        
+        const addedFavorite: FavoriteLocation = {
+          id: data.id,
+          name: data.name,
+          address: data.address,
+          lat: data.latitude,
+          lng: data.longitude
+        };
+        
+        setFavorites(prev => [addedFavorite, ...prev].slice(0, MAX_FAVORITES));
+      } catch (error) {
+        console.error('Error adding favorite to database:', error);
+        // Fall back to localStorage
+        const updated = [newFavorite, ...favorites].slice(0, MAX_FAVORITES);
+        saveLocalFavorites(updated);
+        setFavorites(updated);
+      } finally {
+        setIsSyncingFavorites(false);
+      }
+    } else {
+      const updated = [newFavorite, ...favorites].slice(0, MAX_FAVORITES);
+      saveLocalFavorites(updated);
+      setFavorites(updated);
+    }
+  }, [user, favorites, loadFavorites]);
+
+  // Remove favorite from database or localStorage
+  const removeFavorite = useCallback(async (name: string) => {
+    const favoriteToRemove = favorites.find(f => f.name === name);
+    
+    if (user && favoriteToRemove?.id) {
+      setIsSyncingFavorites(true);
+      try {
+        const { error } = await supabase
+          .from('favorite_locations')
+          .delete()
+          .eq('id', favoriteToRemove.id);
+        
+        if (error) throw error;
+        
+        setFavorites(prev => prev.filter(f => f.name !== name));
+      } catch (error) {
+        console.error('Error removing favorite from database:', error);
+      } finally {
+        setIsSyncingFavorites(false);
+      }
+    } else {
+      const updated = favorites.filter(f => f.name !== name);
+      saveLocalFavorites(updated);
+      setFavorites(updated);
+    }
+  }, [user, favorites]);
+
+  // Toggle favorite status
+  const toggleFavoriteLocation = useCallback(async (location: { name: string; lat: number; lng: number }) => {
+    const exists = isFavorite(location.name, favorites);
+    
+    if (exists) {
+      await removeFavorite(location.name);
+    } else {
+      await addFavorite(location);
+    }
+  }, [favorites, addFavorite, removeFavorite]);
+
+  // Load search history and favorites on mount and when user changes
   useEffect(() => {
     setSearchHistory(loadSearchHistory());
-    setFavorites(loadFavorites());
-  }, []);
+    loadFavorites();
+  }, [loadFavorites]);
+
+  // Migrate localStorage favorites to database when user logs in
+  useEffect(() => {
+    const migrateLocalFavorites = async () => {
+      if (!user) return;
+      
+      const localFavorites = loadLocalFavorites();
+      if (localFavorites.length === 0) return;
+      
+      // Check if user already has favorites in database
+      const { data: existingFavorites } = await supabase
+        .from('favorite_locations')
+        .select('name')
+        .eq('user_id', user.id);
+      
+      if (existingFavorites && existingFavorites.length > 0) {
+        // User already has favorites, don't overwrite
+        return;
+      }
+      
+      // Migrate local favorites to database
+      const toInsert = localFavorites.slice(0, MAX_FAVORITES).map(fav => ({
+        user_id: user.id,
+        name: fav.name,
+        address: fav.address || fav.name,
+        latitude: fav.lat,
+        longitude: fav.lng
+      }));
+      
+      const { error } = await supabase
+        .from('favorite_locations')
+        .insert(toInsert);
+      
+      if (!error) {
+        // Clear localStorage after successful migration
+        localStorage.removeItem(FAVORITES_STORAGE_KEY);
+        // Reload favorites from database
+        loadFavorites();
+      }
+    };
+    
+    migrateLocalFavorites();
+  }, [user, loadFavorites]);
 
   // Get POIs for the detected region
   const popularPOIs = POIS_BY_REGION[detectedRegion] || POIS_BY_REGION['default'];
@@ -418,12 +588,10 @@ const LocationSearchInput = ({
     setSearchHistory(filtered);
   };
 
-  const handleToggleFavorite = (e: React.MouseEvent, location: { name: string; lat: number; lng: number }) => {
+  const handleToggleFavorite = async (e: React.MouseEvent, location: { name: string; lat: number; lng: number }) => {
     e.preventDefault();
     e.stopPropagation();
-    const newFavorites = toggleFavorite(location);
-    saveFavorites(newFavorites);
-    setFavorites(newFavorites);
+    await toggleFavoriteLocation(location);
   };
 
   const handleSelectFavorite = (item: FavoriteLocation) => {
@@ -432,12 +600,10 @@ const LocationSearchInput = ({
     setSuggestions([]);
   };
 
-  const handleRemoveFavorite = (e: React.MouseEvent, name: string) => {
+  const handleRemoveFavorite = async (e: React.MouseEvent, name: string) => {
     e.preventDefault();
     e.stopPropagation();
-    const filtered = favorites.filter(item => item.name !== name);
-    saveFavorites(filtered);
-    setFavorites(filtered);
+    await removeFavorite(name);
   };
 
   const handleUseCurrentLocation = () => {
