@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, X, Navigation, MapPin, Loader2 } from 'lucide-react';
+import { Search, X, Navigation, MapPin, Loader2, Clock, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface LocationSearchInputProps {
@@ -23,9 +23,60 @@ interface POI {
   description: string;
 }
 
+interface RecentSearch {
+  name: string;
+  lat: number;
+  lng: number;
+  timestamp: number;
+}
+
 interface RegionPOIs {
   [region: string]: POI[];
 }
+
+const HISTORY_STORAGE_KEY = 'parkzy:searchHistory';
+const MAX_HISTORY_ITEMS = 5;
+
+// Helper to load search history from localStorage
+const loadSearchHistory = (): RecentSearch[] => {
+  try {
+    const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    // Ignore parse errors
+  }
+  return [];
+};
+
+// Helper to save search history to localStorage
+const saveSearchHistory = (history: RecentSearch[]) => {
+  try {
+    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+  } catch (e) {
+    // Ignore storage errors
+  }
+};
+
+// Add a location to search history
+const addToSearchHistory = (location: { name: string; lat: number; lng: number }) => {
+  // Don't save "Current Location"
+  if (location.name === 'Current Location') return;
+  
+  const history = loadSearchHistory();
+  
+  // Remove duplicate if exists (by name)
+  const filtered = history.filter(item => item.name !== location.name);
+  
+  // Add new item at the beginning
+  const newHistory: RecentSearch[] = [
+    { ...location, timestamp: Date.now() },
+    ...filtered
+  ].slice(0, MAX_HISTORY_ITEMS);
+  
+  saveSearchHistory(newHistory);
+};
 
 // Popular POIs by region
 const POIS_BY_REGION: RegionPOIs = {
@@ -118,12 +169,18 @@ const LocationSearchInput = ({
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [detectedRegion, setDetectedRegion] = useState<string>('default');
+  const [searchHistory, setSearchHistory] = useState<RecentSearch[]>([]);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const sessionTokenRef = useRef<string>(crypto.randomUUID());
   const inputRef = useRef<HTMLInputElement>(null);
   const regionDetectedRef = useRef(false);
   const blurTimeoutRef = useRef<NodeJS.Timeout>();
   const ignoreBlurRef = useRef(false);
+
+  // Load search history on mount
+  useEffect(() => {
+    setSearchHistory(loadSearchHistory());
+  }, []);
 
   // Get POIs for the detected region
   const popularPOIs = POIS_BY_REGION[detectedRegion] || POIS_BY_REGION['default'];
@@ -271,6 +328,10 @@ const LocationSearchInput = ({
         const [lng, lat] = data.features[0].geometry.coordinates;
         const placeName = suggestion.name || suggestion.place_formatted || suggestion.full_address;
         
+        // Save to history
+        addToSearchHistory({ lat, lng, name: placeName });
+        setSearchHistory(loadSearchHistory());
+        
         onSelectLocation({ lat, lng, name: placeName });
         setShowDropdown(false);
         setSuggestions([]);
@@ -279,6 +340,31 @@ const LocationSearchInput = ({
     } catch (error) {
       console.error('Retrieve error:', error);
     }
+  };
+
+  const handleSelectFromHistory = (item: RecentSearch) => {
+    // Save to history again to update timestamp (moves to top)
+    addToSearchHistory({ lat: item.lat, lng: item.lng, name: item.name });
+    setSearchHistory(loadSearchHistory());
+    
+    onSelectLocation({ lat: item.lat, lng: item.lng, name: item.name });
+    setShowDropdown(false);
+    setSuggestions([]);
+  };
+
+  const handleClearHistory = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    localStorage.removeItem(HISTORY_STORAGE_KEY);
+    setSearchHistory([]);
+  };
+
+  const handleRemoveHistoryItem = (e: React.MouseEvent, name: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const filtered = searchHistory.filter(item => item.name !== name);
+    saveSearchHistory(filtered);
+    setSearchHistory(filtered);
   };
 
   const handleUseCurrentLocation = () => {
@@ -506,8 +592,45 @@ const LocationSearchInput = ({
             </button>
           ))}
 
-          {/* Popular POIs - shown when no search query and showPopularPOIs is enabled */}
-          {showPopularPOIs && !isLoadingLocation && suggestions.length === 0 && value.length === 0 && (
+          {/* Recent Searches - shown when no search query and history exists */}
+          {!isLoadingLocation && suggestions.length === 0 && value.length === 0 && searchHistory.length > 0 && (
+            <>
+              <div className="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide bg-muted/30 flex items-center justify-between">
+                <span>Recent searches</span>
+                <button
+                  onMouseDown={handleClearHistory}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Clear all
+                </button>
+              </div>
+              {searchHistory.map((item) => (
+                <button
+                  key={item.name}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelectFromHistory(item);
+                  }}
+                  className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-b-0 focus:outline-none focus:bg-muted/50 group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <p className="text-sm font-medium truncate flex-1">{item.name}</p>
+                    <button
+                      onMouseDown={(e) => handleRemoveHistoryItem(e, item.name)}
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity p-1 -m-1"
+                      title="Remove"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                </button>
+              ))}
+            </>
+          )}
+
+          {/* Popular POIs - shown when no search query, no history, and showPopularPOIs is enabled */}
+          {showPopularPOIs && !isLoadingLocation && suggestions.length === 0 && value.length === 0 && searchHistory.length === 0 && (
             <>
               <div className="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide bg-muted/30">
                 Popular in {detectedRegion === 'default' ? 'Los Angeles' : detectedRegion}
@@ -517,6 +640,9 @@ const LocationSearchInput = ({
                   key={poi.name}
                   onMouseDown={(e) => {
                     e.preventDefault();
+                    // Save POI selection to history too
+                    addToSearchHistory({ lat: poi.lat, lng: poi.lng, name: poi.name });
+                    setSearchHistory(loadSearchHistory());
                     onSelectLocation({ lat: poi.lat, lng: poi.lng, name: poi.name });
                     setShowDropdown(false);
                   }}
