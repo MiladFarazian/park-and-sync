@@ -344,12 +344,20 @@ const LocationSearchInput = ({
   const handleClear = () => {
     onChange('');
     setSuggestions([]);
+    // Reset session token to ensure fresh searches work
+    sessionTokenRef.current = crypto.randomUUID();
     onClear?.();
+    // Show dropdown immediately after clearing
+    setShowDropdown(true);
     inputRef.current?.focus();
   };
 
   const handleFocus = () => {
     setShowDropdown(true);
+    // Trigger search if there's already a value (e.g., user clicked back into input)
+    if (value.trim() && suggestions.length === 0) {
+      searchByQuery(value);
+    }
   };
 
   const handleBlur = () => {
