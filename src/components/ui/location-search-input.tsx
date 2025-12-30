@@ -122,6 +122,8 @@ const LocationSearchInput = ({
   const sessionTokenRef = useRef<string>(crypto.randomUUID());
   const inputRef = useRef<HTMLInputElement>(null);
   const regionDetectedRef = useRef(false);
+  const blurTimeoutRef = useRef<NodeJS.Timeout>();
+  const ignoreBlurRef = useRef(false);
 
   // Get POIs for the detected region
   const popularPOIs = POIS_BY_REGION[detectedRegion] || POIS_BY_REGION['default'];
@@ -342,6 +344,12 @@ const LocationSearchInput = ({
   };
 
   const handleClear = () => {
+    // Cancel any pending blur timeout
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = undefined;
+    }
+    
     onChange('');
     setSuggestions([]);
     // Reset session token to ensure fresh searches work
@@ -349,10 +357,27 @@ const LocationSearchInput = ({
     onClear?.();
     // Show dropdown immediately after clearing
     setShowDropdown(true);
-    inputRef.current?.focus();
+    
+    // Use requestAnimationFrame to ensure focus happens after React updates
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+  };
+
+  const handleClearMouseDown = (e: React.MouseEvent) => {
+    // Prevent the input from losing focus when clicking clear button
+    e.preventDefault();
+    // Mark that we should ignore the next blur event
+    ignoreBlurRef.current = true;
   };
 
   const handleFocus = () => {
+    // Cancel any pending blur timeout when focusing
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = undefined;
+    }
+    
     setShowDropdown(true);
     // Trigger search if there's already a value (e.g., user clicked back into input)
     if (value.trim() && suggestions.length === 0) {
@@ -361,7 +386,21 @@ const LocationSearchInput = ({
   };
 
   const handleBlur = () => {
-    setTimeout(() => setShowDropdown(false), 200);
+    // If we're interacting with clear button, ignore this blur
+    if (ignoreBlurRef.current) {
+      ignoreBlurRef.current = false;
+      return;
+    }
+    
+    // Clear any existing timeout before setting a new one
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+    }
+    
+    blurTimeoutRef.current = setTimeout(() => {
+      setShowDropdown(false);
+      blurTimeoutRef.current = undefined;
+    }, 200);
   };
 
   // Only show "Current Location" text if there's actual content in value field, not auto-pre-fill
@@ -394,6 +433,7 @@ const LocationSearchInput = ({
           <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
         ) : showClearButton ? (
           <button
+            onMouseDown={handleClearMouseDown}
             onClick={handleClear}
             className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded-full hover:bg-muted"
             title="Clear"
