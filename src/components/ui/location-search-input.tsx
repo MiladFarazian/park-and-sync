@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, X, Navigation, MapPin, Loader2, Clock, Trash2 } from 'lucide-react';
+import { Search, X, Navigation, MapPin, Loader2, Clock, Star } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface LocationSearchInputProps {
@@ -30,12 +30,20 @@ interface RecentSearch {
   timestamp: number;
 }
 
+interface FavoriteLocation {
+  name: string;
+  lat: number;
+  lng: number;
+}
+
 interface RegionPOIs {
   [region: string]: POI[];
 }
 
 const HISTORY_STORAGE_KEY = 'parkzy:searchHistory';
+const FAVORITES_STORAGE_KEY = 'parkzy:favoriteLocations';
 const MAX_HISTORY_ITEMS = 5;
+const MAX_FAVORITES = 10;
 
 // Helper to load search history from localStorage
 const loadSearchHistory = (): RecentSearch[] => {
@@ -76,6 +84,47 @@ const addToSearchHistory = (location: { name: string; lat: number; lng: number }
   ].slice(0, MAX_HISTORY_ITEMS);
   
   saveSearchHistory(newHistory);
+};
+
+// Helper to load favorites from localStorage
+const loadFavorites = (): FavoriteLocation[] => {
+  try {
+    const stored = localStorage.getItem(FAVORITES_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    // Ignore parse errors
+  }
+  return [];
+};
+
+// Helper to save favorites to localStorage
+const saveFavorites = (favorites: FavoriteLocation[]) => {
+  try {
+    localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favorites));
+  } catch (e) {
+    // Ignore storage errors
+  }
+};
+
+// Check if a location is favorited
+const isFavorite = (name: string, favorites: FavoriteLocation[]): boolean => {
+  return favorites.some(fav => fav.name === name);
+};
+
+// Toggle favorite status
+const toggleFavorite = (location: { name: string; lat: number; lng: number }): FavoriteLocation[] => {
+  const favorites = loadFavorites();
+  const exists = favorites.some(fav => fav.name === location.name);
+  
+  if (exists) {
+    // Remove from favorites
+    return favorites.filter(fav => fav.name !== location.name);
+  } else {
+    // Add to favorites (at the beginning, limited to max)
+    return [{ name: location.name, lat: location.lat, lng: location.lng }, ...favorites].slice(0, MAX_FAVORITES);
+  }
 };
 
 // Popular POIs by region
@@ -170,6 +219,7 @@ const LocationSearchInput = ({
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [detectedRegion, setDetectedRegion] = useState<string>('default');
   const [searchHistory, setSearchHistory] = useState<RecentSearch[]>([]);
+  const [favorites, setFavorites] = useState<FavoriteLocation[]>([]);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const sessionTokenRef = useRef<string>(crypto.randomUUID());
   const inputRef = useRef<HTMLInputElement>(null);
@@ -177,9 +227,10 @@ const LocationSearchInput = ({
   const blurTimeoutRef = useRef<NodeJS.Timeout>();
   const ignoreBlurRef = useRef(false);
 
-  // Load search history on mount
+  // Load search history and favorites on mount
   useEffect(() => {
     setSearchHistory(loadSearchHistory());
+    setFavorites(loadFavorites());
   }, []);
 
   // Get POIs for the detected region
@@ -365,6 +416,28 @@ const LocationSearchInput = ({
     const filtered = searchHistory.filter(item => item.name !== name);
     saveSearchHistory(filtered);
     setSearchHistory(filtered);
+  };
+
+  const handleToggleFavorite = (e: React.MouseEvent, location: { name: string; lat: number; lng: number }) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const newFavorites = toggleFavorite(location);
+    saveFavorites(newFavorites);
+    setFavorites(newFavorites);
+  };
+
+  const handleSelectFavorite = (item: FavoriteLocation) => {
+    onSelectLocation({ lat: item.lat, lng: item.lng, name: item.name });
+    setShowDropdown(false);
+    setSuggestions([]);
+  };
+
+  const handleRemoveFavorite = (e: React.MouseEvent, name: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const filtered = favorites.filter(item => item.name !== name);
+    saveFavorites(filtered);
+    setFavorites(filtered);
   };
 
   const handleUseCurrentLocation = () => {
@@ -592,6 +665,37 @@ const LocationSearchInput = ({
             </button>
           ))}
 
+          {/* Favorites - shown when no search query and favorites exist */}
+          {!isLoadingLocation && suggestions.length === 0 && value.length === 0 && favorites.length > 0 && (
+            <>
+              <div className="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide bg-muted/30">
+                Saved locations
+              </div>
+              {favorites.map((item) => (
+                <button
+                  key={item.name}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelectFavorite(item);
+                  }}
+                  className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-b-0 focus:outline-none focus:bg-muted/50 group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Star className="h-4 w-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                    <p className="text-sm font-medium truncate flex-1">{item.name}</p>
+                    <button
+                      onMouseDown={(e) => handleRemoveFavorite(e, item.name)}
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity p-1 -m-1"
+                      title="Remove from favorites"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                </button>
+              ))}
+            </>
+          )}
+
           {/* Recent Searches - shown when no search query and history exists */}
           {!isLoadingLocation && suggestions.length === 0 && value.length === 0 && searchHistory.length > 0 && (
             <>
@@ -616,6 +720,13 @@ const LocationSearchInput = ({
                   <div className="flex items-center gap-3">
                     <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     <p className="text-sm font-medium truncate flex-1">{item.name}</p>
+                    <button
+                      onMouseDown={(e) => handleToggleFavorite(e, item)}
+                      className={`p-1 -m-1 transition-opacity ${isFavorite(item.name, favorites) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                      title={isFavorite(item.name, favorites) ? 'Remove from favorites' : 'Add to favorites'}
+                    >
+                      <Star className={`h-3.5 w-3.5 ${isFavorite(item.name, favorites) ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground hover:text-yellow-500'}`} />
+                    </button>
                     <button
                       onMouseDown={(e) => handleRemoveHistoryItem(e, item.name)}
                       className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity p-1 -m-1"
