@@ -14,7 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Star, ChevronLeft, ChevronRight, X, Loader2, CreditCard, ExternalLink, BoltIcon, Accessibility } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { AvailabilityManager, AvailabilityRule } from '@/components/availability/AvailabilityManager';
+import { WeeklyScheduleGrid, AvailabilityRule } from '@/components/availability/WeeklyScheduleGrid';
 import { compressImage } from '@/lib/compressImage';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -940,9 +940,10 @@ const ListSpot = () => {
                   </p>
                 </div>
 
-                <AvailabilityManager
+                <WeeklyScheduleGrid
                   initialRules={availabilityRules}
                   onChange={setAvailabilityRules}
+                  baseRate={Number(formData.hourlyRate) || 0}
                 />
 
                 <div className="flex gap-3">
