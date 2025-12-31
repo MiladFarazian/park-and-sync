@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -72,7 +72,8 @@ const Activity = () => {
               profiles:host_id (
                 first_name,
                 last_name
-              )
+              ),
+              spot_photos(url, is_primary, sort_order)
             )
           `).eq('renter_id', user.id).order('start_at', {
           ascending: false
@@ -92,7 +93,8 @@ const Activity = () => {
             spots!inner (
               title,
               address,
-              host_id
+              host_id,
+              spot_photos(url, is_primary, sort_order)
             ),
             renter:renter_id (
               first_name,
@@ -236,10 +238,45 @@ const Activity = () => {
     booking: any;
     isPast?: boolean;
   }) => {
+    const [imageError, setImageError] = useState(false);
+    
     const isHost = booking.userRole === 'host';
     const isLinkedGuestBooking = booking.is_guest && booking.guest_user_id;
     const otherPartyId = isHost ? booking.renter_id : booking.spots?.host_id;
     const canExtend = !isPast && booking.status !== 'canceled' && booking.userRole === 'renter';
+    
+    // Compute primary photo URL
+    const photos = booking.spots?.spot_photos || [];
+    const primaryPhoto = photos.find((p: any) => p.is_primary);
+    const fallbackPhoto = [...photos].sort((a: any, b: any) => 
+      (a.sort_order ?? 0) - (b.sort_order ?? 0)
+    )[0];
+    const primaryPhotoUrl = primaryPhoto?.url || fallbackPhoto?.url || null;
+    
+    // Thumbnail component
+    const SpotThumbnail = ({ size = 'mobile' }: { size?: 'mobile' | 'desktop' }) => {
+      const sizeClasses = size === 'mobile' 
+        ? 'h-14 w-14 rounded-lg' 
+        : 'h-16 w-16 rounded-xl';
+      
+      if (primaryPhotoUrl && !imageError) {
+        return (
+          <img
+            src={primaryPhotoUrl}
+            alt={booking.spots?.title || 'Parking spot'}
+            className={`${sizeClasses} object-cover border shrink-0`}
+            loading="lazy"
+            onError={() => setImageError(true)}
+          />
+        );
+      }
+      
+      return (
+        <div className={`${sizeClasses} bg-muted border flex items-center justify-center shrink-0`}>
+          <MapPin className="h-5 w-5 text-muted-foreground" />
+        </div>
+      );
+    };
     
     // Review-related logic
     const canReview = (booking.status === 'completed' || (isPast && booking.status === 'paid')) && 
@@ -319,6 +356,7 @@ const Activity = () => {
             {/* Mobile Header - More Compact */}
             <div className="bg-gradient-to-br from-primary/5 via-primary/3 to-transparent p-3">
               <div className="flex items-start justify-between gap-2 mb-3">
+                <SpotThumbnail size="mobile" />
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors mb-1">
                     {booking.spots?.title || 'Parking Spot'}
@@ -489,6 +527,7 @@ const Activity = () => {
             {/* Header Section with Gradient Background */}
             <div className="bg-gradient-to-br from-primary/5 via-primary/3 to-transparent p-5 pb-4">
               <div className="flex items-start justify-between gap-3 mb-4">
+                <SpotThumbnail size="desktop" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-2">
                     <h3 className="font-semibold text-lg truncate group-hover:text-primary transition-colors">
