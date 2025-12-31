@@ -95,6 +95,16 @@ const EmailConfirmation = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       
+      // FIRST: Check if user is already logged in and verified
+      // This handles the case where the link was already used successfully
+      const { data: { session: existingSession } } = await supabase.auth.getSession();
+      
+      if (existingSession?.user?.email_confirmed_at) {
+        console.log('[EmailConfirmation] User already verified');
+        await handleVerificationSuccess(existingSession);
+        return;
+      }
+      
       // Check for error in hash
       if (hash) {
         const hashParams = new URLSearchParams(hash.substring(1));
@@ -102,6 +112,11 @@ const EmailConfirmation = () => {
         const errorDescription = hashParams.get('error_description');
         
         if (errorCode || errorDescription) {
+          // Check if the error is "token used" but user is actually verified
+          if (existingSession?.user?.email_confirmed_at) {
+            await handleVerificationSuccess(existingSession);
+            return;
+          }
           setStatus('error');
           setMessage(errorDescription?.replace(/\+/g, ' ') || 'Email confirmation failed');
           return;
@@ -115,6 +130,12 @@ const EmailConfirmation = () => {
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) {
             console.error('[EmailConfirmation] Code exchange failed:', error);
+            // Check again if user is verified (token might have been used already)
+            const { data: { session: recheckSession } } = await supabase.auth.getSession();
+            if (recheckSession?.user?.email_confirmed_at) {
+              await handleVerificationSuccess(recheckSession);
+              return;
+            }
             setStatus('error');
             setMessage(error.message || 'Failed to verify email. The link may have expired.');
             return;
@@ -128,27 +149,24 @@ const EmailConfirmation = () => {
         }
       }
 
-      // Check for existing session - user might already be verified
-      const { data: { session } } = await supabase.auth.getSession();
+      // If we have a hash with access_token, wait for auth state change
+      if (hash && hash.includes('access_token')) {
+        console.log('[EmailConfirmation] Waiting for auth state change from hash');
+        return;
+      }
       
-      if (session) {
-        if (session.user.email_confirmed_at) {
-          await handleVerificationSuccess(session);
+      // Check for existing session one more time
+      if (existingSession) {
+        if (existingSession.user.email_confirmed_at) {
+          await handleVerificationSuccess(existingSession);
           return;
         } else {
           // Logged in but not verified
           setStatus('resend');
           setMessage('Your email is not yet verified');
-          setResendEmail(session.user.email || '');
+          setResendEmail(existingSession.user.email || '');
           return;
         }
-      }
-
-      // If we have a hash but no session yet, wait for auth state change
-      if (hash && hash.includes('access_token')) {
-        console.log('[EmailConfirmation] Waiting for auth state change from hash');
-        // The auth state listener will handle this
-        return;
       }
 
       // No verification data found
