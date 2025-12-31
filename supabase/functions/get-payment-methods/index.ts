@@ -51,13 +51,32 @@ serve(async (req) => {
       apiVersion: '2025-08-27.basil',
     });
 
-    // Check if customer exists
-    const customers = await stripe.customers.list({
-      email: user.email,
-      limit: 1,
-    });
+    // First check if we have a stripe_customer_id in the profile (most reliable)
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('stripe_customer_id')
+      .eq('user_id', user.id)
+      .single();
 
-    if (customers.data.length === 0) {
+    let customerId = profile?.stripe_customer_id;
+
+    // If no customer ID in profile, fall back to email lookup
+    if (!customerId && user.email) {
+      const customers = await stripe.customers.list({
+        email: user.email,
+        limit: 1,
+      });
+      if (customers.data.length > 0) {
+        customerId = customers.data[0].id;
+        // Update profile with the found customer ID for future consistency
+        await supabaseClient
+          .from('profiles')
+          .update({ stripe_customer_id: customerId })
+          .eq('user_id', user.id);
+      }
+    }
+
+    if (!customerId) {
       return new Response(
         JSON.stringify({ paymentMethods: [] }),
         {
@@ -66,8 +85,6 @@ serve(async (req) => {
         }
       );
     }
-
-    const customerId = customers.data[0].id;
 
     // Get all payment methods for the customer
     const paymentMethods = await stripe.paymentMethods.list({

@@ -44,8 +44,30 @@ serve(async (req) => {
 
     let customerId: string | undefined;
 
-    // Try to find existing customer by email first
-    if (user.email) {
+    // First check if we have a stripe_customer_id in the profile (most reliable)
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('stripe_customer_id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (profile?.stripe_customer_id) {
+      // Verify the customer still exists in Stripe
+      try {
+        await stripe.customers.retrieve(profile.stripe_customer_id);
+        customerId = profile.stripe_customer_id;
+        console.log('[setup-payment-method] Found existing customer from profile:', customerId);
+      } catch (err: any) {
+        if (err.code === 'resource_missing') {
+          console.log('[setup-payment-method] Customer in profile no longer exists in Stripe');
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    // Try to find existing customer by email if not found in profile
+    if (!customerId && user.email) {
       const customers = await stripe.customers.list({
         email: user.email,
         limit: 1,
@@ -84,6 +106,19 @@ serve(async (req) => {
       });
       customerId = customer.id;
       console.log('[setup-payment-method] Created new customer:', customerId);
+    }
+
+    // Always update the profile with the stripe_customer_id to ensure consistency
+    const { error: updateError } = await supabaseClient
+      .from('profiles')
+      .update({ stripe_customer_id: customerId })
+      .eq('user_id', user.id);
+    
+    if (updateError) {
+      console.error('[setup-payment-method] Failed to update profile with customer ID:', updateError);
+      // Don't throw - continue with setup intent creation
+    } else {
+      console.log('[setup-payment-method] Updated profile with stripe_customer_id:', customerId);
     }
 
     // Create setup intent for adding payment method
