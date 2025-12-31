@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, XCircle, Loader2, Car } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { CheckCircle, XCircle, Loader2, Car, Mail, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import parkzyLogo from '@/assets/parkzy-logo.png';
 
 const sendWelcomeEmail = async (userId: string, email: string, firstName?: string) => {
   try {
@@ -43,53 +47,102 @@ const sendWelcomeEmail = async (userId: string, email: string, firstName?: strin
 
 const EmailConfirmation = () => {
   const navigate = useNavigate();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [searchParams] = useSearchParams();
+  const { toast } = useToast();
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'resend'>('loading');
   const [message, setMessage] = useState('Confirming your email...');
+  const [resendEmail, setResendEmail] = useState('');
+  const [sending, setSending] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  
+  // Check if user was redirected here to resend verification
+  const isResendMode = searchParams.get('resend') === 'true';
+  const prefillEmail = searchParams.get('email') || '';
 
   useEffect(() => {
+    if (isResendMode) {
+      setStatus('resend');
+      setMessage('Request a new verification email');
+      setResendEmail(prefillEmail);
+      return;
+    }
+
     const hasHashFragment = window.location.hash.length > 0;
     let timeoutId: NodeJS.Timeout;
 
     // Set up auth state listener to detect when confirmation completes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[EmailConfirmation] Auth event:', event);
+      
       if (event === 'SIGNED_IN' && session) {
         setStatus('success');
-        setMessage('Your email has been confirmed successfully!');
+        setMessage('Your email has been verified successfully!');
+        
+        // Update email_verified in profile
+        supabase
+          .from('profiles')
+          .update({ email_verified: true })
+          .eq('user_id', session.user.id)
+          .then(({ error }) => {
+            if (error) console.error('Failed to update email_verified:', error);
+          });
         
         // Send welcome email (fire and forget)
         const firstName = session.user.user_metadata?.first_name;
         sendWelcomeEmail(session.user.id, session.user.email || '', firstName);
         
+        // Clean up URL hash
+        if (window.location.hash) {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+        
         // Redirect to home after 2 seconds
         setTimeout(() => {
           navigate('/');
-        }, 2000);
+        }, 2500);
       }
     });
 
     // If we have hash fragments, Supabase is processing the auth callback
-    // Give it time to complete before showing an error
     if (hasHashFragment) {
-      // If auth doesn't complete within 5 seconds, show error
+      // Parse the hash to check for errors
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const errorCode = hashParams.get('error_code');
+      const errorDescription = hashParams.get('error_description');
+      
+      if (errorCode || errorDescription) {
+        setStatus('error');
+        setMessage(errorDescription?.replace(/\+/g, ' ') || 'Email confirmation failed');
+        return;
+      }
+      
+      // Give it time to complete before showing an error
       timeoutId = setTimeout(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
           if (!session) {
             setStatus('error');
-            setMessage('Failed to confirm email. Please try again.');
+            setMessage('Failed to confirm email. The link may have expired.');
           }
         });
       }, 5000);
     } else {
-      // No hash fragments means this isn't an auth callback
-      // Check if there's already an active session
+      // No hash fragments - check if there's already an active session
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) {
-          setStatus('success');
-          setMessage('Your email has been confirmed successfully!');
-          setTimeout(() => navigate('/'), 2000);
+          // Check if email is already verified
+          if (session.user.email_confirmed_at) {
+            setStatus('success');
+            setMessage('Your email is already verified!');
+            setTimeout(() => navigate('/'), 2000);
+          } else {
+            // Logged in but not verified - show resend option
+            setStatus('resend');
+            setMessage('Your email is not yet verified');
+            setResendEmail(session.user.email || '');
+          }
         } else {
           setStatus('error');
-          setMessage('No confirmation link detected. Please check your email.');
+          setMessage('No verification link detected. Please check your email or request a new link.');
         }
       });
     }
@@ -98,63 +151,187 @@ const EmailConfirmation = () => {
       subscription.unsubscribe();
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [navigate]);
+  }, [navigate, isResendMode, prefillEmail]);
+
+  const handleResend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resendEmail || cooldown > 0) return;
+
+    setSending(true);
+    
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: resendEmail,
+        options: {
+          emailRedirectTo: `${window.location.origin}/email-confirmation`
+        }
+      });
+
+      if (error) {
+        if (error.message.toLowerCase().includes('rate') || error.message.toLowerCase().includes('too many')) {
+          setCooldown(60);
+          startCooldown();
+          toast({
+            title: "Too many requests",
+            description: "Please wait before requesting another verification email",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: error.message,
+            variant: "destructive"
+          });
+        }
+      } else {
+        setCooldown(60);
+        startCooldown();
+        toast({
+          title: "Verification email sent!",
+          description: `Check ${resendEmail} for the verification link`
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to send verification email",
+        variant: "destructive"
+      });
+    }
+    
+    setSending(false);
+  };
+
+  const startCooldown = () => {
+    const interval = setInterval(() => {
+      setCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-            <Car className="h-6 w-6 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-primary">Parkzy</h1>
+          <img src={parkzyLogo} alt="Parkzy" className="h-10" />
         </div>
 
-        <Card>
+        <Card className="border-border shadow-lg">
           <CardHeader className="text-center">
-            <CardTitle>Email Confirmation</CardTitle>
+            <CardTitle className="text-xl">
+              {status === 'loading' && 'Verifying Email'}
+              {status === 'success' && 'Email Verified!'}
+              {status === 'error' && 'Verification Failed'}
+              {status === 'resend' && 'Resend Verification'}
+            </CardTitle>
             <CardDescription>
-              {status === 'loading' && 'Verifying your email address...'}
+              {status === 'loading' && 'Please wait while we verify your email...'}
               {status === 'success' && 'Welcome to Parkzy!'}
-              {status === 'error' && 'Confirmation Failed'}
+              {status === 'error' && 'Something went wrong'}
+              {status === 'resend' && 'Enter your email to receive a new verification link'}
             </CardDescription>
           </CardHeader>
           
           <CardContent className="flex flex-col items-center space-y-6">
             {status === 'loading' && (
-              <Loader2 className="h-16 w-16 text-primary animate-spin" />
-            )}
-            
-            {status === 'success' && (
-              <CheckCircle className="h-16 w-16 text-green-500" />
-            )}
-            
-            {status === 'error' && (
-              <XCircle className="h-16 w-16 text-destructive" />
-            )}
-            
-            <p className="text-center text-muted-foreground">
-              {message}
-            </p>
-
-            {status === 'success' && (
-              <p className="text-sm text-center text-muted-foreground">
-                Redirecting you to the home page...
-              </p>
-            )}
-
-            {status === 'error' && (
-              <div className="flex flex-col gap-2 w-full">
-                <Button onClick={() => navigate('/auth')} className="w-full">
-                  Go to Sign In
-                </Button>
-                <Button onClick={() => navigate('/')} variant="outline" className="w-full">
-                  Go to Home
-                </Button>
+              <div className="flex flex-col items-center gap-4">
+                <Loader2 className="h-16 w-16 text-primary animate-spin" />
+                <p className="text-center text-muted-foreground">{message}</p>
               </div>
+            )}
+            
+            {status === 'success' && (
+              <div className="flex flex-col items-center gap-4">
+                <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
+                  <CheckCircle className="h-10 w-10 text-green-600" />
+                </div>
+                <p className="text-center text-foreground font-medium">{message}</p>
+                <p className="text-sm text-center text-muted-foreground">
+                  Redirecting you to the app...
+                </p>
+              </div>
+            )}
+            
+            {status === 'error' && (
+              <div className="flex flex-col items-center gap-4 w-full">
+                <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center">
+                  <XCircle className="h-10 w-10 text-destructive" />
+                </div>
+                <p className="text-center text-foreground">{message}</p>
+                <div className="flex flex-col gap-2 w-full mt-2">
+                  <Button 
+                    onClick={() => {
+                      setStatus('resend');
+                      setMessage('Enter your email to receive a new verification link');
+                    }} 
+                    className="w-full"
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Request New Link
+                  </Button>
+                  <Button onClick={() => navigate('/auth')} variant="outline" className="w-full">
+                    Go to Sign In
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {status === 'resend' && (
+              <form onSubmit={handleResend} className="w-full space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={resendEmail}
+                    onChange={(e) => setResendEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    required
+                    className="h-12"
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full h-12"
+                  disabled={sending || cooldown > 0 || !resendEmail}
+                >
+                  {sending ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : cooldown > 0 ? (
+                    `Resend in ${cooldown}s`
+                  ) : (
+                    <>
+                      <Mail className="h-4 w-4 mr-2" />
+                      Send Verification Email
+                    </>
+                  )}
+                </Button>
+                <div className="text-center">
+                  <Button 
+                    variant="link" 
+                    onClick={() => navigate('/auth')}
+                    type="button"
+                  >
+                    Back to Sign In
+                  </Button>
+                </div>
+              </form>
             )}
           </CardContent>
         </Card>
+        
+        <p className="text-center text-xs text-muted-foreground">
+          Having trouble? Contact support@parkzy.app
+        </p>
       </div>
     </div>
   );
