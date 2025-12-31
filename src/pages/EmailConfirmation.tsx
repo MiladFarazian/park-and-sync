@@ -5,6 +5,42 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Loader2, Car } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
+const sendWelcomeEmail = async (userId: string, email: string, firstName?: string) => {
+  try {
+    // Check if welcome email was already sent
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('welcome_email_sent')
+      .eq('user_id', userId)
+      .single();
+
+    if (profile?.welcome_email_sent) {
+      console.log('Welcome email already sent');
+      return;
+    }
+
+    // Send welcome email
+    const { error } = await supabase.functions.invoke('send-welcome-email', {
+      body: { userId, email, firstName },
+    });
+
+    if (error) {
+      console.error('Failed to send welcome email:', error);
+      return;
+    }
+
+    // Mark welcome email as sent
+    await supabase
+      .from('profiles')
+      .update({ welcome_email_sent: true })
+      .eq('user_id', userId);
+
+    console.log('Welcome email sent successfully');
+  } catch (err) {
+    console.error('Error in sendWelcomeEmail:', err);
+  }
+};
+
 const EmailConfirmation = () => {
   const navigate = useNavigate();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -19,6 +55,10 @@ const EmailConfirmation = () => {
       if (event === 'SIGNED_IN' && session) {
         setStatus('success');
         setMessage('Your email has been confirmed successfully!');
+        
+        // Send welcome email (fire and forget)
+        const firstName = session.user.user_metadata?.first_name;
+        sendWelcomeEmail(session.user.id, session.user.email || '', firstName);
         
         // Redirect to home after 2 seconds
         setTimeout(() => {
