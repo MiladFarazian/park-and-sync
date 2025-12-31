@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useRef, useState, useCallback } from "react";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
 
 interface SwipeableToastProps {
   children: React.ReactNode;
@@ -10,10 +11,28 @@ const DISMISS_THRESHOLD = 50; // pixels
 const VELOCITY_THRESHOLD = 0.5; // pixels per ms
 const MIN_MOVEMENT = 5; // minimum pixels before treating as intentional swipe
 
+// Haptic feedback helper - uses Capacitor on native, Vibration API on web
+const triggerHaptic = async (style: 'light' | 'medium' | 'heavy' = 'light') => {
+  try {
+    // Try Capacitor Haptics first (works on native iOS/Android)
+    const impactStyle = style === 'light' ? ImpactStyle.Light 
+      : style === 'medium' ? ImpactStyle.Medium 
+      : ImpactStyle.Heavy;
+    await Haptics.impact({ style: impactStyle });
+  } catch {
+    // Fallback to Web Vibration API (works on Android Chrome)
+    if ('vibrate' in navigator) {
+      const duration = style === 'light' ? 10 : style === 'medium' ? 20 : 30;
+      navigator.vibrate(duration);
+    }
+  }
+};
+
 export function SwipeableToast({ children, onDismiss }: SwipeableToastProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [translateY, setTranslateY] = useState(0);
   const [isDismissing, setIsDismissing] = useState(false);
+  const [hasTriggeredThresholdHaptic, setHasTriggeredThresholdHaptic] = useState(false);
   
   const touchStartRef = useRef<{ y: number; time: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -24,6 +43,7 @@ export function SwipeableToast({ children, onDismiss }: SwipeableToastProps) {
       time: Date.now(),
     };
     setIsDragging(false);
+    setHasTriggeredThresholdHaptic(false);
   }, []);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
@@ -43,7 +63,13 @@ export function SwipeableToast({ children, onDismiss }: SwipeableToastProps) {
 
     setIsDragging(true);
     setTranslateY(deltaY);
-  }, []);
+
+    // Trigger light haptic when crossing the dismiss threshold
+    if (Math.abs(deltaY) > DISMISS_THRESHOLD && !hasTriggeredThresholdHaptic) {
+      triggerHaptic('light');
+      setHasTriggeredThresholdHaptic(true);
+    }
+  }, [hasTriggeredThresholdHaptic]);
 
   const handleTouchEnd = useCallback(() => {
     if (!touchStartRef.current || !isDragging) {
@@ -60,6 +86,8 @@ export function SwipeableToast({ children, onDismiss }: SwipeableToastProps) {
     // Dismiss if past threshold or velocity is high enough
     if (Math.abs(translateY) > DISMISS_THRESHOLD || velocity > VELOCITY_THRESHOLD) {
       setIsDismissing(true);
+      // Trigger medium haptic on successful dismiss
+      triggerHaptic('medium');
       // Wait for animation to complete before dismissing
       setTimeout(() => {
         onDismiss();
