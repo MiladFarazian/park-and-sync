@@ -151,14 +151,6 @@ All colors MUST be HSL.
 
 /* Global touch behavior for interactive elements on touch devices */
 @media (hover: none) and (pointer: coarse) {
-  /* Disable HOVER only (not active) - hover doesn't exist on touch devices anyway */
-  button:hover,
-  [role="button"]:hover,
-  a:hover,
-  [data-radix-collection-item]:hover {
-    background-color: inherit !important;
-  }
-  
   /* Disable tap highlight color to prevent the blue/gray flash on scroll */
   button,
   a,
