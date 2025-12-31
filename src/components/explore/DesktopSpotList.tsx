@@ -244,44 +244,52 @@ const DesktopSpotList = ({
         {/* Filter Chips */}
         <div className="flex flex-wrap gap-2">
           <button
+            type="button"
             onClick={() => toggleFilter('covered')}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+            onMouseDown={e => e.preventDefault()}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors touch-scroll-safe ${
               filters.covered
                 ? 'bg-primary text-primary-foreground'
-                : 'bg-muted hover:bg-muted/80 text-foreground'
+                : 'bg-muted active:bg-muted/80 text-foreground'
             }`}
           >
             <Umbrella className="h-3.5 w-3.5" />
             Covered
           </button>
           <button
+            type="button"
             onClick={() => toggleFilter('evCharging')}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+            onMouseDown={e => e.preventDefault()}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors touch-scroll-safe ${
               filters.evCharging
                 ? 'bg-primary text-primary-foreground'
-                : 'bg-muted hover:bg-muted/80 text-foreground'
+                : 'bg-muted active:bg-muted/80 text-foreground'
             }`}
           >
             <Zap className="h-3.5 w-3.5" />
             EV Charging
           </button>
           <button
+            type="button"
             onClick={() => toggleFilter('secure')}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+            onMouseDown={e => e.preventDefault()}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors touch-scroll-safe ${
               filters.secure
                 ? 'bg-primary text-primary-foreground'
-                : 'bg-muted hover:bg-muted/80 text-foreground'
+                : 'bg-muted active:bg-muted/80 text-foreground'
             }`}
           >
             <Shield className="h-3.5 w-3.5" />
             Secure
           </button>
           <button
+            type="button"
             onClick={() => toggleFilter('adaAccessible')}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+            onMouseDown={e => e.preventDefault()}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors touch-scroll-safe ${
               filters.adaAccessible
                 ? 'bg-primary text-primary-foreground'
-                : 'bg-muted hover:bg-muted/80 text-foreground'
+                : 'bg-muted active:bg-muted/80 text-foreground'
             }`}
           >
             <Accessibility className="h-3.5 w-3.5" />
@@ -316,8 +324,10 @@ const DesktopSpotList = ({
           {/* Clear Filters */}
           {activeFilterCount > 0 && (
             <button
+              type="button"
               onClick={clearAllFilters}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              onMouseDown={e => e.preventDefault()}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium text-muted-foreground active:text-foreground active:bg-muted/50 transition-colors touch-scroll-safe"
             >
               <X className="h-3.5 w-3.5" />
               Clear all
@@ -359,14 +369,14 @@ const DesktopSpotList = ({
                     if (el) cardRefs.current.set(spot.id, el);
                     else cardRefs.current.delete(spot.id);
                   }}
-                  className={`p-4 cursor-pointer transition-all duration-200 ${
+                  className={`p-4 cursor-pointer transition-all duration-200 touch-scroll-safe ${
                     isSelected 
                       ? 'bg-primary/10 border-l-4 border-l-primary ring-1 ring-primary/20 shadow-sm animate-[selection-pulse_0.4s_ease-out]' 
                       : ''
                   } ${
                     isHovered && !isSelected 
                       ? 'bg-muted/70 scale-[1.01]' 
-                      : !isSelected ? 'hover:bg-muted/50' : ''
+                      : ''
                   }`}
                   onMouseEnter={() => onSpotHover?.(spot.id)}
                   onMouseLeave={() => onSpotHover?.(null)}

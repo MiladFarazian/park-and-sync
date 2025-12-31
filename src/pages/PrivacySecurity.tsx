@@ -46,7 +46,12 @@ const PrivacySecurity = () => {
           {securityOptions.map((option, index) => {
             const Icon = option.icon;
             return (
-              <Card key={index} className="p-6 cursor-pointer hover:bg-accent/50 transition-colors" onClick={option.action}>
+              <Card 
+                key={index} 
+                className="p-6 cursor-pointer active:bg-accent/50 transition-colors touch-scroll-safe" 
+                onClick={option.action}
+                onMouseDown={e => e.preventDefault()}
+              >
                 <div className="flex items-center gap-4">
                   <div className="p-3 rounded-full bg-muted">
                     <Icon className="h-5 w-5" />

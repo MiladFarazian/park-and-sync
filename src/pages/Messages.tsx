@@ -688,9 +688,11 @@ const MessagesContent = () => {
       ) : (
         bookingContacts.map((contact) => (
           <button
+            type="button"
             key={contact.user_id}
             onClick={() => handleSelectContact(contact.user_id)}
-            className="w-full p-3 rounded-lg text-left transition-colors hover:bg-accent flex items-center gap-3"
+            onMouseDown={e => e.preventDefault()}
+            className="w-full p-3 rounded-lg text-left transition-colors active:bg-accent flex items-center gap-3 touch-scroll-safe"
           >
             <Avatar>
               <AvatarImage src={contact.avatar_url || undefined} />
@@ -757,11 +759,13 @@ const MessagesContent = () => {
             ) : (
               filteredConversations.map((conversation) => (
                 <button
+                  type="button"
                   key={`${conversation.user_id}-${conversation.last_message_at}-${tick}`}
                   onClick={() => {
                     setSearchParams({ userId: conversation.user_id }, { replace: true });
                   }}
-                  className={`w-full p-3 rounded-lg text-left transition-colors hover:bg-accent ${
+                  onMouseDown={e => e.preventDefault()}
+                  className={`w-full p-3 rounded-lg text-left transition-colors active:bg-accent touch-scroll-safe ${
                     selectedConversation === conversation.user_id ? 'bg-accent' : ''
                   }`}
                 >
