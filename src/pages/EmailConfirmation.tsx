@@ -1,17 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CheckCircle, XCircle, Loader2, Car, Mail, RefreshCw } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Mail, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import parkzyLogo from '@/assets/parkzy-logo.png';
 
 const sendWelcomeEmail = async (userId: string, email: string, firstName?: string) => {
   try {
-    // Check if welcome email was already sent
     const { data: profile } = await supabase
       .from('profiles')
       .select('welcome_email_sent')
@@ -23,7 +22,6 @@ const sendWelcomeEmail = async (userId: string, email: string, firstName?: strin
       return;
     }
 
-    // Send welcome email
     const { error } = await supabase.functions.invoke('send-welcome-email', {
       body: { userId, email, firstName },
     });
@@ -33,7 +31,6 @@ const sendWelcomeEmail = async (userId: string, email: string, firstName?: strin
       return;
     }
 
-    // Mark welcome email as sent
     await supabase
       .from('profiles')
       .update({ welcome_email_sent: true })
@@ -55,9 +52,35 @@ const EmailConfirmation = () => {
   const [sending, setSending] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   
-  // Check if user was redirected here to resend verification
   const isResendMode = searchParams.get('resend') === 'true';
   const prefillEmail = searchParams.get('email') || '';
+
+  const handleVerificationSuccess = useCallback(async (session: any) => {
+    setStatus('success');
+    setMessage('Your email has been verified successfully!');
+    
+    // Update email_verified in profile
+    try {
+      await supabase
+        .from('profiles')
+        .update({ email_verified: true })
+        .eq('user_id', session.user.id);
+    } catch (error) {
+      console.error('Failed to update email_verified:', error);
+    }
+    
+    // Send welcome email
+    const firstName = session.user.user_metadata?.first_name;
+    sendWelcomeEmail(session.user.id, session.user.email || '', firstName);
+    
+    // Clean up URL
+    if (window.location.hash || window.location.search.includes('code=')) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    
+    // Redirect after showing success message
+    setTimeout(() => navigate('/'), 2500);
+  }, [navigate]);
 
   useEffect(() => {
     if (isResendMode) {
@@ -67,91 +90,90 @@ const EmailConfirmation = () => {
       return;
     }
 
-    const hasHashFragment = window.location.hash.length > 0;
-    let timeoutId: NodeJS.Timeout;
+    const processVerification = async () => {
+      const hash = window.location.hash;
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      
+      // Check for error in hash
+      if (hash) {
+        const hashParams = new URLSearchParams(hash.substring(1));
+        const errorCode = hashParams.get('error_code');
+        const errorDescription = hashParams.get('error_description');
+        
+        if (errorCode || errorDescription) {
+          setStatus('error');
+          setMessage(errorDescription?.replace(/\+/g, ' ') || 'Email confirmation failed');
+          return;
+        }
+      }
 
-    // Set up auth state listener to detect when confirmation completes
+      // Try PKCE flow if we have a code
+      if (code) {
+        console.log('[EmailConfirmation] Processing PKCE code exchange');
+        try {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            console.error('[EmailConfirmation] Code exchange failed:', error);
+            setStatus('error');
+            setMessage(error.message || 'Failed to verify email. The link may have expired.');
+            return;
+          }
+          if (data.session) {
+            await handleVerificationSuccess(data.session);
+            return;
+          }
+        } catch (err) {
+          console.error('[EmailConfirmation] Code exchange error:', err);
+        }
+      }
+
+      // Check for existing session - user might already be verified
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        if (session.user.email_confirmed_at) {
+          await handleVerificationSuccess(session);
+          return;
+        } else {
+          // Logged in but not verified
+          setStatus('resend');
+          setMessage('Your email is not yet verified');
+          setResendEmail(session.user.email || '');
+          return;
+        }
+      }
+
+      // If we have a hash but no session yet, wait for auth state change
+      if (hash && hash.includes('access_token')) {
+        console.log('[EmailConfirmation] Waiting for auth state change from hash');
+        // The auth state listener will handle this
+        return;
+      }
+
+      // No verification data found
+      if (!hash && !code) {
+        setStatus('error');
+        setMessage('No verification link detected. Please check your email or request a new link.');
+      }
+    };
+
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('[EmailConfirmation] Auth event:', event);
       
       if (event === 'SIGNED_IN' && session) {
-        setStatus('success');
-        setMessage('Your email has been verified successfully!');
-        
-        // Update email_verified in profile
-        supabase
-          .from('profiles')
-          .update({ email_verified: true })
-          .eq('user_id', session.user.id)
-          .then(({ error }) => {
-            if (error) console.error('Failed to update email_verified:', error);
-          });
-        
-        // Send welcome email (fire and forget)
-        const firstName = session.user.user_metadata?.first_name;
-        sendWelcomeEmail(session.user.id, session.user.email || '', firstName);
-        
-        // Clean up URL hash
-        if (window.location.hash) {
-          window.history.replaceState({}, '', window.location.pathname);
-        }
-        
-        // Redirect to home after 2 seconds
-        setTimeout(() => {
-          navigate('/');
-        }, 2500);
+        handleVerificationSuccess(session);
       }
     });
 
-    // If we have hash fragments, Supabase is processing the auth callback
-    if (hasHashFragment) {
-      // Parse the hash to check for errors
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const errorCode = hashParams.get('error_code');
-      const errorDescription = hashParams.get('error_description');
-      
-      if (errorCode || errorDescription) {
-        setStatus('error');
-        setMessage(errorDescription?.replace(/\+/g, ' ') || 'Email confirmation failed');
-        return;
-      }
-      
-      // Give it time to complete before showing an error
-      timeoutId = setTimeout(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          if (!session) {
-            setStatus('error');
-            setMessage('Failed to confirm email. The link may have expired.');
-          }
-        });
-      }, 5000);
-    } else {
-      // No hash fragments - check if there's already an active session
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-          // Check if email is already verified
-          if (session.user.email_confirmed_at) {
-            setStatus('success');
-            setMessage('Your email is already verified!');
-            setTimeout(() => navigate('/'), 2000);
-          } else {
-            // Logged in but not verified - show resend option
-            setStatus('resend');
-            setMessage('Your email is not yet verified');
-            setResendEmail(session.user.email || '');
-          }
-        } else {
-          setStatus('error');
-          setMessage('No verification link detected. Please check your email or request a new link.');
-        }
-      });
-    }
+    // Process verification
+    processVerification();
 
     return () => {
       subscription.unsubscribe();
-      if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [navigate, isResendMode, prefillEmail]);
+  }, [navigate, isResendMode, prefillEmail, handleVerificationSuccess]);
 
   const handleResend = async (e: React.FormEvent) => {
     e.preventDefault();
