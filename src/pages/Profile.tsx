@@ -909,7 +909,12 @@ const Profile = () => {
         <div className="space-y-3">
           {settingsItems.map((item, index) => {
           const Icon = item.icon;
-          return <Card key={index} className="p-4 cursor-pointer hover:bg-accent/50 transition-colors" onClick={item.onClick}>
+          return <Card 
+              key={index} 
+              className="p-4 cursor-pointer active:bg-accent/50 transition-colors touch-scroll-safe" 
+              onClick={item.onClick}
+              onMouseDown={e => e.preventDefault()}
+            >
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-muted rounded-lg">
                     <Icon className="h-5 w-5" />
@@ -935,22 +940,26 @@ const Profile = () => {
           <p className="text-sm text-muted-foreground text-center mb-3">Need help? Contact support</p>
           <div className="flex justify-center gap-3 flex-wrap">
             <button 
+              type="button"
               onClick={() => navigate('/messages?userId=00000000-0000-0000-0000-000000000001')}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border hover:bg-muted transition-colors text-sm"
+              onMouseDown={e => e.preventDefault()}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border active:bg-muted transition-colors text-sm touch-scroll-safe"
             >
               <MessageCircle className="h-4 w-4 text-primary" />
               Chat
             </button>
             <a 
               href="mailto:support@useparkzy.com" 
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border hover:bg-muted transition-colors text-sm"
+              onMouseDown={e => e.preventDefault()}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border active:bg-muted transition-colors text-sm touch-scroll-safe"
             >
               <Mail className="h-4 w-4 text-primary" />
               Email
             </a>
             <a 
               href="tel:+19495606839" 
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border hover:bg-muted transition-colors text-sm"
+              onMouseDown={e => e.preventDefault()}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border active:bg-muted transition-colors text-sm touch-scroll-safe"
             >
               <Phone className="h-4 w-4 text-primary" />
               Call
