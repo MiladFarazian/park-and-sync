@@ -100,6 +100,7 @@ const BookingDetailContent = () => {
     const fromNotification = searchParams.get('fromNotification');
     const canExtendBooking = (booking.status === 'pending' || booking.status === 'active' || booking.status === 'paid') && new Date() < new Date(booking.end_at);
     const isRenterUser = booking.renter_id === user?.id;
+    const isHostUser = booking.spots.host_id === user?.id;
     
     // Handle action=extend param
     if (action === 'extend' && canExtendBooking && isRenterUser) {
@@ -109,17 +110,22 @@ const BookingDetailContent = () => {
     }
     
     // Handle fromNotification param for deep-linked notifications
-    if (fromNotification && isRenterUser) {
+    if (fromNotification) {
       const notifType = fromNotification;
       
-      // Show contextual banner based on notification type
-      if (notifType === 'grace_period' || notifType === 'ending_soon') {
+      // Driver notifications
+      if (isRenterUser && (notifType === 'grace_period' || notifType === 'ending_soon')) {
         setShowNotificationBanner(notifType);
         
         // Auto-open extend dialog for grace period notifications
         if (notifType === 'grace_period' && canExtendBooking) {
           setShowExtendDialog(true);
         }
+      }
+      
+      // Host notifications for guest overstay
+      if (isHostUser && notifType === 'overstay_host') {
+        setShowNotificationBanner('overstay_host');
       }
       
       // Remove the query param to prevent re-triggering
@@ -583,29 +589,43 @@ const BookingDetailContent = () => {
             className={`p-4 rounded-lg flex items-center gap-3 animate-pulse ${
               showNotificationBanner === 'grace_period' 
                 ? 'bg-destructive/10 border border-destructive/30' 
+                : showNotificationBanner === 'overstay_host'
+                ? 'bg-orange-500/10 border border-orange-500/30'
                 : 'bg-amber-500/10 border border-amber-500/30'
             }`}
           >
             <AlertTriangle className={`h-5 w-5 flex-shrink-0 ${
-              showNotificationBanner === 'grace_period' ? 'text-destructive' : 'text-amber-500'
+              showNotificationBanner === 'grace_period' 
+                ? 'text-destructive' 
+                : showNotificationBanner === 'overstay_host'
+                ? 'text-orange-500'
+                : 'text-amber-500'
             }`} />
             <div className="flex-1">
               <p className={`text-sm font-medium ${
-                showNotificationBanner === 'grace_period' ? 'text-destructive' : 'text-amber-600'
+                showNotificationBanner === 'grace_period' 
+                  ? 'text-destructive' 
+                  : showNotificationBanner === 'overstay_host'
+                  ? 'text-orange-600'
+                  : 'text-amber-600'
               }`}>
                 {showNotificationBanner === 'grace_period' 
                   ? "You're in your grace period — extend now to avoid $25/hr overtime charges"
+                  : showNotificationBanner === 'overstay_host'
+                  ? "Guest has overstayed — you can send a warning or take action below"
                   : "Your parking ends soon — extend now to keep your spot"}
               </p>
             </div>
-            <Button 
-              size="sm" 
-              variant={showNotificationBanner === 'grace_period' ? 'destructive' : 'default'}
-              onClick={() => setShowExtendDialog(true)}
-              disabled={!((booking.status === 'pending' || booking.status === 'active' || booking.status === 'paid') && new Date() < new Date(booking.end_at))}
-            >
-              Extend Now
-            </Button>
+            {showNotificationBanner !== 'overstay_host' && (
+              <Button 
+                size="sm" 
+                variant={showNotificationBanner === 'grace_period' ? 'destructive' : 'default'}
+                onClick={() => setShowExtendDialog(true)}
+                disabled={!((booking.status === 'pending' || booking.status === 'active' || booking.status === 'paid') && new Date() < new Date(booking.end_at))}
+              >
+                Extend Now
+              </Button>
+            )}
             <Button 
               size="icon" 
               variant="ghost" 
