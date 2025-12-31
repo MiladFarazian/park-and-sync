@@ -131,8 +131,9 @@ const ManageAvailabilitySelect = () => {
           {/* Select All */}
           {spots.length > 1 && (
             <div 
-              className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-accent/50 transition-colors"
+              className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer active:bg-accent/50 transition-colors touch-scroll-safe"
               onClick={toggleAll}
+              onMouseDown={e => e.preventDefault()}
             >
               <Checkbox 
                 checked={selectedSpots.length === spots.length}
@@ -149,7 +150,7 @@ const ManageAvailabilitySelect = () => {
             {spots.map(spot => (
               <Card 
                 key={spot.id}
-                className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                className="p-4 cursor-pointer active:bg-accent/50 transition-colors touch-scroll-safe"
                 onClick={() => {
                   if (spots.length === 1) {
                     navigate(`/edit-spot/${spot.id}/availability`);
@@ -157,6 +158,7 @@ const ManageAvailabilitySelect = () => {
                     toggleSpot(spot.id);
                   }
                 }}
+                onMouseDown={e => e.preventDefault()}
               >
                 <div className="flex items-center gap-3">
                   {spots.length > 1 && (

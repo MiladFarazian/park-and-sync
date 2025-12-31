@@ -616,12 +616,13 @@ const Explore = () => {
                   <Card className="absolute top-full mt-2 w-full bg-background shadow-lg max-h-80 overflow-y-auto z-20">
                     {suggestions.map((suggestion, index) => (
                       <button 
+                        type="button"
                         key={index} 
                         onMouseDown={e => {
                           e.preventDefault();
                           handleSelectLocation(suggestion);
                         }} 
-                        className="w-full text-left p-3 hover:bg-accent transition-colors border-b border-border last:border-0"
+                        className="w-full text-left p-3 active:bg-accent transition-colors border-b border-border last:border-0 touch-scroll-safe"
                       >
                         <div className="font-medium text-sm">{suggestion.name}</div>
                         <div className="text-xs text-muted-foreground mt-1">
@@ -642,8 +643,10 @@ const Explore = () => {
                 <div className="flex items-center gap-2 text-sm">
                   {startTime && (
                     <button 
+                      type="button"
                       onClick={() => setMobileStartPickerOpen(true)}
-                      className="flex items-center gap-1 hover:bg-accent/50 rounded px-2 py-1.5 transition-colors"
+                      onMouseDown={e => e.preventDefault()}
+                      className="flex items-center gap-1 active:bg-accent/50 rounded px-2 py-1.5 transition-colors touch-scroll-safe"
                     >
                       <Calendar className="h-3 w-3 text-muted-foreground" />
                       <span className="whitespace-nowrap text-xs">{formatDateDisplay(startTime)}</span>
@@ -656,8 +659,10 @@ const Explore = () => {
                   
                   {endTime && (
                     <button 
+                      type="button"
                       onClick={() => setMobileEndPickerOpen(true)}
-                      className="flex items-center gap-1 hover:bg-accent/50 rounded px-2 py-1.5 transition-colors"
+                      onMouseDown={e => e.preventDefault()}
+                      className="flex items-center gap-1 active:bg-accent/50 rounded px-2 py-1.5 transition-colors touch-scroll-safe"
                     >
                       <Calendar className="h-3 w-3 text-muted-foreground" />
                       <span className="whitespace-nowrap text-xs">{formatDateDisplay(endTime)}</span>
@@ -672,9 +677,11 @@ const Explore = () => {
 
           {/* Current Location Button */}
           <button
+            type="button"
             onClick={handleGoToCurrentLocation}
             disabled={isLoadingLocation}
-            className="absolute bottom-6 right-4 z-10 p-3 bg-background/95 backdrop-blur-sm shadow-lg rounded-full hover:bg-accent transition-colors disabled:opacity-50"
+            onMouseDown={e => e.preventDefault()}
+            className="absolute bottom-6 right-4 z-10 p-3 bg-background/95 backdrop-blur-sm shadow-lg rounded-full active:bg-accent transition-colors disabled:opacity-50 touch-scroll-safe"
             title="Go to current location"
           >
             {isLoadingLocation ? (
@@ -779,12 +786,13 @@ const Explore = () => {
               <Card className="absolute top-full mt-2 w-full bg-background shadow-lg max-h-80 overflow-y-auto z-20">
                 {suggestions.map((suggestion, index) => (
                   <button 
+                    type="button"
                     key={index} 
                     onMouseDown={e => {
                       e.preventDefault();
                       handleSelectLocation(suggestion);
                     }} 
-                    className="w-full text-left p-3 hover:bg-accent transition-colors border-b border-border last:border-0"
+                    className="w-full text-left p-3 active:bg-accent transition-colors border-b border-border last:border-0 touch-scroll-safe"
                   >
                     <div className="font-medium text-sm">{suggestion.name}</div>
                     <div className="text-xs text-muted-foreground mt-1">
@@ -803,8 +811,10 @@ const Explore = () => {
               <div className="flex items-center gap-2 text-sm justify-center mx-0">
                 {startTime && (
                   <button 
+                    type="button"
                     onClick={() => setMobileStartPickerOpen(true)}
-                    className="flex items-center gap-1 hover:bg-accent/50 rounded px-2 py-1.5 transition-colors flex-shrink-0"
+                    onMouseDown={e => e.preventDefault()}
+                    className="flex items-center gap-1 active:bg-accent/50 rounded px-2 py-1.5 transition-colors flex-shrink-0 touch-scroll-safe"
                   >
                     <Calendar className="h-3 w-3 text-muted-foreground" />
                     <span className="whitespace-nowrap text-xs">{formatDateDisplay(startTime)}</span>
@@ -817,8 +827,10 @@ const Explore = () => {
                 
                 {endTime && (
                   <button 
+                    type="button"
                     onClick={() => setMobileEndPickerOpen(true)}
-                    className="flex items-center gap-1 hover:bg-accent/50 rounded px-2 py-1.5 transition-colors flex-shrink-0"
+                    onMouseDown={e => e.preventDefault()}
+                    className="flex items-center gap-1 active:bg-accent/50 rounded px-2 py-1.5 transition-colors flex-shrink-0 touch-scroll-safe"
                   >
                     <Calendar className="h-3 w-3 text-muted-foreground" />
                     <span className="whitespace-nowrap text-xs">{formatDateDisplay(endTime)}</span>
@@ -834,9 +846,11 @@ const Explore = () => {
 
       {/* Current Location Button */}
       <button
+        type="button"
         onClick={handleGoToCurrentLocation}
         disabled={isLoadingLocation}
-        className="absolute bottom-28 right-4 z-10 p-3 bg-background/95 backdrop-blur-sm shadow-lg rounded-full hover:bg-accent transition-colors disabled:opacity-50"
+        onMouseDown={e => e.preventDefault()}
+        className="absolute bottom-28 right-4 z-10 p-3 bg-background/95 backdrop-blur-sm shadow-lg rounded-full active:bg-accent transition-colors disabled:opacity-50 touch-scroll-safe"
         title="Go to current location"
       >
         {isLoadingLocation ? (

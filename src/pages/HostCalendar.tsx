@@ -816,8 +816,9 @@ const HostCalendar = () => {
                     {selectedDateData.bookings.map(booking => (
                       <Card 
                         key={booking.id} 
-                        className="p-3 cursor-pointer hover:bg-accent/50 transition-colors"
+                        className="p-3 cursor-pointer active:bg-accent/50 transition-colors touch-scroll-safe"
                         onClick={() => navigate(`/booking/${booking.id}`)}
+                        onMouseDown={e => e.preventDefault()}
                       >
                         <div className="flex items-start justify-between">
                           <div className="space-y-1">

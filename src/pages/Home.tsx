@@ -406,8 +406,10 @@ const Home = () => {
             <div className="space-y-3">
               {/* Start Time */}
               <button
+                type="button"
                 onClick={() => setMobileStartPickerOpen(true)}
-                className="w-full flex items-center gap-3 p-3 rounded-lg border bg-background hover:bg-accent transition-colors text-left"
+                onMouseDown={e => e.preventDefault()}
+                className="w-full flex items-center gap-3 p-3 rounded-lg border bg-background active:bg-accent transition-colors text-left touch-scroll-safe"
               >
                 <CalendarIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -420,8 +422,10 @@ const Home = () => {
 
               {/* End Time */}
               <button
+                type="button"
                 onClick={() => setMobileEndPickerOpen(true)}
-                className="w-full flex items-center gap-3 p-3 rounded-lg border bg-background hover:bg-accent transition-colors text-left"
+                onMouseDown={e => e.preventDefault()}
+                className="w-full flex items-center gap-3 p-3 rounded-lg border bg-background active:bg-accent transition-colors text-left touch-scroll-safe"
               >
                 <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <div className="flex-1 min-w-0">
