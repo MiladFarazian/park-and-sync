@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { ExtendParkingDialog } from '@/components/booking/ExtendParkingDialog';
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, AlertTriangle, CheckCircle2, Copy, AlarmClockPlus, Flag, Zap, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, AlertTriangle, CheckCircle2, Copy, AlarmClockPlus, Flag, Zap, ChevronLeft, ChevronRight, Car } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -87,6 +87,7 @@ const BookingDetailContent = () => {
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
   const [showNotificationBanner, setShowNotificationBanner] = useState<string | null>(null);
+  const [showTowConfirmDialog, setShowTowConfirmDialog] = useState(false);
 
   useEffect(() => {
     if (!bookingId || !user) return;
@@ -524,13 +525,15 @@ const BookingDetailContent = () => {
   const canCancel = isActive && new Date() < new Date(booking.start_at);
   // Can extend only after booking has started (before start: use modify instead)
   const bookingHasStarted = new Date() >= new Date(booking.start_at);
-  const canExtend = (booking.status === 'pending' || booking.status === 'active' || booking.status === 'paid') && bookingHasStarted && new Date() < new Date(booking.end_at);
   const isHost = user?.id === booking.spots.host_id;
   const isRenter = booking?.renter_id === user?.id;
   
-  // Can modify if renter, booking is active/paid, and booking hasn't started yet
+  // Can extend only after booking has started (before start: use modify instead) - DRIVER ONLY
+  const canExtend = isRenter && !isHost && (booking.status === 'pending' || booking.status === 'active' || booking.status === 'paid') && bookingHasStarted && new Date() < new Date(booking.end_at);
+  
+  // Can modify if renter (not host), booking is active/paid, and booking hasn't started yet
   const canModifyTimes = () => {
-    if (!isRenter || (!isActive && booking.status !== 'pending')) return false;
+    if (!isRenter || isHost || (!isActive && booking.status !== 'pending')) return false;
     const startTime = new Date(booking.start_at);
     const now = new Date();
     return now < startTime;
@@ -778,24 +781,27 @@ const BookingDetailContent = () => {
         <Card className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold">Parking Time</h3>
-            <div className="flex gap-2">
-              {canModifyTimes() && (
-                <Button size="sm" variant="outline" onClick={() => {
-                  setModifyStartTime(new Date(booking.start_at));
-                  setModifyEndTime(new Date(booking.end_at));
-                  setShowModifyStartPicker(true);
-                }}>
-                  <Clock className="h-4 w-4 mr-1" />
-                  Modify
-                </Button>
-              )}
-              {canExtend && (
-                <Button size="sm" variant="outline" onClick={() => setShowExtendDialog(true)}>
-                  <AlarmClockPlus className="h-4 w-4 mr-1" />
-                  Extend
-                </Button>
-              )}
-            </div>
+            {/* Time modification actions - Driver only */}
+            {isRenter && (
+              <div className="flex gap-2">
+                {canModifyTimes() && (
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setModifyStartTime(new Date(booking.start_at));
+                    setModifyEndTime(new Date(booking.end_at));
+                    setShowModifyStartPicker(true);
+                  }}>
+                    <Clock className="h-4 w-4 mr-1" />
+                    Modify
+                  </Button>
+                )}
+                {canExtend && (
+                  <Button size="sm" variant="outline" onClick={() => setShowExtendDialog(true)}>
+                    <AlarmClockPlus className="h-4 w-4 mr-1" />
+                    Extend
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <div className="flex items-center gap-3">
@@ -889,13 +895,13 @@ const BookingDetailContent = () => {
           </div>
         </Card>
 
-        {/* Host Info */}
+        {/* Host/Driver Info - Show different content based on viewer role */}
         <Card className="p-4 space-y-4">
-          <h3 className="font-semibold">Host</h3>
+          <h3 className="font-semibold">{isHost ? 'Driver' : 'Host'}</h3>
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
               {booking.profiles.avatar_url ? (
-                <img src={booking.profiles.avatar_url} alt="Host" className="h-12 w-12 rounded-full object-cover" />
+                <img src={booking.profiles.avatar_url} alt={isHost ? 'Driver' : 'Host'} className="h-12 w-12 rounded-full object-cover" />
               ) : (
                 <span className="text-lg font-semibold text-primary">
                   {booking.profiles.first_name.charAt(0)}
@@ -904,7 +910,7 @@ const BookingDetailContent = () => {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-medium">{booking.profiles.first_name} {booking.profiles.last_name.charAt(0)}.</p>
-              <p className="text-sm text-muted-foreground">Spot Host</p>
+              <p className="text-sm text-muted-foreground">{isHost ? 'Driver' : 'Spot Host'}</p>
             </div>
             <Button variant="outline" size="sm" onClick={handleMessage}>
               <MessageCircle className="h-4 w-4 mr-1" />
@@ -963,11 +969,11 @@ const BookingDetailContent = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleOverstayAction('towing')}
+                          onClick={() => setShowTowConfirmDialog(true)}
                           disabled={overstayLoading}
                           className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
                         >
-                          <AlertCircle className="h-4 w-4 mr-2" />
+                          <Car className="h-4 w-4 mr-2" />
                           Request Tow
                         </Button>
                       </>
@@ -1201,6 +1207,58 @@ const BookingDetailContent = () => {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Tow Confirmation Dialog (Host Only) */}
+      <Dialog open={showTowConfirmDialog} onOpenChange={setShowTowConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Car className="h-5 w-5 text-destructive" />
+              Request Vehicle Tow
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to request a tow for this vehicle? This is a serious action and should only be used when the guest has significantly overstayed and is not responding to warnings.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md p-3">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                <strong>Before requesting a tow:</strong>
+              </p>
+              <ul className="text-sm text-amber-700 dark:text-amber-300 mt-1 list-disc list-inside space-y-1">
+                <li>Ensure you've tried contacting the driver via messages</li>
+                <li>Confirm the vehicle is still in your spot</li>
+                <li>Consider applying overtime charges first</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowTowConfirmDialog(false)} disabled={overstayLoading}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                handleOverstayAction('towing');
+                setShowTowConfirmDialog(false);
+              }} 
+              disabled={overstayLoading}
+            >
+              {overstayLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Car className="h-4 w-4 mr-2" />
+                  Confirm Tow Request
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
