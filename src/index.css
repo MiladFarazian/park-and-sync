@@ -149,11 +149,30 @@ All colors MUST be HSL.
   }
 }
 
-/* Disable hover AND active effects on touch devices to prevent scroll highlights */
+/* Global touch-scroll-safe behavior for all interactive elements on touch devices */
 @media (hover: none) and (pointer: coarse) {
+  /* Apply to explicit touch-scroll-safe class */
   .touch-scroll-safe:hover,
   .touch-scroll-safe:active {
     background-color: inherit !important;
+  }
+  
+  /* Apply globally to common interactive elements */
+  button:not(:focus):hover,
+  [role="button"]:not(:focus):hover,
+  a:not(:focus):hover,
+  [data-radix-collection-item]:hover {
+    background-color: inherit !important;
+  }
+  
+  /* Disable tap highlight on all interactive elements */
+  button,
+  a,
+  [role="button"],
+  [data-radix-collection-item],
+  .cursor-pointer {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
   }
 }
 
