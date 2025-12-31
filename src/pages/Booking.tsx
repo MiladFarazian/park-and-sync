@@ -1263,6 +1263,7 @@ const getStripePromise = async () => {
 const GuestBookingPage = () => {
   const { spotId } = useParams<{ spotId: string }>();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -1287,6 +1288,9 @@ const GuestBookingPage = () => {
   const initialTimes = getInitialTimes();
   const [startDateTime] = useState<Date>(initialTimes.start);
   const [endDateTime] = useState<Date>(initialTimes.end);
+
+  // Build return URL for sign-in redirect
+  const returnUrl = `${location.pathname}${location.search}`;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1379,6 +1383,23 @@ const GuestBookingPage = () => {
       </div>
 
       <div className="max-w-lg mx-auto p-4 space-y-6 pb-8">
+        {/* Sign in for faster checkout option */}
+        <Card className="p-4 bg-muted/50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Have an account?</span>
+            </div>
+            <Button 
+              variant="link" 
+              className="p-0 h-auto text-sm"
+              onClick={() => navigate(`/auth?returnTo=${encodeURIComponent(returnUrl)}`)}
+            >
+              Sign in for faster checkout
+            </Button>
+          </div>
+        </Card>
+
         {/* Spot Summary */}
         <Card className="p-4">
           <div className="flex gap-4">
@@ -1421,19 +1442,24 @@ const GuestBookingPage = () => {
 };
 
 const Booking = () => {
-  const [searchParams] = useSearchParams();
-  const isGuestMode = searchParams.get('guest') === 'true';
+  const { user, loading } = useAuth();
 
-  // If guest mode, don't require auth
-  if (isGuestMode) {
+  // Show loading spinner while checking auth state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // If no user is logged in, show guest booking page
+  if (!user) {
     return <GuestBookingPage />;
   }
 
-  return (
-    <RequireAuth feature="booking">
-      <BookingContent />
-    </RequireAuth>
-  );
+  // User is logged in, show authenticated booking flow
+  return <BookingContent />;
 };
 
 export default Booking;
