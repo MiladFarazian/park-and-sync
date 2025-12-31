@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, User, Mail, Phone, Car, CreditCard, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { User, Car, CreditCard, Loader2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { format } from 'date-fns';
+import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
 interface GuestBookingFormProps {
   spot: any;
@@ -43,6 +42,8 @@ const GuestBookingFormContent = ({
   const [licensePlate, setLicensePlate] = useState('');
   const [loading, setLoading] = useState(false);
   const [cardComplete, setCardComplete] = useState(false);
+  const [saveInfo, setSaveInfo] = useState(false);
+  const [password, setPassword] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +71,18 @@ const GuestBookingFormContent = ({
     if (!cardComplete) {
       toast({ title: "Card required", description: "Please enter your card details", variant: "destructive" });
       return;
+    }
+
+    // Validate password if saving info
+    if (saveInfo) {
+      if (!email.trim()) {
+        toast({ title: "Email required", description: "Please enter an email to create an account", variant: "destructive" });
+        return;
+      }
+      if (password.length < 6) {
+        toast({ title: "Password too short", description: "Password must be at least 6 characters", variant: "destructive" });
+        return;
+      }
     }
 
     setLoading(true);
@@ -114,6 +127,54 @@ const GuestBookingFormContent = ({
       }
 
       if (paymentIntent?.status === 'succeeded') {
+        // Create account if user opted in
+        if (saveInfo && email.trim() && password) {
+          try {
+            const nameParts = fullName.trim().split(' ');
+            const firstName = nameParts[0];
+            const lastName = nameParts.slice(1).join(' ') || '';
+
+            const { error: signUpError } = await supabase.auth.signUp({
+              email: email.trim(),
+              password,
+              options: {
+                emailRedirectTo: `${window.location.origin}/`,
+                data: {
+                  first_name: firstName,
+                  last_name: lastName,
+                },
+              },
+            });
+
+            if (signUpError) {
+              console.warn('Account creation failed:', signUpError.message);
+              // Don't block the booking - just show a toast
+              toast({ 
+                title: "Account creation failed", 
+                description: signUpError.message === 'User already registered' 
+                  ? "An account with this email already exists. You can sign in later to link this booking."
+                  : "Booking confirmed, but we couldn't create your account. You can sign up later.",
+              });
+            } else {
+              toast({ 
+                title: "Account created!", 
+                description: "Check your email to verify your account",
+              });
+              
+              // Try to link the guest booking to the new user
+              try {
+                await supabase.functions.invoke('link-guest-bookings', {
+                  body: { email: email.trim() },
+                });
+              } catch (linkErr) {
+                console.warn('Could not auto-link booking:', linkErr);
+              }
+            }
+          } catch (accountErr) {
+            console.warn('Account creation error:', accountErr);
+          }
+        }
+
         toast({ title: "Booking confirmed!", description: "Your parking spot has been reserved" });
         navigate(`/guest-booking/${booking_id}?token=${guest_access_token}`);
       } else {
@@ -151,13 +212,14 @@ const GuestBookingFormContent = ({
             />
           </div>
           <div>
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">Email {saveInfo && '*'}</Label>
             <Input
               id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="john@example.com"
+              required={saveInfo}
             />
           </div>
           <div>
@@ -224,6 +286,49 @@ const GuestBookingFormContent = ({
             onChange={(e) => setCardComplete(e.complete)}
           />
         </div>
+      </Card>
+
+      {/* Save Info Checkbox */}
+      <Card className="p-4">
+        <div className="flex items-start space-x-3">
+          <Checkbox 
+            id="saveInfo" 
+            checked={saveInfo} 
+            onCheckedChange={(checked) => setSaveInfo(checked === true)}
+          />
+          <div className="flex-1">
+            <Label htmlFor="saveInfo" className="cursor-pointer font-medium">
+              Save my info for next time
+            </Label>
+            <p className="text-xs text-muted-foreground mt-1">
+              Create an account to manage bookings, save payment methods, and get faster checkout
+            </p>
+          </div>
+        </div>
+
+        {saveInfo && (
+          <div className="mt-4 pt-4 border-t space-y-3">
+            <div>
+              <Label htmlFor="password" className="flex items-center gap-2">
+                <Lock className="h-3 w-3" />
+                Create Password *
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 6 characters"
+                minLength={6}
+                required={saveInfo}
+                className="mt-1"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              We'll send a verification email to confirm your account
+            </p>
+          </div>
+        )}
       </Card>
 
       {/* Price Summary */}
