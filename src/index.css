@@ -137,14 +137,23 @@ All colors MUST be HSL.
     animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
-  /* Mobile-safe: disable tap highlight and active states for touch scroll */
+  /* Mobile-safe: disable tap highlight and prevent scroll-activated hover/active */
   .touch-scroll-safe {
     -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
   }
   
   /* Touch manipulation for better scroll behavior */
   .touch-action-manipulation {
     touch-action: manipulation;
+  }
+}
+
+/* Disable hover AND active effects on touch devices to prevent scroll highlights */
+@media (hover: none) and (pointer: coarse) {
+  .touch-scroll-safe:hover,
+  .touch-scroll-safe:active {
+    background-color: inherit !important;
   }
 }
 
