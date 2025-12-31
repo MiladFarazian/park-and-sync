@@ -923,11 +923,14 @@ const BookingContent = () => {
                   {vehicles.map((vehicle) => (
                     <button
                       key={vehicle.id}
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
                         setSelectedVehicle(vehicle);
                         setEditVehicleOpen(false);
                       }}
-                      className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-accent transition-colors text-left"
+                      className={`touch-scroll-safe w-full flex items-center gap-3 p-3 rounded-lg border transition-colors text-left ${
+                        selectedVehicle?.id === vehicle.id ? 'border-primary bg-primary/5' : ''
+                      }`}
                     >
                       <Car className="h-5 w-5 text-muted-foreground" />
                       <div className="flex-1">
@@ -1017,11 +1020,14 @@ const BookingContent = () => {
                   {paymentMethods.map((method) => (
                     <button
                       key={method.id}
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
                         setSelectedPaymentMethod(method);
                         setEditPaymentOpen(false);
                       }}
-                      className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-accent transition-colors text-left"
+                      className={`touch-scroll-safe w-full flex items-center gap-3 p-3 rounded-lg border transition-colors text-left ${
+                        selectedPaymentMethod?.id === method.id ? 'border-primary bg-primary/5' : ''
+                      }`}
                     >
                       <CreditCard className="h-5 w-5 text-muted-foreground" />
                       <div className="flex-1">
