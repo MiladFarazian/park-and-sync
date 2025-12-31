@@ -136,13 +136,45 @@ export const NotificationBell = () => {
     } else if (notification.type === "message") {
       navigate(`/messages`);
     } else if (
+      notification.type === "overstay_warning" ||
+      notification.type === "overstay_grace_ended"
+    ) {
+      // Grace period notifications - deep-link with fromNotification param
+      if (notification.related_id) {
+        if (mode === 'host') {
+          setMode('driver');
+        }
+        navigate(`/booking/${notification.related_id}?fromNotification=grace_period`);
+      }
+    } else if (notification.type === "booking_ending_soon") {
+      // 15-minute warning - deep-link with fromNotification param
+      if (notification.related_id) {
+        if (mode === 'host') {
+          setMode('driver');
+        }
+        navigate(`/booking/${notification.related_id}?fromNotification=ending_soon`);
+      }
+    } else if (
+      notification.type === "overstay_detected" ||
+      notification.type === "overstay_action_needed"
+    ) {
+      // Host overstay notifications - deep-link to booking detail
+      if (notification.related_id) {
+        if (mode === 'driver') {
+          setMode('host');
+        }
+        navigate(`/booking/${notification.related_id}?fromNotification=overstay_host`);
+      }
+    } else if (
       notification.type === "overstay_charge_applied" ||
       notification.type === "overstay_charge_finalized" ||
       notification.type === "overstay_charge_update" ||
+      notification.type === "overstay_charging" ||
+      notification.type === "overstay_towing" ||
       notification.type === "overstay_booking_completed" ||
       notification.type === "departure_confirmed"
     ) {
-      // Navigate to booking detail for overstay-related notifications
+      // Navigate to booking detail for other overstay-related notifications
       if (notification.related_id) {
         navigate(`/booking/${notification.related_id}`);
       }
