@@ -1,10 +1,10 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CheckCircle, XCircle, Loader2, Mail, RefreshCw } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Mail, RefreshCw, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import parkzyLogo from '@/assets/parkzy-logo.png';
@@ -47,17 +47,20 @@ const EmailConfirmation = () => {
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'resend'>('loading');
-  const [message, setMessage] = useState('Confirming your email...');
+  const [message, setMessage] = useState('Verifying your email...');
   const [resendEmail, setResendEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const hasProcessed = useRef(false);
   
   const isResendMode = searchParams.get('resend') === 'true';
   const prefillEmail = searchParams.get('email') || '';
 
   const handleVerificationSuccess = useCallback(async (session: any) => {
+    if (status === 'success') return; // Prevent duplicate processing
+    
     setStatus('success');
-    setMessage('Your email has been verified successfully!');
+    setMessage('Your email has been verified!');
     
     // Update email_verified in profile
     try {
@@ -80,7 +83,7 @@ const EmailConfirmation = () => {
     
     // Redirect after showing success message
     setTimeout(() => navigate('/'), 2500);
-  }, [navigate]);
+  }, [navigate, status]);
 
   useEffect(() => {
     if (isResendMode) {
@@ -90,35 +93,53 @@ const EmailConfirmation = () => {
       return;
     }
 
+    if (hasProcessed.current) return;
+    hasProcessed.current = true;
+
     const processVerification = async () => {
       const hash = window.location.hash;
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       
+      console.log('[EmailConfirmation] Starting verification process');
+      
       // FIRST: Check if user is already logged in and verified
-      // This handles the case where the link was already used successfully
       const { data: { session: existingSession } } = await supabase.auth.getSession();
       
       if (existingSession?.user?.email_confirmed_at) {
-        console.log('[EmailConfirmation] User already verified');
+        console.log('[EmailConfirmation] User already verified via existing session');
         await handleVerificationSuccess(existingSession);
         return;
       }
       
-      // Check for error in hash
+      // Check for error in hash - but treat "token used" as potential success
       if (hash) {
         const hashParams = new URLSearchParams(hash.substring(1));
         const errorCode = hashParams.get('error_code');
         const errorDescription = hashParams.get('error_description');
         
         if (errorCode || errorDescription) {
-          // Check if the error is "token used" but user is actually verified
-          if (existingSession?.user?.email_confirmed_at) {
-            await handleVerificationSuccess(existingSession);
+          const errorMsg = errorDescription?.replace(/\+/g, ' ') || '';
+          console.log('[EmailConfirmation] Hash error:', errorMsg);
+          
+          // Check if user is actually verified despite the error
+          const { data: { session: recheckSession } } = await supabase.auth.getSession();
+          if (recheckSession?.user?.email_confirmed_at) {
+            console.log('[EmailConfirmation] User verified despite hash error');
+            await handleVerificationSuccess(recheckSession);
             return;
           }
+          
+          // Show error with helpful message
           setStatus('error');
-          setMessage(errorDescription?.replace(/\+/g, ' ') || 'Email confirmation failed');
+          setMessage('This verification link has expired or was already used.');
+          return;
+        }
+        
+        // Handle access_token in hash (implicit flow)
+        if (hash.includes('access_token')) {
+          console.log('[EmailConfirmation] Processing access token from hash');
+          // Let the auth state listener handle this
           return;
         }
       }
@@ -130,16 +151,20 @@ const EmailConfirmation = () => {
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) {
             console.error('[EmailConfirmation] Code exchange failed:', error);
+            
             // Check again if user is verified (token might have been used already)
             const { data: { session: recheckSession } } = await supabase.auth.getSession();
             if (recheckSession?.user?.email_confirmed_at) {
+              console.log('[EmailConfirmation] User verified despite code error');
               await handleVerificationSuccess(recheckSession);
               return;
             }
+            
             setStatus('error');
-            setMessage(error.message || 'Failed to verify email. The link may have expired.');
+            setMessage('This verification link has expired or was already used.');
             return;
           }
+          
           if (data.session) {
             await handleVerificationSuccess(data.session);
             return;
@@ -147,12 +172,6 @@ const EmailConfirmation = () => {
         } catch (err) {
           console.error('[EmailConfirmation] Code exchange error:', err);
         }
-      }
-
-      // If we have a hash with access_token, wait for auth state change
-      if (hash && hash.includes('access_token')) {
-        console.log('[EmailConfirmation] Waiting for auth state change from hash');
-        return;
       }
       
       // Check for existing session one more time
@@ -172,7 +191,7 @@ const EmailConfirmation = () => {
       // No verification data found
       if (!hash && !code) {
         setStatus('error');
-        setMessage('No verification link detected. Please check your email or request a new link.');
+        setMessage('No verification link detected.');
       }
     };
 
@@ -180,7 +199,7 @@ const EmailConfirmation = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('[EmailConfirmation] Auth event:', event);
       
-      if (event === 'SIGNED_IN' && session) {
+      if (event === 'SIGNED_IN' && session?.user?.email_confirmed_at) {
         handleVerificationSuccess(session);
       }
     });
@@ -188,10 +207,26 @@ const EmailConfirmation = () => {
     // Process verification
     processVerification();
 
+    // Timeout fallback - if still loading after 5 seconds, check session one more time
+    const timeoutId = setTimeout(async () => {
+      if (status === 'loading') {
+        console.log('[EmailConfirmation] Timeout reached, checking session');
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user?.email_confirmed_at) {
+          handleVerificationSuccess(session);
+        } else {
+          setStatus('error');
+          setMessage('Verification timed out. Please try again or request a new link.');
+        }
+      }
+    }, 5000);
+
     return () => {
       subscription.unsubscribe();
+      clearTimeout(timeoutId);
     };
-  }, [navigate, isResendMode, prefillEmail, handleVerificationSuccess]);
+  }, [navigate, isResendMode, prefillEmail, handleVerificationSuccess, status]);
 
   const handleResend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -256,74 +291,96 @@ const EmailConfirmation = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
+        {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <img src={parkzyLogo} alt="Parkzy" className="h-10" />
+          <img src={parkzyLogo} alt="Parkzy" className="h-12" />
         </div>
 
-        <Card className="border-border shadow-lg">
-          <CardHeader className="text-center">
-            <CardTitle className="text-xl">
-              {status === 'loading' && 'Verifying Email'}
-              {status === 'success' && 'Email Verified!'}
-              {status === 'error' && 'Verification Failed'}
-              {status === 'resend' && 'Resend Verification'}
-            </CardTitle>
-            <CardDescription>
-              {status === 'loading' && 'Please wait while we verify your email...'}
-              {status === 'success' && 'Welcome to Parkzy!'}
-              {status === 'error' && 'Something went wrong'}
-              {status === 'resend' && 'Enter your email to receive a new verification link'}
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent className="flex flex-col items-center space-y-6">
-            {status === 'loading' && (
-              <div className="flex flex-col items-center gap-4">
-                <Loader2 className="h-16 w-16 text-primary animate-spin" />
-                <p className="text-center text-muted-foreground">{message}</p>
-              </div>
-            )}
-            
-            {status === 'success' && (
-              <div className="flex flex-col items-center gap-4">
-                <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
-                  <CheckCircle className="h-10 w-10 text-green-600" />
+        <Card className="border-border shadow-xl overflow-hidden">
+          {/* Loading State */}
+          {status === 'loading' && (
+            <CardContent className="flex flex-col items-center py-12 px-6">
+              <div className="relative">
+                <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Loader2 className="h-10 w-10 text-primary animate-spin" />
                 </div>
-                <p className="text-center text-foreground font-medium">{message}</p>
-                <p className="text-sm text-center text-muted-foreground">
-                  Redirecting you to the app...
+              </div>
+              <h2 className="mt-6 text-xl font-semibold text-foreground">Verifying your email...</h2>
+              <p className="mt-2 text-center text-muted-foreground">
+                Please wait while we confirm your email address
+              </p>
+            </CardContent>
+          )}
+          
+          {/* Success State */}
+          {status === 'success' && (
+            <CardContent className="flex flex-col items-center py-12 px-6">
+              <div className="h-20 w-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center animate-in zoom-in duration-300">
+                <CheckCircle className="h-12 w-12 text-green-600 dark:text-green-400" />
+              </div>
+              <h2 className="mt-6 text-xl font-semibold text-foreground">Email verified!</h2>
+              <p className="mt-2 text-center text-muted-foreground">
+                Welcome to Parkzy! You're all set.
+              </p>
+              <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Redirecting you to the app...</span>
+              </div>
+            </CardContent>
+          )}
+          
+          {/* Error State */}
+          {status === 'error' && (
+            <CardContent className="flex flex-col items-center py-12 px-6">
+              <div className="h-20 w-20 rounded-full bg-destructive/10 flex items-center justify-center">
+                <XCircle className="h-12 w-12 text-destructive" />
+              </div>
+              <h2 className="mt-6 text-xl font-semibold text-foreground">Link expired</h2>
+              <p className="mt-2 text-center text-muted-foreground max-w-xs">
+                {message}
+              </p>
+              <p className="mt-1 text-center text-sm text-muted-foreground">
+                Verification links can only be used once.
+              </p>
+              <div className="mt-8 flex flex-col gap-3 w-full">
+                <Button 
+                  onClick={() => {
+                    setStatus('resend');
+                    setMessage('Enter your email to receive a new verification link');
+                  }} 
+                  className="w-full h-12"
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Request New Link
+                </Button>
+                <Button 
+                  onClick={() => navigate('/auth')} 
+                  variant="outline" 
+                  className="w-full h-12"
+                >
+                  Sign In
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            </CardContent>
+          )}
+
+          {/* Resend State */}
+          {status === 'resend' && (
+            <CardContent className="py-8 px-6">
+              <div className="text-center mb-6">
+                <div className="h-16 w-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                  <Mail className="h-8 w-8 text-primary" />
+                </div>
+                <h2 className="text-xl font-semibold text-foreground">Verify your email</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Enter your email to receive a new verification link
                 </p>
               </div>
-            )}
-            
-            {status === 'error' && (
-              <div className="flex flex-col items-center gap-4 w-full">
-                <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center">
-                  <XCircle className="h-10 w-10 text-destructive" />
-                </div>
-                <p className="text-center text-foreground">{message}</p>
-                <div className="flex flex-col gap-2 w-full mt-2">
-                  <Button 
-                    onClick={() => {
-                      setStatus('resend');
-                      setMessage('Enter your email to receive a new verification link');
-                    }} 
-                    className="w-full"
-                  >
-                    <Mail className="h-4 w-4 mr-2" />
-                    Request New Link
-                  </Button>
-                  <Button onClick={() => navigate('/auth')} variant="outline" className="w-full">
-                    Go to Sign In
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {status === 'resend' && (
-              <form onSubmit={handleResend} className="w-full space-y-4">
+              
+              <form onSubmit={handleResend} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address</Label>
                   <Input
@@ -331,7 +388,7 @@ const EmailConfirmation = () => {
                     type="email"
                     value={resendEmail}
                     onChange={(e) => setResendEmail(e.target.value)}
-                    placeholder="Enter your email"
+                    placeholder="you@example.com"
                     required
                     className="h-12"
                   />
@@ -355,22 +412,26 @@ const EmailConfirmation = () => {
                     </>
                   )}
                 </Button>
-                <div className="text-center">
+                <div className="text-center pt-2">
                   <Button 
-                    variant="link" 
+                    variant="ghost" 
                     onClick={() => navigate('/auth')}
                     type="button"
+                    className="text-muted-foreground hover:text-foreground"
                   >
                     Back to Sign In
                   </Button>
                 </div>
               </form>
-            )}
-          </CardContent>
+            </CardContent>
+          )}
         </Card>
         
         <p className="text-center text-xs text-muted-foreground">
-          Having trouble? Contact support@parkzy.app
+          Having trouble? Contact{' '}
+          <a href="mailto:support@parkzy.app" className="text-primary hover:underline">
+            support@parkzy.app
+          </a>
         </p>
       </div>
     </div>
