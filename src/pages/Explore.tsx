@@ -53,10 +53,14 @@ const Explore = () => {
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   // Desired search location / map center (red destination pin)
-  const [searchLocation, setSearchLocation] = useState({
-    lat: 34.0224,
-    lng: -118.2851
-  }); // Default to University Park as initial search area
+  // Initialize from URL params if available, otherwise null until user searches
+  const initialLat = searchParams.get('lat');
+  const initialLng = searchParams.get('lng');
+  const [searchLocation, setSearchLocation] = useState<{ lat: number; lng: number } | null>(
+    initialLat && initialLng 
+      ? { lat: parseFloat(initialLat), lng: parseFloat(initialLng) }
+      : null
+  );
 
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -163,7 +167,7 @@ const Explore = () => {
     if (start) setStartTime(startDate);
     if (end) setEndTime(endDate);
 
-    // If URL has a lat/lng, treat that as the desired search location
+    // Only load spots if URL has a lat/lng (searched location)
     if (lat && lng) {
       const desired = {
         lat: parseFloat(lat),
@@ -192,19 +196,8 @@ const Explore = () => {
         fetchNearbySpots(desired, 15000, true);
       }
     } else {
-      // No URL lat/lng: use default search location
-      setSearchQuery('University Park, Los Angeles');
-      
-      // Check cache first
-      const cacheKey = getCacheKey(searchLocation.lat, searchLocation.lng);
-      const cachedSpots = getCachedSpots(cacheKey);
-      if (cachedSpots) {
-        setParkingSpots(cachedSpots);
-        setSpotsLoading(false);
-        fetchNearbySpots(searchLocation, 15000, false);
-      } else {
-        fetchNearbySpots(searchLocation, 15000, true);
-      }
+      // No URL lat/lng: show empty state, user needs to search
+      setSpotsLoading(false);
     }
   }, [mapboxToken]);
 
@@ -444,7 +437,8 @@ const Explore = () => {
     setSuggestions([]);
     setShowSuggestions(false);
   };
-  const fetchNearbySpots = useCallback(async (center = searchLocation, radius = 15000, isInitialLoad = true) => {
+  const fetchNearbySpots = useCallback(async (center: { lat: number; lng: number }, radius = 15000, isInitialLoad = true) => {
+    if (!center) return;
     // Increment request ID and capture it for this request
     const requestId = ++latestRequestIdRef.current;
     
@@ -526,6 +520,8 @@ const Explore = () => {
     }, 300);
   };
   const handleDateTimeUpdate = (newStartTime?: Date, newEndTime?: Date) => {
+    if (!searchLocation) return;
+    
     const effectiveStartTime = newStartTime || startTime;
     const effectiveEndTime = newEndTime || endTime;
     
@@ -544,13 +540,13 @@ const Explore = () => {
   const formatDateDisplay = (date: Date) => {
     return isToday(date) ? 'Today' : format(date, 'MMM dd');
   };
-  const exploreParams = {
+  const exploreParams = searchLocation ? {
     lat: searchLocation.lat.toString(),
     lng: searchLocation.lng.toString(),
     start: startTime?.toISOString(),
     end: endTime?.toISOString(),
     q: searchQuery
-  };
+  } : undefined;
 
   // Desktop Layout: Split View with List on Left, Map on Right
   if (!isMobile) {
@@ -688,20 +684,22 @@ const Explore = () => {
             )}
           </button>
 
-          <MapView 
-            spots={parkingSpots} 
-            searchCenter={searchLocation} 
-            currentLocation={currentLocation || searchLocation}
-            onVisibleSpotsChange={() => {}} 
-            onMapMove={handleMapMove}
-            searchQuery={searchQuery}
-            exploreParams={exploreParams}
-            highlightedSpotId={hoveredSpotId}
-            selectedSpotId={selectedSpotId}
-            onSpotHover={setHoveredSpotId}
-            onSpotSelect={setSelectedSpotId}
-            hideCarousel={true}
-          />
+          {searchLocation && (
+            <MapView 
+              spots={parkingSpots} 
+              searchCenter={searchLocation} 
+              currentLocation={currentLocation || searchLocation}
+              onVisibleSpotsChange={() => {}} 
+              onMapMove={handleMapMove}
+              searchQuery={searchQuery}
+              exploreParams={exploreParams}
+              highlightedSpotId={hoveredSpotId}
+              selectedSpotId={selectedSpotId}
+              onSpotHover={setHoveredSpotId}
+              onSpotSelect={setSelectedSpotId}
+              hideCarousel={true}
+            />
+          )}
         </div>
 
         {/* Time Pickers */}
@@ -848,16 +846,18 @@ const Explore = () => {
         )}
       </button>
 
-      <MapView 
-        spots={parkingSpots} 
-        searchCenter={searchLocation} 
-        currentLocation={currentLocation || searchLocation}
-        onVisibleSpotsChange={() => {}} 
-        onMapMove={handleMapMove}
-        searchQuery={searchQuery}
-        exploreParams={exploreParams}
-        selectedSpotId={selectedSpotId}
-      />
+      {searchLocation && (
+        <MapView 
+          spots={parkingSpots} 
+          searchCenter={searchLocation} 
+          currentLocation={currentLocation || searchLocation}
+          onVisibleSpotsChange={() => {}} 
+          onMapMove={handleMapMove}
+          searchQuery={searchQuery}
+          exploreParams={exploreParams}
+          selectedSpotId={selectedSpotId}
+        />
+      )}
 
       {/* Mobile Time Pickers */}
       {mobileStartPickerOpen && startTime && (
