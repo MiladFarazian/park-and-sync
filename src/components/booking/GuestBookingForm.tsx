@@ -44,7 +44,7 @@ const GuestBookingFormContent = ({
   const [cardComplete, setCardComplete] = useState(false);
   const [saveInfo, setSaveInfo] = useState(false);
   const [password, setPassword] = useState('');
-
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -146,6 +146,7 @@ const GuestBookingFormContent = ({
                 data: {
                   first_name: firstName,
                   last_name: lastName,
+                  marketing_opt_in: marketingOptIn,
                 },
               },
             });
@@ -322,7 +323,7 @@ const GuestBookingFormContent = ({
         </div>
 
         {saveInfo && (
-          <div className="mt-4 pt-4 border-t space-y-3">
+          <div className="mt-4 pt-4 border-t space-y-4">
             <div>
               <Label htmlFor="password" className="flex items-center gap-2">
                 <Lock className="h-3 w-3" />
@@ -339,6 +340,23 @@ const GuestBookingFormContent = ({
                 className="mt-1"
               />
             </div>
+            
+            <div className="flex items-start space-x-3">
+              <Checkbox 
+                id="marketingOptIn" 
+                checked={marketingOptIn} 
+                onCheckedChange={(checked) => setMarketingOptIn(checked === true)}
+              />
+              <div className="flex-1">
+                <Label htmlFor="marketingOptIn" className="cursor-pointer text-sm">
+                  Send me parking deals and updates
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Get notified about discounts and new spots in your area
+                </p>
+              </div>
+            </div>
+            
             <p className="text-xs text-muted-foreground">
               We'll send a verification email to confirm your account
             </p>
