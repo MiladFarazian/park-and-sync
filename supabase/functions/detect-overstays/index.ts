@@ -1,10 +1,115 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { Resend } from "npm:resend@2.0.0";
+
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const fromEmail = Deno.env.get("RESEND_FROM_EMAIL") || "Parkzy <noreply@parkzy.app>";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Helper function to send overstay email to host
+async function sendHostOverstayEmail(
+  supabaseClient: any,
+  hostUserId: string,
+  spotTitle: string,
+  spotAddress: string,
+  driverName: string,
+  bookingId: string,
+  graceEndTime: string
+) {
+  try {
+    // Get host email from profiles
+    const { data: hostProfile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('email, first_name')
+      .eq('user_id', hostUserId)
+      .single();
+
+    if (profileError || !hostProfile?.email) {
+      console.log(`No email found for host ${hostUserId}, skipping email notification`);
+      return;
+    }
+
+    const bookingUrl = `https://parkzy.app/booking/${bookingId}?fromNotification=overstay_host`;
+
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: white; border-radius: 12px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+              <!-- Header -->
+              <div style="text-align: center; margin-bottom: 24px;">
+                <h1 style="color: #dc2626; margin: 0; font-size: 24px;">⚠️ Guest Overstay Alert</h1>
+              </div>
+              
+              <!-- Content -->
+              <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 16px 0;">
+                Hi ${hostProfile.first_name || 'there'},
+              </p>
+              
+              <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 16px 0;">
+                A guest has exceeded their booking time at your parking spot. Here are the details:
+              </p>
+              
+              <!-- Booking Details Box -->
+              <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                <p style="margin: 0 0 8px 0; color: #374151;"><strong>Spot:</strong> ${spotTitle}</p>
+                <p style="margin: 0 0 8px 0; color: #374151;"><strong>Address:</strong> ${spotAddress}</p>
+                <p style="margin: 0 0 8px 0; color: #374151;"><strong>Driver:</strong> ${driverName}</p>
+                <p style="margin: 0; color: #dc2626;"><strong>Grace Period Ends:</strong> ${graceEndTime}</p>
+              </div>
+              
+              <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                The guest has a 10-minute grace period to leave. After that, you can choose to apply overtime charges ($25/hour) or request a tow.
+              </p>
+              
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 28px 0;">
+                <a href="${bookingUrl}" style="display: inline-block; background-color: #6366f1; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+                  View Booking & Take Action
+                </a>
+              </div>
+              
+              <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 20px 0 0 0;">
+                You'll receive another notification when the grace period ends if the guest hasn't left.
+              </p>
+            </div>
+            
+            <!-- Footer -->
+            <div style="text-align: center; padding: 20px;">
+              <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+                © ${new Date().getFullYear()} Parkzy. All rights reserved.
+              </p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const { error: emailError } = await resend.emails.send({
+      from: fromEmail,
+      to: [hostProfile.email],
+      subject: `⚠️ Guest Overstay Alert - ${spotTitle}`,
+      html: emailHtml,
+    });
+
+    if (emailError) {
+      console.error(`Failed to send overstay email to host ${hostUserId}:`, emailError);
+    } else {
+      console.log(`Sent overstay alert email to host ${hostProfile.email} for booking ${bookingId}`);
+    }
+  } catch (error) {
+    console.error('Error sending host overstay email:', error);
+  }
+}
 
 // Helper function to send push notifications with deep-link data
 async function sendPushNotification(
@@ -257,6 +362,26 @@ serve(async (req) => {
         true,
         'OVERSTAY_HOST',
         booking.id
+      );
+
+      // Send EMAIL notification to host
+      const driverName = booking.profiles 
+        ? `${booking.profiles.first_name || ''} ${booking.profiles.last_name || ''}`.trim() || 'Guest'
+        : 'Guest';
+      const graceEndFormatted = new Date(graceEnd).toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+      
+      await sendHostOverstayEmail(
+        supabaseClient,
+        booking.spots.host_id,
+        booking.spots.title,
+        booking.spots.address,
+        driverName,
+        booking.id,
+        graceEndFormatted
       );
     }
 
