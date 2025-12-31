@@ -178,3 +178,22 @@ All colors MUST be HSL.
     opacity: 0.85;
   }
 }
+
+@keyframes swipe-out-up {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+
+.animate-swipe-out-up {
+  animation: swipe-out-up 0.15s ease-out forwards;
+}
+
+.touch-action-pan-y {
+  touch-action: pan-y;
+}
