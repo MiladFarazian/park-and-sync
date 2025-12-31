@@ -820,11 +820,12 @@ const ListSpot = () => {
                       <button
                         key={amenity.id}
                         type="button"
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => toggleAmenity(amenity.id)}
-                        className={`p-4 rounded-lg border-2 transition-all text-center ${
+                        className={`touch-scroll-safe p-4 rounded-lg border-2 transition-colors text-center ${
                           isSelected
                             ? 'border-primary bg-primary/5'
-                            : 'border-border bg-background hover:border-primary/50'
+                            : 'border-border bg-background'
                         }`}
                       >
                         <Icon className={`h-6 w-6 mx-auto mb-2 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />

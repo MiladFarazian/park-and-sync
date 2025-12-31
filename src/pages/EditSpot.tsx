@@ -804,15 +804,27 @@ const EditSpot = () => {
                   <Label className="mb-3 block">Amenities</Label>
                   <div className="grid grid-cols-2 gap-3">
                     {amenitiesList.map(amenity => {
-                    const Icon = amenity.icon;
-                    const isSelected = selectedAmenities.includes(amenity.id);
-                    return <button key={amenity.id} type="button" onClick={() => toggleAmenity(amenity.id)} className={`p-4 rounded-lg border-2 transition-all text-center ${isSelected ? 'border-primary bg-primary/5' : 'border-border bg-background hover:border-primary/50'}`}>
+                      const Icon = amenity.icon;
+                      const isSelected = selectedAmenities.includes(amenity.id);
+                      return (
+                        <button
+                          key={amenity.id}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => toggleAmenity(amenity.id)}
+                          className={`touch-scroll-safe p-4 rounded-lg border-2 transition-colors text-center ${
+                            isSelected 
+                              ? 'border-primary bg-primary/5' 
+                              : 'border-border bg-background'
+                          }`}
+                        >
                           <Icon className={`h-6 w-6 mx-auto mb-2 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
                           <p className={`text-sm font-medium ${isSelected ? 'text-primary' : ''}`}>
                             {amenity.label}
                           </p>
-                        </button>;
-                  })}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 

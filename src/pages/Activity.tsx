@@ -799,12 +799,12 @@ const Activity = () => {
                     return (
                       <button
                         key={day.toISOString()}
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => setSelectedDate(isSelected ? null : day)}
                         className={`
-                          aspect-square rounded-lg p-1 text-sm relative transition-colors
+                          touch-scroll-safe aspect-square rounded-lg p-1 text-sm relative transition-colors
                           ${isSelected ? 'bg-primary text-primary-foreground' : ''}
                           ${dayIsToday && !isSelected ? 'border-2 border-primary' : ''}
-                          ${!isSelected ? 'hover:bg-accent' : ''}
                         `}
                       >
                         <span className={dayIsToday && !isSelected ? 'font-bold' : ''}>
