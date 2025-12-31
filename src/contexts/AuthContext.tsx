@@ -26,12 +26,14 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  isEmailVerified: boolean;
   signUp: (email: string, password: string, firstName?: string, lastName?: string, phone?: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: any }>;
   refreshProfile: () => Promise<void>;
   ensureProfileExists: () => Promise<{ error: any }>;
+  resendVerificationEmail: () => Promise<{ error: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -294,17 +296,67 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return ensureProfileExistsForUser(user.id, user.email, user.phone);
   };
 
+  const resendVerificationEmail = async () => {
+    const email = user?.email || profile?.email;
+    if (!email) return { error: new Error('No email address found') };
+
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/email-confirmation`
+      }
+    });
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } else {
+      toast({
+        title: "Verification email sent",
+        description: `Check ${email} for the verification link`
+      });
+    }
+
+    return { error };
+  };
+
+  // Compute email verification status
+  // User is verified if: they confirmed via Supabase OR profile has email_verified = true
+  // Phone-only users without email are considered verified for email purposes
+  const isEmailVerified = (() => {
+    // No user = not verified
+    if (!user) return false;
+    
+    // No email = phone-only user, treat as verified for email purposes
+    const email = user.email || profile?.email;
+    if (!email) return true;
+    
+    // Check Supabase auth confirmation
+    if (user.email_confirmed_at) return true;
+    
+    // Check profile flag
+    if (profile?.email_verified) return true;
+    
+    return false;
+  })();
+
   const value = {
     user,
     session,
     profile,
     loading,
+    isEmailVerified,
     signUp,
     signIn,
     signOut,
     updateProfile,
     refreshProfile,
     ensureProfileExists,
+    resendVerificationEmail,
   };
 
   return (

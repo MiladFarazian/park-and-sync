@@ -11,16 +11,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useMode } from '@/contexts/ModeContext';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/AuthContext';
 import Index from './Index';
 import LocationSearchInput from '@/components/ui/location-search-input';
 import { calculateDriverPrice } from '@/lib/pricing';
 import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
 import FixLocationDialog from '@/components/location/FixLocationDialog';
+import EmailVerificationBanner from '@/components/auth/EmailVerificationBanner';
 
 const Home = () => {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const { setMode } = useMode();
+  const { user, isEmailVerified } = useAuth();
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -369,6 +372,11 @@ const Home = () => {
   return (
     <div className="bg-background">
       <div className="p-4 space-y-6">
+        {/* Email Verification Banner */}
+        {user && !isEmailVerified && (
+          <EmailVerificationBanner />
+        )}
+        
         {/* Search Card */}
         <Card className="p-6 space-y-4">
           <LocationSearchInput

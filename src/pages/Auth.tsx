@@ -601,16 +601,25 @@ const Auth = () => {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <Label htmlFor="password">Password</Label>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowForgotPassword(true);
-                              setForgotPasswordEmail(signInData.email);
-                            }}
-                            className="text-sm text-primary hover:underline"
-                          >
-                            Forgot password?
-                          </button>
+                          <div className="flex gap-3">
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/email-confirmation?resend=true&email=${encodeURIComponent(signInData.email)}`)}
+                              className="text-sm text-muted-foreground hover:text-primary hover:underline"
+                            >
+                              Resend verification
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowForgotPassword(true);
+                                setForgotPasswordEmail(signInData.email);
+                              }}
+                              className="text-sm text-primary hover:underline"
+                            >
+                              Forgot password?
+                            </button>
+                          </div>
                         </div>
                         <div className="relative">
                           <Input 

@@ -40,7 +40,7 @@ const BookingContent = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { profile, refreshProfile, user } = useAuth();
+  const { profile, refreshProfile, user, isEmailVerified } = useAuth();
 
   const paymentMethodsReturnTo = `${location.pathname}${location.search}`;
   const goToPaymentMethods = (options?: { add?: boolean }) => {
