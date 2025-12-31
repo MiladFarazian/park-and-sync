@@ -17,6 +17,7 @@ interface GuestBookingRequest {
   guest_car_model: string;
   guest_license_plate?: string;
   will_use_ev_charging?: boolean;
+  save_payment_method?: boolean;
 }
 
 serve(async (req) => {
@@ -40,7 +41,8 @@ serve(async (req) => {
       guest_phone,
       guest_car_model,
       guest_license_plate,
-      will_use_ev_charging 
+      will_use_ev_charging,
+      save_payment_method
     }: GuestBookingRequest = await req.json();
 
     console.log('Creating guest booking:', { spot_id, start_at, end_at, guest_full_name, guest_email, guest_phone });
@@ -184,9 +186,11 @@ serve(async (req) => {
     console.log('Guest booking created:', booking.id);
 
     // Create PaymentIntent for the guest (no customer ID)
+    // If save_payment_method is true, set up for future use
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(totalAmount * 100),
       currency: 'usd',
+      ...(save_payment_method && { setup_future_usage: 'off_session' }),
       metadata: {
         booking_id: booking.id,
         spot_id,
@@ -195,6 +199,7 @@ serve(async (req) => {
         guest_email: guest_email || '',
         guest_phone: guest_phone || '',
         guest_access_token: guestAccessToken,
+        save_payment_method: save_payment_method ? 'true' : 'false',
       },
       description: `Parking at ${spot.title} - Guest: ${guest_full_name}`,
     });
@@ -210,6 +215,7 @@ serve(async (req) => {
     // Return client secret for Stripe Elements
     return new Response(JSON.stringify({
       client_secret: paymentIntent.client_secret,
+      payment_intent_id: paymentIntent.id,
       booking_id: booking.id,
       guest_access_token: guestAccessToken,
       pricing: {

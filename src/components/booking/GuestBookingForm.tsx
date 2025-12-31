@@ -87,6 +87,8 @@ const GuestBookingFormContent = ({
 
     setLoading(true);
 
+    let paymentIntentId: string | null = null;
+
     try {
       // Create guest booking
       const { data, error } = await supabase.functions.invoke('create-guest-booking', {
@@ -99,13 +101,15 @@ const GuestBookingFormContent = ({
           guest_phone: phone.trim() || null,
           guest_car_model: carModel.trim(),
           guest_license_plate: licensePlate.trim() || null,
+          save_payment_method: saveInfo, // Tell backend to set up for future use
         },
       });
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      const { client_secret, booking_id, guest_access_token } = data;
+      const { client_secret, payment_intent_id, booking_id, guest_access_token } = data;
+      paymentIntentId = payment_intent_id;
 
       // Confirm payment with Stripe
       const cardElement = elements.getElement(CardElement);
@@ -134,7 +138,7 @@ const GuestBookingFormContent = ({
             const firstName = nameParts[0];
             const lastName = nameParts.slice(1).join(' ') || '';
 
-            const { error: signUpError } = await supabase.auth.signUp({
+            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
               email: email.trim(),
               password,
               options: {
@@ -148,7 +152,6 @@ const GuestBookingFormContent = ({
 
             if (signUpError) {
               console.warn('Account creation failed:', signUpError.message);
-              // Don't block the booking - just show a toast
               toast({ 
                 title: "Account creation failed", 
                 description: signUpError.message === 'User already registered' 
@@ -160,6 +163,18 @@ const GuestBookingFormContent = ({
                 title: "Account created!", 
                 description: "Check your email to verify your account",
               });
+              
+              // Attach the payment method to the new account
+              if (paymentIntentId && signUpData.session) {
+                try {
+                  await supabase.functions.invoke('attach-guest-payment-method', {
+                    body: { payment_intent_id: paymentIntentId },
+                  });
+                  console.log('Payment method attached to new account');
+                } catch (attachErr) {
+                  console.warn('Could not attach payment method:', attachErr);
+                }
+              }
               
               // Try to link the guest booking to the new user
               try {
