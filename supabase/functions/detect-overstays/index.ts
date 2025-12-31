@@ -111,6 +111,116 @@ async function sendHostOverstayEmail(
   }
 }
 
+// Helper function to send grace period warning email to driver
+async function sendDriverGracePeriodEmail(
+  supabaseClient: any,
+  driverUserId: string,
+  spotTitle: string,
+  spotAddress: string,
+  bookingId: string,
+  graceEndTime: string,
+  hourlyRate: number
+) {
+  try {
+    // Get driver email from profiles
+    const { data: driverProfile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('email, first_name')
+      .eq('user_id', driverUserId)
+      .single();
+
+    if (profileError || !driverProfile?.email) {
+      console.log(`No email found for driver ${driverUserId}, skipping email notification`);
+      return;
+    }
+
+    const bookingUrl = `https://parkzy.app/booking/${bookingId}?fromNotification=grace_period`;
+
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: white; border-radius: 12px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+              <!-- Header -->
+              <div style="text-align: center; margin-bottom: 24px;">
+                <h1 style="color: #dc2626; margin: 0; font-size: 24px;">🚨 URGENT: Leave Now!</h1>
+              </div>
+              
+              <!-- Content -->
+              <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 16px 0;">
+                Hi ${driverProfile.first_name || 'there'},
+              </p>
+              
+              <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 16px 0;">
+                <strong>Your parking time has expired!</strong> You are now in a 10-minute grace period. Please leave immediately to avoid charges.
+              </p>
+              
+              <!-- Warning Box -->
+              <div style="background-color: #fef2f2; border: 2px solid #dc2626; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                <p style="margin: 0 0 8px 0; color: #374151;"><strong>Location:</strong> ${spotTitle}</p>
+                <p style="margin: 0 0 8px 0; color: #374151;"><strong>Address:</strong> ${spotAddress}</p>
+                <p style="margin: 0; color: #dc2626; font-weight: bold; font-size: 18px;">⏰ Grace Period Ends: ${graceEndTime}</p>
+              </div>
+              
+              <!-- Penalty Warning -->
+              <div style="background-color: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                <p style="margin: 0; color: #92400e; font-weight: 600;">
+                  ⚠️ If you don't leave or extend your booking:
+                </p>
+                <ul style="margin: 8px 0 0 0; padding-left: 20px; color: #92400e;">
+                  <li>You will be charged <strong>$25/hour</strong> for overtime</li>
+                  <li>Your vehicle may be towed at your expense</li>
+                </ul>
+              </div>
+              
+              <!-- CTA Buttons -->
+              <div style="text-align: center; margin: 28px 0;">
+                <a href="${bookingUrl}" style="display: inline-block; background-color: #dc2626; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; margin-bottom: 12px;">
+                  Extend Booking Now
+                </a>
+                <p style="margin: 12px 0 0 0; color: #6b7280; font-size: 14px;">
+                  Or confirm your departure in the app
+                </p>
+              </div>
+              
+              <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 20px 0 0 0; text-align: center;">
+                This is an automated message. Please take action immediately.
+              </p>
+            </div>
+            
+            <!-- Footer -->
+            <div style="text-align: center; padding: 20px;">
+              <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+                © ${new Date().getFullYear()} Parkzy. All rights reserved.
+              </p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const { error: emailError } = await resend.emails.send({
+      from: fromEmail,
+      to: [driverProfile.email],
+      subject: `🚨 URGENT: Your parking has expired - ${spotTitle}`,
+      html: emailHtml,
+    });
+
+    if (emailError) {
+      console.error(`Failed to send grace period email to driver ${driverUserId}:`, emailError);
+    } else {
+      console.log(`Sent grace period warning email to driver ${driverProfile.email} for booking ${bookingId}`);
+    }
+  } catch (error) {
+    console.error('Error sending driver grace period email:', error);
+  }
+}
+
 // Helper function to send push notifications with deep-link data
 async function sendPushNotification(
   supabaseClient: any,
@@ -382,6 +492,17 @@ serve(async (req) => {
         driverName,
         booking.id,
         graceEndFormatted
+      );
+
+      // Send EMAIL notification to driver (grace period warning)
+      await sendDriverGracePeriodEmail(
+        supabaseClient,
+        booking.renter_id,
+        booking.spots.title,
+        booking.spots.address,
+        booking.id,
+        graceEndFormatted,
+        booking.spots.hourly_rate
       );
     }
 
