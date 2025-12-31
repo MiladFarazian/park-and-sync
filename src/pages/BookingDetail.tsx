@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { ExtendParkingDialog } from '@/components/booking/ExtendParkingDialog';
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, AlertTriangle, CheckCircle2, Copy, AlarmClockPlus, Flag, Zap } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, AlertTriangle, CheckCircle2, Copy, AlarmClockPlus, Flag, Zap, ChevronLeft, ChevronRight } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -48,6 +48,11 @@ interface BookingDetails {
     access_notes: string | null;
     has_ev_charging: boolean | null;
     ev_charging_instructions: string | null;
+    spot_photos: Array<{
+      url: string;
+      is_primary: boolean | null;
+      sort_order: number | null;
+    }>;
   };
   profiles: {
     first_name: string;
@@ -78,6 +83,9 @@ const BookingDetailContent = () => {
   const [reportReason, setReportReason] = useState('');
   const [reportDetails, setReportDetails] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [touchStart, setTouchStart] = useState(0);
+  const [touchEnd, setTouchEnd] = useState(0);
 
   useEffect(() => {
     if (!bookingId || !user) return;
@@ -124,7 +132,7 @@ const BookingDetailContent = () => {
           extension_charges,
           will_use_ev_charging,
           ev_charging_fee,
-          spots!inner(id, title, address, host_id, description, access_notes, has_ev_charging, ev_charging_instructions),
+          spots!inner(id, title, address, host_id, description, access_notes, has_ev_charging, ev_charging_instructions, spot_photos(url, is_primary, sort_order)),
           profiles!bookings_renter_id_fkey(first_name, last_name, avatar_url)
         `)
         .eq('id', bookingId)
@@ -422,6 +430,46 @@ const BookingDetailContent = () => {
     }
   };
 
+  // Image carousel handlers
+  const photos = booking?.spots?.spot_photos || [];
+  const sortedPhotos = [...photos].sort((a, b) => {
+    if (a.is_primary && !b.is_primary) return -1;
+    if (!a.is_primary && b.is_primary) return 1;
+    return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+  });
+  const hasMultiplePhotos = sortedPhotos.length > 1;
+
+  const handlePrevImage = () => {
+    setCurrentImageIndex((prev) => 
+      prev === 0 ? sortedPhotos.length - 1 : prev - 1
+    );
+  };
+
+  const handleNextImage = () => {
+    setCurrentImageIndex((prev) => 
+      prev === sortedPhotos.length - 1 ? 0 : prev + 1
+    );
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+    if (isLeftSwipe) handleNextImage();
+    if (isRightSwipe) handlePrevImage();
+    setTouchStart(0);
+    setTouchEnd(0);
+  };
+
 
   if (loading) {
     return (
@@ -507,6 +555,63 @@ const BookingDetailContent = () => {
       </div>
 
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
+        {/* Spot Photo Carousel */}
+        {sortedPhotos.length > 0 && (
+          <div 
+            className="relative rounded-xl overflow-hidden aspect-[16/9] select-none"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            <img 
+              src={sortedPhotos[currentImageIndex]?.url} 
+              alt={booking.spots.title}
+              loading="lazy"
+              className="w-full h-full object-cover"
+            />
+            
+            {hasMultiplePhotos && (
+              <>
+                {/* Navigation Arrows */}
+                <button
+                  onClick={handlePrevImage}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-all hover:scale-110 z-10"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={handleNextImage}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-all hover:scale-110 z-10"
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+
+                {/* Dot Indicators */}
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                  {sortedPhotos.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentImageIndex(index)}
+                      className={`w-2 h-2 rounded-full transition-all ${
+                        index === currentImageIndex 
+                          ? 'bg-white scale-110' 
+                          : 'bg-white/50 hover:bg-white/75'
+                      }`}
+                      aria-label={`Go to image ${index + 1}`}
+                    />
+                  ))}
+                </div>
+
+                {/* Image Counter */}
+                <div className="absolute top-3 right-3 bg-black/50 text-white text-xs px-2 py-1 rounded-full z-10">
+                  {currentImageIndex + 1} / {sortedPhotos.length}
+                </div>
+              </>
+            )}
+          </div>
+        )}
         {/* Departure Confirmation for Renters */}
         {isRenter && canConfirmDeparture() && (
           <Card className="overflow-hidden border-primary/20 bg-primary/5">
