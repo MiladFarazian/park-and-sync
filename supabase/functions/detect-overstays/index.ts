@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper function to send push notifications
+// Helper function to send push notifications with deep-link data
 async function sendPushNotification(
   supabaseClient: any,
   userId: string,
@@ -14,7 +14,9 @@ async function sendPushNotification(
   body: string,
   tag: string,
   url: string,
-  requireInteraction: boolean = false
+  requireInteraction: boolean = false,
+  type?: string,
+  bookingId?: string
 ) {
   try {
     // Fetch push subscriptions for the user
@@ -45,13 +47,15 @@ async function sendPushNotification(
         tag,
         url,
         requireInteraction,
+        type,
+        bookingId,
       }),
     });
 
     if (!response.ok) {
       console.error(`Failed to send push notification: ${response.status}`);
     } else {
-      console.log(`Push notification sent to user ${userId}: "${title}"`);
+      console.log(`Push notification sent to user ${userId}: "${title}" (type: ${type})`);
     }
   } catch (error) {
     console.error('Error sending push notification:', error);
@@ -128,15 +132,17 @@ serve(async (req) => {
             console.log(`Sent 15-minute warning notification to user ${booking.renter_id} for booking ${booking.id}`);
           }
 
-          // Send push notification
+          // Send push notification with deep-link data
           await sendPushNotification(
             supabaseClient,
             booking.renter_id,
             notifTitle,
             notifMessage,
             `ending-soon-${booking.id}`,
-            `/booking/${booking.id}`,
-            false
+            `/booking/${booking.id}?fromNotification=ending_soon`,
+            false,
+            'BOOKING_ENDING_SOON',
+            booking.id
           );
         }
       }
@@ -207,15 +213,17 @@ serve(async (req) => {
         console.log(`Sent grace period warning notification to renter ${booking.renter_id} for booking ${booking.id}`);
       }
 
-      // Send PUSH notification to renter (works even when app is closed)
+      // Send PUSH notification to renter with deep-link data (works even when app is closed)
       await sendPushNotification(
         supabaseClient,
         booking.renter_id,
         renterTitle,
         renterMessage,
         `grace-period-${booking.id}`,
-        `/booking/${booking.id}`,
-        true // requireInteraction - critical notification
+        `/booking/${booking.id}?fromNotification=grace_period`,
+        true, // requireInteraction - critical notification
+        'GRACE_PERIOD',
+        booking.id
       );
 
       // Send notification to host
@@ -238,15 +246,17 @@ serve(async (req) => {
         console.log(`Sent overstay notification to host ${booking.spots.host_id} for booking ${booking.id}`);
       }
 
-      // Send PUSH notification to host
+      // Send PUSH notification to host with deep-link data
       await sendPushNotification(
         supabaseClient,
         booking.spots.host_id,
         hostTitle,
         hostMessage,
         `overstay-host-${booking.id}`,
-        `/booking/${booking.id}`,
-        true
+        `/booking/${booking.id}?fromNotification=overstay_host`,
+        true,
+        'OVERSTAY_HOST',
+        booking.id
       );
     }
 

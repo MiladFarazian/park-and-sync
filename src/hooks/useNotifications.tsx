@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -12,12 +13,19 @@ interface NotificationPayload {
   requireInteraction?: boolean;
 }
 
+interface ServiceWorkerNotificationData {
+  url: string;
+  notificationType: string | null;
+  bookingId: string | null;
+}
+
 export const useNotifications = () => {
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [isSupported, setIsSupported] = useState(false);
   const [isPushSubscribed, setIsPushSubscribed] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const channelsRef = useRef<any[]>([]);
 
   useEffect(() => {
@@ -30,6 +38,48 @@ export const useNotifications = () => {
       registerServiceWorker();
     }
   }, []);
+
+  // Listen for service worker messages (notification clicks when app is open)
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const handleServiceWorkerMessage = async (event: MessageEvent) => {
+      if (event.data?.type === 'NOTIFICATION_CLICKED') {
+        const data = event.data.data as ServiceWorkerNotificationData;
+        console.log('[Notifications] Received notification click from SW:', data);
+
+        // If we have a bookingId, verify the booking still exists
+        if (data.bookingId && user) {
+          const { data: booking, error } = await supabase
+            .from('bookings')
+            .select('id, status')
+            .eq('id', data.bookingId)
+            .single();
+
+          if (error || !booking) {
+            console.log('[Notifications] Booking no longer exists, redirecting to activity');
+            toast({
+              title: "Booking no longer active",
+              description: "This booking is no longer available",
+            });
+            navigate('/activity');
+            return;
+          }
+        }
+
+        // Navigate to the URL from the notification (service worker already navigates, but this ensures React Router state is correct)
+        if (data.url) {
+          navigate(data.url);
+        }
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+    };
+  }, [user, navigate, toast]);
 
   // Check push subscription status when user changes
   useEffect(() => {

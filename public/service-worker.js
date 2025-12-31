@@ -13,27 +13,38 @@ self.addEventListener('notificationclick', (event) => {
   console.log('[Service Worker] Notification clicked:', event.notification.tag);
   event.notification.close();
 
-  // Handle notification clicks
+  // Handle notification clicks with deep-linking
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Get the notification data
+      // Get the notification data including type and bookingId
       const data = event.notification.data || {};
-      const url = data.url || '/';
+      const url = data.url || '/activity';
+      
+      // Build absolute URL for navigation
+      const baseUrl = self.location.origin;
+      const absoluteUrl = url.startsWith('/') ? baseUrl + url : url;
+      
+      console.log('[Service Worker] Navigating to:', absoluteUrl, 'with data:', data);
 
       // Check if there's already a window open
       for (const client of clientList) {
         if (client.url.includes(self.location.origin) && 'focus' in client) {
+          // Post message with full notification data for in-app handling
           client.postMessage({
             type: 'NOTIFICATION_CLICKED',
-            data: data
+            data: {
+              url: url,
+              notificationType: data.type || null,
+              bookingId: data.bookingId || null,
+            }
           });
-          return client.focus().then(() => client.navigate(url));
+          return client.focus().then(() => client.navigate(absoluteUrl));
         }
       }
 
       // Open a new window if no existing window
       if (self.clients.openWindow) {
-        return self.clients.openWindow(url);
+        return self.clients.openWindow(absoluteUrl);
       }
     })
   );

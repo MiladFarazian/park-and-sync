@@ -82,7 +82,7 @@ function base64UrlEncode(data: string | Uint8Array): string {
 
 async function sendPushNotification(
   subscription: { endpoint: string; p256dh: string; auth: string },
-  payload: { title: string; body: string; tag?: string; url?: string; requireInteraction?: boolean }
+  payload: { title: string; body: string; tag?: string; url?: string; requireInteraction?: boolean; type?: string; bookingId?: string }
 ): Promise<boolean> {
   const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
   const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
@@ -103,12 +103,16 @@ async function sendPushNotification(
       vapidPrivateKey
     );
 
-    // Create the push message payload
+    // Create the push message payload with deep-link data
     const pushPayload = JSON.stringify({
       title: payload.title,
       body: payload.body,
       tag: payload.tag || 'parkzy-notification',
-      data: { url: payload.url || '/activity' },
+      data: { 
+        url: payload.url || '/activity',
+        type: payload.type || null,
+        bookingId: payload.bookingId || null,
+      },
       requireInteraction: payload.requireInteraction || false,
     });
 
@@ -156,7 +160,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { userId, userIds, title, body, tag, url, requireInteraction } = await req.json();
+    const { userId, userIds, title, body, tag, url, requireInteraction, type, bookingId } = await req.json();
 
     const targetUserIds = userIds || (userId ? [userId] : []);
 
@@ -190,7 +194,7 @@ serve(async (req) => {
 
     console.log(`Found ${subscriptions.length} subscriptions`);
 
-    const payload = { title, body, tag, url, requireInteraction };
+    const payload = { title, body, tag, url, requireInteraction, type, bookingId };
     let successCount = 0;
     const expiredEndpoints: string[] = [];
 

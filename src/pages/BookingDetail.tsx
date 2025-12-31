@@ -86,22 +86,44 @@ const BookingDetailContent = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
+  const [showNotificationBanner, setShowNotificationBanner] = useState<string | null>(null);
 
   useEffect(() => {
     if (!bookingId || !user) return;
     loadBookingDetails();
   }, [bookingId, user]);
 
-  // Auto-open extend dialog if action=extend query param is present
+  // Auto-open extend dialog if action=extend query param is present or fromNotification param
   useEffect(() => {
     if (!booking || loading) return;
     const action = searchParams.get('action');
+    const fromNotification = searchParams.get('fromNotification');
     const canExtendBooking = (booking.status === 'pending' || booking.status === 'active' || booking.status === 'paid') && new Date() < new Date(booking.end_at);
+    const isRenterUser = booking.renter_id === user?.id;
     
-    if (action === 'extend' && canExtendBooking && booking.renter_id === user?.id) {
+    // Handle action=extend param
+    if (action === 'extend' && canExtendBooking && isRenterUser) {
       setShowExtendDialog(true);
-      // Remove the query param to prevent re-opening on refresh
       searchParams.delete('action');
+      setSearchParams(searchParams, { replace: true });
+    }
+    
+    // Handle fromNotification param for deep-linked notifications
+    if (fromNotification && isRenterUser) {
+      const notifType = fromNotification;
+      
+      // Show contextual banner based on notification type
+      if (notifType === 'grace_period' || notifType === 'ending_soon') {
+        setShowNotificationBanner(notifType);
+        
+        // Auto-open extend dialog for grace period notifications
+        if (notifType === 'grace_period' && canExtendBooking) {
+          setShowExtendDialog(true);
+        }
+      }
+      
+      // Remove the query param to prevent re-triggering
+      searchParams.delete('fromNotification');
       setSearchParams(searchParams, { replace: true });
     }
   }, [booking, loading, searchParams, user]);
@@ -555,6 +577,46 @@ const BookingDetailContent = () => {
       </div>
 
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
+        {/* Notification Banner for deep-linked notifications */}
+        {showNotificationBanner && (
+          <div 
+            className={`p-4 rounded-lg flex items-center gap-3 animate-pulse ${
+              showNotificationBanner === 'grace_period' 
+                ? 'bg-destructive/10 border border-destructive/30' 
+                : 'bg-amber-500/10 border border-amber-500/30'
+            }`}
+          >
+            <AlertTriangle className={`h-5 w-5 flex-shrink-0 ${
+              showNotificationBanner === 'grace_period' ? 'text-destructive' : 'text-amber-500'
+            }`} />
+            <div className="flex-1">
+              <p className={`text-sm font-medium ${
+                showNotificationBanner === 'grace_period' ? 'text-destructive' : 'text-amber-600'
+              }`}>
+                {showNotificationBanner === 'grace_period' 
+                  ? "You're in your grace period — extend now to avoid $25/hr overtime charges"
+                  : "Your parking ends soon — extend now to keep your spot"}
+              </p>
+            </div>
+            <Button 
+              size="sm" 
+              variant={showNotificationBanner === 'grace_period' ? 'destructive' : 'default'}
+              onClick={() => setShowExtendDialog(true)}
+              disabled={!((booking.status === 'pending' || booking.status === 'active' || booking.status === 'paid') && new Date() < new Date(booking.end_at))}
+            >
+              Extend Now
+            </Button>
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              className="h-6 w-6"
+              onClick={() => setShowNotificationBanner(null)}
+            >
+              <XCircle className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        
         {/* Spot Photo Carousel */}
         {sortedPhotos.length > 0 && (
           <div 
