@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import CompleteProfileStep from '@/components/auth/CompleteProfileStep';
+import { isProfileComplete } from '@/lib/profileUtils';
 
 const REMEMBER_ME_KEY = 'parkzy_remember_me';
 
@@ -205,12 +206,19 @@ const Auth = () => {
     if (data.user) {
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('first_name, email, phone_verified')
+        .select('first_name, last_name, email, phone, phone_verified')
         .eq('user_id', data.user.id)
         .single();
       
-      // If profile is incomplete (no name or email), show complete profile step
-      if (!profileData?.first_name || !profileData?.email) {
+      // Use centralized check - if profile is incomplete, show complete profile step
+      // Cast to Profile type for the utility function
+      const profileForCheck = profileData ? {
+        ...profileData,
+        user_id: data.user.id,
+      } as any : null;
+      
+      if (!isProfileComplete(profileForCheck)) {
+        console.log('[Auth] Profile incomplete after OTP, showing complete profile step');
         setVerifiedPhone(formattedPhone);
         setAuthStep('complete-profile');
         setLoading(false);

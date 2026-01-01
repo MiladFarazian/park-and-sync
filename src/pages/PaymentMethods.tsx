@@ -13,6 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Elements, CardElement, PaymentRequestButtonElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe, PaymentRequest } from "@stripe/stripe-js";
 import RequireAuth from "@/components/auth/RequireAuth";
+import { isProfileComplete } from "@/lib/profileUtils";
 
 let stripePromise: Promise<any> | null = null;
 
@@ -368,10 +369,12 @@ const PaymentMethodsContent = () => {
   }, [profile?.email]);
 
   const handleAddCardClick = () => {
-    // Check if profile has email
-    const email = profile?.email || userEmail;
-    if (!email) {
-      console.log('[PaymentMethods] No email found, showing profile form');
+    // Use centralized profile completeness check
+    if (!isProfileComplete(profile)) {
+      console.log('[PaymentMethods] Profile incomplete, showing profile form. Missing:', {
+        first_name: profile?.first_name,
+        email: profile?.email
+      });
       setPendingAddCard(true);
       setShowProfileForm(true);
       return;
