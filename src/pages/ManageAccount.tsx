@@ -141,14 +141,17 @@ const ManageAccount = () => {
         toast.info("Please check your email to confirm the change");
       }
 
+      console.log('[ManageAccount] Saving profile:', formData);
       const { error } = await updateProfile({
         ...formData,
         avatar_url,
       });
       
       if (error) {
+        console.error('[ManageAccount] Profile save failed:', error);
         toast.error("Failed to update profile");
       } else {
+        console.log('[ManageAccount] Profile saved successfully, state refreshed');
         toast.success("Profile updated successfully");
         setAvatarFile(null);
       }

@@ -19,6 +19,8 @@ import { formatPhoneNumber } from '@/lib/utils';
 import { ImageCropDialog } from '@/components/profile/ImageCropDialog';
 import { useMode } from '@/contexts/ModeContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { isProfileComplete } from '@/lib/profileUtils';
+
 const profileSchema = z.object({
   first_name: z.string().trim().min(1, 'First name is required').max(50, 'First name must be less than 50 characters'),
   last_name: z.string().trim().min(1, 'Last name is required').max(50, 'Last name must be less than 50 characters'),
@@ -439,7 +441,7 @@ const Profile = () => {
       return null;
     }
   };
-  const isProfileIncomplete = !profile?.first_name || !profile?.last_name;
+  const isProfileIncomplete = !isProfileComplete(profile);
   const onSubmit = async (data: ProfileFormData) => {
     setIsUpdating(true);
     try {

@@ -23,6 +23,7 @@ import RequireAuth from '@/components/auth/RequireAuth';
 import GuestBookingForm from '@/components/booking/GuestBookingForm';
 import CompleteProfileStep from '@/components/auth/CompleteProfileStep';
 import { useAuth } from '@/contexts/AuthContext';
+import { isProfileComplete } from '@/lib/profileUtils';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 
@@ -70,8 +71,8 @@ const BookingContent = () => {
   // EV Charging state
   const [useEvCharging, setUseEvCharging] = useState(false);
   
-  // Check if profile is incomplete (needs name, email, phone_verified)
-  const isProfileIncomplete = !profile?.first_name || !profile?.email || !profile?.phone_verified;
+  // Check if profile is incomplete using centralized check (first_name + email required)
+  const isProfileIncomplete = !isProfileComplete(profile);
   
   // Get times from URL params or use defaults (1 hour from now + 2 hours duration)
   const getInitialTimes = () => {

@@ -53,9 +53,7 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
       newErrors.email = 'Please enter a valid email address';
     }
     
-    if (!formData.carModel.trim()) {
-      newErrors.carModel = 'Car model is required';
-    }
+    // Car model is optional - do not block profile completion
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -105,20 +103,22 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
         return;
       }
 
-      // Create vehicle record
-      const { error: vehicleError } = await supabase
-        .from('vehicles')
-        .insert({
-          user_id: user.id,
-          model: formData.carModel,
-          license_plate: 'PENDING', // Will be updated later
-          size_class: 'midsize',
-          is_primary: true
-        });
+      // Create vehicle record only if car model was provided
+      if (formData.carModel.trim()) {
+        const { error: vehicleError } = await supabase
+          .from('vehicles')
+          .insert({
+            user_id: user.id,
+            model: formData.carModel,
+            license_plate: 'PENDING', // Will be updated later
+            size_class: 'midsize',
+            is_primary: true
+          });
 
-      if (vehicleError) {
-        console.error('[CompleteProfile] Vehicle save error:', vehicleError);
-        // Non-blocking - continue anyway
+        if (vehicleError) {
+          console.error('[CompleteProfile] Vehicle save error:', vehicleError);
+          // Non-blocking - continue anyway
+        }
       }
 
       // Also update auth email if needed
@@ -212,7 +212,7 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
 
           <div className="space-y-2">
             <Label htmlFor="carModel" className="text-sm font-medium">
-              Car model <span className="text-destructive">*</span>
+              Car model <span className="text-muted-foreground">(optional)</span>
             </Label>
             <div className="relative">
               <Car className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -225,12 +225,9 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
                   setFormData({ ...formData, carModel: e.target.value });
                   if (errors.carModel) setErrors({ ...errors, carModel: undefined });
                 }}
-                className={`pl-10 h-12 rounded-xl border-2 ${errors.carModel ? 'border-destructive' : ''}`}
+                className="pl-10 h-12 rounded-xl border-2"
               />
             </div>
-            {errors.carModel && (
-              <p className="text-sm text-destructive">{errors.carModel}</p>
-            )}
           </div>
 
           <Button
@@ -244,7 +241,7 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
                 Saving...
               </>
             ) : (
-              'Continue to payment'
+              'Continue'
             )}
           </Button>
         </form>
