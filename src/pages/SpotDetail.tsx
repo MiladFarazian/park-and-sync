@@ -757,7 +757,7 @@ const SpotDetail = () => {
                       </Badge>
                     )}
                   </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-[280px] text-center p-3">
+                  <TooltipContent side="bottom" className="max-w-[280px] p-3">
                     {spot.instant_book !== false ? (
                       <p className="text-sm">Book now, park now. Your reservation is confirmed the moment you complete payment.</p>
                     ) : (
