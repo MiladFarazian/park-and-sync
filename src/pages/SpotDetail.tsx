@@ -511,8 +511,8 @@ const SpotDetail = () => {
 
       setSpot(transformedData);
       
-      // Fetch reviews for this specific spot
-      fetchSpotReviews(spotData.id);
+      // Fetch reviews for this specific spot (pass host_id to avoid race condition)
+      fetchSpotReviews(spotData.id, spotData.host_id);
       
       // Check if user owns this spot
       if (user && transformedData.host_id) {
@@ -568,7 +568,7 @@ const SpotDetail = () => {
     }
   };
 
-  const fetchSpotReviews = async (spotId: string) => {
+  const fetchSpotReviews = async (spotId: string, hostId: string) => {
     setReviewsLoading(true);
     try {
       // Get reviews for bookings of this specific spot
@@ -593,7 +593,7 @@ const SpotDetail = () => {
       // Filter to only reviews for this spot where the driver reviewed the host
       // (reviewee_id should be the host, not the driver)
       const spotReviews = (data || []).filter(
-        review => review.booking?.spot_id === spotId && review.reviewee_id === spot?.host_id
+        review => review.booking?.spot_id === spotId && review.reviewee_id === hostId
       );
       
       setReviews(spotReviews);

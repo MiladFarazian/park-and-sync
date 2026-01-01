@@ -257,14 +257,15 @@ serve(async (req) => {
             calendarOverrides
           );
 
-          // Get spot-specific reviews through bookings
+          // Get spot-specific reviews through bookings (only driver reviews)
           const { data: spotReviews } = await supabase
             .from('reviews')
-            .select('rating, booking:booking_id(spot_id)')
+            .select('rating, reviewer_id, booking:booking_id(spot_id, renter_id)')
             .eq('is_public', true);
           
+          // Only count reviews where the reviewer is the driver (renter), not the host
           const spotSpecificReviews = (spotReviews || []).filter(
-            (r: any) => r.booking?.spot_id === spot.id
+            (r: any) => r.booking?.spot_id === spot.id && r.reviewer_id === r.booking?.renter_id
           );
           
           const reviewCount = spotSpecificReviews.length;

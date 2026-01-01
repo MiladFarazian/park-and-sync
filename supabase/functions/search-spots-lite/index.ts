@@ -91,14 +91,16 @@ serve(async (req) => {
     if (spotIds.length > 0) {
       const { data: reviews } = await supabase
         .from('reviews')
-        .select('rating, booking:booking_id(spot_id)')
+        .select('rating, reviewer_id, booking:booking_id(spot_id, renter_id)')
         .eq('is_public', true);
 
-      // Group reviews by spot_id
+      // Group reviews by spot_id - only count driver reviews (where reviewer is the renter)
       const spotReviews = new Map<string, number[]>();
       for (const review of reviews || []) {
-        const spotId = (review.booking as any)?.spot_id;
-        if (spotId && spotIds.includes(spotId)) {
+        const booking = review.booking as any;
+        const spotId = booking?.spot_id;
+        // Only include if reviewer is the driver (renter), not the host
+        if (spotId && spotIds.includes(spotId) && review.reviewer_id === booking?.renter_id) {
           if (!spotReviews.has(spotId)) {
             spotReviews.set(spotId, []);
           }
