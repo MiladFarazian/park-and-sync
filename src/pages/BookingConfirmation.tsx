@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Clock, MapPin, Star, MessageCircle, Car, Calendar, XCircle, Navigation, Copy, AlertTriangle, Zap, Key } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, MapPin, Star, MessageCircle, Car, Calendar, XCircle, Navigation, Copy, AlertTriangle, Zap, Key, CalendarPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -516,8 +516,12 @@ const BookingConfirmationContent = () => {
           <Button className="w-full" size="lg" onClick={() => navigate('/activity')}>
             View My Bookings
           </Button>
-          <Button variant="outline" className="w-full" size="lg" onClick={() => navigate('/')}>
-            Find More Parking
+          <Button variant="outline" className="w-full" size="lg" onClick={() => navigate(`/book/${spot.id}`)}>
+            <CalendarPlus className="h-4 w-4 mr-2" />
+            Book This Spot Again
+          </Button>
+          <Button variant="ghost" className="w-full" size="lg" onClick={() => navigate('/')}>
+            Find Other Parking
           </Button>
           
           {/* Cancel Booking Button - Only show if not cancelled and not past */}
