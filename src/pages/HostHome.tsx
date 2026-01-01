@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, TrendingUp, Calendar, MapPin, Car } from 'lucide-react';
+import { Plus, TrendingUp, Calendar, MapPin, Car, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -254,6 +254,14 @@ const HostHome = () => {
         >
           <Plus className="h-4 w-4 mr-2" />
           Add New Spot
+        </Button>
+        <Button 
+          variant="outline"
+          className="w-full"
+          onClick={() => navigate('/host-calendar')}
+        >
+          <Clock className="h-4 w-4 mr-2" />
+          Manage Availability
         </Button>
         <Button 
           variant="outline"
