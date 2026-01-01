@@ -1,7 +1,7 @@
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle, Loader2, Info, Zap, ChevronRight } from 'lucide-react';
+import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle, Loader2, Info, Zap } from 'lucide-react';
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -792,26 +792,24 @@ const BookingContent = () => {
     <div className="bg-background">
       {/* Header */}
       <div className="border-b bg-card sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-3">
-          {/* Breadcrumb Navigation */}
-          <nav className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
-            <button 
-              onClick={() => navigate('/explore')} 
-              className="hover:text-foreground transition-colors"
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                // If there's history, go back; otherwise navigate to spot detail
+                if (window.history.length > 1) {
+                  navigate(-1);
+                } else {
+                  navigate(`/spot/${spotId}`);
+                }
+              }}
             >
-              Explore
-            </button>
-            <ChevronRight className="h-3 w-3" />
-            <button 
-              onClick={() => navigate(`/spot/${spotId}`)} 
-              className="hover:text-foreground transition-colors"
-            >
-              {spot?.title ? (spot.title.length > 20 ? spot.title.slice(0, 20) + '...' : spot.title) : 'Spot'}
-            </button>
-            <ChevronRight className="h-3 w-3" />
-            <span className="text-foreground font-medium">Book</span>
-          </nav>
-          <h1 className="text-xl font-bold">Order Summary</h1>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-xl font-bold">Order Summary</h1>
+          </div>
         </div>
       </div>
 
