@@ -757,11 +757,11 @@ const SpotDetail = () => {
                       </Badge>
                     )}
                   </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-[250px] text-center">
+                  <TooltipContent side="bottom" className="max-w-[280px] text-center p-3">
                     {spot.instant_book !== false ? (
-                      <p>Your booking is confirmed immediately after payment. No waiting!</p>
+                      <p className="text-sm">Book now, park now. Your reservation is confirmed the moment you complete payment.</p>
                     ) : (
-                      <p>The host must approve your request within 90 minutes. Your card is held but not charged until approved.</p>
+                      <p className="text-sm">Your request will be sent to the host for approval. They have 90 minutes to respond. Your card won't be charged until they confirm.</p>
                     )}
                   </TooltipContent>
                 </Tooltip>
