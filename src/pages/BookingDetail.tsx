@@ -938,8 +938,8 @@ const BookingDetailContent = () => {
                   </p>
                 </div>
 
-                {/* Action Buttons - Available when overstay is detected */}
-                {!booking.overstay_action && (
+                {/* Action Buttons - Available when overstay is detected and no final action taken */}
+                {(!booking.overstay_action || booking.overstay_action === 'pending_action') && (
                   <div className="flex gap-2 flex-wrap">
                     {inGracePeriod && (
                       <Button
