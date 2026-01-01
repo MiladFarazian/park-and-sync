@@ -434,15 +434,21 @@ const DesktopSpotList = ({
                       </div>
 
                       {/* Rating */}
-                      {spot.rating !== undefined && spot.rating > 0 && (
-                        <div className="flex items-center gap-1 mb-1">
-                          <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-                          <span className="text-sm font-medium">{spot.rating.toFixed(1)}</span>
-                          {spot.reviews !== undefined && (
-                            <span className="text-sm text-muted-foreground">({spot.reviews})</span>
-                          )}
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1 mb-1">
+                        {spot.rating !== undefined && spot.rating > 0 ? (
+                          <>
+                            <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                            <span className="text-sm font-medium">{spot.rating.toFixed(1)}</span>
+                            {spot.reviews !== undefined && (
+                              <span className="text-sm text-muted-foreground">({spot.reviews})</span>
+                            )}
+                          </>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
+                            New
+                          </Badge>
+                        )}
+                      </div>
 
                       {/* Distance */}
                       <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2">
