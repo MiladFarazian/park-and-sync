@@ -16,6 +16,19 @@ serve(async (req: Request) => {
   }
 
   try {
+    // Validate internal secret - this is called by Supabase webhook/trigger
+    const authHeader = req.headers.get('Authorization');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    // Allow both service role key and Supabase webhook signatures
+    if (!authHeader || (!authHeader.includes(serviceRoleKey || '') && !authHeader.includes('Bearer '))) {
+      console.warn('[forward-support-messages] Unauthorized access attempt');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''

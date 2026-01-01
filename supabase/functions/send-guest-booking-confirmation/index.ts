@@ -80,6 +80,18 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Validate internal secret - this is called internally after payment
+    const authHeader = req.headers.get('Authorization');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!authHeader || !authHeader.includes(serviceRoleKey || '')) {
+      console.warn('[send-guest-booking-confirmation] Unauthorized access attempt');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const {
       guestEmail,
       guestPhone,

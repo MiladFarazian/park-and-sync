@@ -1,5 +1,24 @@
 project_id = "mqbupmusmciijsjmzbcu"
 
+# =====================================================
+# SECURITY CONFIGURATION
+# =====================================================
+# PUBLIC endpoints (verify_jwt = false):
+#   - search-spots, search-spots-lite: Public search API (rate limited)
+#   - stripe-webhooks: External webhook (signature validated by Stripe)
+#   - get-stripe-publishable-key: Returns public key only
+#   - get-vapid-public-key: Returns public key only
+#   - create-guest-booking: Guest checkout (rate limited, tokenized)
+#   - get-guest-booking: Guest lookup (rate limited, token validated)
+#   - cancel-guest-booking: Guest cancel (rate limited, token validated)
+#   - send-auth-email: Supabase auth hook (signature validated)
+#
+# PROTECTED endpoints (verify_jwt = true, default):
+#   All other endpoints require authentication
+# =====================================================
+
+# === PUBLIC ENDPOINTS (with rate limiting) ===
+
 [functions.search-spots]
 verify_jwt = false
 
@@ -9,17 +28,37 @@ verify_jwt = false
 [functions.stripe-webhooks]
 verify_jwt = false
 
+[functions.get-stripe-publishable-key]
+verify_jwt = false
+
+[functions.get-vapid-public-key]
+verify_jwt = false
+
+[functions.create-guest-booking]
+verify_jwt = false
+
+[functions.get-guest-booking]
+verify_jwt = false
+
+[functions.cancel-guest-booking]
+verify_jwt = false
+
+[functions.send-auth-email]
+verify_jwt = false
+
+# === PROTECTED ENDPOINTS (require JWT) ===
+
 [functions.get-payment-methods]
 verify_jwt = true
 
 [functions.setup-payment-method]
 verify_jwt = true
 
-[functions.cancel-booking]
+[functions.delete-payment-method]
 verify_jwt = true
 
-[functions.get-stripe-publishable-key]
-verify_jwt = false
+[functions.cancel-booking]
+verify_jwt = true
 
 [functions.create-stripe-connect-link]
 verify_jwt = true
@@ -33,20 +72,8 @@ verify_jwt = true
 [functions.extend-booking]
 verify_jwt = true
 
-[functions.forward-support-messages]
-verify_jwt = false
-
-[functions.detect-overstays]
-verify_jwt = false
-
 [functions.confirm-departure]
 verify_jwt = true
-
-[functions.send-push-notification]
-verify_jwt = false
-
-[functions.get-vapid-public-key]
-verify_jwt = false
 
 [functions.send-listing-confirmation]
 verify_jwt = true
@@ -63,16 +90,44 @@ verify_jwt = true
 [functions.reject-booking]
 verify_jwt = true
 
+[functions.create-booking]
+verify_jwt = true
+
+[functions.create-booking-hold]
+verify_jwt = true
+
+[functions.modify-booking-times]
+verify_jwt = true
+
+[functions.get-mapbox-token]
+verify_jwt = true
+
+[functions.get-vehicle-image]
+verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true
+
+[functions.attach-guest-payment-method]
+verify_jwt = true
+
+[functions.cancel-tow-request]
+verify_jwt = true
+
+# === INTERNAL ENDPOINTS (protected by internal secret) ===
+# These are called by other edge functions or cron jobs
+# They validate X-Internal-Secret header instead of JWT
+
+[functions.forward-support-messages]
+verify_jwt = false
+
+[functions.detect-overstays]
+verify_jwt = false
+
+[functions.send-push-notification]
+verify_jwt = false
+
 [functions.expire-pending-bookings]
-verify_jwt = false
-
-[functions.create-guest-booking]
-verify_jwt = false
-
-[functions.get-guest-booking]
-verify_jwt = false
-
-[functions.cancel-guest-booking]
 verify_jwt = false
 
 [functions.send-guest-booking-confirmation]
@@ -82,7 +137,4 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-welcome-email]
-verify_jwt = false
-
-[functions.send-auth-email]
 verify_jwt = false

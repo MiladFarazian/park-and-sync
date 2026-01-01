@@ -6,6 +6,48 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Rate limit configuration
+const RATE_LIMIT_PER_MINUTE = 10;
+const RATE_LIMIT_PER_HOUR = 60;
+
+async function checkRateLimit(
+  supabase: any,
+  clientIp: string
+): Promise<{ allowed: boolean; retryAfter: number }> {
+  const functionName = 'get-guest-booking';
+  const minuteKey = `ip:${clientIp}:${functionName}:min`;
+  const hourKey = `ip:${clientIp}:${functionName}:hour`;
+
+  try {
+    const { data: minuteOk } = await supabase.rpc('check_rate_limit', {
+      p_key: minuteKey,
+      p_window_seconds: 60,
+      p_max_requests: RATE_LIMIT_PER_MINUTE
+    });
+
+    const { data: hourOk } = await supabase.rpc('check_rate_limit', {
+      p_key: hourKey,
+      p_window_seconds: 3600,
+      p_max_requests: RATE_LIMIT_PER_HOUR
+    });
+
+    if (!minuteOk) {
+      console.warn(`[rate-limit] ${functionName} minute limit exceeded for IP: ${clientIp.substring(0, 8)}...`);
+      return { allowed: false, retryAfter: 60 };
+    }
+    
+    if (!hourOk) {
+      console.warn(`[rate-limit] ${functionName} hour limit exceeded for IP: ${clientIp.substring(0, 8)}...`);
+      return { allowed: false, retryAfter: 3600 };
+    }
+
+    return { allowed: true, retryAfter: 0 };
+  } catch (error) {
+    console.error('[rate-limit] Error checking rate limit:', error);
+    return { allowed: true, retryAfter: 0 };
+  }
+}
+
 interface GetGuestBookingRequest {
   booking_id: string;
   access_token: string;
@@ -21,6 +63,28 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+
+    // Get client IP for rate limiting
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() 
+      || req.headers.get('cf-connecting-ip') 
+      || req.headers.get('x-real-ip')
+      || 'unknown';
+
+    // Check rate limit
+    const rateLimit = await checkRateLimit(supabaseAdmin, clientIp);
+    if (!rateLimit.allowed) {
+      return new Response(JSON.stringify({ 
+        error: 'Too many requests. Please try again later.',
+        retry_after: rateLimit.retryAfter
+      }), {
+        status: 429,
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'Retry-After': String(rateLimit.retryAfter)
+        },
+      });
+    }
 
     const { booking_id, access_token }: GetGuestBookingRequest = await req.json();
 

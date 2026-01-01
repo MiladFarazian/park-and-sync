@@ -549,6 +549,30 @@ export type Database = {
           },
         ]
       }
+      rate_limits: {
+        Row: {
+          count: number
+          created_at: string
+          id: string
+          key: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          created_at?: string
+          id?: string
+          key: string
+          window_start: string
+        }
+        Update: {
+          count?: number
+          created_at?: string
+          id?: string
+          key?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       reviews: {
         Row: {
           booking_id: string
@@ -1054,6 +1078,14 @@ export type Database = {
             }
             Returns: string
           }
+      check_rate_limit: {
+        Args: {
+          p_key: string
+          p_max_requests?: number
+          p_window_seconds?: number
+        }
+        Returns: boolean
+      }
       check_spot_availability: {
         Args: {
           p_end_at: string
@@ -1065,6 +1097,7 @@ export type Database = {
         Returns: boolean
       }
       cleanup_expired_holds: { Args: never; Returns: undefined }
+      cleanup_old_rate_limits: { Args: never; Returns: number }
       create_booking_hold: {
         Args: {
           p_end_at: string

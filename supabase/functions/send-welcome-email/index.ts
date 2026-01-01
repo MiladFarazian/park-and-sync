@@ -21,6 +21,18 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Validate internal secret - this is called internally
+    const authHeader = req.headers.get('Authorization');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!authHeader || !authHeader.includes(serviceRoleKey || '')) {
+      console.warn('[send-welcome-email] Unauthorized access attempt');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { userId, email, firstName }: WelcomeEmailRequest = await req.json();
 
     if (!email || !email.includes('@')) {
