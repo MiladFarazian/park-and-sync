@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -741,17 +742,30 @@ const SpotDetail = () => {
                   {spot.category}
                 </span>
               )}
-              {spot.instant_book !== false ? (
-                <Badge variant="secondary" className="w-fit text-xs bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
-                  <BoltIcon className="h-3 w-3 mr-1" />
-                  Instant Book
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className="w-fit text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-                  <Clock className="h-3 w-3 mr-1" />
-                  Requires Confirmation
-                </Badge>
-              )}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    {spot.instant_book !== false ? (
+                      <Badge variant="secondary" className="w-fit text-xs bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 cursor-help">
+                        <BoltIcon className="h-3 w-3 mr-1" />
+                        Instant Book
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="w-fit text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 cursor-help">
+                        <Clock className="h-3 w-3 mr-1" />
+                        Requires Confirmation
+                      </Badge>
+                    )}
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[250px] text-center">
+                    {spot.instant_book !== false ? (
+                      <p>Your booking is confirmed immediately after payment. No waiting!</p>
+                    ) : (
+                      <p>The host must approve your request within 90 minutes. Your card is held but not charged until approved.</p>
+                    )}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
             <div className="text-right">
               <p className="text-2xl font-bold text-primary">${calculateDriverPrice(spot.hourlyRate).toFixed(2)}</p>
