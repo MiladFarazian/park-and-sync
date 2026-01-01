@@ -1,11 +1,26 @@
 import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, ChevronLeft, Clock, DollarSign } from 'lucide-react';
+import { Loader2, ChevronLeft, Clock, DollarSign, CreditCard, ChevronDown, Check } from 'lucide-react';
 import { format, addDays, startOfDay, setHours, setMinutes, differenceInMinutes } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { loadStripe } from '@stripe/stripe-js';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+interface PaymentMethod {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+}
 
 const QUICK_EXTEND_OPTIONS = [
   { label: '30 min', hours: 0.5 },
@@ -26,9 +41,15 @@ export const ExtendParkingDialog = ({
   booking, 
   onExtendSuccess 
 }: ExtendParkingDialogProps) => {
+  const navigate = useNavigate();
   const [view, setView] = useState<'quick' | 'custom'>('quick');
   const [extending, setExtending] = useState(false);
   const [selectedExtendHours, setSelectedExtendHours] = useState<number | null>(null);
+  
+  // Payment method state
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [loadingPaymentMethods, setLoadingPaymentMethods] = useState(false);
   
   // Custom time picker state
   const now = new Date();
@@ -85,6 +106,27 @@ export const ExtendParkingDialog = ({
   const minuteRef = useRef<HTMLDivElement>(null);
   const periodRef = useRef<HTMLDivElement>(null);
 
+  // Fetch payment methods when dialog opens
+  const fetchPaymentMethods = async () => {
+    setLoadingPaymentMethods(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('get-payment-methods');
+      if (error) throw error;
+      
+      const methods = data.paymentMethods || [];
+      setPaymentMethods(methods);
+      
+      // Select first method by default
+      if (methods.length > 0 && !selectedPaymentMethod) {
+        setSelectedPaymentMethod(methods[0]);
+      }
+    } catch (err) {
+      console.error('Error fetching payment methods:', err);
+    } finally {
+      setLoadingPaymentMethods(false);
+    }
+  };
+
   // Reset state when dialog opens
   useEffect(() => {
     if (open) {
@@ -95,6 +137,7 @@ export const ExtendParkingDialog = ({
       setSelectedHour(init.hour);
       setSelectedMinute(init.minute);
       setSelectedPeriod(init.period);
+      fetchPaymentMethods();
     }
   }, [open, booking]);
 
@@ -196,8 +239,25 @@ export const ExtendParkingDialog = ({
     return true;
   };
 
+  const getCardBrandIcon = (brand: string) => {
+    const brandLower = brand.toLowerCase();
+    if (brandLower === 'visa') return 'Visa';
+    if (brandLower === 'mastercard') return 'MC';
+    if (brandLower === 'amex') return 'Amex';
+    if (brandLower === 'discover') return 'Disc';
+    return brand.charAt(0).toUpperCase() + brand.slice(1);
+  };
+
   const handleQuickExtend = async (hrs: number) => {
     if (!booking) return;
+    
+    // Check if user has a payment method
+    if (paymentMethods.length === 0) {
+      toast.error('No payment method on file. Please add a card first.');
+      onOpenChange(false);
+      navigate('/payment-methods?add=1&returnTo=' + encodeURIComponent(window.location.pathname));
+      return;
+    }
     
     setSelectedExtendHours(hrs);
     setExtending(true);
@@ -212,7 +272,8 @@ export const ExtendParkingDialog = ({
       const { data, error } = await supabase.functions.invoke('extend-booking', {
         body: {
           bookingId: booking.id,
-          extensionHours: hrs
+          extensionHours: hrs,
+          paymentMethodId: selectedPaymentMethod?.id
         }
       });
 
@@ -249,6 +310,14 @@ export const ExtendParkingDialog = ({
   const handleCustomExtend = async () => {
     if (!booking || !validateCustomTime()) return;
     
+    // Check if user has a payment method
+    if (paymentMethods.length === 0) {
+      toast.error('No payment method on file. Please add a card first.');
+      onOpenChange(false);
+      navigate('/payment-methods?add=1&returnTo=' + encodeURIComponent(window.location.pathname));
+      return;
+    }
+    
     const selectedDate = getSelectedDate();
     const extensionMinutes = differenceInMinutes(selectedDate, bookingEndTime);
     const hrs = extensionMinutes / 60;
@@ -265,7 +334,8 @@ export const ExtendParkingDialog = ({
       const { data, error } = await supabase.functions.invoke('extend-booking', {
         body: {
           bookingId: booking.id,
-          extensionHours: hrs
+          extensionHours: hrs,
+          paymentMethodId: selectedPaymentMethod?.id
         }
       });
 
@@ -332,7 +402,73 @@ export const ExtendParkingDialog = ({
         
         {view === 'quick' ? (
           <div className="space-y-3 py-4">
-            <p className="text-sm text-muted-foreground mb-4">
+            {/* Payment Method Selector */}
+            {loadingPaymentMethods ? (
+              <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Loading payment methods...</span>
+              </div>
+            ) : paymentMethods.length === 0 ? (
+              <div 
+                className="flex items-center gap-3 p-3 bg-destructive/10 border border-destructive/20 rounded-lg cursor-pointer hover:bg-destructive/15 transition-colors"
+                onClick={() => {
+                  onOpenChange(false);
+                  navigate('/payment-methods?add=1&returnTo=' + encodeURIComponent(window.location.pathname));
+                }}
+              >
+                <CreditCard className="h-5 w-5 text-destructive" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">No payment method</p>
+                  <p className="text-xs text-muted-foreground">Tap to add a card</p>
+                </div>
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </div>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="w-full flex items-center gap-3 p-3 bg-muted/50 rounded-lg hover:bg-muted/70 transition-colors text-left">
+                    <CreditCard className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground">Pay with</p>
+                      {selectedPaymentMethod && (
+                        <p className="text-sm font-medium truncate">
+                          {getCardBrandIcon(selectedPaymentMethod.brand)} •••• {selectedPaymentMethod.last4}
+                        </p>
+                      )}
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-[calc(100vw-3rem)] max-w-[384px]">
+                  {paymentMethods.map((pm) => (
+                    <DropdownMenuItem
+                      key={pm.id}
+                      onClick={() => setSelectedPaymentMethod(pm)}
+                      className="flex items-center gap-3 py-3"
+                    >
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                      <span className="flex-1">
+                        {getCardBrandIcon(pm.brand)} •••• {pm.last4}
+                      </span>
+                      {selectedPaymentMethod?.id === pm.id && (
+                        <Check className="h-4 w-4 text-primary" />
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuItem
+                    onClick={() => {
+                      onOpenChange(false);
+                      navigate('/payment-methods?add=1&returnTo=' + encodeURIComponent(window.location.pathname));
+                    }}
+                    className="flex items-center gap-3 py-3 text-primary"
+                  >
+                    <span className="flex-1">Add new card</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            <p className="text-sm text-muted-foreground">
               Select how long you'd like to extend:
             </p>
             
@@ -342,7 +478,7 @@ export const ExtendParkingDialog = ({
                 variant="outline"
                 className="w-full justify-between h-auto py-3 px-4 hover:bg-primary/5 hover:border-primary/30"
                 onClick={() => handleQuickExtend(option.hours)}
-                disabled={extending}
+                disabled={extending || paymentMethods.length === 0}
               >
                 <span className="font-medium">{option.label}</span>
                 <span className="flex items-center gap-2">
@@ -534,11 +670,31 @@ export const ExtendParkingDialog = ({
               </div>
             )}
 
+            {/* Payment Method Display */}
+            {selectedPaymentMethod && (
+              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">
+                    {getCardBrandIcon(selectedPaymentMethod.brand)} •••• {selectedPaymentMethod.last4}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs h-auto py-1 px-2"
+                  onClick={() => setView('quick')}
+                >
+                  Change
+                </Button>
+              </div>
+            )}
+
             {/* Confirm Button */}
             <Button 
               className="w-full"
               onClick={handleCustomExtend}
-              disabled={extending || customCost.hours <= 0}
+              disabled={extending || customCost.hours <= 0 || paymentMethods.length === 0}
             >
               {extending ? (
                 <>
