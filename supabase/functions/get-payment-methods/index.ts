@@ -36,38 +36,34 @@ serve(async (req) => {
       throw new Error('User not authenticated');
     }
 
-    // If user has no email, they can't have Stripe payment methods yet
-    if (!user.email) {
-      return new Response(
-        JSON.stringify({ paymentMethods: [] }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
-    }
+    console.log('[get-payment-methods] Processing for user:', user.id, 'auth email:', user.email);
 
     const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
       apiVersion: '2025-08-27.basil',
     });
 
-    // First check if we have a stripe_customer_id in the profile (most reliable)
+    // Fetch profile to get stripe_customer_id and profile email (for phone-auth users)
     const { data: profile } = await supabaseClient
       .from('profiles')
-      .select('stripe_customer_id')
+      .select('stripe_customer_id, email')
       .eq('user_id', user.id)
       .single();
 
+    console.log('[get-payment-methods] Profile:', profile?.stripe_customer_id, 'profile email:', profile?.email);
+
     let customerId = profile?.stripe_customer_id;
 
-    // If no customer ID in profile, fall back to email lookup
-    if (!customerId && user.email) {
+    // If no customer ID in profile, try email lookup (auth email or profile email)
+    const lookupEmail = user.email || profile?.email;
+    if (!customerId && lookupEmail) {
+      console.log('[get-payment-methods] Looking up customer by email:', lookupEmail);
       const customers = await stripe.customers.list({
-        email: user.email,
+        email: lookupEmail,
         limit: 1,
       });
       if (customers.data.length > 0) {
         customerId = customers.data[0].id;
+        console.log('[get-payment-methods] Found customer by email:', customerId);
         // Update profile with the found customer ID for future consistency
         await supabaseClient
           .from('profiles')
@@ -76,7 +72,9 @@ serve(async (req) => {
       }
     }
 
+    // If still no customer ID and no email anywhere, return empty
     if (!customerId) {
+      console.log('[get-payment-methods] No customer found, returning empty');
       return new Response(
         JSON.stringify({ paymentMethods: [] }),
         {
@@ -85,6 +83,8 @@ serve(async (req) => {
         }
       );
     }
+
+    console.log('[get-payment-methods] Using customer:', customerId);
 
     // Get all payment methods for the customer
     const paymentMethods = await stripe.paymentMethods.list({
