@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { format } from 'date-fns';
 import { CalendarIcon, Clock, Search } from 'lucide-react';
-import { Star, MapPin, Loader2, Plus, Activity, Zap, AlertCircle } from 'lucide-react';
+import { Star, MapPin, Loader2, Plus, Activity, Zap, AlertCircle, Footprints } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -208,29 +208,32 @@ const Home = () => {
       }
 
       const transformedSpots =
-        data.spots?.map((spot: any) => ({
-          id: spot.id,
-          title: spot.title,
-          category: spot.category,
-          address: spot.address,
-          hourlyRate: parseFloat(spot.hourly_rate),
-          rating: spot.spot_rating || 0,
-          reviews: spot.spot_review_count || 0,
-          lat: parseFloat(spot.latitude),
-          lng: parseFloat(spot.longitude),
-          imageUrl:
-            spot.spot_photos?.find((photo: any) => photo.is_primary)?.url ||
-            spot.spot_photos?.[0]?.url,
-          distance: spot.distance
-            ? `${(spot.distance / 1000).toFixed(1)} km`
-            : undefined,
-          amenities: [
-            ...(spot.has_ev_charging ? ['EV Charging'] : []),
-            ...(spot.is_covered ? ['Covered'] : []),
-            ...(spot.is_secure ? ['Secure'] : []),
-          ],
-          hostId: spot.host_id,
-        })) || [];
+        data.spots?.map((spot: any) => {
+          const distanceMiles = spot.distance ? spot.distance / 1609.34 : null;
+          const walkTime = distanceMiles ? Math.round(distanceMiles * 20) : null; // ~3mph walking speed
+          return {
+            id: spot.id,
+            title: spot.title,
+            category: spot.category,
+            address: spot.address,
+            hourlyRate: parseFloat(spot.hourly_rate),
+            rating: spot.spot_rating || 0,
+            reviews: spot.spot_review_count || 0,
+            lat: parseFloat(spot.latitude),
+            lng: parseFloat(spot.longitude),
+            imageUrl:
+              spot.spot_photos?.find((photo: any) => photo.is_primary)?.url ||
+              spot.spot_photos?.[0]?.url,
+            distanceMiles,
+            walkTime,
+            amenities: [
+              ...(spot.has_ev_charging ? ['EV Charging'] : []),
+              ...(spot.is_covered ? ['Covered'] : []),
+              ...(spot.is_secure ? ['Secure'] : []),
+            ],
+            hostId: spot.host_id,
+          };
+        }) || [];
 
       setParkingSpots(transformedSpots);
     } catch (err) {
@@ -284,14 +287,26 @@ const Home = () => {
             </div>
           </div>
 
-          <div className="flex items-start gap-1 text-sm text-muted-foreground">
+          <div className="flex items-start gap-1 text-xs text-muted-foreground">
             <MapPin className="h-3 w-3 flex-shrink-0 mt-0.5" />
-            <span className="leading-tight">{spot.address}</span>
+            <span className="leading-tight line-clamp-1">{spot.address}</span>
           </div>
 
-          {spot.distance && (
-            <p className="text-sm text-muted-foreground">{spot.distance} away</p>
+          {spot.distanceMiles && (
+            <div className="flex items-center gap-3 text-sm">
+              <div className="flex items-center gap-1">
+                <MapPin className="h-3.5 w-3.5 text-primary" />
+                <span className="font-semibold text-foreground">{spot.distanceMiles.toFixed(1)} mi</span>
+              </div>
+              {spot.walkTime && (
+                <div className="flex items-center gap-1">
+                  <Footprints className="h-3.5 w-3.5 text-primary" />
+                  <span className="font-semibold text-foreground">{spot.walkTime} min walk</span>
+                </div>
+              )}
+            </div>
           )}
+
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1">
