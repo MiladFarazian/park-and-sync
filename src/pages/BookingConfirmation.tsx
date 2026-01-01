@@ -311,73 +311,56 @@ const BookingConfirmationContent = () => {
               </div>
             </div>
 
-            {/* PRIORITY 1: Navigate to Your Spot Card */}
-            <Card className="p-4 border-primary/30 bg-primary/5">
-              <div className="flex items-center gap-2 mb-4">
-                <Navigation className="h-5 w-5 text-primary" />
-                <h3 className="font-bold">Navigate to Your Spot</h3>
-              </div>
-              
-              <div className="space-y-4">
-                {/* Address with copy button */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-2 flex-1">
-                    <MapPin className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-                    <p className="text-base font-medium">{spot.address}</p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="shrink-0 h-8 w-8"
-                    onClick={() => {
-                      navigator.clipboard.writeText(spot.address);
-                      toast({ title: "Address copied", description: "Ready to paste in your navigation app" });
-                    }}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Booking time */}
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  <span>
-                    {format(new Date(booking.start_at), 'MMM d, h:mm a')} - {format(new Date(booking.end_at), 'h:mm a')}
-                  </span>
-                </div>
-
-                {/* Large Get Directions button */}
-                <Button size="lg" className="w-full" onClick={handleDirections}>
-                  <Navigation className="mr-2 h-5 w-5" />
-                  Get Directions
-                </Button>
-              </div>
-            </Card>
-
           </>
         )}
 
-        {/* Spot Details Card */}
-        <Card className="p-4">
+        {/* Parking Spot Card - Combined with navigation for confirmed bookings */}
+        <Card className={`p-4 ${!isPendingApproval ? 'border-primary/30 bg-primary/5' : ''}`}>
           <h3 className="font-bold mb-4">Parking Spot</h3>
+          
+          {/* Spot photo and title */}
           <div className="flex gap-4">
             {primaryPhoto && <img src={primaryPhoto} alt={spot.title} className="w-20 h-20 rounded-lg object-cover" />}
             <div className="flex-1">
               <div className="font-semibold">{spot.title}</div>
+              {/* Address with copy button for confirmed bookings */}
+              {!isPendingApproval && (
+                <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                  <MapPin className="h-3 w-3 flex-shrink-0" />
+                  <span className="flex-1">{spot.address}</span>
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(spot.address);
+                      toast({ title: "Address copied", description: "Ready to paste in your navigation app" });
+                    }}
+                    className="p-1 hover:bg-muted rounded"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+              {/* Address for pending bookings */}
               {isPendingApproval && (
                 <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
                   <MapPin className="h-3 w-3 flex-shrink-0" />
                   <span>{spot.address}</span>
                 </div>
               )}
-              {isPendingApproval && (
-                <div className="flex items-center gap-2 text-sm mt-1">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>{format(new Date(booking.start_at), 'MMM d, h:mm a')} - {format(new Date(booking.end_at), 'h:mm a')}</span>
-                </div>
-              )}
+              {/* Booking time */}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                <Calendar className="h-3 w-3" />
+                <span>{format(new Date(booking.start_at), 'MMM d, h:mm a')} - {format(new Date(booking.end_at), 'h:mm a')}</span>
+              </div>
             </div>
           </div>
+
+          {/* Get Directions button - prominent for confirmed bookings */}
+          {!isPendingApproval && (
+            <Button size="lg" className="w-full mt-4" onClick={handleDirections}>
+              <Navigation className="mr-2 h-5 w-5" />
+              Get Directions
+            </Button>
+          )}
           
           {/* Spot Description */}
           {spot.description && (
