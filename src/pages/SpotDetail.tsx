@@ -1053,7 +1053,9 @@ const SpotDetail = () => {
             <p className="text-lg font-bold">${calculateDriverPrice(spot.hourlyRate).toFixed(2)} / hour</p>
             <div className="flex items-center gap-1">
               <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-              <span className="text-sm font-medium">{spot.rating || 'New'}</span>
+              <span className="text-sm font-medium">
+                {reviews.length > 0 ? `${getAverageRating()} (${reviews.length})` : 'New'}
+              </span>
             </div>
           </div>
           {isOwnSpot ? (
