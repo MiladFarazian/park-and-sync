@@ -36,7 +36,7 @@ serve(async (req) => {
       throw new Error('User not authenticated');
     }
 
-    console.log('[setup-payment-method] Processing for user:', user.id, 'email:', user.email, 'phone:', user.phone);
+    console.log('[setup-payment-method] Processing for user:', user.id, 'auth email:', user.email, 'phone:', user.phone);
 
     const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
       apiVersion: '2025-08-27.basil',
@@ -44,12 +44,20 @@ serve(async (req) => {
 
     let customerId: string | undefined;
 
-    // First check if we have a stripe_customer_id in the profile (most reliable)
+    // Fetch profile to get stripe_customer_id and profile email/name (for phone-auth users)
     const { data: profile } = await supabaseClient
       .from('profiles')
-      .select('stripe_customer_id')
+      .select('stripe_customer_id, email, first_name, last_name')
       .eq('user_id', user.id)
       .single();
+
+    // Use profile email if auth email is not available (phone-auth users)
+    const customerEmail = user.email || profile?.email;
+    const customerName = profile?.first_name 
+      ? `${profile.first_name} ${profile.last_name || ''}`.trim()
+      : (user.email || user.phone);
+
+    console.log('[setup-payment-method] Customer email:', customerEmail, 'name:', customerName);
 
     if (profile?.stripe_customer_id) {
       // Verify the customer still exists in Stripe
@@ -67,9 +75,9 @@ serve(async (req) => {
     }
 
     // Try to find existing customer by email if not found in profile
-    if (!customerId && user.email) {
+    if (!customerId && customerEmail) {
       const customers = await stripe.customers.list({
-        email: user.email,
+        email: customerEmail,
         limit: 1,
       });
       if (customers.data.length > 0) {
@@ -95,11 +103,11 @@ serve(async (req) => {
 
     // Create new customer if none found
     if (!customerId) {
-      console.log('[setup-payment-method] Creating new customer');
+      console.log('[setup-payment-method] Creating new customer with email:', customerEmail, 'name:', customerName);
       const customer = await stripe.customers.create({
-        email: user.email || undefined,
+        email: customerEmail || undefined,
         phone: user.phone || undefined,
-        name: user.email || user.phone || undefined,
+        name: customerName || undefined,
         metadata: {
           supabase_user_id: user.id,
         },
