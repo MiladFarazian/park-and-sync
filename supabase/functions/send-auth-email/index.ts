@@ -3,7 +3,11 @@ import { Resend } from "npm:resend@2.0.0";
 import { Webhook } from "https://esm.sh/standardwebhooks@1.0.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
-const hookSecret = Deno.env.get("SEND_AUTH_EMAIL_HOOK_SECRET");
+
+// Supabase sends hook secrets in format "v1,whsec_<base64>", 
+// but standardwebhooks expects only the base64 part after "whsec_"
+const rawHookSecret = Deno.env.get("SEND_AUTH_EMAIL_HOOK_SECRET");
+const hookSecret = rawHookSecret?.replace(/^v1,whsec_/, "");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -166,6 +170,11 @@ const getEmailTemplate = (
 };
 
 const handler = async (req: Request): Promise<Response> => {
+  // Diagnostic logging
+  console.log(`[send-auth-email] Request: ${req.method} ${req.url}`);
+  console.log(`[send-auth-email] Headers present:`, [...req.headers.keys()].join(', '));
+  console.log(`[send-auth-email] Hook secret configured:`, !!rawHookSecret);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -177,14 +186,38 @@ const handler = async (req: Request): Promise<Response> => {
     const payload = await req.text();
     const headers = Object.fromEntries(req.headers);
     
+    // Check for webhook signature headers
+    const hasWebhookId = !!headers['webhook-id'];
+    const hasWebhookTimestamp = !!headers['webhook-timestamp'];
+    const hasWebhookSignature = !!headers['webhook-signature'];
+    console.log(`[send-auth-email] Webhook headers: id=${hasWebhookId}, timestamp=${hasWebhookTimestamp}, signature=${hasWebhookSignature}`);
+    
     let data: AuthEmailPayload;
     
     // Verify webhook signature if secret is configured
     if (hookSecret) {
-      const wh = new Webhook(hookSecret);
-      data = wh.verify(payload, headers) as AuthEmailPayload;
+      console.log(`[send-auth-email] Verifying webhook signature...`);
+      try {
+        const wh = new Webhook(hookSecret);
+        data = wh.verify(payload, headers) as AuthEmailPayload;
+        console.log(`[send-auth-email] Signature verified successfully`);
+      } catch (verifyError: any) {
+        console.error(`[send-auth-email] Signature verification failed:`, verifyError.message);
+        return new Response(
+          JSON.stringify({
+            error: {
+              http_code: 401,
+              message: `Webhook signature verification failed: ${verifyError.message}`,
+            },
+          }),
+          {
+            status: 401,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          }
+        );
+      }
     } else {
-      // For testing or when hook secret is not configured
+      console.warn(`[send-auth-email] No hook secret configured - skipping signature verification`);
       data = JSON.parse(payload);
     }
 
@@ -203,6 +236,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { subject, html } = getEmailTemplate(email_action_type, firstName, confirmUrl, token);
 
     // Send the branded email via Resend
+    console.log(`[send-auth-email] Sending email via Resend...`);
     const { data: emailResult, error } = await resend.emails.send({
       from: fromEmail,
       to: [user.email],
@@ -212,10 +246,21 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (error) {
       console.error('[send-auth-email] Resend error:', error);
-      throw error;
+      return new Response(
+        JSON.stringify({
+          error: {
+            http_code: 500,
+            message: `Email sending failed: ${error.message}`,
+          },
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
     }
 
-    console.log(`[send-auth-email] Email sent successfully:`, emailResult?.id);
+    console.log(`[send-auth-email] Email sent successfully: ${emailResult?.id}`);
 
     // Return success to Supabase Auth Hook
     return new Response(JSON.stringify({}), {
@@ -223,18 +268,18 @@ const handler = async (req: Request): Promise<Response> => {
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   } catch (error: any) {
-    console.error("[send-auth-email] Error:", error);
+    console.error("[send-auth-email] Unexpected error:", error);
     
     // Return error in the format Supabase expects
     return new Response(
       JSON.stringify({
         error: {
-          http_code: error.code || 500,
-          message: error.message || 'Failed to send email',
+          http_code: 500,
+          message: error.message || 'Unexpected error processing auth email',
         },
       }),
       {
-        status: 401,
+        status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       }
     );
