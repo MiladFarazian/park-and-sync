@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { ExtendParkingDialog } from '@/components/booking/ExtendParkingDialog';
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, AlertTriangle, CheckCircle2, Copy, AlarmClockPlus, Flag, Zap, ChevronLeft, ChevronRight, Car } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, AlertTriangle, CheckCircle2, Copy, AlarmClockPlus, Flag, Zap, ChevronLeft, ChevronRight, Car, CalendarPlus } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -1050,6 +1050,26 @@ const BookingDetailContent = () => {
                 <Button variant="destructive" size="sm" onClick={() => setShowCancelDialog(true)}>
                   <XCircle className="h-4 w-4 mr-2" />
                   Cancel Booking
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Book Again Option (Renter Only) */}
+        {isRenter && !isHost && (
+          <Card className="p-4 bg-primary/5 border-primary/20">
+            <div className="flex items-start gap-3">
+              <CalendarPlus className="h-5 w-5 text-primary mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium mb-1">Want to park here again?</p>
+                <p className="text-xs text-muted-foreground mb-3">Book this spot for another date or time</p>
+                <Button 
+                  size="sm" 
+                  onClick={() => navigate(`/book/${booking.spots.id}`)}
+                >
+                  <CalendarPlus className="h-4 w-4 mr-2" />
+                  Book Again
                 </Button>
               </div>
             </div>
