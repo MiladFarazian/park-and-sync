@@ -797,7 +797,14 @@ const BookingContent = () => {
             <Button
               variant="ghost"
               size="icon"
-            onClick={() => navigate(-1)}
+              onClick={() => {
+                // If there's history, go back; otherwise navigate to spot detail
+                if (window.history.length > 1) {
+                  navigate(-1);
+                } else {
+                  navigate(`/spot/${spotId}`);
+                }
+              }}
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -1381,7 +1388,13 @@ const GuestBookingPage = () => {
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background border-b">
         <div className="flex items-center gap-4 p-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <Button variant="ghost" size="icon" onClick={() => {
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate(`/spot/${spotId}`);
+            }
+          }}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <h1 className="text-lg font-semibold">Guest Checkout</h1>
