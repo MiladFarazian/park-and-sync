@@ -1239,10 +1239,15 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                         </div>
                         
                         {searchCenter && (
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <span>{calculateDistance(searchCenter.lat, searchCenter.lng, spot.lat, spot.lng).toFixed(1)} mi</span>
-                            <Footprints className="h-3 w-3" />
-                            <span>{calculateWalkTime(calculateDistance(searchCenter.lat, searchCenter.lng, spot.lat, spot.lng))} min walk</span>
+                          <div className="flex items-center gap-4 text-base">
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-4 w-4 text-primary" />
+                              <span className="font-semibold text-foreground">{calculateDistance(searchCenter.lat, searchCenter.lng, spot.lat, spot.lng).toFixed(1)} mi</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Footprints className="h-4 w-4 text-primary" />
+                              <span className="font-semibold text-foreground">{calculateWalkTime(calculateDistance(searchCenter.lat, searchCenter.lng, spot.lat, spot.lng))} min walk</span>
+                            </div>
                           </div>
                         )}
                         
