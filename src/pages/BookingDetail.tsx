@@ -271,8 +271,8 @@ const BookingDetailContent = () => {
   };
 
   const handleOverstayAction = async (action: 'charging' | 'towing') => {
-    if (!booking || !gracePeriodEnded) {
-      toast.error('This action can only be taken after grace period ends');
+    if (!booking || !isOverstayed) {
+      toast.error('This action can only be taken when overstay is detected');
       return;
     }
     
@@ -938,7 +938,7 @@ const BookingDetailContent = () => {
                   </p>
                 </div>
 
-                {/* Action Buttons - Progressive System */}
+                {/* Action Buttons - Available when overstay is detected */}
                 {!booking.overstay_action && (
                   <div className="flex gap-2 flex-wrap">
                     {inGracePeriod && (
@@ -954,30 +954,27 @@ const BookingDetailContent = () => {
                       </Button>
                     )}
 
-                    {gracePeriodEnded && (
-                      <>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleOverstayAction('charging')}
-                          disabled={overstayLoading}
-                        >
-                          <DollarSign className="h-4 w-4 mr-2" />
-                          Charge $25/hr
-                        </Button>
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowTowConfirmDialog(true)}
-                          disabled={overstayLoading}
-                          className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                        >
-                          <Car className="h-4 w-4 mr-2" />
-                          Request Tow
-                        </Button>
-                      </>
-                    )}
+                    {/* Tow and Charge options available as soon as overstay is detected */}
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleOverstayAction('charging')}
+                      disabled={overstayLoading}
+                    >
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      Charge $25/hr
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowTowConfirmDialog(true)}
+                      disabled={overstayLoading}
+                      className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    >
+                      <Car className="h-4 w-4 mr-2" />
+                      Request Tow
+                    </Button>
                   </div>
                 )}
                 
