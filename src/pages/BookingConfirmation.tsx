@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Clock, MapPin, Star, MessageCircle, Car, Calendar, XCircle, Navigation, Copy, AlertTriangle, Zap } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, MapPin, Star, MessageCircle, Car, Calendar, XCircle, Navigation, Copy, AlertTriangle, Zap, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -265,7 +265,7 @@ const BookingConfirmationContent = () => {
       </div>
 
       <div className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
-        {/* Status Message */}
+        {/* Pending Approval UI */}
         {isPendingApproval ? (
           <>
             <div className="text-center space-y-4">
@@ -299,18 +299,126 @@ const BookingConfirmationContent = () => {
             </Card>
           </>
         ) : (
-          <div className="text-center space-y-4">
-            <div className="flex justify-center">
-              <div className="rounded-full bg-green-100 dark:bg-green-900/20 p-6">
-                <CheckCircle2 className="h-16 w-16 text-green-600 dark:text-green-500" />
+          <>
+            {/* Compact Success Header for Confirmed Bookings */}
+            <div className="flex items-center justify-center gap-3 py-2">
+              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full">
+                <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
+              </div>
+              <div className="text-center">
+                <h2 className="text-lg font-semibold text-green-700 dark:text-green-400">Booking Confirmed!</h2>
+                <p className="text-sm text-muted-foreground">Confirmation sent to your email</p>
               </div>
             </div>
-            <h2 className="text-2xl font-bold text-green-700 dark:text-green-500">Booking Confirmed!</h2>
-            <p className="text-muted-foreground">
-              Your parking reservation has been confirmed. You'll receive a confirmation email shortly.
-            </p>
-          </div>
+
+            {/* PRIORITY 1: Navigate to Your Spot Card */}
+            <Card className="p-4 border-primary/30 bg-primary/5">
+              <div className="flex items-center gap-2 mb-4">
+                <Navigation className="h-5 w-5 text-primary" />
+                <h3 className="font-bold">Navigate to Your Spot</h3>
+              </div>
+              
+              <div className="space-y-4">
+                {/* Address with copy button */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 flex-1">
+                    <MapPin className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+                    <p className="text-base font-medium">{spot.address}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 h-8 w-8"
+                    onClick={() => {
+                      navigator.clipboard.writeText(spot.address);
+                      toast({ title: "Address copied", description: "Ready to paste in your navigation app" });
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Booking time */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Clock className="h-4 w-4" />
+                  <span>
+                    {format(new Date(booking.start_at), 'MMM d, h:mm a')} - {format(new Date(booking.end_at), 'h:mm a')}
+                  </span>
+                </div>
+
+                {/* Large Get Directions button */}
+                <Button size="lg" className="w-full" onClick={handleDirections}>
+                  <Navigation className="mr-2 h-5 w-5" />
+                  Get Directions
+                </Button>
+              </div>
+            </Card>
+
+            {/* PRIORITY 2: Access Instructions Card */}
+            {spot.access_notes && (
+              <Card className="p-4 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20">
+                <div className="flex items-center gap-2 mb-3">
+                  <Key className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  <h3 className="font-bold text-amber-800 dark:text-amber-300">Access Instructions</h3>
+                </div>
+                <p className="text-base text-amber-900 dark:text-amber-100">{spot.access_notes}</p>
+                
+                {/* EV Charging Instructions */}
+                {booking.will_use_ev_charging && spot?.ev_charging_instructions && (
+                  <div className="mt-4 pt-4 border-t border-amber-200 dark:border-amber-700">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      <span className="font-semibold text-green-800 dark:text-green-300">EV Charging</span>
+                    </div>
+                    <p className="text-sm text-green-700 dark:text-green-400">{spot.ev_charging_instructions}</p>
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {/* EV Charging Only Card (when no access notes but has EV charging) */}
+            {!spot.access_notes && booking.will_use_ev_charging && spot?.ev_charging_instructions && (
+              <Card className="p-4 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
+                <div className="flex items-center gap-2 mb-3">
+                  <Zap className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <h3 className="font-bold text-green-800 dark:text-green-300">EV Charging Instructions</h3>
+                </div>
+                <p className="text-base text-green-700 dark:text-green-400">{spot.ev_charging_instructions}</p>
+              </Card>
+            )}
+          </>
         )}
+
+        {/* Spot Details Card - Simplified for confirmed, full for pending */}
+        <Card className="p-4">
+          <h3 className="font-bold mb-4">Parking Spot</h3>
+          <div className="flex gap-4">
+            {primaryPhoto && <img src={primaryPhoto} alt={spot.title} className="w-20 h-20 rounded-lg object-cover" />}
+            <div className="flex-1">
+              <div className="font-semibold">{spot.title}</div>
+              {isPendingApproval && (
+                <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                  <MapPin className="h-3 w-3 flex-shrink-0" />
+                  <span>{spot.address}</span>
+                </div>
+              )}
+              {isPendingApproval && (
+                <div className="flex items-center gap-2 text-sm mt-1">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span>{format(new Date(booking.start_at), 'MMM d, h:mm a')} - {format(new Date(booking.end_at), 'h:mm a')}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Spot Description */}
+          {spot.description && (
+            <div className="mt-4 pt-4 border-t">
+              <h4 className="text-sm font-semibold mb-2">About This Spot</h4>
+              <p className="text-sm text-muted-foreground">{spot.description}</p>
+            </div>
+          )}
+        </Card>
 
         {/* Booking Summary Card */}
         <Card className="p-6">
@@ -330,69 +438,6 @@ const BookingConfirmationContent = () => {
               <span className="font-bold text-lg">${booking.total_amount.toFixed(2)}</span>
             </div>
           </div>
-        </Card>
-
-        {/* Spot Details Card */}
-        <Card className="p-4">
-          <h3 className="font-bold mb-4">Parking Spot</h3>
-          <div className="flex gap-4">
-            {primaryPhoto && <img src={primaryPhoto} alt={spot.title} className="w-20 h-20 rounded-lg object-cover" />}
-            <div className="flex-1">
-              <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
-                <MapPin className="h-3 w-3 flex-shrink-0" />
-                <span className="flex-1">{spot.address}</span>
-                <button 
-                  onClick={() => {
-                    navigator.clipboard.writeText(spot.address);
-                    toast({ title: "Address copied to clipboard" });
-                  }}
-                  className="p-1 hover:bg-muted rounded"
-                >
-                  <Copy className="h-3 w-3" />
-                </button>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span>{format(new Date(booking.start_at), 'MMM d, h:mm a')} - {format(new Date(booking.end_at), 'h:mm a')}</span>
-              </div>
-            </div>
-          </div>
-          
-          {/* Spot Description */}
-          {spot.description && (
-            <div className="mt-4 pt-4 border-t">
-              <h4 className="text-sm font-semibold mb-2">About This Spot</h4>
-              <p className="text-sm text-muted-foreground">{spot.description}</p>
-            </div>
-          )}
-          
-          {/* Access Information */}
-          {spot.access_notes && (
-            <div className="mt-4 pt-4 border-t">
-              <h4 className="text-sm font-semibold mb-2">Access Instructions</h4>
-              <p className="text-sm text-muted-foreground">{spot.access_notes}</p>
-            </div>
-          )}
-          
-          {/* EV Charging Instructions */}
-          {booking.will_use_ev_charging && spot?.ev_charging_instructions && (
-            <div className="mt-4 pt-4 border-t">
-              <div className="p-3 rounded-lg border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10">
-                <div className="flex items-start gap-3">
-                  <Zap className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="text-sm font-semibold text-green-800 dark:text-green-300">Charging Instructions</h4>
-                    <p className="text-sm text-green-700 dark:text-green-400 mt-1">{spot.ev_charging_instructions}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <Button variant="outline" className="w-full mt-4" onClick={handleDirections}>
-            <Navigation className="h-4 w-4 mr-2" />
-            Get Directions
-          </Button>
         </Card>
 
         {/* Directions Dialog */}
