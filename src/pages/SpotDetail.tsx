@@ -590,9 +590,10 @@ const SpotDetail = () => {
 
       if (error) throw error;
       
-      // Filter to only reviews for this spot
+      // Filter to only reviews for this spot where the driver reviewed the host
+      // (reviewee_id should be the host, not the driver)
       const spotReviews = (data || []).filter(
-        review => review.booking?.spot_id === spotId
+        review => review.booking?.spot_id === spotId && review.reviewee_id === spot?.host_id
       );
       
       setReviews(spotReviews);
