@@ -354,42 +354,10 @@ const BookingConfirmationContent = () => {
               </div>
             </Card>
 
-            {/* PRIORITY 2: Access Instructions Card */}
-            {spot.access_notes && (
-              <Card className="p-4 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20">
-                <div className="flex items-center gap-2 mb-3">
-                  <Key className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                  <h3 className="font-bold text-amber-800 dark:text-amber-300">Access Instructions</h3>
-                </div>
-                <p className="text-base text-amber-900 dark:text-amber-100">{spot.access_notes}</p>
-                
-                {/* EV Charging Instructions */}
-                {booking.will_use_ev_charging && spot?.ev_charging_instructions && (
-                  <div className="mt-4 pt-4 border-t border-amber-200 dark:border-amber-700">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Zap className="h-5 w-5 text-green-600 dark:text-green-400" />
-                      <span className="font-semibold text-green-800 dark:text-green-300">EV Charging</span>
-                    </div>
-                    <p className="text-sm text-green-700 dark:text-green-400">{spot.ev_charging_instructions}</p>
-                  </div>
-                )}
-              </Card>
-            )}
-
-            {/* EV Charging Only Card (when no access notes but has EV charging) */}
-            {!spot.access_notes && booking.will_use_ev_charging && spot?.ev_charging_instructions && (
-              <Card className="p-4 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
-                <div className="flex items-center gap-2 mb-3">
-                  <Zap className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  <h3 className="font-bold text-green-800 dark:text-green-300">EV Charging Instructions</h3>
-                </div>
-                <p className="text-base text-green-700 dark:text-green-400">{spot.ev_charging_instructions}</p>
-              </Card>
-            )}
           </>
         )}
 
-        {/* Spot Details Card - Simplified for confirmed, full for pending */}
+        {/* Spot Details Card */}
         <Card className="p-4">
           <h3 className="font-bold mb-4">Parking Spot</h3>
           <div className="flex gap-4">
@@ -416,6 +384,28 @@ const BookingConfirmationContent = () => {
             <div className="mt-4 pt-4 border-t">
               <h4 className="text-sm font-semibold mb-2">About This Spot</h4>
               <p className="text-sm text-muted-foreground">{spot.description}</p>
+            </div>
+          )}
+
+          {/* Access Instructions - inside Parking Spot card for confirmed bookings */}
+          {!isPendingApproval && spot.access_notes && (
+            <div className="mt-4 pt-4 border-t">
+              <div className="flex items-center gap-2 mb-2">
+                <Key className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300">Access Instructions</h4>
+              </div>
+              <p className="text-sm text-amber-900 dark:text-amber-100">{spot.access_notes}</p>
+            </div>
+          )}
+
+          {/* EV Charging Instructions - inside Parking Spot card for confirmed bookings */}
+          {!isPendingApproval && booking.will_use_ev_charging && spot?.ev_charging_instructions && (
+            <div className="mt-4 pt-4 border-t">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <h4 className="text-sm font-semibold text-green-800 dark:text-green-300">EV Charging Instructions</h4>
+              </div>
+              <p className="text-sm text-green-700 dark:text-green-400">{spot.ev_charging_instructions}</p>
             </div>
           )}
         </Card>
