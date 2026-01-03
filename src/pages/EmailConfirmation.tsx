@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import type { EmailOtpType } from '@supabase/supabase-js';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -77,7 +78,11 @@ const EmailConfirmation = () => {
     sendWelcomeEmail(session.user.id, session.user.email || '', firstName);
     
     // Clean up URL
-    if (window.location.hash || window.location.search.includes('code=')) {
+    if (
+      window.location.hash ||
+      window.location.search.includes('code=') ||
+      window.location.search.includes('token_hash=')
+    ) {
       window.history.replaceState({}, '', window.location.pathname);
     }
     
@@ -100,6 +105,8 @@ const EmailConfirmation = () => {
       const hash = window.location.hash;
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
+      const tokenHash = urlParams.get('token_hash');
+      const otpType = (urlParams.get('type') as EmailOtpType | null) ?? null;
       
       console.log('[EmailConfirmation] Starting verification process');
       
@@ -110,6 +117,27 @@ const EmailConfirmation = () => {
         console.log('[EmailConfirmation] User already verified via existing session');
         await handleVerificationSuccess(existingSession);
         return;
+      }
+
+      // If the email link landed on our app with token_hash/type, verify via verifyOtp
+      if (tokenHash && otpType) {
+        console.log('[EmailConfirmation] Verifying via token_hash');
+        const { data, error } = await supabase.auth.verifyOtp({
+          type: otpType,
+          token_hash: tokenHash,
+        });
+
+        if (error) {
+          console.error('[EmailConfirmation] verifyOtp failed:', error);
+          setStatus('error');
+          setMessage(error.message || 'This verification link has expired or was already used.');
+          return;
+        }
+
+        if (data.session) {
+          await handleVerificationSuccess(data.session);
+          return;
+        }
       }
       
       // Check for error in hash - but treat "token used" as potential success
@@ -132,7 +160,7 @@ const EmailConfirmation = () => {
           
           // Show error with helpful message
           setStatus('error');
-          setMessage('This verification link has expired or was already used.');
+          setMessage(errorMsg || 'This verification link has expired or was already used.');
           return;
         }
         
@@ -161,7 +189,7 @@ const EmailConfirmation = () => {
             }
             
             setStatus('error');
-            setMessage('This verification link has expired or was already used.');
+            setMessage(error.message || 'This verification link has expired or was already used.');
             return;
           }
           
@@ -173,7 +201,6 @@ const EmailConfirmation = () => {
           console.error('[EmailConfirmation] Code exchange error:', err);
         }
       }
-      
       // Check for existing session one more time
       if (existingSession) {
         if (existingSession.user.email_confirmed_at) {
@@ -189,7 +216,7 @@ const EmailConfirmation = () => {
       }
 
       // No verification data found
-      if (!hash && !code) {
+      if (!hash && !code && !tokenHash) {
         setStatus('error');
         setMessage('No verification link detected.');
       }

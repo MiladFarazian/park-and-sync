@@ -179,7 +179,6 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'Parkzy <onboarding@resend.dev>';
 
   try {
@@ -226,12 +225,13 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`[send-auth-email] Processing ${email_action_type} for ${user.email}`);
 
-    // Build the confirmation URL (use URLSearchParams to ensure proper encoding)
+    // Build a confirmation URL that goes to our app (not /auth/v1/verify).
+    // This avoids email-client link scanners accidentally consuming one-time verification links.
     const confirmUrl = (() => {
-      const url = new URL(`${supabaseUrl}/auth/v1/verify`);
-      url.searchParams.set('token', token_hash);
+      const base = redirect_to || email_data.site_url || Deno.env.get('APP_URL') || 'https://parkzy.lovable.app/email-confirmation';
+      const url = new URL(base);
+      url.searchParams.set('token_hash', token_hash);
       url.searchParams.set('type', email_action_type);
-      if (redirect_to) url.searchParams.set('redirect_to', redirect_to);
       return url.toString();
     })();
 
