@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { calculateDriverPrice, calculateBookingTotal } from '@/lib/pricing';
 import RequireAuth from '@/components/auth/RequireAuth';
+import RequireVerifiedAuth from '@/components/auth/RequireVerifiedAuth';
 import GuestBookingForm from '@/components/booking/GuestBookingForm';
 import CompleteProfileStep from '@/components/auth/CompleteProfileStep';
 import { useAuth } from '@/contexts/AuthContext';
@@ -1478,8 +1479,12 @@ const Booking = () => {
     return <GuestBookingPage />;
   }
 
-  // User is logged in, show authenticated booking flow
-  return <BookingContent />;
+  // User is logged in - require email verification for authenticated booking flow
+  return (
+    <RequireVerifiedAuth feature="booking">
+      <BookingContent />
+    </RequireVerifiedAuth>
+  );
 };
 
 export default Booking;

@@ -28,7 +28,7 @@ interface AuthContextType {
   loading: boolean;
   isEmailVerified: boolean;
   signUp: (email: string, password: string, firstName?: string, lastName?: string, phone?: string) => Promise<{ error: any }>;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: any; unverified?: boolean }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: any }>;
   refreshProfile: () => Promise<void>;
@@ -220,8 +220,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error };
   };
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+  const signIn = async (email: string, password: string): Promise<{ error: any; unverified?: boolean }> => {
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -232,9 +232,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: error.message,
         variant: "destructive"
       });
+      return { error };
     }
 
-    return { error };
+    // Check if email is verified - block login if not
+    if (data.user && !data.user.email_confirmed_at) {
+      // Sign out the user immediately
+      await supabase.auth.signOut();
+      
+      toast({
+        title: "Email Not Verified",
+        description: "Please check your email and click the verification link before signing in.",
+        variant: "destructive"
+      });
+      
+      return { error: new Error('Email not verified'), unverified: true };
+    }
+
+    return { error: null };
   };
 
   const signOut = async () => {

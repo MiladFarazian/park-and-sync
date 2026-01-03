@@ -29,6 +29,7 @@ import {
   DrawerTitle,
 } from '@/components/ui/drawer';
 import RequireAuth from '@/components/auth/RequireAuth';
+import RequireVerifiedAuth from '@/components/auth/RequireVerifiedAuth';
 
 // Helper to format display name (First Name + Last Initial)
 const formatDisplayName = (firstName?: string | null, lastName?: string | null): string => {
@@ -857,9 +858,9 @@ const MessagesContent = () => {
 
 const Messages = () => {
   return (
-    <RequireAuth feature="messages">
+    <RequireVerifiedAuth feature="messages">
       <MessagesContent />
-    </RequireAuth>
+    </RequireVerifiedAuth>
   );
 };
 
