@@ -226,8 +226,14 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`[send-auth-email] Processing ${email_action_type} for ${user.email}`);
 
-    // Build the confirmation URL
-    const confirmUrl = `${supabaseUrl}/auth/v1/verify?token=${token_hash}&type=${email_action_type}&redirect_to=${redirect_to}`;
+    // Build the confirmation URL (use URLSearchParams to ensure proper encoding)
+    const confirmUrl = (() => {
+      const url = new URL(`${supabaseUrl}/auth/v1/verify`);
+      url.searchParams.set('token', token_hash);
+      url.searchParams.set('type', email_action_type);
+      if (redirect_to) url.searchParams.set('redirect_to', redirect_to);
+      return url.toString();
+    })();
 
     // Get first name from user metadata
     const firstName = user.user_metadata?.first_name || '';
