@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CheckCircle, XCircle, Loader2, Mail, RefreshCw, ArrowRight } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Mail, RefreshCw, ArrowRight, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import parkzyLogo from '@/assets/parkzy-logo.png';
@@ -43,27 +43,30 @@ const sendWelcomeEmail = async (userId: string, email: string, firstName?: strin
   }
 };
 
+type VerificationStage = 'checking' | 'ready' | 'verifying' | 'success' | 'error' | 'resend';
+
 const EmailConfirmation = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'resend'>('loading');
-  const [message, setMessage] = useState('Verifying your email...');
+  const [stage, setStage] = useState<VerificationStage>('checking');
+  const [errorMessage, setErrorMessage] = useState('');
   const [resendEmail, setResendEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [cooldown, setCooldown] = useState(0);
-  const hasProcessed = useRef(false);
+  const hasChecked = useRef(false);
+  
+  // Store token params for manual verification
+  const [tokenParams, setTokenParams] = useState<{ tokenHash: string; otpType: EmailOtpType } | null>(null);
   
   const isResendMode = searchParams.get('resend') === 'true';
   const prefillEmail = searchParams.get('email') || '';
 
   const handleVerificationSuccess = useCallback(async (session: any) => {
-    if (status === 'success') return; // Prevent duplicate processing
+    if (stage === 'success') return;
     
-    setStatus('success');
-    setMessage('Your email has been verified!');
+    setStage('success');
     
-    // Update email_verified in profile
     try {
       await supabase
         .from('profiles')
@@ -73,7 +76,6 @@ const EmailConfirmation = () => {
       console.error('Failed to update email_verified:', error);
     }
     
-    // Send welcome email
     const firstName = session.user.user_metadata?.first_name;
     sendWelcomeEmail(session.user.id, session.user.email || '', firstName);
     
@@ -86,174 +88,149 @@ const EmailConfirmation = () => {
       window.history.replaceState({}, '', window.location.pathname);
     }
     
-    // Redirect after showing success message
     setTimeout(() => navigate('/'), 2500);
-  }, [navigate, status]);
+  }, [navigate, stage]);
+
+  // Handle the "Confirm Email" button click
+  const handleConfirmClick = async () => {
+    if (!tokenParams) return;
+    
+    setStage('verifying');
+    console.log('[EmailConfirmation] User clicked confirm, calling verifyOtp...');
+    
+    const { data, error } = await supabase.auth.verifyOtp({
+      type: tokenParams.otpType,
+      token_hash: tokenParams.tokenHash,
+    });
+
+    if (error) {
+      console.error('[EmailConfirmation] verifyOtp failed:', error);
+      
+      // Check if user is actually verified despite the error (token consumed by scanner)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.email_confirmed_at) {
+        console.log('[EmailConfirmation] User verified despite error (scanner consumed token)');
+        await handleVerificationSuccess(session);
+        return;
+      }
+      
+      setStage('error');
+      setErrorMessage(error.message || 'Verification failed');
+      return;
+    }
+
+    if (data.session) {
+      await handleVerificationSuccess(data.session);
+    }
+  };
 
   useEffect(() => {
     if (isResendMode) {
-      setStatus('resend');
-      setMessage('Request a new verification email');
+      setStage('resend');
       setResendEmail(prefillEmail);
       return;
     }
 
-    if (hasProcessed.current) return;
-    hasProcessed.current = true;
+    if (hasChecked.current) return;
+    hasChecked.current = true;
 
-    const processVerification = async () => {
-      const hash = window.location.hash;
+    const checkInitialState = async () => {
       const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
       const tokenHash = urlParams.get('token_hash');
-      const otpType = (urlParams.get('type') as EmailOtpType | null) ?? null;
+      const otpType = urlParams.get('type') as EmailOtpType | null;
+      const code = urlParams.get('code');
+      const hash = window.location.hash;
       
-      console.log('[EmailConfirmation] Starting verification process');
+      console.log('[EmailConfirmation] Params check - tokenHash:', !!tokenHash, 'otpType:', !!otpType, 'code:', !!code);
       
-      // FIRST: Check if user is already logged in and verified
+      // Check if user is already verified
       const { data: { session: existingSession } } = await supabase.auth.getSession();
       
       if (existingSession?.user?.email_confirmed_at) {
-        console.log('[EmailConfirmation] User already verified via existing session');
+        console.log('[EmailConfirmation] User already verified');
         await handleVerificationSuccess(existingSession);
         return;
       }
 
-      // If the email link landed on our app with token_hash/type, verify via verifyOtp
+      // If we have token_hash and type, show "Click to Verify" button (don't auto-verify)
       if (tokenHash && otpType) {
-        console.log('[EmailConfirmation] Verifying via token_hash');
-        const { data, error } = await supabase.auth.verifyOtp({
-          type: otpType,
-          token_hash: tokenHash,
-        });
+        console.log('[EmailConfirmation] Token params found, showing confirm button');
+        setTokenParams({ tokenHash, otpType });
+        setStage('ready');
+        return;
+      }
 
+      // Handle PKCE code flow (auto-process as it's a one-time redirect)
+      if (code) {
+        console.log('[EmailConfirmation] Processing PKCE code');
+        setStage('verifying');
+        
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) {
-          console.error('[EmailConfirmation] verifyOtp failed:', error);
-          setStatus('error');
-          setMessage(error.message || 'This verification link has expired or was already used.');
+          const { data: { session: recheckSession } } = await supabase.auth.getSession();
+          if (recheckSession?.user?.email_confirmed_at) {
+            await handleVerificationSuccess(recheckSession);
+            return;
+          }
+          setStage('error');
+          setErrorMessage(error.message || 'Verification failed');
           return;
         }
-
+        
         if (data.session) {
           await handleVerificationSuccess(data.session);
           return;
         }
       }
-      
-      // Check for error in hash - but treat "token used" as potential success
+
+      // Handle hash-based errors or tokens
       if (hash) {
         const hashParams = new URLSearchParams(hash.substring(1));
         const errorCode = hashParams.get('error_code');
         const errorDescription = hashParams.get('error_description');
         
         if (errorCode || errorDescription) {
-          const errorMsg = errorDescription?.replace(/\+/g, ' ') || '';
-          console.log('[EmailConfirmation] Hash error:', errorMsg);
-          
-          // Check if user is actually verified despite the error
           const { data: { session: recheckSession } } = await supabase.auth.getSession();
           if (recheckSession?.user?.email_confirmed_at) {
-            console.log('[EmailConfirmation] User verified despite hash error');
             await handleVerificationSuccess(recheckSession);
             return;
           }
-          
-          // Show error with helpful message
-          setStatus('error');
-          setMessage(errorMsg || 'This verification link has expired or was already used.');
+          setStage('error');
+          setErrorMessage(errorDescription?.replace(/\+/g, ' ') || 'Verification failed');
           return;
         }
         
-        // Handle access_token in hash (implicit flow)
         if (hash.includes('access_token')) {
-          console.log('[EmailConfirmation] Processing access token from hash');
-          // Let the auth state listener handle this
+          setStage('verifying');
           return;
         }
       }
 
-      // Try PKCE flow if we have a code
-      if (code) {
-        console.log('[EmailConfirmation] Processing PKCE code exchange');
-        try {
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) {
-            console.error('[EmailConfirmation] Code exchange failed:', error);
-            
-            // Check again if user is verified (token might have been used already)
-            const { data: { session: recheckSession } } = await supabase.auth.getSession();
-            if (recheckSession?.user?.email_confirmed_at) {
-              console.log('[EmailConfirmation] User verified despite code error');
-              await handleVerificationSuccess(recheckSession);
-              return;
-            }
-            
-            setStatus('error');
-            setMessage(error.message || 'This verification link has expired or was already used.');
-            return;
-          }
-          
-          if (data.session) {
-            await handleVerificationSuccess(data.session);
-            return;
-          }
-        } catch (err) {
-          console.error('[EmailConfirmation] Code exchange error:', err);
-        }
-      }
-      // Check for existing session one more time
+      // Logged in but not verified
       if (existingSession) {
-        if (existingSession.user.email_confirmed_at) {
-          await handleVerificationSuccess(existingSession);
-          return;
-        } else {
-          // Logged in but not verified
-          setStatus('resend');
-          setMessage('Your email is not yet verified');
-          setResendEmail(existingSession.user.email || '');
-          return;
-        }
+        setStage('resend');
+        setResendEmail(existingSession.user.email || '');
+        return;
       }
 
-      // No verification data found
-      if (!hash && !code && !tokenHash) {
-        setStatus('error');
-        setMessage('No verification link detected.');
-      }
+      // No verification data
+      setStage('error');
+      setErrorMessage('No verification link detected.');
     };
 
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('[EmailConfirmation] Auth event:', event);
-      
       if (event === 'SIGNED_IN' && session?.user?.email_confirmed_at) {
         handleVerificationSuccess(session);
       }
     });
 
-    // Process verification
-    processVerification();
-
-    // Timeout fallback - if still loading after 5 seconds, check session one more time
-    const timeoutId = setTimeout(async () => {
-      if (status === 'loading') {
-        console.log('[EmailConfirmation] Timeout reached, checking session');
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user?.email_confirmed_at) {
-          handleVerificationSuccess(session);
-        } else {
-          setStatus('error');
-          setMessage('Verification timed out. Please try again or request a new link.');
-        }
-      }
-    }, 5000);
+    checkInitialState();
 
     return () => {
       subscription.unsubscribe();
-      clearTimeout(timeoutId);
     };
-  }, [navigate, isResendMode, prefillEmail, handleVerificationSuccess, status]);
+  }, [navigate, isResendMode, prefillEmail, handleVerificationSuccess, stage]);
 
   const handleResend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -326,13 +303,48 @@ const EmailConfirmation = () => {
         </div>
 
         <Card className="border-border shadow-xl overflow-hidden">
-          {/* Loading State */}
-          {status === 'loading' && (
+          {/* Checking State */}
+          {stage === 'checking' && (
             <CardContent className="flex flex-col items-center py-12 px-6">
-              <div className="relative">
-                <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Loader2 className="h-10 w-10 text-primary animate-spin" />
-                </div>
+              <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center">
+                <Loader2 className="h-10 w-10 text-primary animate-spin" />
+              </div>
+              <h2 className="mt-6 text-xl font-semibold text-foreground">Loading...</h2>
+              <p className="mt-2 text-center text-muted-foreground">
+                Please wait a moment
+              </p>
+            </CardContent>
+          )}
+
+          {/* Ready State - Click to Verify */}
+          {stage === 'ready' && (
+            <CardContent className="flex flex-col items-center py-12 px-6">
+              <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center">
+                <ShieldCheck className="h-10 w-10 text-primary" />
+              </div>
+              <h2 className="mt-6 text-xl font-semibold text-foreground">Confirm your email</h2>
+              <p className="mt-2 text-center text-muted-foreground">
+                Tap the button below to complete verification
+              </p>
+              <Button 
+                onClick={handleConfirmClick}
+                className="w-full h-12 mt-8"
+                size="lg"
+              >
+                <CheckCircle className="h-5 w-5 mr-2" />
+                Confirm My Email
+              </Button>
+              <p className="mt-4 text-xs text-center text-muted-foreground">
+                This extra step prevents email scanners from using your link
+              </p>
+            </CardContent>
+          )}
+
+          {/* Verifying State */}
+          {stage === 'verifying' && (
+            <CardContent className="flex flex-col items-center py-12 px-6">
+              <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center">
+                <Loader2 className="h-10 w-10 text-primary animate-spin" />
               </div>
               <h2 className="mt-6 text-xl font-semibold text-foreground">Verifying your email...</h2>
               <p className="mt-2 text-center text-muted-foreground">
@@ -342,7 +354,7 @@ const EmailConfirmation = () => {
           )}
           
           {/* Success State */}
-          {status === 'success' && (
+          {stage === 'success' && (
             <CardContent className="flex flex-col items-center py-12 px-6">
               <div className="h-20 w-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center animate-in zoom-in duration-300">
                 <CheckCircle className="h-12 w-12 text-green-600 dark:text-green-400" />
@@ -359,23 +371,22 @@ const EmailConfirmation = () => {
           )}
           
           {/* Error State */}
-          {status === 'error' && (
+          {stage === 'error' && (
             <CardContent className="flex flex-col items-center py-12 px-6">
               <div className="h-20 w-20 rounded-full bg-destructive/10 flex items-center justify-center">
                 <XCircle className="h-12 w-12 text-destructive" />
               </div>
-              <h2 className="mt-6 text-xl font-semibold text-foreground">Link expired</h2>
+              <h2 className="mt-6 text-xl font-semibold text-foreground">Link may have been used</h2>
               <p className="mt-2 text-center text-muted-foreground max-w-xs">
-                {message}
+                Some email apps automatically open links for security scanning, which can use up verification links.
               </p>
-              <p className="mt-1 text-center text-sm text-muted-foreground">
-                Verification links can only be used once.
+              <p className="mt-2 text-center text-xs text-muted-foreground">
+                {errorMessage}
               </p>
               <div className="mt-8 flex flex-col gap-3 w-full">
                 <Button 
                   onClick={() => {
-                    setStatus('resend');
-                    setMessage('Enter your email to receive a new verification link');
+                    setStage('resend');
                   }} 
                   className="w-full h-12"
                 >
@@ -395,7 +406,7 @@ const EmailConfirmation = () => {
           )}
 
           {/* Resend State */}
-          {status === 'resend' && (
+          {stage === 'resend' && (
             <CardContent className="py-8 px-6">
               <div className="text-center mb-6">
                 <div className="h-16 w-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
