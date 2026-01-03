@@ -13,6 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Elements, CardElement, PaymentRequestButtonElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe, PaymentRequest } from "@stripe/stripe-js";
 import RequireAuth from "@/components/auth/RequireAuth";
+import RequireVerifiedAuth from "@/components/auth/RequireVerifiedAuth";
 import { isProfileComplete } from "@/lib/profileUtils";
 
 let stripePromise: Promise<any> | null = null;
@@ -615,9 +616,9 @@ const PaymentMethodsContent = () => {
 
 const PaymentMethods = () => {
   return (
-    <RequireAuth feature="payments">
+    <RequireVerifiedAuth feature="payments">
       <PaymentMethodsContent />
-    </RequireAuth>
+    </RequireVerifiedAuth>
   );
 };
 

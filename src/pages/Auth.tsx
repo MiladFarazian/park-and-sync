@@ -64,7 +64,7 @@ const isValidPhoneNumber = (phone: string): boolean => {
 const Auth = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resendVerificationEmail } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [authMethod, setAuthMethod] = useState<AuthMethod>('phone');
@@ -82,6 +82,8 @@ const Auth = () => {
   const [showSignInPassword, setShowSignInPassword] = useState(false);
   const [showSignUpPassword, setShowSignUpPassword] = useState(false);
   const [verifiedPhone, setVerifiedPhone] = useState('');
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [resendEmail, setResendEmail] = useState('');
   
   // Check for guest conversion params
   const isGuestConversion = searchParams.get('convert') === 'true';
@@ -276,6 +278,51 @@ const Auth = () => {
     setLoading(false);
   };
 
+  const handleResendVerificationEmail = async () => {
+    if (!resendEmail) return;
+    setLoading(true);
+    
+    // Temporarily sign in to get user context for resend, then sign out
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: resendEmail,
+      password: signInData.password,
+    });
+    
+    if (!signInError) {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: resendEmail,
+        options: {
+          emailRedirectTo: `${window.location.origin}/email-confirmation`
+        }
+      });
+      
+      await supabase.auth.signOut();
+      
+      if (error) {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Verification email sent",
+          description: `Check ${resendEmail} for the verification link`
+        });
+        setShowResendVerification(false);
+      }
+    } else {
+      toast({
+        title: "Error",
+        description: "Could not resend verification email. Please try again.",
+        variant: "destructive"
+      });
+    }
+    
+    setLoading(false);
+  };
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -289,8 +336,13 @@ const Auth = () => {
       sessionStorage.setItem('parkzy_session_only', 'true');
     }
     
-    const { error } = await signIn(signInData.email, signInData.password);
-    if (!error) {
+    const result = await signIn(signInData.email, signInData.password);
+    
+    if (result.unverified) {
+      // Show option to resend verification email
+      setResendEmail(signInData.email);
+      setShowResendVerification(true);
+    } else if (!result.error) {
       navigate('/');
     }
     setLoading(false);
@@ -1193,6 +1245,55 @@ const Auth = () => {
               </p>
             </div>
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Not Verified Dialog */}
+      <Dialog open={showResendVerification} onOpenChange={setShowResendVerification}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-amber-500" />
+              Email Not Verified
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-muted-foreground">
+              Your email address hasn't been verified yet. Please check your inbox for the verification link.
+            </p>
+            <div className="bg-muted/50 rounded-lg p-4">
+              <p className="text-sm font-medium">{resendEmail}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Check your spam folder if you don't see the email
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowResendVerification(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleResendVerificationEmail}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="h-4 w-4 mr-2" />
+                    Resend Email
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
