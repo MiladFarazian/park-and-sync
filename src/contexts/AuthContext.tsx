@@ -112,6 +112,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const profileData = await fetchProfile(session.user.id);
             setProfile(profileData);
             setLoading(false);
+
+            // Link guest bookings on SIGNED_IN event (handles post-email-verification)
+            if (event === 'SIGNED_IN') {
+              try {
+                const { data: linkData, error: linkError } = await supabase.functions.invoke('link-guest-bookings', {
+                  body: { 
+                    user_id: session.user.id, 
+                    email: session.user.email,
+                    phone: session.user.phone,
+                    first_name: session.user.user_metadata?.first_name || session.user.user_metadata?.firstName
+                  }
+                });
+                
+                if (linkError) {
+                  console.error('[Auth] Error linking guest bookings on sign in:', linkError);
+                } else if (linkData?.linked_count > 0) {
+                  console.log(`[Auth] Linked ${linkData.linked_count} guest bookings on sign in`);
+                }
+              } catch (err) {
+                console.error('[Auth] Failed to link guest bookings on sign in:', err);
+              }
+            }
           }, 0);
         } else {
           setProfile(null);
@@ -191,8 +213,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: "Please check your email to verify your account.",
       });
 
-      // Link any guest bookings to the new user
-      if (data.user) {
+      // Only try to link guest bookings if we have an active session (email confirmation disabled)
+      // Otherwise, linking will happen automatically on SIGNED_IN event after email verification
+      if (data.user && data.session) {
         try {
           const { data: linkData, error: linkError } = await supabase.functions.invoke('link-guest-bookings', {
             body: { 
