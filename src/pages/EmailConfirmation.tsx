@@ -67,16 +67,30 @@ const EmailConfirmation = () => {
     
     setStage('success');
     
+    // Extract names from user metadata (support both naming conventions)
+    const meta = session.user.user_metadata || {};
+    const firstName = meta.first_name || meta.firstName || null;
+    const lastName = meta.last_name || meta.lastName || null;
+    
     try {
+      // Upsert profile to ensure it exists and has correct data
       await supabase
         .from('profiles')
-        .update({ email_verified: true })
-        .eq('user_id', session.user.id);
+        .upsert({
+          user_id: session.user.id,
+          email: session.user.email,
+          email_verified: true,
+          first_name: firstName,
+          last_name: lastName,
+        }, {
+          onConflict: 'user_id',
+          ignoreDuplicates: false
+        });
+      console.log('[EmailConfirmation] Profile upserted successfully');
     } catch (error) {
-      console.error('Failed to update email_verified:', error);
+      console.error('Failed to upsert profile:', error);
     }
     
-    const firstName = session.user.user_metadata?.first_name;
     sendWelcomeEmail(session.user.id, session.user.email || '', firstName);
     
     // Clean up URL

@@ -282,42 +282,36 @@ const Auth = () => {
     if (!resendEmail) return;
     setLoading(true);
     
-    // Temporarily sign in to get user context for resend, then sign out
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    // Directly call resend - no sign-in needed
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
       email: resendEmail,
-      password: signInData.password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/email-confirmation`
+      }
     });
     
-    if (!signInError) {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: resendEmail,
-        options: {
-          emailRedirectTo: `${window.location.origin}/email-confirmation`
-        }
-      });
-      
-      await supabase.auth.signOut();
-      
-      if (error) {
+    if (error) {
+      // Handle rate limiting specifically
+      if (error.message.toLowerCase().includes('rate') || error.message.toLowerCase().includes('seconds')) {
+        toast({
+          title: "Please wait",
+          description: "Too many requests. Please wait 60 seconds before trying again.",
+          variant: "destructive"
+        });
+      } else {
         toast({
           title: "Error",
           description: error.message,
           variant: "destructive"
         });
-      } else {
-        toast({
-          title: "Verification email sent",
-          description: `Check ${resendEmail} for the verification link`
-        });
-        setShowResendVerification(false);
       }
     } else {
       toast({
-        title: "Error",
-        description: "Could not resend verification email. Please try again.",
-        variant: "destructive"
+        title: "Verification email sent",
+        description: `Check ${resendEmail} for the verification link`
       });
+      setShowResendVerification(false);
     }
     
     setLoading(false);
