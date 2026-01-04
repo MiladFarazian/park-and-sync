@@ -98,30 +98,69 @@ const EmailConfirmation = () => {
     setStage('verifying');
     console.log('[EmailConfirmation] User clicked confirm, calling verifyOtp...');
     
-    const { data, error } = await supabase.auth.verifyOtp({
-      type: tokenParams.otpType,
-      token_hash: tokenParams.tokenHash,
-    });
+    // Try verification up to 2 times
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const { data, error } = await supabase.auth.verifyOtp({
+        type: tokenParams.otpType,
+        token_hash: tokenParams.tokenHash,
+      });
 
-    if (error) {
-      console.error('[EmailConfirmation] verifyOtp failed:', error);
+      if (!error && data.session) {
+        console.log('[EmailConfirmation] verifyOtp succeeded on attempt', attempt);
+        await handleVerificationSuccess(data.session);
+        return;
+      }
+
+      console.log('[EmailConfirmation] verifyOtp attempt', attempt, 'failed:', error?.message);
       
-      // Check if user is actually verified despite the error (token consumed by scanner)
+      // After each failure, check if user is actually verified (scanner consumed token)
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.email_confirmed_at) {
         console.log('[EmailConfirmation] User verified despite error (scanner consumed token)');
         await handleVerificationSuccess(session);
         return;
       }
-      
-      setStage('error');
-      setErrorMessage(error.message || 'Verification failed');
+
+      // Also try refreshing the session
+      const { data: refreshData } = await supabase.auth.refreshSession();
+      if (refreshData.session?.user?.email_confirmed_at) {
+        console.log('[EmailConfirmation] User verified after session refresh');
+        await handleVerificationSuccess(refreshData.session);
+        return;
+      }
+
+      if (attempt < 2) {
+        // Wait a moment before retry
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+    
+    // All attempts failed - show error with retry option
+    setStage('error');
+    setErrorMessage('The link may have expired. Please request a new one.');
+  };
+
+  // Retry button handler for error state
+  const handleRetry = async () => {
+    setStage('verifying');
+    
+    // Check if already verified
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user?.email_confirmed_at) {
+      await handleVerificationSuccess(session);
       return;
     }
-
-    if (data.session) {
-      await handleVerificationSuccess(data.session);
+    
+    // Try refresh
+    const { data: refreshData } = await supabase.auth.refreshSession();
+    if (refreshData.session?.user?.email_confirmed_at) {
+      await handleVerificationSuccess(refreshData.session);
+      return;
     }
+    
+    // Still not verified
+    setStage('error');
+    setErrorMessage('Email not yet verified. Please request a new link.');
   };
 
   useEffect(() => {
@@ -385,6 +424,14 @@ const EmailConfirmation = () => {
               </p>
               <div className="mt-8 flex flex-col gap-3 w-full">
                 <Button 
+                  onClick={handleRetry}
+                  variant="outline"
+                  className="w-full h-12"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Check Again
+                </Button>
+                <Button 
                   onClick={() => {
                     setStage('resend');
                   }} 
@@ -395,11 +442,10 @@ const EmailConfirmation = () => {
                 </Button>
                 <Button 
                   onClick={() => navigate('/auth')} 
-                  variant="outline" 
-                  className="w-full h-12"
+                  variant="ghost" 
+                  className="w-full h-12 text-muted-foreground"
                 >
-                  Sign In
-                  <ArrowRight className="h-4 w-4 ml-2" />
+                  Back to Sign In
                 </Button>
               </div>
             </CardContent>
