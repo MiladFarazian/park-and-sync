@@ -144,23 +144,54 @@ serve(async (req) => {
   }
 
   try {
-    // Validate internal secret - this function should only be called internally
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    // Verify JWT and get authenticated user
     const authHeader = req.headers.get('Authorization');
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    console.log('[link-guest-bookings] Request received, auth header present:', !!authHeader);
     
-    if (!authHeader || !authHeader.includes(serviceRoleKey || '')) {
-      console.warn('[link-guest-bookings] Unauthorized access attempt');
+    if (!authHeader) {
+      console.warn('[link-guest-bookings] Missing Authorization header');
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ error: 'Missing session token - user must be signed in to link guest bookings' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create client with user's JWT to verify identity
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser();
+
+    if (authError || !authUser) {
+      console.warn('[link-guest-bookings] Failed to get authenticated user:', authError?.message);
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired session' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('[link-guest-bookings] Authenticated user:', authUser.id);
+
+    // Parse request body
+    const { user_id, email, phone, first_name }: LinkRequest = await req.json();
+    console.log('[link-guest-bookings] Requested user_id:', user_id);
+
+    // CRITICAL: Verify the user_id matches the authenticated user
+    if (user_id !== authUser.id) {
+      console.warn(`[link-guest-bookings] User ID mismatch: requested ${user_id}, authenticated ${authUser.id}`);
+      return new Response(
+        JSON.stringify({ error: 'Cannot link bookings for another user' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    // Use service role client for privileged database operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    const { user_id, email, phone, first_name }: LinkRequest = await req.json();
 
     if (!user_id) {
       return new Response(
