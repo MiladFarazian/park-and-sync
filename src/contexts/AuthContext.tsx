@@ -250,6 +250,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     if (error) {
+      // Check if this is an email not confirmed error from Supabase
+      const isUnverifiedError = 
+        error.message?.toLowerCase().includes('email not confirmed') ||
+        (error as any).code === 'email_not_confirmed';
+      
+      if (isUnverifiedError) {
+        toast({
+          title: "Email Not Verified",
+          description: "Please check your email and click the verification link before signing in.",
+          variant: "destructive"
+        });
+        return { error, unverified: true };
+      }
+      
       toast({
         title: "Sign In Failed",
         description: error.message,
@@ -258,9 +272,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error };
     }
 
-    // Check if email is verified - block login if not
+    // Additional check if email is verified (fallback for edge cases)
     if (data.user && !data.user.email_confirmed_at) {
-      // Sign out the user immediately
       await supabase.auth.signOut();
       
       toast({
