@@ -36,9 +36,12 @@ const getEmailTemplate = (
   type: string,
   firstName: string,
   confirmUrl: string,
-  token: string
+  _token: string // kept for API compatibility but not used in template
 ): { subject: string; html: string } => {
   const appUrl = Deno.env.get('APP_URL') || 'https://parkzy.lovable.app';
+  // Parkzy purple from design system: hsl(250, 100%, 65%) = #6B4EFF
+  const parkzyPurple = '#6B4EFF';
+  const parkzyPurpleDark = '#5B3EEF';
   
   const templates: Record<string, { subject: string; heading: string; description: string; buttonText: string }> = {
     signup: {
@@ -85,11 +88,8 @@ const getEmailTemplate = (
           <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
             <!-- Header with Logo -->
             <tr>
-              <td style="background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); padding: 40px 30px; text-align: center;">
-                <div style="margin-bottom: 16px;">
-                  <span style="font-size: 40px;">🚗</span>
-                </div>
-                <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Parkzy</h1>
+              <td style="background: linear-gradient(135deg, ${parkzyPurple} 0%, ${parkzyPurpleDark} 100%); padding: 40px 30px; text-align: center;">
+                <img src="https://mqbupmusmciijsjmzbcu.supabase.co/storage/v1/object/public/assets/parkzy-logo-white.png" alt="Parkzy" style="height: 48px; width: auto;" />
               </td>
             </tr>
             
@@ -110,7 +110,7 @@ const getEmailTemplate = (
                 <table width="100%" cellpadding="0" cellspacing="0" style="margin: 32px 0;">
                   <tr>
                     <td align="center">
-                      <a href="${confirmUrl}" style="display: inline-block; background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 10px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 14px rgba(139, 92, 246, 0.4);">${template.buttonText}</a>
+                      <a href="${confirmUrl}" style="display: inline-block; background: linear-gradient(135deg, ${parkzyPurple} 0%, ${parkzyPurpleDark} 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 10px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 14px rgba(107, 78, 255, 0.4);">${template.buttonText}</a>
                     </td>
                   </tr>
                 </table>
@@ -120,20 +120,10 @@ const getEmailTemplate = (
                   <p style="margin: 0 0 12px 0; color: #6b7280; font-size: 14px; text-align: center;">
                     Or copy and paste this link into your browser:
                   </p>
-                  <p style="margin: 0; color: #8B5CF6; font-size: 12px; word-break: break-all; text-align: center;">
+                  <p style="margin: 0; color: ${parkzyPurple}; font-size: 12px; word-break: break-all; text-align: center;">
                     ${confirmUrl}
                   </p>
                 </div>
-                
-                ${type === 'signup' || type === 'magiclink' ? `
-                <!-- Verification Code Box -->
-                <div style="margin: 24px 0; padding: 20px; background-color: #f3e8ff; border-radius: 12px; text-align: center;">
-                  <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">
-                    Your verification code:
-                  </p>
-                  <code style="display: inline-block; padding: 12px 24px; background-color: #ffffff; border-radius: 8px; border: 1px solid #e5e7eb; color: #1f2937; font-size: 18px; font-weight: 600; letter-spacing: 2px;">${token}</code>
-                </div>
-                ` : ''}
                 
                 <!-- Security Note -->
                 <p style="margin: 24px 0 0 0; color: #9ca3af; font-size: 13px; line-height: 1.5; text-align: center;">
@@ -146,15 +136,15 @@ const getEmailTemplate = (
             <tr>
               <td style="background-color: #f8f9fa; padding: 24px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
                 <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">
-                  Happy Parking! 🚗<br><strong style="color: #8B5CF6;">The Parkzy Team</strong>
+                  Happy Parking! 🚗<br><strong style="color: ${parkzyPurple};">The Parkzy Team</strong>
                 </p>
                 <p style="margin: 12px 0 0 0; color: #9ca3af; font-size: 12px;">
                   © 2025 Parkzy. All rights reserved.
                 </p>
                 <p style="margin: 8px 0 0 0;">
-                  <a href="${appUrl}" style="color: #8B5CF6; text-decoration: none; font-size: 12px;">Visit Parkzy</a>
+                  <a href="${appUrl}" style="color: ${parkzyPurple}; text-decoration: none; font-size: 12px;">Visit Parkzy</a>
                   <span style="color: #d1d5db; margin: 0 8px;">|</span>
-                  <a href="mailto:support@parkzy.app" style="color: #8B5CF6; text-decoration: none; font-size: 12px;">Contact Support</a>
+                  <a href="mailto:support@useparkzy.com" style="color: ${parkzyPurple}; text-decoration: none; font-size: 12px;">Contact Support</a>
                 </p>
               </td>
             </tr>
