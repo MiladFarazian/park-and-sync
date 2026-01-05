@@ -1015,6 +1015,15 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           onSpotSelect?.(spot.id);
           // Scroll carousel to this spot
           scrollToSpot(spot.id);
+          
+          // Center map on the clicked spot
+          if (map.current) {
+            map.current.flyTo({
+              center: [spot.lng, spot.lat],
+              zoom: Math.max(map.current.getZoom(), 15),
+              duration: 500
+            });
+          }
         } else {
           console.error('[MapView] Spot not found in spots array for ID:', f.properties.id);
         }
