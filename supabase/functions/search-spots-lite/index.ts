@@ -6,9 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Rate limit configuration (more lenient for lite endpoint)
-const RATE_LIMIT_PER_MINUTE = 20;
-const RATE_LIMIT_PER_HOUR = 200;
+// Rate limit configuration (generous for map interactions)
+const RATE_LIMIT_PER_MINUTE = 60;
+const RATE_LIMIT_PER_HOUR = 500;
 
 // Check rate limit using database
 async function checkRateLimit(
