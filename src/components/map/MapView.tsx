@@ -1266,26 +1266,28 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       {/* Swipeable Spot Cards Carousel - Hidden on desktop split view */}
       {sortedSpots.length > 0 && !hideCarousel && (
         <div className="absolute bottom-[calc(5rem+env(safe-area-inset-bottom)+1rem)] md:bottom-4 left-0 right-0 z-10">
-          {/* Navigation arrows and counter */}
-          <div className="flex items-center justify-between px-4 mb-2">
-            <button
-              onClick={scrollPrev}
-              disabled={currentSlideIndex === 0}
-              className="p-2 rounded-full bg-background/90 backdrop-blur-sm shadow-md disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            <span className="text-sm font-medium bg-background/90 backdrop-blur-sm px-3 py-1 rounded-full shadow-md">
-              {currentSlideIndex + 1} / {sortedSpots.length}
-            </span>
-            <button
-              onClick={scrollNext}
-              disabled={currentSlideIndex === sortedSpots.length - 1}
-              className="p-2 rounded-full bg-background/90 backdrop-blur-sm shadow-md disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </button>
-          </div>
+          {/* Navigation arrows and counter - only show if more than 1 spot */}
+          {sortedSpots.length > 1 && (
+            <div className="flex items-center justify-between px-4 mb-2">
+              <button
+                onClick={scrollPrev}
+                disabled={currentSlideIndex === 0}
+                className="p-2 rounded-full bg-background/90 backdrop-blur-sm shadow-md disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <span className="text-sm font-medium bg-background/90 backdrop-blur-sm px-3 py-1 rounded-full shadow-md">
+                {currentSlideIndex + 1} / {sortedSpots.length}
+              </span>
+              <button
+                onClick={scrollNext}
+                disabled={currentSlideIndex === sortedSpots.length - 1}
+                className="p-2 rounded-full bg-background/90 backdrop-blur-sm shadow-md disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+          )}
 
           {/* Carousel */}
           <div ref={emblaRef} className="overflow-hidden px-4">
