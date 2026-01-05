@@ -651,7 +651,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       promoteId: 'id' // Use the 'id' property for feature-state
     } as any);
 
-    const pinImageId = 'pin-blue';
+    const pinImageIdWhite = 'pin-white';
+    const pinImageIdPurple = 'pin-purple';
 
     const addLayers = () => {
       // Add cluster pulse/glow layer (behind the main cluster circle)
@@ -887,15 +888,19 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       };
 
       // Add unclustered point layer (individual pins)
-      // Note: icon-size is a layout property so can't use feature-state
-      // We'll use paint property icon-opacity for visual feedback instead
+      // Use different pin images based on selection state
       (map.current as any).addLayer({
         id: circleId,
         type: 'symbol',
         source: sourceId,
         filter: ['!', ['has', 'point_count']],
         layout: {
-          'icon-image': pinImageId,
+          'icon-image': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            pinImageIdPurple,
+            pinImageIdWhite
+          ],
           'icon-size': 1.5,
           'icon-allow-overlap': true,
           'icon-anchor': 'bottom'
@@ -923,7 +928,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
             'case',
             ['boolean', ['feature-state', 'selected'], false],
             'hsl(250, 60%, 45%)', // Darker purple text for selected
-            'hsl(250, 100%, 65%)'
+            '#666666' // Dark gray text for unselected (on white pin)
           ],
           'text-halo-color': '#ffffff',
           'text-halo-width': 0.5,
@@ -1041,32 +1046,78 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       console.log('Rendered', features.length, 'spot pins via layers');
     };
 
-    // Ensure the pin image is available, then add layers
-    if (!(map.current as any).hasImage?.(pinImageId)) {
-      const svg = `
-        <svg width="50" height="60" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
-              <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.35)" />
-            </filter>
-          </defs>
-          <g filter="url(#shadow)">
-            <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
-                  fill="hsl(250, 100%, 65%)" stroke="white" stroke-width="2.5"/>
-            <circle cx="25" cy="20" r="13" fill="white" opacity="0.95"/>
-          </g>
-        </svg>`;
-      const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-      const img = new Image(50, 60);
-      img.onload = () => {
-        try {
-          (map.current as any).addImage(pinImageId, img, { pixelRatio: 2 });
-        } catch (e) {
-          console.warn('addImage error (may already exist):', e);
+    // Ensure both pin images are available, then add layers
+    const hasWhite = (map.current as any).hasImage?.(pinImageIdWhite);
+    const hasPurple = (map.current as any).hasImage?.(pinImageIdPurple);
+    
+    if (!hasWhite || !hasPurple) {
+      let loadedCount = 0;
+      const checkAndAddLayers = () => {
+        loadedCount++;
+        if (loadedCount >= 2) {
+          addLayers();
         }
-        addLayers();
       };
-      img.src = url;
+      
+      // White pin (default for unselected)
+      if (!hasWhite) {
+        const whiteSvg = `
+          <svg width="50" height="60" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="shadow-white" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.35)" />
+              </filter>
+            </defs>
+            <g filter="url(#shadow-white)">
+              <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
+                    fill="white" stroke="#e0e0e0" stroke-width="2"/>
+              <circle cx="25" cy="20" r="13" fill="#f5f5f5" opacity="0.95"/>
+            </g>
+          </svg>`;
+        const whiteUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(whiteSvg);
+        const whiteImg = new Image(50, 60);
+        whiteImg.onload = () => {
+          try {
+            (map.current as any).addImage(pinImageIdWhite, whiteImg, { pixelRatio: 2 });
+          } catch (e) {
+            console.warn('addImage error (white pin may already exist):', e);
+          }
+          checkAndAddLayers();
+        };
+        whiteImg.src = whiteUrl;
+      } else {
+        checkAndAddLayers();
+      }
+      
+      // Purple pin (for selected)
+      if (!hasPurple) {
+        const purpleSvg = `
+          <svg width="50" height="60" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="shadow-purple" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.35)" />
+              </filter>
+            </defs>
+            <g filter="url(#shadow-purple)">
+              <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
+                    fill="hsl(250, 100%, 65%)" stroke="white" stroke-width="2.5"/>
+              <circle cx="25" cy="20" r="13" fill="white" opacity="0.95"/>
+            </g>
+          </svg>`;
+        const purpleUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(purpleSvg);
+        const purpleImg = new Image(50, 60);
+        purpleImg.onload = () => {
+          try {
+            (map.current as any).addImage(pinImageIdPurple, purpleImg, { pixelRatio: 2 });
+          } catch (e) {
+            console.warn('addImage error (purple pin may already exist):', e);
+          }
+          checkAndAddLayers();
+        };
+        purpleImg.src = purpleUrl;
+      } else {
+        checkAndAddLayers();
+      }
     } else {
       addLayers();
     }
