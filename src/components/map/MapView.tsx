@@ -887,26 +887,49 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         animateSelectedPulse();
       };
 
-      // Add unclustered point layer (individual pins)
-      // Use different pin images based on selection state
+      // Add unclustered point layer - WHITE pins (default/unselected)
+      // Show at full opacity when not selected, hide when selected
       (map.current as any).addLayer({
         id: circleId,
         type: 'symbol',
         source: sourceId,
         filter: ['!', ['has', 'point_count']],
         layout: {
-          'icon-image': [
-            'case',
-            ['boolean', ['feature-state', 'selected'], false],
-            pinImageIdPurple,
-            pinImageIdWhite
-          ],
+          'icon-image': pinImageIdWhite,
           'icon-size': 1.5,
           'icon-allow-overlap': true,
           'icon-anchor': 'bottom'
         },
         paint: {
-          'icon-opacity': 0.95
+          'icon-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            0, // Hide white pin when selected
+            0.95
+          ]
+        }
+      } as any);
+
+      // Add unclustered point layer - PURPLE pins (selected only)
+      // Show only when selected
+      (map.current as any).addLayer({
+        id: 'spots-circles-selected',
+        type: 'symbol',
+        source: sourceId,
+        filter: ['!', ['has', 'point_count']],
+        layout: {
+          'icon-image': pinImageIdPurple,
+          'icon-size': 1.5,
+          'icon-allow-overlap': true,
+          'icon-anchor': 'bottom'
+        },
+        paint: {
+          'icon-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            0.95, // Show purple pin when selected
+            0
+          ]
         }
       } as any);
 
@@ -997,6 +1020,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         }
       };
       (map.current as any).on('click', circleId, onClick);
+      (map.current as any).on('click', 'spots-circles-selected', onClick);
       (map.current as any).on('click', labelId, onClick);
 
       // Change cursor on hover for clusters
@@ -1007,7 +1031,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         (map.current as any).getCanvas().style.cursor = '';
       });
 
-      // Change cursor and notify on hover for spots
+      // Change cursor and notify on hover for spots (white pins)
       (map.current as any).on('mouseenter', circleId, (e: any) => {
         (map.current as any).getCanvas().style.cursor = 'pointer';
         const f = e.features?.[0];
@@ -1016,6 +1040,19 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         }
       });
       (map.current as any).on('mouseleave', circleId, () => {
+        (map.current as any).getCanvas().style.cursor = '';
+        onSpotHover?.(null);
+      });
+
+      // Change cursor and notify on hover for spots (purple selected pins)
+      (map.current as any).on('mouseenter', 'spots-circles-selected', (e: any) => {
+        (map.current as any).getCanvas().style.cursor = 'pointer';
+        const f = e.features?.[0];
+        if (f?.properties?.id) {
+          onSpotHover?.(f.properties.id);
+        }
+      });
+      (map.current as any).on('mouseleave', 'spots-circles-selected', () => {
         (map.current as any).getCanvas().style.cursor = '';
         onSpotHover?.(null);
       });
