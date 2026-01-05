@@ -95,6 +95,13 @@ const Explore = () => {
 
   // Ignore the first onMapMove fired by Mapbox on initial idle
   const ignoreFirstMapMoveRef = useRef(true);
+  
+  // Track last fetched center to avoid redundant requests for small movements
+  const lastFetchedCenterRef = useRef<{ lat: number; lng: number; radius: number } | null>(null);
+  
+  // Adaptive debounce - increases during rapid panning
+  const consecutiveMoveCountRef = useRef(0);
+  const lastMoveTimeRef = useRef(0);
 
   // Ensure end time is always after start time
   const validateAndSetTimes = (newStartTime: Date, newEndTime: Date | null) => {
@@ -517,14 +524,43 @@ const Explore = () => {
       ignoreFirstMapMoveRef.current = false;
       return;
     }
+    
+    // Check if we've moved enough to warrant a new fetch (at least 10% of radius)
+    const minMoveThreshold = radiusMeters * 0.1; // 10% of visible radius
+    if (lastFetchedCenterRef.current) {
+      const { lat: lastLat, lng: lastLng, radius: lastRadius } = lastFetchedCenterRef.current;
+      const latDiff = Math.abs(center.lat - lastLat) * 111000; // ~111km per degree lat
+      const lngDiff = Math.abs(center.lng - lastLng) * 111000 * Math.cos(center.lat * Math.PI / 180);
+      const distance = Math.sqrt(latDiff ** 2 + lngDiff ** 2);
+      
+      // Skip if movement is too small AND radius hasn't changed significantly
+      if (distance < minMoveThreshold && Math.abs(radiusMeters - lastRadius) < lastRadius * 0.3) {
+        return;
+      }
+    }
+    
+    // Adaptive debounce: increase delay during rapid panning
+    const now = Date.now();
+    if (now - lastMoveTimeRef.current < 500) {
+      consecutiveMoveCountRef.current++;
+    } else {
+      consecutiveMoveCountRef.current = 0;
+    }
+    lastMoveTimeRef.current = now;
+    
+    // Base 300ms, increases up to 800ms during rapid panning
+    const debounceDelay = Math.min(300 + consecutiveMoveCountRef.current * 100, 800);
 
-    // Debounce map movement - reduced from 800ms to 300ms for responsiveness
+    // Debounce map movement
     if (fetchTimeoutRef.current) {
       clearTimeout(fetchTimeoutRef.current);
     }
     fetchTimeoutRef.current = setTimeout(() => {
-      fetchNearbySpots(center, radiusMeters, false); // Don't show loading on map movement
-    }, 300);
+      // Store the center we're about to fetch
+      lastFetchedCenterRef.current = { lat: center.lat, lng: center.lng, radius: radiusMeters };
+      consecutiveMoveCountRef.current = 0; // Reset after successful fetch
+      fetchNearbySpots(center, radiusMeters, false);
+    }, debounceDelay);
   };
   const handleDateTimeUpdate = (newStartTime?: Date, newEndTime?: Date) => {
     if (!searchLocation) return;
