@@ -9,6 +9,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { format, isToday } from 'date-fns';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { toast } from 'sonner';
 
 // Session cache utilities for instant back/forward navigation
 const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
@@ -467,6 +468,12 @@ const Explore = () => {
       
       if (error) {
         console.error('Search error:', error);
+        // Check for rate limit error (429)
+        if (error.message?.includes('429') || error.message?.includes('Too many requests')) {
+          toast.error('Too many requests. Please wait a moment and try again.', {
+            duration: 5000,
+          });
+        }
         return;
       }
       
