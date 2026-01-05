@@ -1188,8 +1188,12 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     prevHighlightedRef.current = highlightedSpotId || null;
   }, [highlightedSpotId, mapReady]);
 
-  // Update feature-state when propSelectedSpotId changes (from parent component)
+  // Update feature-state when propSelectedSpotId OR internal selectedSpot changes
   const prevSelectedRef = useRef<string | null>(null);
+  
+  // Determine the effective selected spot ID (prioritize internal selection from carousel)
+  const effectiveSelectedId = selectedSpot?.id || propSelectedSpotId || null;
+  
   useEffect(() => {
     if (!map.current || !mapReady) return;
     
@@ -1198,7 +1202,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     if (!source) return;
 
     // Remove selected state from previous spot
-    if (prevSelectedRef.current) {
+    if (prevSelectedRef.current && prevSelectedRef.current !== effectiveSelectedId) {
       map.current.setFeatureState(
         { source: sourceId, id: prevSelectedRef.current },
         { selected: false }
@@ -1206,15 +1210,15 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     }
 
     // Add selected state to new spot
-    if (propSelectedSpotId) {
+    if (effectiveSelectedId) {
       map.current.setFeatureState(
-        { source: sourceId, id: propSelectedSpotId },
+        { source: sourceId, id: effectiveSelectedId },
         { selected: true }
       );
     }
 
-    prevSelectedRef.current = propSelectedSpotId || null;
-  }, [propSelectedSpotId, mapReady]);
+    prevSelectedRef.current = effectiveSelectedId;
+  }, [effectiveSelectedId, mapReady]);
 
   const handleSpotClick = (spot: Spot) => {
     setSelectedSpot(spot);
