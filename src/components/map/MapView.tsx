@@ -204,13 +204,21 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     };
   }, [emblaApi, onSelect]);
 
-  // Scroll carousel to spot when marker is clicked
+  // Scroll carousel to spot when marker is clicked - use ref to avoid stale closure
   const scrollToSpot = useCallback((spotId: string) => {
-    if (!emblaApi || !sortedSpots.length) return;
-    const index = sortedSpots.findIndex(s => s.id === spotId);
-    if (index !== -1) {
-      emblaApi.scrollTo(index);
-    }
+    if (!emblaApi) return;
+    
+    // Use a small delay to ensure sortedSpots is up-to-date after any refetch
+    setTimeout(() => {
+      const currentSortedSpots = sortedSpots;
+      if (!currentSortedSpots.length) return;
+      
+      const index = currentSortedSpots.findIndex(s => s.id === spotId);
+      if (index !== -1) {
+        emblaApi.scrollTo(index);
+        setCurrentSlideIndex(index);
+      }
+    }, 50);
   }, [emblaApi, sortedSpots]);
 
   // Navigation handlers
