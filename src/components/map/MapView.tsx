@@ -1041,11 +1041,11 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           // Scroll carousel to this spot
           scrollToSpot(spot.id);
           
-          // Center map on the clicked spot
+          // Center map on the clicked spot without zooming in too much
           if (map.current) {
             map.current.flyTo({
               center: [spot.lng, spot.lat],
-              zoom: Math.max(map.current.getZoom(), 15),
+              zoom: Math.min(map.current.getZoom(), 13), // Keep zoomed out for context
               duration: 500
             });
           }
