@@ -548,8 +548,11 @@ const SpotDetail = () => {
               .lt('start_at', requestedEnd)
               .gt('end_at', requestedStart);
           } else {
-            // No specific time requested, check for any booking that hasn't ended
-            query = query.gte('end_at', now);
+            // No specific time requested, only show "View Booking" if currently active
+            // (user is currently parked there - now is between start and end)
+            query = query
+              .lte('start_at', now)
+              .gte('end_at', now);
           }
           
           const { data: existingBooking } = await query
