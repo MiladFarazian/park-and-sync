@@ -1248,6 +1248,7 @@ const BookingContent = () => {
         }}
         mode="start"
         initialValue={startDateTime}
+        availabilityRules={availabilityRules}
       />
       
       <MobileTimePicker
@@ -1260,6 +1261,7 @@ const BookingContent = () => {
         mode="end"
         startTime={startDateTime}
         initialValue={endDateTime}
+        availabilityRules={availabilityRules}
       />
     </div>
   );

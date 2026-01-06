@@ -1,7 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { X, AlertCircle } from 'lucide-react';
 import { format, addDays, startOfDay, setHours, setMinutes, isBefore, isAfter, addMinutes, differenceInMinutes } from 'date-fns';
+
+interface AvailabilityRule {
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  is_available?: boolean;
+}
 
 interface MobileTimePickerProps {
   isOpen: boolean;
@@ -10,6 +17,7 @@ interface MobileTimePickerProps {
   mode: 'start' | 'end';
   startTime?: Date;
   initialValue?: Date;
+  availabilityRules?: AvailabilityRule[];
 }
 
 export const MobileTimePicker = ({ 
@@ -18,7 +26,8 @@ export const MobileTimePicker = ({
   onConfirm, 
   mode,
   startTime,
-  initialValue 
+  initialValue,
+  availabilityRules = []
 }: MobileTimePickerProps) => {
   const now = new Date();
   
@@ -72,6 +81,58 @@ export const MobileTimePicker = ({
   const minuteRef = useRef<HTMLDivElement>(null);
   const periodRef = useRef<HTMLDivElement>(null);
 
+  // Get available hours for the selected day
+  const availableHoursInfo = useMemo(() => {
+    if (availabilityRules.length === 0) {
+      return { hasRules: false, availableWindows: [], displayText: '' };
+    }
+    
+    const dayOfWeek = days[selectedDay]?.date.getDay() ?? 0;
+    const dayRules = availabilityRules.filter(r => r.day_of_week === dayOfWeek && r.is_available !== false);
+    
+    if (dayRules.length === 0) {
+      return { hasRules: true, availableWindows: [], displayText: 'Not available this day' };
+    }
+    
+    const windows = dayRules.map(rule => {
+      const formatTime = (timeStr: string) => {
+        const [hours, mins] = timeStr.split(':').map(Number);
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 || 12;
+        return `${displayHours}:${mins.toString().padStart(2, '0')} ${period}`;
+      };
+      return {
+        start: rule.start_time,
+        end: rule.end_time,
+        display: `${formatTime(rule.start_time)} - ${formatTime(rule.end_time)}`
+      };
+    });
+    
+    return { 
+      hasRules: true, 
+      availableWindows: windows,
+      displayText: windows.map(w => w.display).join(', ')
+    };
+  }, [availabilityRules, selectedDay, days]);
+
+  // Check if a specific time is within availability
+  const isTimeWithinAvailability = (hour24: number, minute: number): boolean => {
+    if (availabilityRules.length === 0) return true;
+    
+    const dayOfWeek = days[selectedDay]?.date.getDay() ?? 0;
+    const dayRules = availabilityRules.filter(r => r.day_of_week === dayOfWeek && r.is_available !== false);
+    
+    if (dayRules.length === 0) return false;
+    
+    const timeStr = `${hour24.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+    
+    return dayRules.some(rule => {
+      const startTime = rule.start_time.slice(0, 5);
+      const endTime = rule.end_time.slice(0, 5);
+      return timeStr >= startTime && timeStr <= endTime;
+    });
+  };
+
   // Scroll to selected items on mount
   useEffect(() => {
     if (isOpen) {
@@ -89,21 +150,6 @@ export const MobileTimePicker = ({
       const itemHeight = 56;
       ref.current.scrollTop = index * itemHeight;
     }
-  };
-
-  const handleScroll = (
-    ref: React.RefObject<HTMLDivElement>,
-    items: any[],
-    setter: (value: any) => void
-  ) => {
-    if (!ref.current) return;
-    
-    const itemHeight = 56;
-    const scrollTop = ref.current.scrollTop;
-    const index = Math.round(scrollTop / itemHeight);
-    const clampedIndex = Math.max(0, Math.min(items.length - 1, index));
-    
-    setter(items[clampedIndex]);
   };
 
   const createScrollHandler = (
@@ -126,7 +172,7 @@ export const MobileTimePicker = ({
         
         // Trigger haptic feedback when selection changes
         if (clampedIndex !== lastIndex && 'vibrate' in navigator) {
-          navigator.vibrate(10); // Short 10ms vibration
+          navigator.vibrate(10);
           lastIndex = clampedIndex;
         }
         
@@ -150,6 +196,14 @@ export const MobileTimePicker = ({
     return setMinutes(setHours(baseDate, hour), selectedMinute);
   };
 
+  // Get 24-hour format for current selection
+  const getCurrentHour24 = () => {
+    let hour = selectedHour;
+    if (selectedPeriod === 'PM' && hour !== 12) hour += 12;
+    if (selectedPeriod === 'AM' && hour === 12) hour = 0;
+    return hour;
+  };
+
   const validateSelection = () => {
     const selectedDate = getSelectedDate();
     
@@ -169,13 +223,22 @@ export const MobileTimePicker = ({
       // For extensions, require at least 15 minutes
       const extensionMinutes = differenceInMinutes(selectedDate, startTime);
       if (extensionMinutes < 15) {
-        setError('Extension must be at least 15 minutes');
+        setError('Duration must be at least 15 minutes');
         return false;
       }
       
       // Maximum 24 hours extension
       if (extensionMinutes > 1440) {
-        setError('Extension cannot exceed 24 hours');
+        setError('Duration cannot exceed 24 hours');
+        return false;
+      }
+    }
+    
+    // Check availability rules
+    if (availabilityRules.length > 0) {
+      const hour24 = getCurrentHour24();
+      if (!isTimeWithinAvailability(hour24, selectedMinute)) {
+        setError(`This time is outside available hours: ${availableHoursInfo.displayText}`);
         return false;
       }
     }
@@ -190,6 +253,13 @@ export const MobileTimePicker = ({
       onClose();
     }
   };
+
+  // Check if current selection is valid for availability
+  const isCurrentSelectionValid = useMemo(() => {
+    if (availabilityRules.length === 0) return true;
+    const hour24 = getCurrentHour24();
+    return isTimeWithinAvailability(hour24, selectedMinute);
+  }, [selectedDay, selectedHour, selectedMinute, selectedPeriod, availabilityRules]);
 
   if (!isOpen) return null;
 
@@ -211,13 +281,34 @@ export const MobileTimePicker = ({
               <X className="h-5 w-5" />
             </Button>
           </div>
+          
+          {/* Availability Info Banner */}
+          {availableHoursInfo.hasRules && (
+            <div className={`mt-3 p-3 rounded-lg flex items-start gap-2 ${
+              availableHoursInfo.availableWindows.length === 0 
+                ? 'bg-destructive/10 text-destructive' 
+                : 'bg-muted'
+            }`}>
+              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <div className="text-sm">
+                <span className="font-medium">Available hours: </span>
+                <span className={availableHoursInfo.availableWindows.length === 0 ? '' : 'text-muted-foreground'}>
+                  {availableHoursInfo.displayText || 'Not available this day'}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Picker Container */}
         <div className="p-6">
           <div className="relative bg-muted/30 rounded-2xl p-4 shadow-inner">
             {/* Selection highlight */}
-            <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 h-14 bg-background/80 rounded-xl pointer-events-none border-2 border-primary/20" />
+            <div className={`absolute inset-x-4 top-1/2 -translate-y-1/2 h-14 rounded-xl pointer-events-none border-2 transition-colors ${
+              isCurrentSelectionValid 
+                ? 'bg-background/80 border-primary/20' 
+                : 'bg-destructive/10 border-destructive/30'
+            }`} />
             
             <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-2 relative">
               {/* Day Column */}
@@ -229,24 +320,33 @@ export const MobileTimePicker = ({
                   style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                 >
                   <div className="h-14" />
-                  {days.map((day, index) => (
-                    <div
-                      key={index}
-                      className="h-14 flex items-center justify-center snap-center cursor-pointer transition-all px-2"
-                      style={{
-                        opacity: selectedDay === index ? 1 : 0.3,
-                        transform: selectedDay === index ? 'scale(1)' : 'scale(0.9)'
-                      }}
-                      onClick={() => {
-                        setSelectedDay(index);
-                        scrollToIndex(dayRef, index);
-                      }}
-                    >
-                      <span className="text-base font-medium whitespace-nowrap">
-                        {day.label}
-                      </span>
-                    </div>
-                  ))}
+                  {days.map((day, index) => {
+                    // Check if this day has any availability
+                    const dayOfWeek = day.date.getDay();
+                    const dayHasRules = availabilityRules.length === 0 || 
+                      availabilityRules.some(r => r.day_of_week === dayOfWeek && r.is_available !== false);
+                    
+                    return (
+                      <div
+                        key={index}
+                        className={`h-14 flex items-center justify-center snap-center cursor-pointer transition-all px-2 ${
+                          !dayHasRules ? 'opacity-30' : ''
+                        }`}
+                        style={{
+                          opacity: selectedDay === index ? 1 : (dayHasRules ? 0.3 : 0.15),
+                          transform: selectedDay === index ? 'scale(1)' : 'scale(0.9)'
+                        }}
+                        onClick={() => {
+                          setSelectedDay(index);
+                          scrollToIndex(dayRef, index);
+                        }}
+                      >
+                        <span className="text-base font-medium whitespace-nowrap">
+                          {day.label}
+                        </span>
+                      </div>
+                    );
+                  })}
                   <div className="h-14" />
                 </div>
               </div>
