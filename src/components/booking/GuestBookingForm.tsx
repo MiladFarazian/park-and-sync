@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Car, CreditCard, Loader2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,10 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Combobox } from '@/components/ui/combobox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { formatPhoneInput } from '@/lib/utils';
+import { vehicleMakes, vehicleModels } from '@/lib/vehicleData';
 
 interface GuestBookingFormProps {
   spot: any;
@@ -39,13 +41,26 @@ const GuestBookingFormContent = ({
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [carModel, setCarModel] = useState('');
+  const [vehicleMake, setVehicleMake] = useState('');
+  const [vehicleModel, setVehicleModel] = useState('');
   const [licensePlate, setLicensePlate] = useState('');
   const [loading, setLoading] = useState(false);
   const [cardComplete, setCardComplete] = useState(false);
   const [saveInfo, setSaveInfo] = useState(false);
   const [password, setPassword] = useState('');
   const [marketingOptIn, setMarketingOptIn] = useState(false);
+
+  // Get available models based on selected make
+  const availableModels = useMemo(() => {
+    if (!vehicleMake) return [];
+    return vehicleModels[vehicleMake] || [];
+  }, [vehicleMake]);
+
+  // Reset model when make changes
+  const handleMakeChange = (make: string) => {
+    setVehicleMake(make);
+    setVehicleModel('');
+  };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -74,8 +89,13 @@ const GuestBookingFormContent = ({
       return;
     }
 
-    if (!carModel.trim()) {
-      toast({ title: "Vehicle required", description: "Please enter your vehicle model", variant: "destructive" });
+    if (!vehicleMake.trim()) {
+      toast({ title: "Vehicle make required", description: "Please select your vehicle make", variant: "destructive" });
+      return;
+    }
+
+    if (!vehicleModel.trim()) {
+      toast({ title: "Vehicle model required", description: "Please select your vehicle model", variant: "destructive" });
       return;
     }
 
@@ -110,7 +130,7 @@ const GuestBookingFormContent = ({
           guest_full_name: fullName.trim(),
           guest_email: email.trim(),
           guest_phone: phone.trim(),
-          guest_car_model: carModel.trim(),
+          guest_car_model: `${vehicleMake} ${vehicleModel}`.trim(),
           guest_license_plate: licensePlate.trim(),
           save_payment_method: saveInfo, // Tell backend to set up for future use
         },
@@ -271,13 +291,26 @@ const GuestBookingFormContent = ({
         </h3>
         <div className="space-y-4">
           <div>
-            <Label htmlFor="carModel">Vehicle Make & Model *</Label>
-            <Input
-              id="carModel"
-              value={carModel}
-              onChange={(e) => setCarModel(e.target.value)}
-              placeholder="Toyota Camry"
-              required
+            <Label>Vehicle Make *</Label>
+            <Combobox
+              options={vehicleMakes}
+              value={vehicleMake}
+              onChange={handleMakeChange}
+              placeholder="Select make"
+              searchPlaceholder="Search makes..."
+              emptyText="No make found."
+            />
+          </div>
+          <div>
+            <Label>Vehicle Model *</Label>
+            <Combobox
+              options={availableModels}
+              value={vehicleModel}
+              onChange={setVehicleModel}
+              placeholder="Select model"
+              searchPlaceholder="Search models..."
+              emptyText={vehicleMake ? "No model found." : "Select a make first"}
+              disabled={!vehicleMake}
             />
           </div>
           <div>
