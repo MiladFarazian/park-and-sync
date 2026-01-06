@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { formatPhoneInput } from '@/lib/utils';
 
 interface GuestBookingFormProps {
   spot: any;
@@ -254,8 +255,8 @@ const GuestBookingFormContent = ({
               id="phone"
               type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+1 (555) 123-4567"
+              onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
+              placeholder="(555) 123-4567"
               required
             />
           </div>
