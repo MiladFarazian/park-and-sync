@@ -266,9 +266,11 @@ const BookingContent = () => {
               .lt('start_at', requestedEnd)
               .gt('end_at', requestedStart);
           } else {
-            // No specific time, check for any current/future booking
+            // No specific time, only redirect if currently active (user is parked now)
             const now = new Date().toISOString();
-            existingQuery = existingQuery.gte('end_at', now);
+            existingQuery = existingQuery
+              .lte('start_at', now)
+              .gte('end_at', now);
           }
           
           const { data: existingBookingData } = await existingQuery
