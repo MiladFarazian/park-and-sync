@@ -169,7 +169,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         isCarouselNavigationRef.current = true;
         map.current.flyTo({
           center: [sortedSpots[index].lng, sortedSpots[index].lat],
-          zoom: Math.max(map.current.getZoom(), 14),
+          zoom: Math.min(map.current.getZoom(), 13), // Zoom out to 13 max for better context
           duration: 500
         });
         // Reset flag after animation completes
