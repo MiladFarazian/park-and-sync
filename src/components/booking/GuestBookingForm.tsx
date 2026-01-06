@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { formatPhoneInput } from '@/lib/utils';
-import { vehicleMakes, vehicleModels } from '@/lib/vehicleData';
+import { vehicleMakes, vehicleModels, vehicleColors } from '@/lib/vehicleData';
 
 interface GuestBookingFormProps {
   spot: any;
@@ -43,6 +43,7 @@ const GuestBookingFormContent = ({
   const [phone, setPhone] = useState('');
   const [vehicleMake, setVehicleMake] = useState('');
   const [vehicleModel, setVehicleModel] = useState('');
+  const [vehicleColor, setVehicleColor] = useState('');
   const [licensePlate, setLicensePlate] = useState('');
   const [loading, setLoading] = useState(false);
   const [cardComplete, setCardComplete] = useState(false);
@@ -130,7 +131,7 @@ const GuestBookingFormContent = ({
           guest_full_name: fullName.trim(),
           guest_email: email.trim(),
           guest_phone: phone.trim(),
-          guest_car_model: `${vehicleMake} ${vehicleModel}`.trim(),
+          guest_car_model: [vehicleColor, vehicleMake, vehicleModel].filter(Boolean).join(' '),
           guest_license_plate: licensePlate.trim(),
           save_payment_method: saveInfo, // Tell backend to set up for future use
         },
@@ -311,6 +312,17 @@ const GuestBookingFormContent = ({
               searchPlaceholder="Search models..."
               emptyText={vehicleMake ? "No model found." : "Select a make first"}
               disabled={!vehicleMake}
+            />
+          </div>
+          <div>
+            <Label>Vehicle Color</Label>
+            <Combobox
+              options={vehicleColors}
+              value={vehicleColor}
+              onChange={setVehicleColor}
+              placeholder="Select color (optional)"
+              searchPlaceholder="Search colors..."
+              emptyText="No color found."
             />
           </div>
           <div>
