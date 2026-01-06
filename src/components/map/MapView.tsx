@@ -99,6 +99,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
   const searchMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const spotsRef = useRef<Spot[]>([]); // Keep current spots for event handlers
   const isCarouselNavigationRef = useRef(false); // Track carousel-initiated map movements
+  const pendingCarouselSpotIdRef = useRef<string | null>(null); // Ensure marker-click selection always syncs to carousel
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [nearestSpotId, setNearestSpotId] = useState<string | null>(null);
   const [userSelectedSpot, setUserSelectedSpot] = useState(false);
@@ -204,22 +205,43 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     };
   }, [emblaApi, onSelect]);
 
-  // Scroll carousel to spot when marker is clicked - use ref to avoid stale closure
-  const scrollToSpot = useCallback((spotId: string) => {
-    if (!emblaApi) return;
-    
-    // Use a small delay to ensure sortedSpots is up-to-date after any refetch
-    setTimeout(() => {
-      const currentSortedSpots = sortedSpots;
-      if (!currentSortedSpots.length) return;
-      
-      const index = currentSortedSpots.findIndex(s => s.id === spotId);
-      if (index !== -1) {
+  const syncCarouselToSpotId = useCallback(
+    (spotId: string) => {
+      if (!emblaApi || !sortedSpots.length) return false;
+
+      const index = sortedSpots.findIndex((s) => s.id === spotId);
+      if (index === -1) return false;
+
+      if (emblaApi.selectedScrollSnap() !== index) {
         emblaApi.scrollTo(index);
-        setCurrentSlideIndex(index);
       }
-    }, 50);
-  }, [emblaApi, sortedSpots]);
+      setCurrentSlideIndex(index);
+      return true;
+    },
+    [emblaApi, sortedSpots]
+  );
+
+  // Scroll carousel to spot when marker is clicked (and keep it synced through any refetch/re-sort)
+  const scrollToSpot = useCallback(
+    (spotId: string) => {
+      pendingCarouselSpotIdRef.current = spotId;
+      syncCarouselToSpotId(spotId);
+    },
+    [syncCarouselToSpotId]
+  );
+
+  // If spots re-fetch or re-sort happens after a marker click, force the carousel to the selected spot
+  useEffect(() => {
+    if (!emblaApi || !sortedSpots.length) return;
+
+    const targetId = pendingCarouselSpotIdRef.current ?? selectedSpot?.id;
+    if (!targetId) return;
+
+    const didSync = syncCarouselToSpotId(targetId);
+    if (didSync && pendingCarouselSpotIdRef.current === targetId) {
+      pendingCarouselSpotIdRef.current = null;
+    }
+  }, [emblaApi, sortedSpots.length, selectedSpot?.id, syncCarouselToSpotId]);
 
   // Navigation handlers
   const scrollPrev = useCallback(() => {
