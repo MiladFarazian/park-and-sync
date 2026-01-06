@@ -98,6 +98,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
   const markers = useRef<mapboxgl.Marker[]>([]);
   const searchMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const spotsRef = useRef<Spot[]>([]); // Keep current spots for event handlers
+  const isCarouselNavigationRef = useRef(false); // Track carousel-initiated map movements
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [nearestSpotId, setNearestSpotId] = useState<string | null>(null);
   const [userSelectedSpot, setUserSelectedSpot] = useState(false);
@@ -163,16 +164,35 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       setSelectedSpot(sortedSpots[index]);
       setUserSelectedSpot(true);
       
-      // Pan map to selected spot
+      // Pan map to selected spot - mark as carousel navigation to prevent refetch
       if (map.current) {
+        isCarouselNavigationRef.current = true;
         map.current.flyTo({
           center: [sortedSpots[index].lng, sortedSpots[index].lat],
           zoom: Math.max(map.current.getZoom(), 14),
           duration: 500
         });
+        // Reset flag after animation completes
+        map.current.once('moveend', () => {
+          isCarouselNavigationRef.current = false;
+        });
       }
     }
   }, [emblaApi, sortedSpots]);
+
+  // Reset carousel index when spots array changes and index is out of bounds
+  useEffect(() => {
+    if (!emblaApi || !sortedSpots.length) return;
+    
+    // If current index is out of bounds, reset to 0
+    if (currentSlideIndex >= sortedSpots.length) {
+      setCurrentSlideIndex(0);
+      emblaApi.scrollTo(0);
+      if (sortedSpots[0]) {
+        setSelectedSpot(sortedSpots[0]);
+      }
+    }
+  }, [sortedSpots.length, emblaApi, currentSlideIndex]);
 
   // Set up embla event listeners
   useEffect(() => {
@@ -447,6 +467,11 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     // Update visible spots count and notify parent when map moves
     const updateVisibleSpots = () => {
       if (!map.current) return;
+      
+      // Skip API call if this movement was from carousel navigation
+      if (isCarouselNavigationRef.current) {
+        return;
+      }
       
       const bounds = map.current.getBounds();
       const center = map.current.getCenter();
@@ -1277,7 +1302,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                 <ChevronLeft className="h-5 w-5" />
               </button>
               <span className="text-sm font-medium bg-background/90 backdrop-blur-sm px-3 py-1 rounded-full shadow-md">
-                {currentSlideIndex + 1} / {sortedSpots.length}
+                {Math.min(currentSlideIndex + 1, sortedSpots.length)} / {sortedSpots.length}
               </span>
               <button
                 onClick={scrollNext}
