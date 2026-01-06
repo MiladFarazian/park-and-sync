@@ -172,6 +172,7 @@ serve(async (req) => {
                         <!-- Header -->
                         <tr>
                           <td style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); padding: 40px 30px; text-align: center;">
+                            <img src="https://mqbupmusmciijsjmzbcu.supabase.co/storage/v1/object/public/assets/parkzy-logo-white.png" alt="Parkzy" style="height: 40px; width: auto; margin-bottom: 16px;" />
                             <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">✅ Booking Approved!</h1>
                             <p style="margin: 10px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px;">Your parking is confirmed</p>
                           </td>

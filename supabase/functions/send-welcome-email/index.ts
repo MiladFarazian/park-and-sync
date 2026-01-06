@@ -67,6 +67,7 @@ const handler = async (req: Request): Promise<Response> => {
                     <!-- Header -->
                     <tr>
                       <td style="background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); padding: 50px 30px; text-align: center;">
+                        <img src="https://mqbupmusmciijsjmzbcu.supabase.co/storage/v1/object/public/assets/parkzy-logo-white.png" alt="Parkzy" style="height: 48px; width: auto; margin-bottom: 20px;" />
                         <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: 700;">Welcome to Parkzy! 🚗</h1>
                         <p style="margin: 16px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 18px;">Your parking journey starts here</p>
                       </td>
