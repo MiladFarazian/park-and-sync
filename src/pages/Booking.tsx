@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { differenceInHours, differenceInMinutes, addHours, format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Label } from '@/components/ui/label';
 import { calculateDriverPrice, calculateBookingTotal } from '@/lib/pricing';
 import RequireAuth from '@/components/auth/RequireAuth';
 import RequireVerifiedAuth from '@/components/auth/RequireVerifiedAuth';
@@ -1279,7 +1280,7 @@ const getStripePromise = async () => {
 // Guest Booking Page Component
 const GuestBookingPage = () => {
   const { spotId } = useParams<{ spotId: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -1287,6 +1288,11 @@ const GuestBookingPage = () => {
   const [spot, setSpot] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [stripePromise, setStripePromise] = useState<Promise<any> | null>(null);
+  const [availabilityRules, setAvailabilityRules] = useState<any[]>([]);
+  
+  // Mobile time picker states
+  const [mobileStartPickerOpen, setMobileStartPickerOpen] = useState(false);
+  const [mobileEndPickerOpen, setMobileEndPickerOpen] = useState(false);
   
   // Get times from URL params or use defaults
   const getInitialTimes = () => {
@@ -1303,32 +1309,81 @@ const GuestBookingPage = () => {
   };
   
   const initialTimes = getInitialTimes();
-  const [startDateTime] = useState<Date>(initialTimes.start);
-  const [endDateTime] = useState<Date>(initialTimes.end);
+  const [startDateTime, setStartDateTime] = useState<Date>(initialTimes.start);
+  const [endDateTime, setEndDateTime] = useState<Date>(initialTimes.end);
 
   // Build return URL for sign-in redirect
   const returnUrl = `${location.pathname}${location.search}`;
+
+  // Helper to check if a specific time is within availability rules
+  const isTimeWithinAvailability = (date: Date) => {
+    if (availabilityRules.length === 0) return true;
+    
+    const dayOfWeek = date.getDay();
+    const timeString = format(date, 'HH:mm:ss');
+    
+    const rulesForDay = availabilityRules.filter(
+      (rule) => rule.day_of_week === dayOfWeek && rule.is_available !== false
+    );
+    
+    if (rulesForDay.length === 0) return false;
+    
+    return rulesForDay.some((rule) => {
+      return timeString >= rule.start_time && timeString <= rule.end_time;
+    });
+  };
+
+  // Check if the selected time range is valid
+  const isTimeRangeValid = useMemo(() => {
+    if (!startDateTime || !endDateTime || availabilityRules.length === 0) return true;
+    return isTimeWithinAvailability(startDateTime) && isTimeWithinAvailability(endDateTime);
+  }, [startDateTime, endDateTime, availabilityRules]);
+
+  // Update URL params when times change
+  const handleStartDateTimeChange = (date: Date) => {
+    setStartDateTime(date);
+    // If end is before or equal to new start, adjust end
+    if (endDateTime <= date) {
+      const newEnd = addHours(date, 2);
+      setEndDateTime(newEnd);
+      setSearchParams({ start: date.toISOString(), end: newEnd.toISOString() });
+    } else {
+      setSearchParams({ start: date.toISOString(), end: endDateTime.toISOString() });
+    }
+  };
+
+  const handleEndDateTimeChange = (date: Date) => {
+    setEndDateTime(date);
+    setSearchParams({ start: startDateTime.toISOString(), end: date.toISOString() });
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       if (!spotId) return;
       
       try {
-        // Fetch spot
-        const { data: spotData, error } = await supabase
-          .from('spots')
-          .select(`*, spot_photos(url, is_primary)`)
-          .eq('id', spotId)
-          .eq('status', 'active')
-          .single();
+        // Fetch spot and availability rules in parallel
+        const [spotResponse, rulesResponse] = await Promise.all([
+          supabase
+            .from('spots')
+            .select(`*, spot_photos(url, is_primary)`)
+            .eq('id', spotId)
+            .eq('status', 'active')
+            .single(),
+          supabase
+            .from('availability_rules')
+            .select('*')
+            .eq('spot_id', spotId)
+        ]);
 
-        if (error || !spotData) {
+        if (spotResponse.error || !spotResponse.data) {
           toast({ title: "Spot not available", description: "This spot is not available for booking", variant: "destructive" });
           navigate('/explore');
           return;
         }
 
-        setSpot(spotData);
+        setSpot(spotResponse.data);
+        setAvailabilityRules(rulesResponse.data || []);
         
         // Initialize Stripe
         const promise = getStripePromise();
@@ -1439,12 +1494,58 @@ const GuestBookingPage = () => {
                 <MapPin className="h-3 w-3" />
                 {spot.address}
               </p>
-              <div className="flex items-center gap-2 mt-2 text-sm">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span>{format(startDateTime, 'MMM d, h:mm a')} - {format(endDateTime, 'h:mm a')}</span>
-              </div>
             </div>
           </div>
+        </Card>
+
+        {/* Time Selection */}
+        <Card className="p-4">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Booking Time
+          </h3>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Start</Label>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !isTimeRangeValid && "border-destructive text-destructive"
+                )}
+                onClick={() => setMobileStartPickerOpen(true)}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                <span className="truncate">{format(startDateTime, 'MMM d, h:mm a')}</span>
+              </Button>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">End</Label>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !isTimeRangeValid && "border-destructive text-destructive"
+                )}
+                onClick={() => setMobileEndPickerOpen(true)}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                <span className="truncate">{format(endDateTime, 'h:mm a')}</span>
+              </Button>
+            </div>
+          </div>
+          
+          {!isTimeRangeValid && (
+            <p className="text-xs text-destructive mt-2 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              Selected times are outside available hours
+            </p>
+          )}
+          
+          <p className="text-sm text-muted-foreground mt-3">
+            Duration: {pricing.hours.toFixed(1)} hours
+          </p>
         </Card>
 
         {/* Guest Booking Form with Stripe Elements */}
@@ -1457,9 +1558,37 @@ const GuestBookingPage = () => {
             subtotal={pricing.subtotal}
             serviceFee={pricing.serviceFee}
             totalAmount={pricing.total}
+            isTimeValid={isTimeRangeValid}
           />
         </Elements>
       </div>
+
+      {/* Mobile Time Pickers */}
+      <MobileTimePicker
+        isOpen={mobileStartPickerOpen}
+        onClose={() => setMobileStartPickerOpen(false)}
+        onConfirm={(date) => {
+          handleStartDateTimeChange(date);
+          setMobileStartPickerOpen(false);
+          setMobileEndPickerOpen(true);
+        }}
+        mode="start"
+        initialValue={startDateTime}
+        availabilityRules={availabilityRules}
+      />
+      
+      <MobileTimePicker
+        isOpen={mobileEndPickerOpen}
+        onClose={() => setMobileEndPickerOpen(false)}
+        onConfirm={(date) => {
+          handleEndDateTimeChange(date);
+          setMobileEndPickerOpen(false);
+        }}
+        mode="end"
+        startTime={startDateTime}
+        initialValue={endDateTime}
+        availabilityRules={availabilityRules}
+      />
     </div>
   );
 };

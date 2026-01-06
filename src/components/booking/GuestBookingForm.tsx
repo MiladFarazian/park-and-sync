@@ -22,6 +22,7 @@ interface GuestBookingFormProps {
   subtotal: number;
   serviceFee: number;
   totalAmount: number;
+  isTimeValid?: boolean;
 }
 
 const GuestBookingFormContent = ({ 
@@ -31,7 +32,8 @@ const GuestBookingFormContent = ({
   totalHours,
   subtotal,
   serviceFee,
-  totalAmount 
+  totalAmount,
+  isTimeValid = true
 }: GuestBookingFormProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -441,7 +443,7 @@ const GuestBookingFormContent = ({
         </div>
       </Card>
 
-      <Button type="submit" className="w-full" size="lg" disabled={loading}>
+      <Button type="submit" className="w-full" size="lg" disabled={loading || !isTimeValid}>
         {loading ? (
           <>
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
