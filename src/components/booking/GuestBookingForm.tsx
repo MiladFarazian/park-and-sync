@@ -58,8 +58,18 @@ const GuestBookingFormContent = ({
       return;
     }
 
-    if (!email.trim() && !phone.trim()) {
-      toast({ title: "Contact required", description: "Please enter email or phone number", variant: "destructive" });
+    if (!email.trim()) {
+      toast({ title: "Email required", description: "Please enter your email address", variant: "destructive" });
+      return;
+    }
+
+    if (!phone.trim()) {
+      toast({ title: "Phone required", description: "Please enter your phone number", variant: "destructive" });
+      return;
+    }
+
+    if (!licensePlate.trim()) {
+      toast({ title: "License plate required", description: "Please enter your license plate number", variant: "destructive" });
       return;
     }
 
@@ -97,10 +107,10 @@ const GuestBookingFormContent = ({
           start_at: startDateTime.toISOString(),
           end_at: endDateTime.toISOString(),
           guest_full_name: fullName.trim(),
-          guest_email: email.trim() || null,
-          guest_phone: phone.trim() || null,
+          guest_email: email.trim(),
+          guest_phone: phone.trim(),
           guest_car_model: carModel.trim(),
-          guest_license_plate: licensePlate.trim() || null,
+          guest_license_plate: licensePlate.trim(),
           save_payment_method: saveInfo, // Tell backend to set up for future use
         },
       });
@@ -228,27 +238,27 @@ const GuestBookingFormContent = ({
             />
           </div>
           <div>
-            <Label htmlFor="email">Email {saveInfo && '*'}</Label>
+            <Label htmlFor="email">Email *</Label>
             <Input
               id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="john@example.com"
-              required={saveInfo}
+              required
             />
           </div>
           <div>
-            <Label htmlFor="phone">Phone</Label>
+            <Label htmlFor="phone">Phone *</Label>
             <Input
               id="phone"
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+1 (555) 123-4567"
+              required
             />
           </div>
-          <p className="text-xs text-muted-foreground">* Email or phone required for booking confirmation</p>
         </div>
       </Card>
 
@@ -270,12 +280,13 @@ const GuestBookingFormContent = ({
             />
           </div>
           <div>
-            <Label htmlFor="licensePlate">License Plate (optional)</Label>
+            <Label htmlFor="licensePlate">License Plate *</Label>
             <Input
               id="licensePlate"
               value={licensePlate}
               onChange={(e) => setLicensePlate(e.target.value)}
               placeholder="ABC 1234"
+              required
             />
           </div>
         </div>
