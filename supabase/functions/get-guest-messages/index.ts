@@ -6,15 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Rate limit configuration
-const RATE_LIMIT_PER_MINUTE = 10;
-const RATE_LIMIT_PER_HOUR = 60;
+const RATE_LIMIT_PER_MINUTE = 30;
+const RATE_LIMIT_PER_HOUR = 200;
 
 async function checkRateLimit(
   supabase: any,
   clientIp: string
 ): Promise<{ allowed: boolean; retryAfter: number }> {
-  const functionName = 'get-guest-booking';
+  const functionName = 'get-guest-messages';
   const minuteKey = `ip:${clientIp}:${functionName}:min`;
   const hourKey = `ip:${clientIp}:${functionName}:hour`;
 
@@ -32,23 +31,21 @@ async function checkRateLimit(
     });
 
     if (!minuteOk) {
-      console.warn(`[rate-limit] ${functionName} minute limit exceeded for IP: ${clientIp.substring(0, 8)}...`);
       return { allowed: false, retryAfter: 60 };
     }
     
     if (!hourOk) {
-      console.warn(`[rate-limit] ${functionName} hour limit exceeded for IP: ${clientIp.substring(0, 8)}...`);
       return { allowed: false, retryAfter: 3600 };
     }
 
     return { allowed: true, retryAfter: 0 };
   } catch (error) {
-    console.error('[rate-limit] Error checking rate limit:', error);
+    console.error('[rate-limit] Error:', error);
     return { allowed: true, retryAfter: 0 };
   }
 }
 
-interface GetGuestBookingRequest {
+interface GetGuestMessagesRequest {
   booking_id: string;
   access_token: string;
 }
@@ -64,13 +61,11 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get client IP for rate limiting
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() 
       || req.headers.get('cf-connecting-ip') 
       || req.headers.get('x-real-ip')
       || 'unknown';
 
-    // Check rate limit
     const rateLimit = await checkRateLimit(supabaseAdmin, clientIp);
     if (!rateLimit.allowed) {
       return new Response(JSON.stringify({ 
@@ -86,9 +81,7 @@ serve(async (req) => {
       });
     }
 
-    const { booking_id, access_token }: GetGuestBookingRequest = await req.json();
-
-    console.log('Fetching guest booking:', { booking_id });
+    const { booking_id, access_token }: GetGuestMessagesRequest = await req.json();
 
     if (!booking_id || !access_token) {
       return new Response(JSON.stringify({ error: 'Booking ID and access token are required' }), {
@@ -97,104 +90,63 @@ serve(async (req) => {
       });
     }
 
-    // Fetch booking with spot and host details
+    // Verify booking and token
     const { data: booking, error: bookingError } = await supabaseAdmin
       .from('bookings')
-      .select(`
-        id,
-        spot_id,
-        start_at,
-        end_at,
-        status,
-        hourly_rate,
-        total_hours,
-        subtotal,
-        platform_fee,
-        total_amount,
-        ev_charging_fee,
-        is_guest,
-        guest_full_name,
-        guest_email,
-        guest_phone,
-        guest_car_model,
-        guest_license_plate,
-        guest_access_token,
-        created_at,
-        spots!inner(
-          id,
-          title,
-          address,
-          latitude,
-          longitude,
-          access_notes,
-          host_rules,
-          host_id,
-          has_ev_charging,
-          is_covered,
-          is_secure
-        )
-      `)
+      .select('id, guest_access_token')
       .eq('id', booking_id)
       .eq('is_guest', true)
       .single();
 
     if (bookingError || !booking) {
-      console.error('Booking not found:', bookingError);
       return new Response(JSON.stringify({ error: 'Booking not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Validate access token
     if (booking.guest_access_token !== access_token) {
-      console.error('Invalid access token for booking:', booking_id);
       return new Response(JSON.stringify({ error: 'Invalid access token' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Get host profile
-    const spot = booking.spots as any;
-    const { data: hostProfile } = await supabaseAdmin
-      .from('profiles')
-      .select('first_name, last_name, avatar_url, rating, review_count, email, phone')
-      .eq('user_id', spot.host_id)
-      .single();
-
-    // Get unread message count for guest
-    const { count: unreadCount } = await supabaseAdmin
+    // Fetch messages
+    const { data: messages, error: messagesError } = await supabaseAdmin
       .from('guest_messages')
-      .select('*', { count: 'exact', head: true })
+      .select('*')
       .eq('booking_id', booking_id)
-      .eq('sender_type', 'host')
-      .is('read_at', null);
+      .order('created_at', { ascending: true });
 
-    // Get spot photos
-    const { data: spotPhotos } = await supabaseAdmin
-      .from('spot_photos')
-      .select('url, is_primary, sort_order')
-      .eq('spot_id', spot.id)
-      .order('sort_order', { ascending: true });
+    if (messagesError) {
+      console.error('Failed to fetch messages:', messagesError);
+      return new Response(JSON.stringify({ error: 'Failed to fetch messages' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    // Remove sensitive token from response
-    const { guest_access_token: _, ...safeBooking } = booking;
+    // Mark host messages as read by guest
+    const unreadHostMessages = messages?.filter(
+      m => m.sender_type === 'host' && !m.read_at
+    ) || [];
 
-    return new Response(JSON.stringify({
-      booking: safeBooking,
-      spot: {
-        ...spot,
-        photos: spotPhotos || [],
-      },
-      host: hostProfile || { first_name: 'Host' },
-      unread_messages: unreadCount || 0,
+    if (unreadHostMessages.length > 0) {
+      await supabaseAdmin
+        .from('guest_messages')
+        .update({ read_at: new Date().toISOString() })
+        .in('id', unreadHostMessages.map(m => m.id));
+    }
+
+    return new Response(JSON.stringify({ 
+      messages: messages || []
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Get guest booking error:', error);
+    console.error('Get guest messages error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,

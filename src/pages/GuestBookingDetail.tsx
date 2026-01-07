@@ -9,6 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import GuestChatPane from '@/components/guest/GuestChatPane';
 
 interface SpotPhoto {
   url: string;
@@ -306,6 +307,15 @@ const GuestBookingDetail = () => {
             </div>
             <p className="text-sm text-green-700">{spot.ev_charging_instructions}</p>
           </Card>
+        )}
+
+        {/* Guest Chat */}
+        {token && (
+          <GuestChatPane 
+            bookingId={bookingId!} 
+            accessToken={token} 
+            hostName={host?.first_name || 'Host'} 
+          />
         )}
 
         {/* Host Contact */}
