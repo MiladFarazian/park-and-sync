@@ -66,7 +66,7 @@ const handler = async (req: Request): Promise<Response> => {
                   <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                     <!-- Header -->
                     <tr>
-                      <td style="background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); padding: 50px 30px; text-align: center;">
+                      <td style="background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); padding: 50px 30px; text-align: center;">
                         <img src="https://mqbupmusmciijsjmzbcu.supabase.co/storage/v1/object/public/assets/parkzy-logo-white.png" alt="Parkzy" style="height: 48px; width: auto; margin-bottom: 20px;" />
                         <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: 700;">Welcome to Parkzy! 🚗</h1>
                         <p style="margin: 16px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 18px;">Your parking journey starts here</p>
@@ -90,7 +90,7 @@ const handler = async (req: Request): Promise<Response> => {
                               <table width="100%" cellpadding="0" cellspacing="0">
                                 <tr>
                                   <td width="50" valign="top">
-                                    <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); border-radius: 10px; text-align: center; line-height: 40px; font-size: 20px;">🔍</div>
+                                    <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); border-radius: 10px; text-align: center; line-height: 40px; font-size: 20px;">🔍</div>
                                   </td>
                                   <td style="padding-left: 12px;">
                                     <h3 style="margin: 0 0 6px 0; color: #1f2937; font-size: 16px; font-weight: 600;">Find Parking Instantly</h3>
@@ -138,7 +138,7 @@ const handler = async (req: Request): Promise<Response> => {
                         <table width="100%" cellpadding="0" cellspacing="0" style="margin: 32px 0;">
                           <tr>
                             <td align="center">
-                              <a href="${appUrl}/explore" style="display: inline-block; background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 10px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 14px rgba(139, 92, 246, 0.4);">Start Exploring →</a>
+                              <a href="${appUrl}/explore" style="display: inline-block; background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 10px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 14px rgba(107, 78, 255, 0.4);">Start Exploring →</a>
                             </td>
                           </tr>
                         </table>
@@ -168,7 +168,7 @@ const handler = async (req: Request): Promise<Response> => {
                     <tr>
                       <td style="background-color: #f8f9fa; padding: 24px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
                         <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">
-                          Happy Parking! 🚗<br><strong style="color: #8B5CF6;">The Parkzy Team</strong>
+                          Happy Parking! 🚗<br><strong style="color: #6B4EFF;">The Parkzy Team</strong>
                         </p>
                         <p style="margin: 12px 0 0 0; color: #9ca3af; font-size: 12px;">
                           © 2025 Parkzy. All rights reserved.

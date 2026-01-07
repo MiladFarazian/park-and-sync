@@ -146,7 +146,7 @@ serve(async (req) => {
               subject: "⏰ Booking Request Expiring in 30 Minutes",
               html: `
                 <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                  <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); padding: 24px; border-radius: 12px;">
+                  <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); padding: 24px; border-radius: 12px;">
                     <img src="https://mqbupmusmciijsjmzbcu.supabase.co/storage/v1/object/public/assets/parkzy-logo-white.png" alt="Parkzy" style="height: 40px; width: auto;" />
                   </div>
                   
@@ -191,8 +191,9 @@ serve(async (req) => {
                   
                   <div style="text-align: center; margin: 32px 0;">
                     <a href="${appUrl}/host-booking-confirmation/${booking.id}" 
-                       style="display: inline-block; background: #8b5cf6; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+                       style="display: inline-block; background: #6B4EFF; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
                       Review & Respond Now
+                    </a>
                     </a>
                   </div>
                   
