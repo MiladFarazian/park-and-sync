@@ -573,14 +573,14 @@ const LocationSearchInput = ({
     setSuggestions([]);
   };
 
-  const handleClearHistory = (e: React.MouseEvent) => {
+  const handleClearHistory = (e: React.SyntheticEvent) => {
     e.preventDefault();
     e.stopPropagation();
     localStorage.removeItem(HISTORY_STORAGE_KEY);
     setSearchHistory([]);
   };
 
-  const handleRemoveHistoryItem = (e: React.MouseEvent, name: string) => {
+  const handleRemoveHistoryItem = (e: React.SyntheticEvent, name: string) => {
     e.preventDefault();
     e.stopPropagation();
     const filtered = searchHistory.filter(item => item.name !== name);
@@ -588,7 +588,7 @@ const LocationSearchInput = ({
     setSearchHistory(filtered);
   };
 
-  const handleToggleFavorite = async (e: React.MouseEvent, location: { name: string; lat: number; lng: number }) => {
+  const handleToggleFavorite = async (e: React.SyntheticEvent, location: { name: string; lat: number; lng: number }) => {
     e.preventDefault();
     e.stopPropagation();
     await toggleFavoriteLocation(location);
@@ -600,7 +600,7 @@ const LocationSearchInput = ({
     setSuggestions([]);
   };
 
-  const handleRemoveFavorite = async (e: React.MouseEvent, name: string) => {
+  const handleRemoveFavorite = async (e: React.SyntheticEvent, name: string) => {
     e.preventDefault();
     e.stopPropagation();
     await removeFavorite(name);
@@ -710,10 +710,18 @@ const LocationSearchInput = ({
     }
   };
 
-  // Helper to handle touch/mouse interaction - prevents blur from closing dropdown
-  const handleItemInteraction = (e: React.MouseEvent | React.TouchEvent) => {
+  const handlePointerAction = (e: React.PointerEvent, action: () => void) => {
+    // Prevent the input from blurring before the tap/click is processed (mobile Safari)
     e.preventDefault();
     ignoreBlurRef.current = true;
+
+    // In some mobile browsers blur won't fire if we preventDefault;
+    // release the flag shortly after to avoid ignoring later real blurs.
+    window.setTimeout(() => {
+      ignoreBlurRef.current = false;
+    }, 350);
+
+    action();
   };
 
   const handleBlur = () => {
@@ -780,9 +788,8 @@ const LocationSearchInput = ({
         <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-background border border-border rounded-xl shadow-lg max-h-72 overflow-y-auto">
           {/* Use Current Location Option - Always shown first */}
           <button
-            onMouseDown={handleItemInteraction}
-            onTouchStart={handleItemInteraction}
-            onClick={handleUseCurrentLocation}
+            type="button"
+            onPointerDown={(e) => handlePointerAction(e, handleUseCurrentLocation)}
             className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 focus:outline-none focus:bg-muted/50"
           >
             <div className="flex items-center gap-3">
@@ -816,10 +823,11 @@ const LocationSearchInput = ({
           {/* Search Suggestions */}
           {suggestions.map((suggestion, index) => (
             <button
+              type="button"
               key={suggestion.mapbox_id || index}
-              onMouseDown={handleItemInteraction}
-              onTouchStart={handleItemInteraction}
-              onClick={() => handleSelectSuggestion(suggestion)}
+              onPointerDown={(e) =>
+                handlePointerAction(e, () => handleSelectSuggestion(suggestion))
+              }
               className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-b-0 focus:outline-none focus:bg-muted/50"
             >
               <div className="flex items-start gap-3">
@@ -844,18 +852,22 @@ const LocationSearchInput = ({
               </div>
               {favorites.map((item) => (
                 <button
+                  type="button"
                   key={item.name}
-                  onMouseDown={handleItemInteraction}
-                  onTouchStart={handleItemInteraction}
-                  onClick={() => handleSelectFavorite(item)}
+                  onPointerDown={(e) => handlePointerAction(e, () => handleSelectFavorite(item))}
                   className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-b-0 focus:outline-none focus:bg-muted/50 group"
                 >
                   <div className="flex items-center gap-3">
                     <Star className="h-4 w-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
                     <p className="text-sm font-medium truncate flex-1">{item.name}</p>
                     <button
-                      onMouseDown={(e) => { e.stopPropagation(); handleRemoveFavorite(e, item.name); }}
-                      onTouchStart={(e) => e.stopPropagation()}
+                      type="button"
+                      onPointerDown={(e) => {
+                        // Prevent the row selection handler
+                        e.preventDefault();
+                        e.stopPropagation();
+                        void handleRemoveFavorite(e, item.name);
+                      }}
                       className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity p-1 -m-1"
                       title="Remove from favorites"
                     >
@@ -873,7 +885,12 @@ const LocationSearchInput = ({
               <div className="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide bg-muted/30 flex items-center justify-between">
                 <span>Recent searches</span>
                 <button
-                  onMouseDown={handleClearHistory}
+                  type="button"
+                  onPointerDown={(e) =>
+                    handlePointerAction(e, () => {
+                      void handleClearHistory(e);
+                    })
+                  }
                   className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Clear all
@@ -881,26 +898,33 @@ const LocationSearchInput = ({
               </div>
               {searchHistory.map((item) => (
                 <button
+                  type="button"
                   key={item.name}
-                  onMouseDown={handleItemInteraction}
-                  onTouchStart={handleItemInteraction}
-                  onClick={() => handleSelectFromHistory(item)}
+                  onPointerDown={(e) => handlePointerAction(e, () => handleSelectFromHistory(item))}
                   className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-b-0 focus:outline-none focus:bg-muted/50 group"
                 >
                   <div className="flex items-center gap-3">
                     <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     <p className="text-sm font-medium truncate flex-1">{item.name}</p>
                     <button
-                      onMouseDown={(e) => { e.stopPropagation(); handleToggleFavorite(e, item); }}
-                      onTouchStart={(e) => e.stopPropagation()}
+                      type="button"
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        void handleToggleFavorite(e, item as any);
+                      }}
                       className={`p-1 -m-1 transition-opacity ${isFavorite(item.name, favorites) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                       title={isFavorite(item.name, favorites) ? 'Remove from favorites' : 'Add to favorites'}
                     >
                       <Star className={`h-3.5 w-3.5 ${isFavorite(item.name, favorites) ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground hover:text-yellow-500'}`} />
                     </button>
                     <button
-                      onMouseDown={(e) => { e.stopPropagation(); handleRemoveHistoryItem(e, item.name); }}
-                      onTouchStart={(e) => e.stopPropagation()}
+                      type="button"
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleRemoveHistoryItem(e, item.name);
+                      }}
                       className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity p-1 -m-1"
                       title="Remove"
                     >
@@ -920,16 +944,17 @@ const LocationSearchInput = ({
               </div>
               {popularPOIs.map((poi) => (
                 <button
+                  type="button"
                   key={poi.name}
-                  onMouseDown={handleItemInteraction}
-                  onTouchStart={handleItemInteraction}
-                  onClick={() => {
-                    // Save POI selection to history too
-                    addToSearchHistory({ lat: poi.lat, lng: poi.lng, name: poi.name });
-                    setSearchHistory(loadSearchHistory());
-                    onSelectLocation({ lat: poi.lat, lng: poi.lng, name: poi.name });
-                    setShowDropdown(false);
-                  }}
+                  onPointerDown={(e) =>
+                    handlePointerAction(e, () => {
+                      // Save POI selection to history too
+                      addToSearchHistory({ lat: poi.lat, lng: poi.lng, name: poi.name });
+                      setSearchHistory(loadSearchHistory());
+                      onSelectLocation({ lat: poi.lat, lng: poi.lng, name: poi.name });
+                      setShowDropdown(false);
+                    })
+                  }
                   className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-b-0 focus:outline-none focus:bg-muted/50"
                 >
                   <div className="flex items-start gap-3">
