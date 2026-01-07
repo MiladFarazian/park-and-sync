@@ -28,6 +28,8 @@ interface BookingForCalendar {
   end_at: string;
   status: string;
   total_amount: number;
+  is_guest?: boolean;
+  guest_full_name?: string | null;
   renter?: {
     first_name: string | null;
     last_name: string | null;
@@ -132,7 +134,7 @@ const HostCalendar = () => {
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select(`
-          id, spot_id, start_at, end_at, status, total_amount,
+          id, spot_id, start_at, end_at, status, total_amount, is_guest, guest_full_name,
           renter:profiles!bookings_renter_id_fkey(first_name, last_name),
           spot:spots!bookings_spot_id_fkey(title, address)
         `)
@@ -337,10 +339,13 @@ const HostCalendar = () => {
     const handleReview = (e: React.MouseEvent) => {
       e.stopPropagation();
       const renter = booking.renter;
+      const isGuestBooking = booking.is_guest === true;
       setReviewBooking({
         ...booking,
         revieweeId: booking.renter_id,
-        revieweeName: renter?.first_name ? `${renter.first_name} ${renter.last_name || ''}`.trim() : 'Guest',
+        revieweeName: isGuestBooking 
+          ? (booking.guest_full_name || 'Guest')
+          : (renter?.first_name ? `${renter.first_name} ${renter.last_name || ''}`.trim() : 'Guest'),
         reviewerRole: 'host'
       });
       setReviewModalOpen(true);
@@ -359,7 +364,12 @@ const HostCalendar = () => {
               </h3>
               <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
                 <User className="h-3.5 w-3.5 shrink-0" />
-                <span>{booking.renter?.first_name || 'Guest'} {booking.renter?.last_name?.[0] || ''}.</span>
+                <span>
+                  {booking.is_guest 
+                    ? (booking.guest_full_name || 'Guest')
+                    : `${booking.renter?.first_name || 'Guest'} ${booking.renter?.last_name?.[0] || ''}.`
+                  }
+                </span>
               </div>
             </div>
             <Badge 
@@ -825,7 +835,10 @@ const HostCalendar = () => {
                             <div className="flex items-center gap-2">
                               <User className="h-4 w-4 text-muted-foreground" />
                               <span className="font-medium">
-                                {booking.renter?.first_name} {booking.renter?.last_name || ''}
+                                {booking.is_guest 
+                                  ? (booking.guest_full_name || 'Guest')
+                                  : `${booking.renter?.first_name || ''} ${booking.renter?.last_name || ''}`.trim() || 'Guest'
+                                }
                               </span>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
