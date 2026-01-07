@@ -29,6 +29,7 @@ const GuestChatPane = ({ bookingId, accessToken, hostName }: GuestChatPaneProps)
   const [error, setError] = useState<string | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
+  const pendingMessageRef = useRef<string | null>(null);
 
   const scrollToBottom = () => {
     if (messagesContainerRef.current) {
@@ -49,7 +50,10 @@ const GuestChatPane = ({ bookingId, accessToken, hostName }: GuestChatPaneProps)
       setError(null);
     } catch (err: any) {
       console.error('Failed to fetch messages:', err);
-      setError('Failed to load messages');
+      // Don't show error for rate limiting - just skip this poll
+      if (!err.message?.includes('Too many requests')) {
+        setError('Failed to load messages');
+      }
     } finally {
       setLoading(false);
     }
@@ -61,11 +65,21 @@ const GuestChatPane = ({ bookingId, accessToken, hostName }: GuestChatPaneProps)
     // Subscribe to real-time updates
     const channel = supabase.channel(`guest-messages:${bookingId}`)
       .on('broadcast', { event: 'new_message' }, (payload) => {
-        console.log('Received new message:', payload);
         const newMsg = payload.payload as GuestMessage;
+        
+        // Skip if this is our own pending message (we'll get it from the API response)
+        if (pendingMessageRef.current && newMsg.message === pendingMessageRef.current) {
+          return;
+        }
+        
         setMessages((prev) => {
-          // Avoid duplicates
-          if (prev.some(m => m.id === newMsg.id)) return prev;
+          // Avoid duplicates by checking ID and also temp IDs
+          if (prev.some(m => m.id === newMsg.id || (m.id.startsWith('temp-') && m.message === newMsg.message))) {
+            // Replace temp message with real one
+            return prev.map(m => 
+              m.id.startsWith('temp-') && m.message === newMsg.message ? newMsg : m
+            );
+          }
           return [...prev, newMsg];
         });
       })
@@ -94,10 +108,14 @@ const GuestChatPane = ({ bookingId, accessToken, hostName }: GuestChatPaneProps)
     setSending(true);
     const messageText = newMessage.trim();
     setNewMessage('');
+    
+    // Track pending message to avoid duplicate from broadcast
+    pendingMessageRef.current = messageText;
 
     // Optimistic update
+    const tempId = `temp-${Date.now()}`;
     const tempMessage: GuestMessage = {
-      id: `temp-${Date.now()}`,
+      id: tempId,
       booking_id: bookingId,
       sender_type: 'guest',
       message: messageText,
@@ -116,16 +134,17 @@ const GuestChatPane = ({ bookingId, accessToken, hostName }: GuestChatPaneProps)
 
       // Replace temp message with real one
       setMessages((prev) => 
-        prev.map(m => m.id === tempMessage.id ? data.message : m)
+        prev.map(m => m.id === tempId ? data.message : m)
       );
     } catch (err: any) {
       console.error('Failed to send message:', err);
       // Remove optimistic message on failure
-      setMessages((prev) => prev.filter(m => m.id !== tempMessage.id));
+      setMessages((prev) => prev.filter(m => m.id !== tempId));
       setNewMessage(messageText); // Restore the message
       setError('Failed to send message. Please try again.');
     } finally {
       setSending(false);
+      pendingMessageRef.current = null;
     }
   };
 
