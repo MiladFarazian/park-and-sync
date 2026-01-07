@@ -4,7 +4,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { Search, Send, Loader2, ArrowLeft, Paperclip, X, Check, CheckCheck, PenSquare } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Search, Send, Loader2, ArrowLeft, Paperclip, X, Check, CheckCheck, PenSquare, User } from 'lucide-react';
 import { useMessages, Message } from '@/contexts/MessagesContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,6 +31,7 @@ import {
 } from '@/components/ui/drawer';
 import RequireAuth from '@/components/auth/RequireAuth';
 import RequireVerifiedAuth from '@/components/auth/RequireVerifiedAuth';
+import GuestChatPaneHost from '@/components/guest/GuestChatPaneHost';
 
 // Helper to format display name (First Name + Last Initial)
 const formatDisplayName = (firstName?: string | null, lastName?: string | null): string => {
@@ -773,8 +775,14 @@ const MessagesContent = () => {
                   <div className="flex items-start gap-3">
                     <div className="relative">
                       <Avatar>
-                        <AvatarImage src={conversation.avatar_url} />
-                        <AvatarFallback>{conversation.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                        {conversation.is_guest_conversation ? (
+                          <AvatarFallback><User className="h-4 w-4" /></AvatarFallback>
+                        ) : (
+                          <>
+                            <AvatarImage src={conversation.avatar_url} />
+                            <AvatarFallback>{conversation.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                          </>
+                        )}
                       </Avatar>
                       {/* Unread indicator dot - static */}
                       {conversation.unread_count > 0 && (
@@ -783,10 +791,15 @@ const MessagesContent = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <p className={`font-semibold text-sm truncate ${conversation.unread_count > 0 ? 'text-foreground' : ''}`}>
-                          {conversation.name}
-                        </p>
-                        <span className={`text-xs ${conversation.unread_count > 0 ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                        <div className="flex items-center gap-2">
+                          <p className={`font-semibold text-sm truncate ${conversation.unread_count > 0 ? 'text-foreground' : ''}`}>
+                            {conversation.name}
+                          </p>
+                          {conversation.is_guest_conversation && (
+                            <Badge variant="outline" className="text-xs shrink-0">Guest</Badge>
+                          )}
+                        </div>
+                        <span className={`text-xs shrink-0 ${conversation.unread_count > 0 ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
                           {formatDistanceToNow(new Date(conversation.last_message_at), { addSuffix: true })}
                         </span>
                       </div>
@@ -810,16 +823,26 @@ const MessagesContent = () => {
       {/* Messages Area */}
       <div className={`${selectedConversation && isMobile ? 'flex' : 'hidden'} md:flex flex-1 flex-col overflow-hidden bg-card`}>
         {selectedConversation ? (
-          <ChatPane
-            key={selectedConversation}
-            conversationId={selectedConversation}
-            userId={(user?.id as string) ?? ''}
-            onBack={() => setSearchParams({}, { replace: true })}
-            displayName={displayName}
-            displayAvatar={displayAvatar}
-            messagesCacheRef={messagesCacheRef}
-            markAsRead={markAsRead}
-          />
+          // Check if this is a guest conversation
+          selectedConversation.startsWith('guest:') ? (
+            <GuestChatPaneHost
+              bookingId={selectedConversation.replace('guest:', '')}
+              guestName={selectedConvData?.guest_name || selectedConvData?.name?.replace(' (Guest)', '') || 'Guest'}
+              onBack={() => setSearchParams({}, { replace: true })}
+              markAsRead={markAsRead}
+            />
+          ) : (
+            <ChatPane
+              key={selectedConversation}
+              conversationId={selectedConversation}
+              userId={(user?.id as string) ?? ''}
+              onBack={() => setSearchParams({}, { replace: true })}
+              displayName={displayName}
+              displayAvatar={displayAvatar}
+              messagesCacheRef={messagesCacheRef}
+              markAsRead={markAsRead}
+            />
+          )
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center">

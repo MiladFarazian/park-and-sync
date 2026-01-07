@@ -10,6 +10,10 @@ export interface Conversation {
   last_message: string;
   last_message_at: string;
   unread_count: number;
+  // Guest conversation metadata
+  is_guest_conversation?: boolean;
+  booking_id?: string;
+  guest_name?: string;
 }
 
 export interface Message {
@@ -68,8 +72,87 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastDataHashRef = useRef<string>('');
 
+  // Fetch guest conversations for hosts
+  const fetchGuestConversations = useCallback(async (): Promise<Conversation[]> => {
+    if (!user) return [];
+
+    try {
+      // Get all bookings where user is host with guest messages
+      const { data: hostSpots } = await supabase
+        .from('spots')
+        .select('id')
+        .eq('host_id', user.id);
+
+      if (!hostSpots || hostSpots.length === 0) return [];
+
+      const spotIds = hostSpots.map(s => s.id);
+
+      // Get guest bookings with messages for host's spots
+      const { data: guestBookings } = await supabase
+        .from('bookings')
+        .select(`
+          id,
+          guest_full_name,
+          guest_email,
+          spots!inner(id, title, host_id)
+        `)
+        .in('spot_id', spotIds)
+        .eq('is_guest', true);
+
+      if (!guestBookings || guestBookings.length === 0) return [];
+
+      const bookingIds = guestBookings.map(b => b.id);
+
+      // Fetch guest messages for these bookings
+      const { data: guestMessages } = await supabase
+        .from('guest_messages')
+        .select('*')
+        .in('booking_id', bookingIds)
+        .order('created_at', { ascending: false });
+
+      if (!guestMessages || guestMessages.length === 0) return [];
+
+      // Group messages by booking
+      const messagesByBooking = new Map<string, any[]>();
+      for (const msg of guestMessages) {
+        if (!messagesByBooking.has(msg.booking_id)) {
+          messagesByBooking.set(msg.booking_id, []);
+        }
+        messagesByBooking.get(msg.booking_id)!.push(msg);
+      }
+
+      // Build guest conversations
+      const guestConvs: Conversation[] = [];
+      for (const booking of guestBookings) {
+        const messages = messagesByBooking.get(booking.id);
+        if (!messages || messages.length === 0) continue;
+
+        const latestMsg = messages[0]; // Already sorted desc
+        const unreadCount = messages.filter(m => m.sender_type === 'guest' && !m.read_at).length;
+
+        guestConvs.push({
+          id: `guest:${booking.id}`,
+          user_id: `guest:${booking.id}`,
+          name: `${booking.guest_full_name || 'Guest'} (Guest)`,
+          avatar_url: undefined,
+          last_message: latestMsg.message,
+          last_message_at: latestMsg.created_at,
+          unread_count: unreadCount,
+          is_guest_conversation: true,
+          booking_id: booking.id,
+          guest_name: booking.guest_full_name || 'Guest',
+        });
+      }
+
+      return guestConvs;
+    } catch (error) {
+      console.error('Error fetching guest conversations:', error);
+      return [];
+    }
+  }, [user]);
+
   // Build conversations from messages (shared logic)
-  const buildConversations = useCallback(async (allMessages: any[], profiles: any[]): Promise<Conversation[]> => {
+  const buildConversations = useCallback(async (allMessages: any[], profiles: any[], guestConvs: Conversation[] = []): Promise<Conversation[]> => {
     if (!user) return [];
     
     const conversationMap = new Map<string, any>();
@@ -129,8 +212,10 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       });
     }
 
-    convs.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
-    return convs;
+    // Add guest conversations
+    const allConvs = [...convs, ...guestConvs];
+    allConvs.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
+    return allConvs;
   }, [user]);
 
   // Create a hash of conversations for comparison
@@ -143,12 +228,16 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!user || !mountedRef.current) return;
 
     try {
-      const { data: allMessages, error } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
-        .order('created_at', { ascending: false });
+      const [messagesResult, guestConvs] = await Promise.all([
+        supabase
+          .from('messages')
+          .select('*')
+          .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
+          .order('created_at', { ascending: false }),
+        fetchGuestConversations()
+      ]);
 
+      const { data: allMessages, error } = messagesResult;
       if (error || !mountedRef.current) return;
 
       const partnerIds = [...new Set((allMessages || []).map(m => 
@@ -164,7 +253,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         profiles = data || [];
       }
 
-      const newConvs = await buildConversations(allMessages || [], profiles);
+      const newConvs = await buildConversations(allMessages || [], profiles, guestConvs);
       
       setConversations(prev => {
         const newHash = hashConversations(newConvs);
@@ -177,7 +266,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (error) {
       // Silent fail for background refresh
     }
-  }, [user, buildConversations]);
+  }, [user, buildConversations, fetchGuestConversations]);
 
   // Initial load with loading indicator
   const loadConversations = useCallback(async () => {
@@ -188,12 +277,16 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setLoading(true);
       }
       
-      const { data: allMessages, error } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
-        .order('created_at', { ascending: false });
+      const [messagesResult, guestConvs] = await Promise.all([
+        supabase
+          .from('messages')
+          .select('*')
+          .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
+          .order('created_at', { ascending: false }),
+        fetchGuestConversations()
+      ]);
 
+      const { data: allMessages, error } = messagesResult;
       if (error) throw error;
       if (!mountedRef.current) return;
 
@@ -210,7 +303,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         profiles = data || [];
       }
 
-      const convs = await buildConversations(allMessages || [], profiles);
+      const convs = await buildConversations(allMessages || [], profiles, guestConvs);
       lastDataHashRef.current = hashConversations(convs);
       
       if (mountedRef.current) {
@@ -223,10 +316,13 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setLoading(false);
       }
     }
-  }, [user, buildConversations, conversations.length]);
+  }, [user, buildConversations, conversations.length, fetchGuestConversations]);
 
   // Helpers for realtime incremental updates
   const ensureProfileLoaded = useCallback(async (partnerId: string) => {
+    // Skip guest conversation IDs
+    if (partnerId.startsWith('guest:')) return;
+    
     if (profileCacheRef.current.has(partnerId)) return;
     
     if (partnerId === '00000000-0000-0000-0000-000000000001') {
@@ -300,6 +396,22 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           : conv
       )
     );
+
+    // Handle guest conversations
+    if (senderId.startsWith('guest:')) {
+      const bookingId = senderId.replace('guest:', '');
+      try {
+        await supabase
+          .from('guest_messages')
+          .update({ read_at: new Date().toISOString() })
+          .eq('booking_id', bookingId)
+          .eq('sender_type', 'guest')
+          .is('read_at', null);
+      } catch (error) {
+        console.error('Error marking guest messages as read:', error);
+      }
+      return;
+    }
 
     try {
       await supabase
