@@ -90,29 +90,43 @@ const GuestChatPaneHost = ({ bookingId, guestName, onBack, markAsRead }: GuestCh
   useEffect(() => {
     fetchMessages();
 
-    // Subscribe to real-time updates
-    const channel = supabase.channel(`guest-messages:${bookingId}`)
-      .on('broadcast', { event: 'new_message' }, (payload) => {
-        const newMsg = payload.payload as GuestMessage;
-        
-        // Skip if this is our own pending message
-        if (pendingMessageRef.current && newMsg.message === pendingMessageRef.current) {
-          return;
-        }
-        
-        setMessages((prev) => {
-          // Check for duplicates or temp messages with same content
-          if (prev.some(m => m.id === newMsg.id || (m.id.startsWith('temp-') && m.message === newMsg.message))) {
-            return prev.map(m => 
-              m.id.startsWith('temp-') && m.message === newMsg.message ? newMsg : m
+    // Subscribe to DB inserts for instant guest->host delivery
+    const channel = supabase
+      .channel(`guest-messages-db:${bookingId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'guest_messages',
+          filter: `booking_id=eq.${bookingId}`,
+        },
+        (payload) => {
+          const newMsg = payload.new as GuestMessage;
+
+          setMessages((prev) => {
+            // If this is our own message, replace the optimistic temp message
+            const tempIndex = prev.findIndex(
+              (m) =>
+                m.id.startsWith('temp-') &&
+                m.sender_type === 'host' &&
+                m.message === newMsg.message
             );
-          }
-          return [...prev, newMsg];
-        });
-        
-        // Mark as read
-        setTimeout(() => markAsRead(`guest:${bookingId}`), 500);
-      })
+            if (tempIndex !== -1) {
+              const next = [...prev];
+              next[tempIndex] = newMsg;
+              return next;
+            }
+
+            // Avoid duplicates
+            if (prev.some((m) => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+
+          // Mark as read
+          setTimeout(() => markAsRead(`guest:${bookingId}`), 500);
+        }
+      )
       .subscribe();
 
     channelRef.current = channel;
