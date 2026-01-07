@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Calendar, Clock, Car, Check, Navigation, Loader2, Phone, Mail, User } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Clock, Car, Check, Navigation, Loader2, Phone, Mail, User, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -228,6 +228,17 @@ const GuestBookingDetail = () => {
           <Card className="p-4">
             <h3 className="font-semibold mb-2">Access Instructions</h3>
             <p className="text-sm text-muted-foreground">{spot.access_notes}</p>
+          </Card>
+        )}
+
+        {/* EV Charging Instructions */}
+        {booking.will_use_ev_charging && spot.has_ev_charging && spot.ev_charging_instructions && (
+          <Card className="p-4 border-green-200 bg-green-50/50">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="h-5 w-5 text-green-600" />
+              <h3 className="font-semibold text-green-800">EV Charging Instructions</h3>
+            </div>
+            <p className="text-sm text-green-700">{spot.ev_charging_instructions}</p>
           </Card>
         )}
 
