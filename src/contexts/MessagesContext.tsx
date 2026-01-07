@@ -133,7 +133,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         guestConvs.push({
           id: `guest:${booking.id}`,
           user_id: `guest:${booking.id}`,
-          name: `${booking.guest_full_name || 'Guest'} (Guest)`,
+          name: booking.guest_full_name || 'Guest',
           avatar_url: undefined,
           last_message: latestMsg.message,
           last_message_at: latestMsg.created_at,
