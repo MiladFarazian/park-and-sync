@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { Message } from '@/hooks/useMessages';
+import type { Message } from '@/contexts/MessagesContext';
 
 export function sendMessage({
   recipientId,

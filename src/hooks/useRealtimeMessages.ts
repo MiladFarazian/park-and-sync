@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import type { Message } from './useMessages';
+import type { Message } from '@/contexts/MessagesContext';
 
 export function useRealtimeMessages(
   conversationUserId: string | null,
