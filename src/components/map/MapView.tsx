@@ -361,22 +361,15 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           }
         });
 
-        // Load destination pin image (purple pin)
+        // Load destination pin image (modern purple pin without shadow)
         const destPinSvg = `
-          <svg width="50" height="60" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <filter id="shadow-dest" x="-50%" y="-50%" width="200%" height="200%">
-                <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.4)" />
-              </filter>
-            </defs>
-            <g filter="url(#shadow-dest)">
-              <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
-                    fill="#f0edfe" stroke="#694dff" stroke-width="3"/>
-              <circle cx="25" cy="20" r="8" fill="#694dff" opacity="1"/>
-            </g>
+          <svg width="36" height="44" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 18 2 C 10 2 4 8 4 16 C 4 26 18 42 18 42 C 18 42 32 26 32 16 C 32 8 26 2 18 2 Z" 
+                  fill="#f0edfe" stroke="#694dff" stroke-width="2"/>
+            <circle cx="18" cy="16" r="6" fill="#694dff"/>
           </svg>`;
         const destPinUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(destPinSvg);
-        const destImg = new Image(50, 60);
+        const destImg = new Image(36, 44);
         destImg.onload = () => {
           try {
             if (!map.current?.hasImage('pin-destination')) {
@@ -452,20 +445,13 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         });
 
         const destPinSvg = `
-          <svg width="50" height="60" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <filter id="shadow-dest-alt" x="-50%" y="-50%" width="200%" height="200%">
-                <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.4)" />
-              </filter>
-            </defs>
-            <g filter="url(#shadow-dest-alt)">
-              <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
-                    fill="#f0edfe" stroke="#694dff" stroke-width="3"/>
-              <circle cx="25" cy="20" r="8" fill="#694dff" opacity="1"/>
-            </g>
+          <svg width="36" height="44" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 18 2 C 10 2 4 8 4 16 C 4 26 18 42 18 42 C 18 42 32 26 32 16 C 32 8 26 2 18 2 Z" 
+                  fill="#f0edfe" stroke="#694dff" stroke-width="2"/>
+            <circle cx="18" cy="16" r="6" fill="#694dff"/>
           </svg>`;
         const destPinUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(destPinSvg);
-        const destImg = new Image(50, 60);
+        const destImg = new Image(36, 44);
         destImg.onload = () => {
           try {
             if (!map.current?.hasImage('pin-destination')) {
@@ -1163,20 +1149,13 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       // White pin (default for unselected)
       if (!hasWhite) {
         const whiteSvg = `
-          <svg width="50" height="60" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <filter id="shadow-white" x="-50%" y="-50%" width="200%" height="200%">
-                <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.35)" />
-              </filter>
-            </defs>
-            <g filter="url(#shadow-white)">
-              <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
-                    fill="white" stroke="#e0e0e0" stroke-width="2"/>
-              <circle cx="25" cy="20" r="13" fill="#f5f5f5" opacity="0.95"/>
-            </g>
+          <svg width="36" height="44" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 18 2 C 10 2 4 8 4 16 C 4 26 18 42 18 42 C 18 42 32 26 32 16 C 32 8 26 2 18 2 Z" 
+                  fill="white" stroke="#d1d5db" stroke-width="1.5"/>
+            <circle cx="18" cy="16" r="10" fill="#f9fafb"/>
           </svg>`;
         const whiteUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(whiteSvg);
-        const whiteImg = new Image(50, 60);
+        const whiteImg = new Image(36, 44);
         whiteImg.onload = () => {
           try {
             (map.current as any).addImage(pinImageIdWhite, whiteImg, { pixelRatio: 2 });
@@ -1193,20 +1172,13 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       // Purple pin (for selected)
       if (!hasPurple) {
         const purpleSvg = `
-          <svg width="50" height="60" viewBox="0 0 50 60" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <filter id="shadow-purple" x="-50%" y="-50%" width="200%" height="200%">
-                <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.35)" />
-              </filter>
-            </defs>
-            <g filter="url(#shadow-purple)">
-              <path d="M 25 2 C 15 2 7 10 7 20 C 7 30 25 58 25 58 C 25 58 43 30 43 20 C 43 10 35 2 25 2 Z" 
-                    fill="hsl(250, 100%, 65%)" stroke="white" stroke-width="2.5"/>
-              <circle cx="25" cy="20" r="13" fill="white" opacity="0.95"/>
-            </g>
+          <svg width="36" height="44" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 18 2 C 10 2 4 8 4 16 C 4 26 18 42 18 42 C 18 42 32 26 32 16 C 32 8 26 2 18 2 Z" 
+                  fill="hsl(250, 100%, 65%)" stroke="white" stroke-width="2"/>
+            <circle cx="18" cy="16" r="10" fill="white"/>
           </svg>`;
         const purpleUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(purpleSvg);
-        const purpleImg = new Image(50, 60);
+        const purpleImg = new Image(36, 44);
         purpleImg.onload = () => {
           try {
             (map.current as any).addImage(pinImageIdPurple, purpleImg, { pixelRatio: 2 });
