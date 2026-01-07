@@ -188,7 +188,7 @@ const HostCalendar = () => {
             address,
             host_id
           ),
-          renter:renter_id (
+          renter:profiles!bookings_renter_id_fkey (
             first_name,
             last_name
           )
