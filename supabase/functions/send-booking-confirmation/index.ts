@@ -139,7 +139,7 @@ const handler = async (req: Request): Promise<Response> => {
                   <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                     <!-- Header -->
                     <tr>
-                      <td style="background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); padding: 40px 30px; text-align: center;">
+                      <td style="background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); padding: 40px 30px; text-align: center;">
                         <img src="https://mqbupmusmciijsjmzbcu.supabase.co/storage/v1/object/public/assets/parkzy-logo-white.png" alt="Parkzy" style="height: 40px; width: auto; margin-bottom: 16px;" />
                         <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">🎉 New Booking!</h1>
                         <p style="margin: 10px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px;">You've earned $${totalAmount.toFixed(2)}</p>
@@ -160,7 +160,7 @@ const handler = async (req: Request): Promise<Response> => {
                         <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; border-radius: 12px; padding: 24px; margin: 24px 0;">
                           <tr>
                             <td>
-                              <h2 style="margin: 0 0 16px 0; color: #8B5CF6; font-size: 18px; font-weight: 600;">Booking Details</h2>
+                              <h2 style="margin: 0 0 16px 0; color: #6B4EFF; font-size: 18px; font-weight: 600;">Booking Details</h2>
                               
                               <table width="100%" cellpadding="8" cellspacing="0">
                                 <tr>
@@ -188,7 +188,7 @@ const handler = async (req: Request): Promise<Response> => {
                                     <table width="100%">
                                       <tr>
                                         <td style="color: #1f2937; font-size: 16px; font-weight: 700;">💰 Total Earnings</td>
-                                        <td style="color: #8B5CF6; font-size: 20px; font-weight: 700; text-align: right;">$${totalAmount.toFixed(2)}</td>
+                                        <td style="color: #6B4EFF; font-size: 20px; font-weight: 700; text-align: right;">$${totalAmount.toFixed(2)}</td>
                                       </tr>
                                     </table>
                                   </td>
@@ -202,7 +202,7 @@ const handler = async (req: Request): Promise<Response> => {
                         <table width="100%" cellpadding="0" cellspacing="0" style="margin: 32px 0 24px 0;">
                           <tr>
                             <td align="center">
-                              <a href="${hostBookingUrl}" style="display: inline-block; background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 0 8px 8px 8px;">View Booking</a>
+                              <a href="${hostBookingUrl}" style="display: inline-block; background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 0 8px 8px 8px;">View Booking</a>
                               <a href="${directionsUrl}" style="display: inline-block; background-color: #f3f4f6; color: #1f2937; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 0 8px 8px 8px;">Get Directions</a>
                             </td>
                           </tr>
@@ -218,7 +218,7 @@ const handler = async (req: Request): Promise<Response> => {
                     <tr>
                       <td style="background-color: #f8f9fa; padding: 24px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
                         <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">
-                          Best regards,<br><strong style="color: #8B5CF6;">The Parkzy Team</strong>
+                          Best regards,<br><strong style="color: #6B4EFF;">The Parkzy Team</strong>
                         </p>
                         <p style="margin: 8px 0 0 0; color: #9ca3af; font-size: 12px;">
                           © 2025 Parkzy. All rights reserved.
@@ -261,7 +261,7 @@ const handler = async (req: Request): Promise<Response> => {
                   <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                     <!-- Header -->
                     <tr>
-                      <td style="background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); padding: 40px 30px; text-align: center;">
+                      <td style="background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); padding: 40px 30px; text-align: center;">
                         <img src="https://mqbupmusmciijsjmzbcu.supabase.co/storage/v1/object/public/assets/parkzy-logo-white.png" alt="Parkzy" style="height: 40px; width: auto; margin-bottom: 16px;" />
                         <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">✅ Booking Confirmed!</h1>
                         <p style="margin: 10px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px;">Your parking is secured</p>
@@ -282,7 +282,7 @@ const handler = async (req: Request): Promise<Response> => {
                         <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; border-radius: 12px; padding: 24px; margin: 24px 0;">
                           <tr>
                             <td>
-                              <h2 style="margin: 0 0 16px 0; color: #8B5CF6; font-size: 18px; font-weight: 600;">Your Parking Details</h2>
+                              <h2 style="margin: 0 0 16px 0; color: #6B4EFF; font-size: 18px; font-weight: 600;">Your Parking Details</h2>
                               
                               <table width="100%" cellpadding="8" cellspacing="0">
                                 <tr>
@@ -310,7 +310,7 @@ const handler = async (req: Request): Promise<Response> => {
                                     <table width="100%">
                                       <tr>
                                         <td style="color: #1f2937; font-size: 16px; font-weight: 700;">💳 Total Paid</td>
-                                        <td style="color: #8B5CF6; font-size: 20px; font-weight: 700; text-align: right;">$${totalAmount.toFixed(2)}</td>
+                                        <td style="color: #6B4EFF; font-size: 20px; font-weight: 700; text-align: right;">$${totalAmount.toFixed(2)}</td>
                                       </tr>
                                     </table>
                                   </td>
@@ -338,7 +338,7 @@ const handler = async (req: Request): Promise<Response> => {
                         <table width="100%" cellpadding="0" cellspacing="0" style="margin: 32px 0 24px 0;">
                           <tr>
                             <td align="center">
-                              <a href="${directionsUrl}" style="display: inline-block; background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 0 8px 8px 8px;">🗺️ Get Directions</a>
+                              <a href="${directionsUrl}" style="display: inline-block; background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 0 8px 8px 8px;">🗺️ Get Directions</a>
                               <a href="${driverBookingUrl}" style="display: inline-block; background-color: #f3f4f6; color: #1f2937; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 0 8px 8px 8px;">View Booking</a>
                             </td>
                           </tr>
@@ -354,7 +354,7 @@ const handler = async (req: Request): Promise<Response> => {
                     <tr>
                       <td style="background-color: #f8f9fa; padding: 24px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
                         <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">
-                          Happy parking!<br><strong style="color: #8B5CF6;">The Parkzy Team</strong>
+                          Happy parking!<br><strong style="color: #6B4EFF;">The Parkzy Team</strong>
                         </p>
                         <p style="margin: 8px 0 0 0; color: #9ca3af; font-size: 12px;">
                           © 2025 Parkzy. All rights reserved.

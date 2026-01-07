@@ -58,7 +58,7 @@ const handler = async (req: Request): Promise<Response> => {
                 <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                   <!-- Header -->
                   <tr>
-                    <td style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); padding: 32px; text-align: center;">
+                    <td style="background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); padding: 32px; text-align: center;">
                       <img src="https://mqbupmusmciijsjmzbcu.supabase.co/storage/v1/object/public/assets/parkzy-logo-white.png" alt="Parkzy" style="height: 40px; width: auto;" />
                     </td>
                   </tr>
@@ -80,7 +80,7 @@ const handler = async (req: Request): Promise<Response> => {
                             <p style="color: #71717a; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Listing Details</p>
                             <p style="color: #18181b; margin: 0 0 12px 0; font-size: 18px; font-weight: 600;">${spotCategory}</p>
                             <p style="color: #52525b; margin: 0 0 12px 0; font-size: 14px;">${spotAddress}</p>
-                            <p style="color: #8b5cf6; margin: 0; font-size: 20px; font-weight: 700;">$${hourlyRate.toFixed(2)}/hour</p>
+                            <p style="color: #6B4EFF; margin: 0; font-size: 20px; font-weight: 700;">$${hourlyRate.toFixed(2)}/hour</p>
                           </td>
                         </tr>
                       </table>
@@ -93,7 +93,7 @@ const handler = async (req: Request): Promise<Response> => {
                       <table width="100%" cellpadding="0" cellspacing="0">
                         <tr>
                           <td align="center">
-                            <a href="${dashboardUrl}" style="display: inline-block; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                            <a href="${dashboardUrl}" style="display: inline-block; background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
                               View Your Dashboard
                             </a>
                           </td>
@@ -106,7 +106,7 @@ const handler = async (req: Request): Promise<Response> => {
                   <tr>
                     <td style="background-color: #fafafa; padding: 24px 32px; text-align: center; border-top: 1px solid #e4e4e7;">
                       <p style="color: #71717a; margin: 0 0 8px 0; font-size: 14px;">
-                        Need help? Contact us at <a href="mailto:support@useparkzy.com" style="color: #8b5cf6; text-decoration: none;">support@useparkzy.com</a>
+                        Need help? Contact us at <a href="mailto:support@useparkzy.com" style="color: #6B4EFF; text-decoration: none;">support@useparkzy.com</a>
                       </p>
                       <p style="color: #a1a1aa; margin: 0; font-size: 12px;">
                         © ${new Date().getFullYear()} Parkzy. All rights reserved.

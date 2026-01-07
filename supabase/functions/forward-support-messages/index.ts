@@ -85,7 +85,8 @@ serve(async (req: Request) => {
                   <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                     <!-- Header -->
                     <tr>
-                      <td style="background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); padding: 30px; text-align: center;">
+                      <td style="background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); padding: 30px; text-align: center;">
+                        <img src="https://mqbupmusmciijsjmzbcu.supabase.co/storage/v1/object/public/assets/parkzy-logo-white.png" alt="Parkzy" style="height: 36px; width: auto; margin-bottom: 12px;" />
                         <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700;">💬 New Support Message</h1>
                       </td>
                     </tr>
@@ -106,14 +107,14 @@ serve(async (req: Request) => {
                               <p style="margin: 0 0 16px 0; color: #1f2937; font-size: 12px; font-family: monospace;">${record.sender_id}</p>
                               
                               <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px; font-weight: 600;">Message:</p>
-                              <div style="background-color: #ffffff; border-left: 4px solid #8B5CF6; padding: 16px; border-radius: 8px; margin-top: 8px;">
+                              <div style="background-color: #ffffff; border-left: 4px solid #6B4EFF; padding: 16px; border-radius: 8px; margin-top: 8px;">
                                 <p style="margin: 0; color: #1f2937; font-size: 15px; line-height: 1.6; white-space: pre-wrap;">${record.message || '(No text - media only)'}</p>
                               </div>
                               
                               ${record.media_url ? `
                                 <p style="margin: 16px 0 8px 0; color: #6b7280; font-size: 14px; font-weight: 600;">Attachment:</p>
                                 <p style="margin: 0;">
-                                  <a href="${record.media_url}" style="color: #8B5CF6; text-decoration: underline;">View attachment</a>
+                                  <a href="${record.media_url}" style="color: #6B4EFF; text-decoration: underline;">View attachment</a>
                                 </p>
                               ` : ''}
                             </td>
@@ -129,7 +130,7 @@ serve(async (req: Request) => {
                         <table width="100%" cellpadding="0" cellspacing="0" style="margin: 24px 0;">
                           <tr>
                             <td align="center">
-                              <a href="https://mqbupmusmciijsjmzbcu.supabase.co/messages?userId=${record.sender_id}" style="display: inline-block; background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px;">View in App</a>
+                              <a href="https://mqbupmusmciijsjmzbcu.supabase.co/messages?userId=${record.sender_id}" style="display: inline-block; background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px;">View in App</a>
                             </td>
                           </tr>
                         </table>

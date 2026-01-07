@@ -76,7 +76,8 @@ const sendWelcomeEmail = async (
     </head>
     <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; padding: 40px 20px;">
       <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-        <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 40px 30px; text-align: center;">
+        <div style="background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); padding: 40px 30px; text-align: center;">
+          <img src="https://mqbupmusmciijsjmzbcu.supabase.co/storage/v1/object/public/assets/parkzy-logo-white.png" alt="Parkzy" style="height: 40px; width: auto; margin-bottom: 16px;" />
           <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to Parkzy! 🎉</h1>
         </div>
         

@@ -230,7 +230,7 @@ serve(async (req) => {
                             <table width="100%" cellpadding="0" cellspacing="0" style="margin: 32px 0 24px 0;">
                               <tr>
                                 <td align="center">
-                                  <a href="${searchUrl}" style="display: inline-block; background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">🔍 Find Other Parking</a>
+                                  <a href="${searchUrl}" style="display: inline-block; background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">🔍 Find Other Parking</a>
                                 </td>
                               </tr>
                             </table>
@@ -245,7 +245,7 @@ serve(async (req) => {
                         <tr>
                           <td style="background-color: #f8f9fa; padding: 24px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
                             <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">
-                              Best regards,<br><strong style="color: #8B5CF6;">The Parkzy Team</strong>
+                              Best regards,<br><strong style="color: #6B4EFF;">The Parkzy Team</strong>
                             </p>
                             <p style="margin: 8px 0 0 0; color: #9ca3af; font-size: 12px;">
                               © 2025 Parkzy. All rights reserved.
