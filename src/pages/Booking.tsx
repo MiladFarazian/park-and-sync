@@ -1292,6 +1292,10 @@ const GuestBookingPage = () => {
   const [stripePromise, setStripePromise] = useState<Promise<any> | null>(null);
   const [availabilityRules, setAvailabilityRules] = useState<any[]>([]);
   
+  // Server-side availability check state
+  const [serverAvailable, setServerAvailable] = useState<{ ok: boolean; reason?: string }>({ ok: true });
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+  
   // Mobile time picker states
   const [mobileStartPickerOpen, setMobileStartPickerOpen] = useState(false);
   const [mobileEndPickerOpen, setMobileEndPickerOpen] = useState(false);
@@ -1400,6 +1404,43 @@ const GuestBookingPage = () => {
 
     fetchData();
   }, [spotId, navigate, toast]);
+
+  // Check server-side availability when times change
+  useEffect(() => {
+    const checkAvailability = async () => {
+      if (!spotId || !startDateTime || !endDateTime) return;
+      
+      setCheckingAvailability(true);
+      try {
+        const { data, error } = await supabase.rpc('check_spot_availability', {
+          p_spot_id: spotId,
+          p_start_at: startDateTime.toISOString(),
+          p_end_at: endDateTime.toISOString(),
+          p_exclude_booking_id: null,
+          p_exclude_user_id: null
+        });
+        
+        if (error) {
+          console.error('Availability check error:', error);
+          setServerAvailable({ ok: true }); // Fail open - let server validate
+        } else {
+          setServerAvailable({
+            ok: !!data,
+            reason: data ? undefined : 'This time slot is no longer available'
+          });
+        }
+      } catch (err) {
+        console.error('Availability check failed:', err);
+        setServerAvailable({ ok: true }); // Fail open
+      } finally {
+        setCheckingAvailability(false);
+      }
+    };
+    
+    // Debounce the check
+    const timeout = setTimeout(checkAvailability, 300);
+    return () => clearTimeout(timeout);
+  }, [spotId, startDateTime, endDateTime]);
 
   const calculateTotal = () => {
     if (!startDateTime || !endDateTime || !spot) return null;
@@ -1550,6 +1591,19 @@ const GuestBookingPage = () => {
           </p>
         </Card>
 
+        {/* Availability Conflict Warning */}
+        {!serverAvailable.ok && (
+          <Card className="p-4 border-destructive bg-destructive/10">
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5 flex-shrink-0" />
+              <div>
+                <p className="font-medium">Spot Not Available</p>
+                <p className="text-sm opacity-90">{serverAvailable.reason || 'This time slot has already been booked'}</p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Guest Booking Form with Stripe Elements */}
         <Elements stripe={stripePromise}>
           <GuestBookingForm
@@ -1561,6 +1615,8 @@ const GuestBookingPage = () => {
             serviceFee={pricing.serviceFee}
             totalAmount={pricing.total}
             isTimeValid={isTimeRangeValid}
+            isAvailable={serverAvailable.ok}
+            checkingAvailability={checkingAvailability}
           />
         </Elements>
       </div>
