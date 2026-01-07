@@ -39,6 +39,11 @@ interface BookingDetails {
   extension_charges: number | null;
   will_use_ev_charging: boolean | null;
   ev_charging_fee: number | null;
+  is_guest?: boolean;
+  guest_full_name?: string | null;
+  guest_car_model?: string | null;
+  guest_license_plate?: string | null;
+  guest_email?: string | null;
   spots: {
     id: string;
     title: string;
@@ -161,6 +166,11 @@ const BookingDetailContent = () => {
           extension_charges,
           will_use_ev_charging,
           ev_charging_fee,
+          is_guest,
+          guest_full_name,
+          guest_car_model,
+          guest_license_plate,
+          guest_email,
           spots!inner(id, title, address, host_id, description, access_notes, has_ev_charging, ev_charging_instructions, spot_photos(url, is_primary, sort_order)),
           profiles!bookings_renter_id_fkey(first_name, last_name, avatar_url)
         `)
@@ -897,10 +907,16 @@ const BookingDetailContent = () => {
 
         {/* Host/Driver Info - Show different content based on viewer role */}
         <Card className="p-4 space-y-4">
-          <h3 className="font-semibold">{isHost ? 'Driver' : 'Host'}</h3>
+          <h3 className="font-semibold">
+            {isHost ? (booking.is_guest ? 'Guest' : 'Driver') : 'Host'}
+          </h3>
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              {booking.profiles.avatar_url ? (
+              {isHost && booking.is_guest ? (
+                <span className="text-lg font-semibold text-primary">
+                  {(booking.guest_full_name || 'G').charAt(0)}
+                </span>
+              ) : booking.profiles.avatar_url ? (
                 <img src={booking.profiles.avatar_url} alt={isHost ? 'Driver' : 'Host'} className="h-12 w-12 rounded-full object-cover" />
               ) : (
                 <span className="text-lg font-semibold text-primary">
@@ -909,10 +925,28 @@ const BookingDetailContent = () => {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-medium">{booking.profiles.first_name} {booking.profiles.last_name.charAt(0)}.</p>
-              <p className="text-sm text-muted-foreground">{isHost ? 'Driver' : 'Spot Host'}</p>
+              {isHost && booking.is_guest ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{booking.guest_full_name || 'Guest'}</p>
+                    <Badge variant="outline" className="text-xs">Guest</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Guest booking</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium">{booking.profiles.first_name} {booking.profiles.last_name.charAt(0)}.</p>
+                  <p className="text-sm text-muted-foreground">{isHost ? 'Driver' : 'Spot Host'}</p>
+                </>
+              )}
             </div>
-            <Button variant="outline" size="sm" onClick={handleMessage}>
+            <Button variant="outline" size="sm" onClick={() => {
+              if (isHost && booking.is_guest) {
+                navigate(`/messages?userId=guest:${booking.id}`);
+              } else {
+                handleMessage();
+              }
+            }}>
               <MessageCircle className="h-4 w-4 mr-1" />
               Message
             </Button>
