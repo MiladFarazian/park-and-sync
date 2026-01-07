@@ -1020,10 +1020,10 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         filter: ['!', ['has', 'point_count']],
         layout: {
           'text-field': ['get', 'price'],
-          'text-size': 11,
+          'text-size': 12,
           'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
           'text-allow-overlap': true,
-          'text-offset': [0, -2.8]
+          'text-offset': [0, -2.4]
         },
         paint: {
           'text-color': [
@@ -1187,13 +1187,13 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       // White pin (default for unselected)
       if (!hasWhite) {
         const whiteSvg = `
-          <svg width="36" height="44" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg">
-            <path d="M 18 2 C 10 2 4 8 4 16 C 4 26 18 42 18 42 C 18 42 32 26 32 16 C 32 8 26 2 18 2 Z" 
+          <svg width="44" height="54" viewBox="0 0 44 54" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 22 2 C 12 2 4 10 4 20 C 4 32 22 52 22 52 C 22 52 40 32 40 20 C 40 10 32 2 22 2 Z" 
                   fill="white" stroke="#d1d5db" stroke-width="1.5"/>
-            <circle cx="18" cy="16" r="10" fill="#f9fafb"/>
+            <circle cx="22" cy="20" r="14" fill="#f9fafb"/>
           </svg>`;
         const whiteUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(whiteSvg);
-        const whiteImg = new Image(36, 44);
+        const whiteImg = new Image(44, 54);
         whiteImg.onload = () => {
           try {
             (map.current as any).addImage(pinImageIdWhite, whiteImg, { pixelRatio: 2 });
@@ -1210,13 +1210,13 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       // Purple pin (for selected)
       if (!hasPurple) {
         const purpleSvg = `
-          <svg width="36" height="44" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg">
-            <path d="M 18 2 C 10 2 4 8 4 16 C 4 26 18 42 18 42 C 18 42 32 26 32 16 C 32 8 26 2 18 2 Z" 
+          <svg width="44" height="54" viewBox="0 0 44 54" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 22 2 C 12 2 4 10 4 20 C 4 32 22 52 22 52 C 22 52 40 32 40 20 C 40 10 32 2 22 2 Z" 
                   fill="hsl(250, 100%, 65%)" stroke="white" stroke-width="2"/>
-            <circle cx="18" cy="16" r="10" fill="white"/>
+            <circle cx="22" cy="20" r="14" fill="white"/>
           </svg>`;
         const purpleUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(purpleSvg);
-        const purpleImg = new Image(36, 44);
+        const purpleImg = new Image(44, 54);
         purpleImg.onload = () => {
           try {
             (map.current as any).addImage(pinImageIdPurple, purpleImg, { pixelRatio: 2 });
