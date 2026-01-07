@@ -73,8 +73,8 @@ const GuestChatPane = ({ bookingId, accessToken, hostName }: GuestChatPaneProps)
 
     channelRef.current = channel;
 
-    // Polling fallback every 10 seconds
-    const pollInterval = setInterval(fetchMessages, 10000);
+    // Polling fallback every 30 seconds
+    const pollInterval = setInterval(fetchMessages, 30000);
 
     return () => {
       if (channelRef.current) {
