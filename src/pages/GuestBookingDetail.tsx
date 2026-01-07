@@ -81,6 +81,7 @@ const GuestBookingDetail = () => {
   const [spot, setSpot] = useState<any>(null);
   const [host, setHost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [verifying, setVerifying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,6 +104,28 @@ const GuestBookingDetail = () => {
         setBooking(data.booking);
         setSpot(data.spot);
         setHost(data.host);
+
+        // If booking is pending, verify payment status
+        if (data.booking?.status === 'pending') {
+          setVerifying(true);
+          try {
+            const { data: verifyData } = await supabase.functions.invoke('verify-guest-payment', {
+              body: { booking_id: bookingId, access_token: token },
+            });
+            
+            if (verifyData?.verified && verifyData?.status === 'active') {
+              setBooking((prev: any) => ({ ...prev, status: 'active' }));
+              toast({ 
+                title: "Payment confirmed!", 
+                description: "Your booking is now active." 
+              });
+            }
+          } catch (verifyErr) {
+            console.error('Payment verification failed:', verifyErr);
+          } finally {
+            setVerifying(false);
+          }
+        }
       } catch (err: any) {
         console.error('Failed to fetch guest booking:', err);
         setError(err.message || 'Failed to load booking');
@@ -112,7 +135,7 @@ const GuestBookingDetail = () => {
     };
 
     fetchBooking();
-  }, [bookingId, token]);
+  }, [bookingId, token, toast]);
 
   const handleCancel = async () => {
     if (!bookingId || !token) return;
@@ -190,11 +213,18 @@ const GuestBookingDetail = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Booking Status</p>
-              <Badge className={statusColors[booking.status] || 'bg-gray-100 text-gray-800'}>
-                {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-              </Badge>
+              {verifying ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm text-muted-foreground">Verifying payment...</span>
+                </div>
+              ) : (
+                <Badge className={statusColors[booking.status] || 'bg-gray-100 text-gray-800'}>
+                  {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                </Badge>
+              )}
             </div>
-            {booking.status === 'active' && (
+            {booking.status === 'active' && !verifying && (
               <Check className="h-8 w-8 text-green-600" />
             )}
           </div>

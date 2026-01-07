@@ -49,6 +49,9 @@ verify_jwt = false
 [functions.get-guest-messages]
 verify_jwt = false
 
+[functions.verify-guest-payment]
+verify_jwt = false
+
 [functions.send-auth-email]
 verify_jwt = false
 
