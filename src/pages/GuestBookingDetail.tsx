@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Calendar, Clock, Car, Check, Navigation, Loader2, Phone, Mail, User, Zap } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Clock, Car, Check, Navigation, Loader2, Phone, Mail, User, Zap, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,65 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+
+interface SpotPhoto {
+  url: string;
+  is_primary: boolean;
+  sort_order: number;
+}
+
+// Simple photo gallery component
+const SpotPhotoGallery = ({ photos }: { photos: SpotPhoto[] }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  if (photos.length === 0) return null;
+
+  const goToPrevious = () => {
+    setCurrentIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1));
+  };
+
+  const goToNext = () => {
+    setCurrentIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1));
+  };
+
+  return (
+    <div className="relative">
+      <div className="aspect-video bg-muted">
+        <img
+          src={photos[currentIndex].url}
+          alt={`Parking spot photo ${currentIndex + 1}`}
+          className="w-full h-full object-cover"
+        />
+      </div>
+      
+      {photos.length > 1 && (
+        <>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute left-2 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background/90 h-8 w-8 rounded-full"
+            onClick={goToPrevious}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background/90 h-8 w-8 rounded-full"
+            onClick={goToNext}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          
+          {/* Photo counter */}
+          <div className="absolute bottom-2 right-2 bg-background/80 px-2 py-1 rounded text-xs font-medium">
+            {currentIndex + 1} / {photos.length}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 const GuestBookingDetail = () => {
   const { bookingId } = useParams();
@@ -139,6 +198,13 @@ const GuestBookingDetail = () => {
             )}
           </div>
         </Card>
+
+        {/* Spot Photos Gallery */}
+        {spot.photos && spot.photos.length > 0 && (
+          <Card className="overflow-hidden">
+            <SpotPhotoGallery photos={spot.photos} />
+          </Card>
+        )}
 
         {/* Spot Details */}
         <Card className="p-4">
