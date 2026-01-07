@@ -297,6 +297,12 @@ const GuestBookingDetail = () => {
               <span className="text-muted-foreground">Vehicle</span>
               <span>{booking.guest_car_model}</span>
             </div>
+            {booking.guest_license_plate && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">License Plate</span>
+                <span className="font-mono">{booking.guest_license_plate}</span>
+              </div>
+            )}
           </div>
         </Card>
 
