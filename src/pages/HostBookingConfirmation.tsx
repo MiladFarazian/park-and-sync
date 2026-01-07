@@ -191,7 +191,12 @@ const HostBookingConfirmation = () => {
 
   const duration = differenceInHours(new Date(booking.end_at), new Date(booking.start_at));
   const primaryPhoto = spot?.spot_photos?.find((p: any) => p.is_primary)?.url || spot?.spot_photos?.[0]?.url;
-  const driverName = driver ? `${driver.first_name || ''} ${driver.last_name || ''}`.trim() : 'Driver';
+  
+  // For guest bookings, use guest_full_name; for registered users, use profile
+  const isGuestBooking = booking.is_guest === true;
+  const driverName = isGuestBooking 
+    ? (booking.guest_full_name || 'Guest')
+    : (driver ? `${driver.first_name || ''} ${driver.last_name || ''}`.trim() : 'Driver');
   const driverInitial = driverName.charAt(0).toUpperCase();
   const bookingNumber = `#PK-${new Date(booking.created_at).getFullYear()}-${booking.id.slice(0, 3).toUpperCase()}`;
   const hostEarnings = booking.host_earnings || (booking.subtotal - booking.platform_fee);
@@ -408,25 +413,43 @@ const HostBookingConfirmation = () => {
 
         {/* Driver Info Card */}
         <Card className="p-4">
-          <h3 className="font-bold mb-4">Driver Information</h3>
+          <h3 className="font-bold mb-4">
+            {isGuestBooking ? 'Guest Information' : 'Driver Information'}
+          </h3>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <Avatar className="h-12 w-12">
-                <AvatarImage src={driver?.avatar_url} />
+                {!isGuestBooking && <AvatarImage src={driver?.avatar_url} />}
                 <AvatarFallback>{driverInitial}</AvatarFallback>
               </Avatar>
               <div>
-                <div className="font-semibold">{driverName}</div>
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                  <span>{driver?.rating || 'New'}</span>
+                <div className="font-semibold flex items-center gap-2">
+                  {driverName}
+                  {isGuestBooking && (
+                    <Badge variant="outline" className="text-xs">Guest</Badge>
+                  )}
                 </div>
+                {!isGuestBooking && (
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                    <span>{driver?.rating || 'New'}</span>
+                  </div>
+                )}
+                {isGuestBooking && booking.guest_email && (
+                  <div className="text-sm text-muted-foreground">{booking.guest_email}</div>
+                )}
               </div>
             </div>
             <Button 
               variant="outline" 
               size="sm"
-              onClick={handleMessageDriver}
+              onClick={() => {
+                if (isGuestBooking) {
+                  navigate(`/messages?userId=guest:${booking.id}`);
+                } else {
+                  handleMessageDriver();
+                }
+              }}
             >
               <MessageCircle className="h-4 w-4 mr-2" />
               Message
@@ -434,19 +457,32 @@ const HostBookingConfirmation = () => {
           </div>
           
           {/* Vehicle Info */}
-          {vehicle && (
+          {(vehicle || isGuestBooking) && (
             <div className="bg-muted/50 rounded-lg p-3">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
                   <Car className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <div className="font-medium text-sm">
-                    {vehicle.make} {vehicle.model} {vehicle.year ? `(${vehicle.year})` : ''}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Plate: {vehicle.license_plate} • {vehicle.color || 'Unknown color'}
-                  </div>
+                  {isGuestBooking ? (
+                    <>
+                      <div className="font-medium text-sm">
+                        {booking.guest_car_model || 'Vehicle not specified'}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Plate: {booking.guest_license_plate || 'Not provided'}
+                      </div>
+                    </>
+                  ) : vehicle ? (
+                    <>
+                      <div className="font-medium text-sm">
+                        {vehicle.make} {vehicle.model} {vehicle.year ? `(${vehicle.year})` : ''}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Plate: {vehicle.license_plate} • {vehicle.color || 'Unknown color'}
+                      </div>
+                    </>
+                  ) : null}
                 </div>
               </div>
             </div>
