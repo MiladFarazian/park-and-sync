@@ -23,6 +23,8 @@ interface GuestBookingFormProps {
   serviceFee: number;
   totalAmount: number;
   isTimeValid?: boolean;
+  isAvailable?: boolean;
+  checkingAvailability?: boolean;
 }
 
 const GuestBookingFormContent = ({ 
@@ -33,7 +35,9 @@ const GuestBookingFormContent = ({
   subtotal,
   serviceFee,
   totalAmount,
-  isTimeValid = true
+  isTimeValid = true,
+  isAvailable = true,
+  checkingAvailability = false
 }: GuestBookingFormProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -443,12 +447,19 @@ const GuestBookingFormContent = ({
         </div>
       </Card>
 
-      <Button type="submit" className="w-full" size="lg" disabled={loading || !isTimeValid}>
+      <Button type="submit" className="w-full" size="lg" disabled={loading || !isTimeValid || !isAvailable || checkingAvailability}>
         {loading ? (
           <>
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             Processing...
           </>
+        ) : checkingAvailability ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Checking availability...
+          </>
+        ) : !isAvailable ? (
+          'Spot Unavailable'
         ) : (
           `Pay $${totalAmount.toFixed(2)}`
         )}
