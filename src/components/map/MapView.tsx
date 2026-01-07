@@ -828,105 +828,6 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           'circle-translate': [0, -20] // Offset to align with pin head
         }
       } as any);
-      
-      // Add selected spot pulse animation layer (replaces ring)
-      (map.current as any).addLayer({
-        id: 'spots-selected-pulse',
-        type: 'circle',
-        source: sourceId,
-        filter: ['!', ['has', 'point_count']],
-        paint: {
-          'circle-radius': [
-            'case',
-            ['boolean', ['feature-state', 'selected'], false],
-            20,
-            0
-          ],
-          'circle-color': 'hsl(250, 100%, 65%)', // Parkzy purple
-          'circle-opacity': [
-            'case',
-            ['boolean', ['feature-state', 'selected'], false],
-            0.3,
-            0
-          ],
-          'circle-translate': [0, -20]
-        }
-      } as any);
-      
-      // Start pulse animation for selected spots (stops after 3 seconds)
-      let selectedPulseFrame: number;
-      let selectedPulseDirection = 1;
-      let selectedPulseRadius = 16;
-      const selectedMinRadius = 14;
-      const selectedMaxRadius = 22;
-      const selectedPulseSpeed = 0.15;
-      let pulseStartTime = Date.now();
-      const pulseDuration = 3000; // 3 seconds
-      
-      const animateSelectedPulse = () => {
-        if (!map.current) return;
-        
-        // Stop animation after 3 seconds
-        if (Date.now() - pulseStartTime > pulseDuration) {
-          // Set final static state
-          try {
-            (map.current as any).setPaintProperty('spots-selected-pulse', 'circle-radius', [
-              'case',
-              ['boolean', ['feature-state', 'selected'], false],
-              16,
-              0
-            ]);
-            (map.current as any).setPaintProperty('spots-selected-pulse', 'circle-opacity', [
-              'case',
-              ['boolean', ['feature-state', 'selected'], false],
-              0.25,
-              0
-            ]);
-          } catch (e) {}
-          return; // Stop the animation loop
-        }
-        
-        selectedPulseRadius += selectedPulseDirection * selectedPulseSpeed;
-        if (selectedPulseRadius >= selectedMaxRadius) {
-          selectedPulseDirection = -1;
-        } else if (selectedPulseRadius <= selectedMinRadius) {
-          selectedPulseDirection = 1;
-        }
-        
-        try {
-          (map.current as any).setPaintProperty('spots-selected-pulse', 'circle-radius', [
-            'case',
-            ['boolean', ['feature-state', 'selected'], false],
-            selectedPulseRadius,
-            0
-          ]);
-          
-          // Fade opacity as it expands
-          const opacityRange = (selectedPulseRadius - selectedMinRadius) / (selectedMaxRadius - selectedMinRadius);
-          const opacity = 0.35 - (opacityRange * 0.2);
-          (map.current as any).setPaintProperty('spots-selected-pulse', 'circle-opacity', [
-            'case',
-            ['boolean', ['feature-state', 'selected'], false],
-            opacity,
-            0
-          ]);
-        } catch (e) {
-          // Layer might not exist yet
-        }
-        
-        selectedPulseFrame = requestAnimationFrame(animateSelectedPulse);
-      };
-      
-      animateSelectedPulse();
-      
-      // Restart pulse animation when selection changes
-      const restartPulse = () => {
-        pulseStartTime = Date.now();
-        selectedPulseRadius = 16;
-        selectedPulseDirection = 1;
-        cancelAnimationFrame(selectedPulseFrame);
-        animateSelectedPulse();
-      };
 
       // Add unclustered point layer - WHITE pins (default/unselected)
       // Show at full opacity when not selected, hide when selected
@@ -1020,10 +921,10 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         filter: ['!', ['has', 'point_count']],
         layout: {
           'text-field': ['get', 'price'],
-          'text-size': 12,
+          'text-size': 11,
           'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
           'text-allow-overlap': true,
-          'text-offset': [0, -2.4]
+          'text-offset': [0, -3.0]
         },
         paint: {
           'text-color': [
@@ -1184,16 +1085,16 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         }
       };
       
-      // White pin (default for unselected)
+      // White pin (default for unselected) - teardrop shape
       if (!hasWhite) {
         const whiteSvg = `
-          <svg width="44" height="54" viewBox="0 0 44 54" xmlns="http://www.w3.org/2000/svg">
-            <path d="M 22 2 C 12 2 4 10 4 20 C 4 32 22 52 22 52 C 22 52 40 32 40 20 C 40 10 32 2 22 2 Z" 
+          <svg width="36" height="52" viewBox="0 0 36 52" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 18 2 C 10 2 4 8 4 16 C 4 28 18 50 18 50 C 18 50 32 28 32 16 C 32 8 26 2 18 2 Z" 
                   fill="white" stroke="#d1d5db" stroke-width="1.5"/>
-            <circle cx="22" cy="20" r="14" fill="#f9fafb"/>
+            <circle cx="18" cy="16" r="11" fill="#f9fafb"/>
           </svg>`;
         const whiteUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(whiteSvg);
-        const whiteImg = new Image(44, 54);
+        const whiteImg = new Image(36, 52);
         whiteImg.onload = () => {
           try {
             (map.current as any).addImage(pinImageIdWhite, whiteImg, { pixelRatio: 2 });
@@ -1207,16 +1108,16 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         checkAndAddLayers();
       }
       
-      // Purple pin (for selected)
+      // Purple pin (for selected) - teardrop shape
       if (!hasPurple) {
         const purpleSvg = `
-          <svg width="44" height="54" viewBox="0 0 44 54" xmlns="http://www.w3.org/2000/svg">
-            <path d="M 22 2 C 12 2 4 10 4 20 C 4 32 22 52 22 52 C 22 52 40 32 40 20 C 40 10 32 2 22 2 Z" 
+          <svg width="36" height="52" viewBox="0 0 36 52" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 18 2 C 10 2 4 8 4 16 C 4 28 18 50 18 50 C 18 50 32 28 32 16 C 32 8 26 2 18 2 Z" 
                   fill="hsl(250, 100%, 65%)" stroke="white" stroke-width="2"/>
-            <circle cx="22" cy="20" r="14" fill="white"/>
+            <circle cx="18" cy="16" r="11" fill="white"/>
           </svg>`;
         const purpleUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(purpleSvg);
-        const purpleImg = new Image(44, 54);
+        const purpleImg = new Image(36, 52);
         purpleImg.onload = () => {
           try {
             (map.current as any).addImage(pinImageIdPurple, purpleImg, { pixelRatio: 2 });
