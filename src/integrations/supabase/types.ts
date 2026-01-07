@@ -336,6 +336,50 @@ export type Database = {
           },
         ]
       }
+      guest_messages: {
+        Row: {
+          booking_id: string
+          created_at: string
+          delivered_at: string | null
+          id: string
+          media_type: string | null
+          media_url: string | null
+          message: string
+          read_at: string | null
+          sender_type: string
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          media_type?: string | null
+          media_url?: string | null
+          message: string
+          read_at?: string | null
+          sender_type: string
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          media_type?: string | null
+          media_url?: string | null
+          message?: string
+          read_at?: string | null
+          sender_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guest_messages_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           booking_id: string | null

@@ -6,15 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Rate limit configuration
 const RATE_LIMIT_PER_MINUTE = 10;
-const RATE_LIMIT_PER_HOUR = 60;
+const RATE_LIMIT_PER_HOUR = 30;
 
 async function checkRateLimit(
   supabase: any,
   clientIp: string
 ): Promise<{ allowed: boolean; retryAfter: number }> {
-  const functionName = 'get-guest-booking';
+  const functionName = 'send-guest-message';
   const minuteKey = `ip:${clientIp}:${functionName}:min`;
   const hourKey = `ip:${clientIp}:${functionName}:hour`;
 
@@ -48,9 +47,10 @@ async function checkRateLimit(
   }
 }
 
-interface GetGuestBookingRequest {
+interface SendGuestMessageRequest {
   booking_id: string;
   access_token: string;
+  message: string;
 }
 
 serve(async (req) => {
@@ -64,17 +64,15 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get client IP for rate limiting
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() 
       || req.headers.get('cf-connecting-ip') 
       || req.headers.get('x-real-ip')
       || 'unknown';
 
-    // Check rate limit
     const rateLimit = await checkRateLimit(supabaseAdmin, clientIp);
     if (!rateLimit.allowed) {
       return new Response(JSON.stringify({ 
-        error: 'Too many requests. Please try again later.',
+        error: 'Too many messages. Please try again later.',
         retry_after: rateLimit.retryAfter
       }), {
         status: 429,
@@ -86,53 +84,33 @@ serve(async (req) => {
       });
     }
 
-    const { booking_id, access_token }: GetGuestBookingRequest = await req.json();
+    const { booking_id, access_token, message }: SendGuestMessageRequest = await req.json();
 
-    console.log('Fetching guest booking:', { booking_id });
+    console.log('Guest sending message:', { booking_id, messageLength: message?.length });
 
-    if (!booking_id || !access_token) {
-      return new Response(JSON.stringify({ error: 'Booking ID and access token are required' }), {
+    if (!booking_id || !access_token || !message) {
+      return new Response(JSON.stringify({ error: 'Booking ID, access token, and message are required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Fetch booking with spot and host details
+    if (message.length > 2000) {
+      return new Response(JSON.stringify({ error: 'Message too long (max 2000 characters)' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verify booking and token
     const { data: booking, error: bookingError } = await supabaseAdmin
       .from('bookings')
       .select(`
         id,
-        spot_id,
-        start_at,
-        end_at,
-        status,
-        hourly_rate,
-        total_hours,
-        subtotal,
-        platform_fee,
-        total_amount,
-        ev_charging_fee,
-        is_guest,
-        guest_full_name,
-        guest_email,
-        guest_phone,
-        guest_car_model,
-        guest_license_plate,
         guest_access_token,
-        created_at,
-        spots!inner(
-          id,
-          title,
-          address,
-          latitude,
-          longitude,
-          access_notes,
-          host_rules,
-          host_id,
-          has_ev_charging,
-          is_covered,
-          is_secure
-        )
+        guest_full_name,
+        status,
+        spots!inner(host_id, title)
       `)
       .eq('id', booking_id)
       .eq('is_guest', true)
@@ -146,7 +124,6 @@ serve(async (req) => {
       });
     }
 
-    // Validate access token
     if (booking.guest_access_token !== access_token) {
       console.error('Invalid access token for booking:', booking_id);
       return new Response(JSON.stringify({ error: 'Invalid access token' }), {
@@ -155,46 +132,61 @@ serve(async (req) => {
       });
     }
 
-    // Get host profile
-    const spot = booking.spots as any;
-    const { data: hostProfile } = await supabaseAdmin
-      .from('profiles')
-      .select('first_name, last_name, avatar_url, rating, review_count, email, phone')
-      .eq('user_id', spot.host_id)
+    // Insert message
+    const { data: newMessage, error: insertError } = await supabaseAdmin
+      .from('guest_messages')
+      .insert({
+        booking_id,
+        sender_type: 'guest',
+        message: message.trim(),
+      })
+      .select()
       .single();
 
-    // Get unread message count for guest
-    const { count: unreadCount } = await supabaseAdmin
-      .from('guest_messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('booking_id', booking_id)
-      .eq('sender_type', 'host')
-      .is('read_at', null);
+    if (insertError) {
+      console.error('Failed to insert message:', insertError);
+      return new Response(JSON.stringify({ error: 'Failed to send message' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    // Get spot photos
-    const { data: spotPhotos } = await supabaseAdmin
-      .from('spot_photos')
-      .select('url, is_primary, sort_order')
-      .eq('spot_id', spot.id)
-      .order('sort_order', { ascending: true });
+    console.log('Guest message sent:', newMessage.id);
 
-    // Remove sensitive token from response
-    const { guest_access_token: _, ...safeBooking } = booking;
+    // Broadcast to channel for real-time updates
+    const channel = supabaseAdmin.channel(`guest-messages:${booking_id}`);
+    await channel.send({
+      type: 'broadcast',
+      event: 'new_message',
+      payload: newMessage
+    });
+    await supabaseAdmin.removeChannel(channel);
 
-    return new Response(JSON.stringify({
-      booking: safeBooking,
-      spot: {
-        ...spot,
-        photos: spotPhotos || [],
-      },
-      host: hostProfile || { first_name: 'Host' },
-      unread_messages: unreadCount || 0,
+    // Create notification for host
+    const spot = booking.spots as any;
+    try {
+      await supabaseAdmin
+        .from('notifications')
+        .insert({
+          user_id: spot.host_id,
+          type: 'guest_message',
+          title: 'New Guest Message',
+          message: `${booking.guest_full_name} sent you a message about ${spot.title}`,
+          related_id: booking_id,
+        });
+    } catch (notifError) {
+      console.error('Failed to create notification:', notifError);
+    }
+
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: newMessage 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Get guest booking error:', error);
+    console.error('Send guest message error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
