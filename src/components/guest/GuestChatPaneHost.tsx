@@ -63,6 +63,7 @@ const GuestChatPaneHost = ({ bookingId, guestName, onBack, markAsRead }: GuestCh
   const [sending, setSending] = useState(false);
   const virtuosoRef = useRef<any>(null);
   const channelRef = useRef<any>(null);
+  const pendingMessageRef = useRef<string | null>(null);
 
   const fetchMessages = async () => {
     try {
@@ -93,17 +94,31 @@ const GuestChatPaneHost = ({ bookingId, guestName, onBack, markAsRead }: GuestCh
     const channel = supabase.channel(`guest-messages:${bookingId}`)
       .on('broadcast', { event: 'new_message' }, (payload) => {
         const newMsg = payload.payload as GuestMessage;
+        
+        // Skip if this is our own pending message
+        if (pendingMessageRef.current && newMsg.message === pendingMessageRef.current) {
+          return;
+        }
+        
         setMessages((prev) => {
-          if (prev.some(m => m.id === newMsg.id)) return prev;
+          // Check for duplicates or temp messages with same content
+          if (prev.some(m => m.id === newMsg.id || (m.id.startsWith('temp-') && m.message === newMsg.message))) {
+            return prev.map(m => 
+              m.id.startsWith('temp-') && m.message === newMsg.message ? newMsg : m
+            );
+          }
           return [...prev, newMsg];
         });
+        
+        // Mark as read
+        setTimeout(() => markAsRead(`guest:${bookingId}`), 500);
       })
       .subscribe();
 
     channelRef.current = channel;
 
-    // Polling fallback
-    const pollInterval = setInterval(fetchMessages, 10000);
+    // Polling fallback every 15 seconds
+    const pollInterval = setInterval(fetchMessages, 15000);
 
     return () => {
       if (channelRef.current) {
@@ -128,10 +143,14 @@ const GuestChatPaneHost = ({ bookingId, guestName, onBack, markAsRead }: GuestCh
     setSending(true);
     const messageText = messageInput.trim();
     setMessageInput('');
+    
+    // Track pending message
+    pendingMessageRef.current = messageText;
 
     // Optimistic update
+    const tempId = `temp-${Date.now()}`;
     const tempMessage: GuestMessage = {
-      id: `temp-${Date.now()}`,
+      id: tempId,
       booking_id: bookingId,
       sender_type: 'host',
       message: messageText,
@@ -155,7 +174,7 @@ const GuestChatPaneHost = ({ bookingId, guestName, onBack, markAsRead }: GuestCh
 
       // Replace temp message with real one
       setMessages((prev) => 
-        prev.map(m => m.id === tempMessage.id ? (data as GuestMessage) : m)
+        prev.map(m => m.id === tempId ? (data as GuestMessage) : m)
       );
 
       // Broadcast to channel
@@ -169,10 +188,11 @@ const GuestChatPaneHost = ({ bookingId, guestName, onBack, markAsRead }: GuestCh
     } catch (err) {
       console.error('Failed to send message:', err);
       // Remove optimistic message on failure
-      setMessages((prev) => prev.filter(m => m.id !== tempMessage.id));
+      setMessages((prev) => prev.filter(m => m.id !== tempId));
       setMessageInput(messageText);
     } finally {
       setSending(false);
+      pendingMessageRef.current = null;
     }
   };
 
