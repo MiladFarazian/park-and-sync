@@ -113,9 +113,9 @@ const GuestBookingDetail = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="h-screen flex flex-col bg-background">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background border-b">
+      <div className="flex-shrink-0 bg-background border-b" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="flex items-center gap-3 p-4">
           <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
             <ArrowLeft className="h-5 w-5" />
@@ -124,7 +124,7 @@ const GuestBookingDetail = () => {
         </div>
       </div>
 
-      <div className="p-4 space-y-4 max-w-2xl mx-auto">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-2xl mx-auto w-full" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 2rem)' }}>
         {/* Status Banner */}
         <Card className="p-4">
           <div className="flex items-center justify-between">
