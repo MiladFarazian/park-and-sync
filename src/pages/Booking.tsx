@@ -1113,8 +1113,8 @@ const BookingContent = () => {
           )}
         </Card>
 
-        {/* EV Charging Option (only if spot supports it) */}
-        {spot?.has_ev_charging && (
+        {/* EV Charging Option (only if spot supports it AND has a premium > 0) */}
+        {spot?.has_ev_charging && (spot.ev_charging_premium_per_hour || 0) > 0 && (
           <Card className="p-4 border-green-200 dark:border-green-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
