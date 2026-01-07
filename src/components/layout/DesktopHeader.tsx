@@ -14,7 +14,7 @@ import ModeSwitcher from './ModeSwitcher';
 import { NotificationBell } from './NotificationBell';
 import { useMode } from '@/contexts/ModeContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMessages } from '@/hooks/useMessages';
+import { useMessages } from '@/contexts/MessagesContext';
 import { useSupportRole } from '@/hooks/useSupportRole';
 import { Badge } from '@/components/ui/badge';
 
