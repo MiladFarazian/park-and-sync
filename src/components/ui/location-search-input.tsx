@@ -222,6 +222,8 @@ const LocationSearchInput = ({
   const regionDetectedRef = useRef(false);
   const blurTimeoutRef = useRef<NodeJS.Timeout>();
   const ignoreBlurRef = useRef(false);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Load favorites from database for logged-in users, localStorage for guests
   const loadFavorites = useCallback(async () => {
@@ -710,15 +712,48 @@ const LocationSearchInput = ({
     }
   };
 
-  // Prevent blur when interacting with dropdown items (but don't fire action yet - let onClick handle it)
-  const handlePreventBlur = (e: React.PointerEvent | React.MouseEvent) => {
-    e.preventDefault();
+  // Track touch start position to differentiate tap from scroll
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
     ignoreBlurRef.current = true;
-    // Release the flag after a short delay to handle edge cases
-    window.setTimeout(() => {
-      ignoreBlurRef.current = false;
-    }, 350);
   };
+
+  // Check if touch ended without significant movement (tap vs scroll)
+  const isTap = (e: React.TouchEvent): boolean => {
+    if (!touchStartRef.current) return false;
+    const touch = e.changedTouches[0];
+    const dx = Math.abs(touch.clientX - touchStartRef.current.x);
+    const dy = Math.abs(touch.clientY - touchStartRef.current.y);
+    touchStartRef.current = null;
+    // If moved less than 10px in any direction, it's a tap
+    return dx < 10 && dy < 10;
+  };
+
+  // Create a handler that works for both mouse and touch
+  const createItemHandler = (action: () => void) => ({
+    onMouseDown: (e: React.MouseEvent) => {
+      e.preventDefault();
+      ignoreBlurRef.current = true;
+    },
+    onClick: (e: React.MouseEvent) => {
+      // Only fire for mouse clicks (not touch - touch uses onTouchEnd)
+      if (e.detail > 0) {
+        action();
+      }
+    },
+    onTouchStart: handleTouchStart,
+    onTouchEnd: (e: React.TouchEvent) => {
+      if (isTap(e)) {
+        e.preventDefault();
+        action();
+      }
+      // Reset blur flag after a delay
+      window.setTimeout(() => {
+        ignoreBlurRef.current = false;
+      }, 100);
+    },
+  });
 
   const handleBlur = () => {
     // If we're interacting with a dropdown item, ignore this blur
@@ -781,12 +816,11 @@ const LocationSearchInput = ({
 
       {/* Dropdown */}
       {showDropdown && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-background border border-border rounded-xl shadow-lg max-h-72 overflow-y-auto">
+        <div ref={dropdownRef} className="absolute top-full left-0 right-0 z-50 mt-1 bg-background border border-border rounded-xl shadow-lg max-h-72 overflow-y-auto">
           {/* Use Current Location Option - Always shown first */}
           <button
             type="button"
-            onPointerDown={handlePreventBlur}
-            onClick={handleUseCurrentLocation}
+            {...createItemHandler(handleUseCurrentLocation)}
             className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 focus:outline-none focus:bg-muted/50"
           >
             <div className="flex items-center gap-3">
@@ -822,8 +856,7 @@ const LocationSearchInput = ({
             <button
               type="button"
               key={suggestion.mapbox_id || index}
-              onPointerDown={handlePreventBlur}
-              onClick={() => handleSelectSuggestion(suggestion)}
+              {...createItemHandler(() => handleSelectSuggestion(suggestion))}
               className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-b-0 focus:outline-none focus:bg-muted/50"
             >
               <div className="flex items-start gap-3">
@@ -850,8 +883,7 @@ const LocationSearchInput = ({
                 <button
                   type="button"
                   key={item.name}
-                  onPointerDown={handlePreventBlur}
-                  onClick={() => handleSelectFavorite(item)}
+                  {...createItemHandler(() => handleSelectFavorite(item))}
                   className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-b-0 focus:outline-none focus:bg-muted/50 group"
                 >
                   <div className="flex items-center gap-3">
@@ -859,11 +891,8 @@ const LocationSearchInput = ({
                     <p className="text-sm font-medium truncate flex-1">{item.name}</p>
                     <button
                       type="button"
-                      onPointerDown={handlePreventBlur}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleRemoveFavorite(e, item.name);
-                      }}
+                      {...createItemHandler(() => void handleRemoveFavorite({} as any, item.name))}
+                      onClick={(e) => e.stopPropagation()}
                       className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity p-1 -m-1"
                       title="Remove from favorites"
                     >
@@ -882,8 +911,7 @@ const LocationSearchInput = ({
                 <span>Recent searches</span>
                 <button
                   type="button"
-                  onPointerDown={handlePreventBlur}
-                  onClick={(e) => void handleClearHistory(e)}
+                  {...createItemHandler(() => void handleClearHistory({} as any))}
                   className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Clear all
@@ -893,8 +921,7 @@ const LocationSearchInput = ({
                 <button
                   type="button"
                   key={item.name}
-                  onPointerDown={handlePreventBlur}
-                  onClick={() => handleSelectFromHistory(item)}
+                  {...createItemHandler(() => handleSelectFromHistory(item))}
                   className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-b-0 focus:outline-none focus:bg-muted/50 group"
                 >
                   <div className="flex items-center gap-3">
@@ -902,11 +929,8 @@ const LocationSearchInput = ({
                     <p className="text-sm font-medium truncate flex-1">{item.name}</p>
                     <button
                       type="button"
-                      onPointerDown={handlePreventBlur}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleToggleFavorite(e, item as any);
-                      }}
+                      {...createItemHandler(() => void handleToggleFavorite({} as any, item))}
+                      onClick={(e) => e.stopPropagation()}
                       className={`p-1 -m-1 transition-opacity ${isFavorite(item.name, favorites) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                       title={isFavorite(item.name, favorites) ? 'Remove from favorites' : 'Add to favorites'}
                     >
@@ -914,11 +938,8 @@ const LocationSearchInput = ({
                     </button>
                     <button
                       type="button"
-                      onPointerDown={handlePreventBlur}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveHistoryItem(e, item.name);
-                      }}
+                      {...createItemHandler(() => handleRemoveHistoryItem({} as any, item.name))}
+                      onClick={(e) => e.stopPropagation()}
                       className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity p-1 -m-1"
                       title="Remove"
                     >
@@ -940,14 +961,13 @@ const LocationSearchInput = ({
                 <button
                   type="button"
                   key={poi.name}
-                  onPointerDown={handlePreventBlur}
-                  onClick={() => {
+                  {...createItemHandler(() => {
                     // Save POI selection to history too
                     addToSearchHistory({ lat: poi.lat, lng: poi.lng, name: poi.name });
                     setSearchHistory(loadSearchHistory());
                     onSelectLocation({ lat: poi.lat, lng: poi.lng, name: poi.name });
                     setShowDropdown(false);
-                  }}
+                  })}
                   className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-b-0 focus:outline-none focus:bg-muted/50"
                 >
                   <div className="flex items-start gap-3">
