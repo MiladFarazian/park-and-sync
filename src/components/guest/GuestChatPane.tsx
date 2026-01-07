@@ -27,11 +27,13 @@ const GuestChatPane = ({ bookingId, accessToken, hostName }: GuestChatPaneProps)
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
   };
 
   const fetchMessages = async () => {
@@ -148,7 +150,7 @@ const GuestChatPane = ({ bookingId, accessToken, hostName }: GuestChatPaneProps)
       ) : (
         <>
           {/* Messages Container */}
-          <div className="max-h-64 overflow-y-auto space-y-3 mb-4 p-2 bg-muted/30 rounded-lg">
+          <div ref={messagesContainerRef} className="max-h-64 overflow-y-auto space-y-3 mb-4 p-2 bg-muted/30 rounded-lg">
             {messages.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
                 No messages yet. Send a message to your host!
@@ -176,7 +178,6 @@ const GuestChatPane = ({ bookingId, accessToken, hostName }: GuestChatPaneProps)
                 </div>
               ))
             )}
-            <div ref={messagesEndRef} />
           </div>
 
           {error && (
