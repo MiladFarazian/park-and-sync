@@ -335,6 +335,13 @@ const ListSpot = () => {
   const onSubmit = async (data: FormData) => {
     if (isSubmitting) return;
     
+    // Validate EV charging premium if EV is enabled
+    const hasEvCharging = selectedAmenities.includes('ev');
+    if (hasEvCharging && (!evChargingPremium || parseFloat(evChargingPremium) <= 0)) {
+      toast.error('EV charging premium must be greater than $0 when EV charging is enabled');
+      return;
+    }
+    
     try {
       setIsSubmitting(true);
       const { data: { user } } = await supabase.auth.getUser();
@@ -847,22 +854,22 @@ const ListSpot = () => {
                       </div>
                       
                       <div>
-                        <Label htmlFor="evPremium">EV Charging Premium ($/hour)</Label>
+                        <Label htmlFor="evPremium">EV Charging Premium ($/hour) <span className="text-destructive">*</span></Label>
                         <div className="relative mt-1.5">
                           <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                           <Input
                             id="evPremium"
                             type="number"
                             step="0.01"
-                            min="0"
-                            placeholder="0.00"
+                            min="0.01"
+                            placeholder="2.00"
                             value={evChargingPremium}
                             onChange={(e) => setEvChargingPremium(e.target.value)}
-                            className="pl-10"
+                            className={`pl-10 ${(!evChargingPremium || parseFloat(evChargingPremium) <= 0) ? 'border-destructive' : ''}`}
                           />
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Additional charge per hour when driver uses EV charging
+                          Required: Additional charge per hour when driver uses EV charging (must be &gt; $0)
                         </p>
                       </div>
                       
