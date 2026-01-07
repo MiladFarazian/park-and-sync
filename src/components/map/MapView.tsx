@@ -947,7 +947,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
             ['boolean', ['feature-state', 'selected'], false],
             0, // Hide white pin when selected
             0.95
-          ]
+          ],
+          'icon-translate': [0, -30] // Start offset for bounce animation
         }
       } as any);
 
@@ -970,9 +971,46 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
             ['boolean', ['feature-state', 'selected'], false],
             0.95, // Show purple pin when selected
             0
-          ]
+          ],
+          'icon-translate': [0, -30] // Start offset for bounce animation
         }
       } as any);
+      
+      // Bounce animation for pins when they first appear
+      let bounceFrame: number;
+      let bounceProgress = 0;
+      const bounceDuration = 400; // ms
+      const bounceStartTime = Date.now();
+      
+      const animateBounce = () => {
+        if (!map.current) return;
+        
+        const elapsed = Date.now() - bounceStartTime;
+        bounceProgress = Math.min(elapsed / bounceDuration, 1);
+        
+        // Easing function with overshoot for bounce effect
+        // Using elastic-out-like easing
+        const easeOutBounce = (t: number) => {
+          const c4 = (2 * Math.PI) / 3;
+          return t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+        };
+        
+        const easedProgress = easeOutBounce(bounceProgress);
+        const translateY = -30 * (1 - easedProgress); // Animate from -30 to 0
+        
+        try {
+          (map.current as any).setPaintProperty(circleId, 'icon-translate', [0, translateY]);
+          (map.current as any).setPaintProperty('spots-circles-selected', 'icon-translate', [0, translateY]);
+        } catch (e) {
+          // Layers might not exist
+        }
+        
+        if (bounceProgress < 1) {
+          bounceFrame = requestAnimationFrame(animateBounce);
+        }
+      };
+      
+      animateBounce();
 
       // Price text centered inside the pin head (unclustered only)
       (map.current as any).addLayer({
