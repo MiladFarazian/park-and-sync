@@ -6,8 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const RATE_LIMIT_PER_MINUTE = 30;
-const RATE_LIMIT_PER_HOUR = 200;
+const RATE_LIMIT_PER_MINUTE = 60;
+const RATE_LIMIT_PER_HOUR = 600;
 
 async function checkRateLimit(
   supabase: any,
