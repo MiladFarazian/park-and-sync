@@ -710,8 +710,14 @@ const LocationSearchInput = ({
     }
   };
 
+  // Helper to handle touch/mouse interaction - prevents blur from closing dropdown
+  const handleItemInteraction = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    ignoreBlurRef.current = true;
+  };
+
   const handleBlur = () => {
-    // If we're interacting with clear button, ignore this blur
+    // If we're interacting with a dropdown item, ignore this blur
     if (ignoreBlurRef.current) {
       ignoreBlurRef.current = false;
       return;
@@ -722,10 +728,11 @@ const LocationSearchInput = ({
       clearTimeout(blurTimeoutRef.current);
     }
     
+    // Use a longer timeout to handle mobile touch events properly
     blurTimeoutRef.current = setTimeout(() => {
       setShowDropdown(false);
       blurTimeoutRef.current = undefined;
-    }, 200);
+    }, 250);
   };
 
   // Only show "Current Location" text if there's actual content in value field, not auto-pre-fill
@@ -773,10 +780,9 @@ const LocationSearchInput = ({
         <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-background border border-border rounded-xl shadow-lg max-h-72 overflow-y-auto">
           {/* Use Current Location Option - Always shown first */}
           <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              handleUseCurrentLocation();
-            }}
+            onMouseDown={handleItemInteraction}
+            onTouchStart={handleItemInteraction}
+            onClick={handleUseCurrentLocation}
             className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 focus:outline-none focus:bg-muted/50"
           >
             <div className="flex items-center gap-3">
@@ -811,10 +817,9 @@ const LocationSearchInput = ({
           {suggestions.map((suggestion, index) => (
             <button
               key={suggestion.mapbox_id || index}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                handleSelectSuggestion(suggestion);
-              }}
+              onMouseDown={handleItemInteraction}
+              onTouchStart={handleItemInteraction}
+              onClick={() => handleSelectSuggestion(suggestion)}
               className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-b-0 focus:outline-none focus:bg-muted/50"
             >
               <div className="flex items-start gap-3">
@@ -840,17 +845,17 @@ const LocationSearchInput = ({
               {favorites.map((item) => (
                 <button
                   key={item.name}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    handleSelectFavorite(item);
-                  }}
+                  onMouseDown={handleItemInteraction}
+                  onTouchStart={handleItemInteraction}
+                  onClick={() => handleSelectFavorite(item)}
                   className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-b-0 focus:outline-none focus:bg-muted/50 group"
                 >
                   <div className="flex items-center gap-3">
                     <Star className="h-4 w-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
                     <p className="text-sm font-medium truncate flex-1">{item.name}</p>
                     <button
-                      onMouseDown={(e) => handleRemoveFavorite(e, item.name)}
+                      onMouseDown={(e) => { e.stopPropagation(); handleRemoveFavorite(e, item.name); }}
+                      onTouchStart={(e) => e.stopPropagation()}
                       className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity p-1 -m-1"
                       title="Remove from favorites"
                     >
@@ -877,24 +882,25 @@ const LocationSearchInput = ({
               {searchHistory.map((item) => (
                 <button
                   key={item.name}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    handleSelectFromHistory(item);
-                  }}
+                  onMouseDown={handleItemInteraction}
+                  onTouchStart={handleItemInteraction}
+                  onClick={() => handleSelectFromHistory(item)}
                   className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-b-0 focus:outline-none focus:bg-muted/50 group"
                 >
                   <div className="flex items-center gap-3">
                     <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     <p className="text-sm font-medium truncate flex-1">{item.name}</p>
                     <button
-                      onMouseDown={(e) => handleToggleFavorite(e, item)}
+                      onMouseDown={(e) => { e.stopPropagation(); handleToggleFavorite(e, item); }}
+                      onTouchStart={(e) => e.stopPropagation()}
                       className={`p-1 -m-1 transition-opacity ${isFavorite(item.name, favorites) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                       title={isFavorite(item.name, favorites) ? 'Remove from favorites' : 'Add to favorites'}
                     >
                       <Star className={`h-3.5 w-3.5 ${isFavorite(item.name, favorites) ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground hover:text-yellow-500'}`} />
                     </button>
                     <button
-                      onMouseDown={(e) => handleRemoveHistoryItem(e, item.name)}
+                      onMouseDown={(e) => { e.stopPropagation(); handleRemoveHistoryItem(e, item.name); }}
+                      onTouchStart={(e) => e.stopPropagation()}
                       className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity p-1 -m-1"
                       title="Remove"
                     >
@@ -915,8 +921,9 @@ const LocationSearchInput = ({
               {popularPOIs.map((poi) => (
                 <button
                   key={poi.name}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
+                  onMouseDown={handleItemInteraction}
+                  onTouchStart={handleItemInteraction}
+                  onClick={() => {
                     // Save POI selection to history too
                     addToSearchHistory({ lat: poi.lat, lng: poi.lng, name: poi.name });
                     setSearchHistory(loadSearchHistory());
