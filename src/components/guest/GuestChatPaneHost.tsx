@@ -127,18 +127,24 @@ const GuestChatPaneHost = ({ bookingId, guestName, onBack, markAsRead }: GuestCh
           setTimeout(() => markAsRead(`guest:${bookingId}`), 500);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        // When subscription is ready, refetch to catch any missed messages
+        if (status === 'SUBSCRIBED') {
+          fetchMessages();
+        }
+      });
 
     channelRef.current = channel;
 
-    // Polling fallback every 15 seconds
-    const pollInterval = setInterval(fetchMessages, 15000);
+    // Refetch on window focus for reliability
+    const handleFocus = () => fetchMessages();
+    window.addEventListener('focus', handleFocus);
 
     return () => {
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
       }
-      clearInterval(pollInterval);
+      window.removeEventListener('focus', handleFocus);
     };
   }, [bookingId]);
 
