@@ -1,0 +1,15 @@
+<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- NEMA 14-50 outlet - rectangular outlet with 4 slots -->
+  <g stroke="#4CAF50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Main rectangular body with rounded corners -->
+    <rect x="12" y="10" width="40" height="44" rx="6" ry="6" />
+    <!-- Top horizontal ground slot -->
+    <path d="M26 20 L38 20" />
+    <!-- Left angled hot slot -->
+    <path d="M20 30 L20 42" />
+    <!-- Right angled hot slot -->
+    <path d="M44 30 L44 42" />
+    <!-- Bottom neutral slot (semi-circle/arc) -->
+    <path d="M26 48 C26 44 32 42 38 48" />
+  </g>
+</svg>
