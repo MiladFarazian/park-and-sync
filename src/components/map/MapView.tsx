@@ -924,7 +924,10 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           'text-size': 12,
           'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
           'text-allow-overlap': true,
-          'text-offset': [0, -2.65]
+          'text-anchor': 'center',
+          'text-justify': 'center',
+          // Y offset is in "ems"; less-negative brings the label down into the circle.
+          'text-offset': [0, -1.6]
         },
         paint: {
           'text-color': [
@@ -1089,14 +1092,9 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       if (!hasWhite) {
         const whiteSvg = `
           <svg width="48" height="56" viewBox="0 0 48 56" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <filter id="shadow-w" x="-20%" y="-10%" width="140%" height="140%">
-                <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.15"/>
-              </filter>
-            </defs>
-            <path d="M 24 4 C 13 4 4 12 4 22 C 4 32 24 52 24 52 C 24 52 44 32 44 22 C 44 12 35 4 24 4 Z" 
-                  fill="white" filter="url(#shadow-w)"/>
-            <circle cx="24" cy="20" r="14" fill="white"/>
+            <path d="M 24 4 C 13 4 4 12 4 22 C 4 32 24 52 24 52 C 24 52 44 32 44 22 C 44 12 35 4 24 4 Z"
+                  fill="white" stroke="#E5E7EB" stroke-width="1.5"/>
+            <circle cx="24" cy="20" r="14" fill="#F9FAFB"/>
           </svg>`;
         const whiteUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(whiteSvg);
         const whiteImg = new Image(48, 56);
@@ -1117,13 +1115,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       if (!hasPurple) {
         const purpleSvg = `
           <svg width="48" height="56" viewBox="0 0 48 56" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <filter id="shadow-p" x="-20%" y="-10%" width="140%" height="140%">
-                <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#6B4EFF" flood-opacity="0.35"/>
-              </filter>
-            </defs>
-            <path d="M 24 4 C 13 4 4 12 4 22 C 4 32 24 52 24 52 C 24 52 44 32 44 22 C 44 12 35 4 24 4 Z" 
-                  fill="#6B4EFF" filter="url(#shadow-p)"/>
+            <path d="M 24 4 C 13 4 4 12 4 22 C 4 32 24 52 24 52 C 24 52 44 32 44 22 C 44 12 35 4 24 4 Z"
+                  fill="#6B4EFF" stroke="white" stroke-width="2"/>
             <circle cx="24" cy="20" r="14" fill="white"/>
           </svg>`;
         const purpleUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(purpleSvg);
