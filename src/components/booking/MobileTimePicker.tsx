@@ -49,7 +49,8 @@ export const MobileTimePicker = ({
 
   // Initialize with current time or passed initial value
   const getInitialValues = () => {
-    let baseTime = initialValue || (mode === 'end' && startTime ? addMinutes(startTime, 15) : now);
+    // For end mode, default to 2 hours after start time (standard booking duration)
+    let baseTime = initialValue || (mode === 'end' && startTime ? addMinutes(startTime, 120) : now);
 
     // Ensure start defaults are always in the future
     if (mode === 'start' && isBefore(baseTime, now)) {
