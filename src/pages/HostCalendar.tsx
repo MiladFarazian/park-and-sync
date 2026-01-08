@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addDays, addMonths, addWeeks, isSameDay, isBefore, startOfDay, isToday, startOfWeek, endOfWeek } from 'date-fns';
@@ -61,6 +62,7 @@ const HostCalendar = () => {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
   const [spots, setSpots] = useState<SpotWithRate[]>([]);
+  const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
   const [bookings, setBookings] = useState<BookingForCalendar[]>([]);
   const [allBookings, setAllBookings] = useState<any[]>([]);
   const [overrides, setOverrides] = useState<CalendarOverride[]>([]);
@@ -94,13 +96,40 @@ const HostCalendar = () => {
 
   useEffect(() => {
     if (user) {
+      fetchSpots();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user && selectedSpotId) {
       fetchData();
       fetchAllReservations();
     }
-  }, [user, currentMonth, currentWeek, viewMode]);
+  }, [user, currentMonth, currentWeek, viewMode, selectedSpotId]);
+
+  const fetchSpots = async () => {
+    if (!user) return;
+    
+    try {
+      const { data: spotsData, error: spotsError } = await supabase
+        .from('spots')
+        .select('id, title, hourly_rate')
+        .eq('host_id', user.id);
+
+      if (spotsError) throw spotsError;
+      setSpots(spotsData || []);
+      
+      // Auto-select first spot if available
+      if (spotsData && spotsData.length > 0 && !selectedSpotId) {
+        setSelectedSpotId(spotsData[0].id);
+      }
+    } catch (error) {
+      console.error('Error fetching spots:', error);
+    }
+  };
 
   const fetchData = async () => {
-    if (!user) return;
+    if (!user || !selectedSpotId) return;
     
     try {
       setLoading(true);
@@ -114,23 +143,7 @@ const HostCalendar = () => {
         rangeEnd = endOfWeek(currentWeek, { weekStartsOn: 0 });
       }
 
-      // Fetch host's spots
-      const { data: spotsData, error: spotsError } = await supabase
-        .from('spots')
-        .select('id, title, hourly_rate')
-        .eq('host_id', user.id);
-
-      if (spotsError) throw spotsError;
-      setSpots(spotsData || []);
-
-      if (!spotsData || spotsData.length === 0) {
-        setLoading(false);
-        return;
-      }
-
-      const spotIds = spotsData.map(s => s.id);
-
-      // Fetch bookings for the range with renter info
+      // Fetch bookings for the selected spot
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select(`
@@ -138,7 +151,7 @@ const HostCalendar = () => {
           renter:profiles!bookings_renter_id_fkey(first_name, last_name),
           spot:spots!bookings_spot_id_fkey(title, address)
         `)
-        .in('spot_id', spotIds)
+        .eq('spot_id', selectedSpotId)
         .gte('start_at', rangeStart.toISOString())
         .lte('start_at', rangeEnd.toISOString())
         .in('status', ['pending', 'paid', 'active', 'completed']);
@@ -146,11 +159,11 @@ const HostCalendar = () => {
       if (bookingsError) throw bookingsError;
       setBookings(bookingsData || []);
 
-      // Fetch calendar overrides
+      // Fetch calendar overrides for selected spot
       const { data: overridesData, error: overridesError } = await supabase
         .from('calendar_overrides')
         .select('id, spot_id, override_date, is_available, custom_rate')
-        .in('spot_id', spotIds)
+        .eq('spot_id', selectedSpotId)
         .gte('override_date', format(rangeStart, 'yyyy-MM-dd'))
         .lte('override_date', format(rangeEnd, 'yyyy-MM-dd'));
 
@@ -165,7 +178,7 @@ const HostCalendar = () => {
   };
 
   const fetchAllReservations = async () => {
-    if (!user) return;
+    if (!user || !selectedSpotId) return;
     
     try {
       setReservationsLoading(true);
@@ -178,7 +191,7 @@ const HostCalendar = () => {
       
       setUserReviews(new Set(reviewsData?.map(r => r.booking_id) || []));
 
-      // Fetch all bookings for host's spots
+      // Fetch all bookings for the selected spot
       const { data: hostBookings, error: hostError } = await supabase
         .from('bookings')
         .select(`
@@ -193,7 +206,7 @@ const HostCalendar = () => {
             last_name
           )
         `)
-        .eq('spots.host_id', user.id)
+        .eq('spot_id', selectedSpotId)
         .order('start_at', { ascending: false });
 
       if (hostError) throw hostError;
@@ -251,7 +264,9 @@ const HostCalendar = () => {
     return eachDayOfInterval({ start: weekStart, end: addDays(weekStart, 6) });
   }, [currentWeek]);
 
-  // Get data for a specific date
+  // Get data for a specific date (for the selected spot)
+  const selectedSpot = spots.find(s => s.id === selectedSpotId);
+  
   const getDateData = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const today = startOfDay(new Date());
@@ -267,8 +282,8 @@ const HostCalendar = () => {
     const dateOverrides = overrides.filter(o => o.override_date === dateStr);
     const hasUnavailable = dateOverrides.some(o => !o.is_available);
     
-    // Calculate rate to show (use custom rate if available, otherwise base rate)
-    let displayRate = spots.length > 0 ? Math.min(...spots.map(s => s.hourly_rate)) : null;
+    // Calculate rate to show (use custom rate if available, otherwise base rate from selected spot)
+    let displayRate = selectedSpot?.hourly_rate ?? null;
     const customRate = dateOverrides.find(o => o.custom_rate)?.custom_rate;
     if (customRate) displayRate = customRate;
 
@@ -484,9 +499,35 @@ const HostCalendar = () => {
         </Tabs>
       </div>
 
+      {/* Spot Selector */}
+      {spots.length > 0 && (
+        <Select value={selectedSpotId || ''} onValueChange={setSelectedSpotId}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select a spot" />
+          </SelectTrigger>
+          <SelectContent>
+            {spots.map(spot => (
+              <SelectItem key={spot.id} value={spot.id}>
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <span>{spot.title}</span>
+                  <span className="text-muted-foreground text-sm">(${spot.hourly_rate}/hr)</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+
+      {spots.length === 0 && !loading && (
+        <Card className="p-6 text-center">
+          <p className="text-muted-foreground mb-4">You don't have any spots yet.</p>
+          <Button onClick={() => navigate('/list-spot')}>List a Spot</Button>
+        </Card>
+      )}
+
       {/* Calendar Views (Month & Week) */}
-      {/* Calendar Views (Month & Week) */}
-      {(viewMode === 'month' || viewMode === 'week') && (
+      {selectedSpotId && (viewMode === 'month' || viewMode === 'week') && (
         <Card className="p-4">
           {/* Navigation */}
           <div className="flex items-center justify-between mb-4">
@@ -720,7 +761,7 @@ const HostCalendar = () => {
       )}
 
       {/* Reservations View */}
-      {viewMode === 'reservations' && (
+      {selectedSpotId && viewMode === 'reservations' && (
         <div className="space-y-4">
           <Tabs value={reservationsTab} onValueChange={(v) => setReservationsTab(v as 'upcoming' | 'past')}>
             <TabsList className="grid w-full grid-cols-2">
