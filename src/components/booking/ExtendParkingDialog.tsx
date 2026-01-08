@@ -248,9 +248,11 @@ export const ExtendParkingDialog = ({
     return brand.charAt(0).toUpperCase() + brand.slice(1);
   };
 
-  const handleQuickExtend = async (hrs: number) => {
-    if (!booking) return;
-    
+  const handleQuickExtend = async () => {
+    if (!booking || selectedExtendHours === null) return;
+
+    const hrs = selectedExtendHours;
+
     // Check if user has a payment method
     if (paymentMethods.length === 0) {
       toast.error('No payment method on file. Please add a card first.');
@@ -258,10 +260,9 @@ export const ExtendParkingDialog = ({
       navigate('/payment-methods?add=1&returnTo=' + encodeURIComponent(window.location.pathname));
       return;
     }
-    
-    setSelectedExtendHours(hrs);
+
     setExtending(true);
-    
+
     try {
       const { data: keyData, error: keyError } = await supabase.functions.invoke('get-stripe-publishable-key');
       if (keyError) throw keyError;
@@ -303,7 +304,6 @@ export const ExtendParkingDialog = ({
       toast.error(err.message || 'Failed to extend booking');
     } finally {
       setExtending(false);
-      setSelectedExtendHours(null);
     }
   };
 
@@ -471,28 +471,50 @@ export const ExtendParkingDialog = ({
             <p className="text-sm text-muted-foreground">
               Select how long you'd like to extend:
             </p>
-            
+
             {QUICK_EXTEND_OPTIONS.map((option) => (
               <Button
                 key={option.hours}
                 variant="outline"
-                className="w-full justify-between h-auto py-3 px-4 hover:bg-primary/5 hover:border-primary/30"
-                onClick={() => handleQuickExtend(option.hours)}
-                disabled={extending || paymentMethods.length === 0}
+                className={`w-full justify-between h-auto py-3 px-4 transition-colors ${
+                  selectedExtendHours === option.hours
+                    ? 'bg-primary/10 border-primary ring-1 ring-primary/30'
+                    : 'hover:bg-primary/5 hover:border-primary/30'
+                }`}
+                onClick={() => setSelectedExtendHours(option.hours)}
+                disabled={extending}
               >
                 <span className="font-medium">{option.label}</span>
                 <span className="flex items-center gap-2">
-                  {extending && selectedExtendHours === option.hours ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <span className="text-primary font-semibold">
-                      +${getExtensionCost(option.hours).toFixed(2)}
-                    </span>
+                  <span className={selectedExtendHours === option.hours ? 'text-primary font-semibold' : 'text-primary font-semibold'}>
+                    +${getExtensionCost(option.hours).toFixed(2)}
+                  </span>
+                  {selectedExtendHours === option.hours && (
+                    <Check className="h-4 w-4 text-primary" />
                   )}
                 </span>
               </Button>
             ))}
-            
+
+            {/* Confirm Button */}
+            <Button
+              className="w-full mt-4"
+              size="lg"
+              onClick={handleQuickExtend}
+              disabled={extending || selectedExtendHours === null || paymentMethods.length === 0}
+            >
+              {extending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Processing...
+                </>
+              ) : selectedExtendHours !== null ? (
+                `Confirm +$${getExtensionCost(selectedExtendHours).toFixed(2)}`
+              ) : (
+                'Select a duration'
+              )}
+            </Button>
+
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
@@ -501,7 +523,7 @@ export const ExtendParkingDialog = ({
                 <span className="bg-background px-2 text-muted-foreground">or</span>
               </div>
             </div>
-            
+
             <Button
               variant="ghost"
               className="w-full text-muted-foreground hover:text-foreground"
