@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, isToday, isTomorrow, isPast } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { getStreetAddress } from '@/lib/addressUtils';
 
 interface ReservationPreview {
   id: string;
@@ -200,7 +201,7 @@ const UpcomingReservationsWidget = () => {
                   <Clock className="h-3 w-3" />
                   <span>{format(new Date(reservation.start_at), 'h:mm a')}</span>
                   <span>•</span>
-                  <span className="truncate">{reservation.spot?.address}</span>
+                  <span className="truncate">{getStreetAddress(reservation.spot?.address)}</span>
                 </div>
               </div>
 

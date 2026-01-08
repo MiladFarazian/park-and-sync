@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
 import { ReviewModal } from "./ReviewModal";
 import { ExtendParkingDialog } from "./ExtendParkingDialog";
+import { getStreetAddress } from "@/lib/addressUtils";
 
 interface HostProfile {
   user_id: string;
@@ -394,7 +395,7 @@ export const ActiveBookingBanner = () => {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <h3 className="font-semibold text-sm truncate">
-                    {activeBooking.spots.address}
+                    {getStreetAddress(activeBooking.spots.address)}
                   </h3>
                   {isOverstayed && !activeBooking.overstay_action && (
                     <Badge variant="destructive" className="text-xs flex-shrink-0">Overstayed</Badge>
