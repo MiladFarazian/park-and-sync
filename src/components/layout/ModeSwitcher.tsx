@@ -1,7 +1,8 @@
 import React from 'react';
 import { Car, Home } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useMode } from '@/contexts/ModeContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
 interface ModeSwitcherProps {
@@ -11,10 +12,18 @@ interface ModeSwitcherProps {
 
 const ModeSwitcher = ({ variant = 'default', navigate: shouldNavigate = true }: ModeSwitcherProps) => {
   const { mode, setMode, isLoading } = useMode();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleModeSwitch = (newMode: 'driver' | 'host') => {
     if (newMode !== mode) {
+      // Require login for host mode
+      if (newMode === 'host' && !user) {
+        navigate('/auth', { state: { from: location.pathname, intendedMode: 'host' } });
+        return;
+      }
+      
       setMode(newMode, shouldNavigate); // Only show overlay when navigating
       if (shouldNavigate) {
         if (newMode === 'host') {
