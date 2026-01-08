@@ -927,7 +927,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           'text-anchor': 'center',
           'text-justify': 'center',
           // Y offset is in "ems"; less-negative brings the label down into the circle.
-          'text-offset': [0, -1.6]
+          'text-offset': [0, -1.2]
         },
         paint: {
           'text-color': [
