@@ -921,20 +921,20 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         filter: ['!', ['has', 'point_count']],
         layout: {
           'text-field': ['get', 'price'],
-          'text-size': 11,
-          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+          'text-size': 12,
+          'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
           'text-allow-overlap': true,
-          'text-offset': [0, -3.0]
+          'text-offset': [0, -2.65]
         },
         paint: {
           'text-color': [
             'case',
             ['boolean', ['feature-state', 'selected'], false],
-            'hsl(250, 60%, 45%)', // Darker purple text for selected
-            '#666666' // Dark gray text for unselected (on white pin)
+            '#6B4EFF', // Parkzy purple text for selected
+            '#374151' // Dark gray text for unselected
           ],
           'text-halo-color': '#ffffff',
-          'text-halo-width': 0.5,
+          'text-halo-width': 0,
           'text-opacity': 1
         }
       } as any);
@@ -1085,16 +1085,21 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         }
       };
       
-      // White pin (default for unselected) - teardrop shape
+      // White pin (default for unselected) - modern rounded pill shape
       if (!hasWhite) {
         const whiteSvg = `
-          <svg width="36" height="52" viewBox="0 0 36 52" xmlns="http://www.w3.org/2000/svg">
-            <path d="M 18 2 C 10 2 4 8 4 16 C 4 28 18 50 18 50 C 18 50 32 28 32 16 C 32 8 26 2 18 2 Z" 
-                  fill="white" stroke="#d1d5db" stroke-width="1.5"/>
-            <circle cx="18" cy="16" r="11" fill="#f9fafb"/>
+          <svg width="48" height="56" viewBox="0 0 48 56" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="shadow-w" x="-20%" y="-10%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.15"/>
+              </filter>
+            </defs>
+            <path d="M 24 4 C 13 4 4 12 4 22 C 4 32 24 52 24 52 C 24 52 44 32 44 22 C 44 12 35 4 24 4 Z" 
+                  fill="white" filter="url(#shadow-w)"/>
+            <circle cx="24" cy="20" r="14" fill="white"/>
           </svg>`;
         const whiteUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(whiteSvg);
-        const whiteImg = new Image(36, 52);
+        const whiteImg = new Image(48, 56);
         whiteImg.onload = () => {
           try {
             (map.current as any).addImage(pinImageIdWhite, whiteImg, { pixelRatio: 2 });
@@ -1108,16 +1113,21 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         checkAndAddLayers();
       }
       
-      // Purple pin (for selected) - teardrop shape
+      // Purple pin (for selected) - modern rounded pill shape
       if (!hasPurple) {
         const purpleSvg = `
-          <svg width="36" height="52" viewBox="0 0 36 52" xmlns="http://www.w3.org/2000/svg">
-            <path d="M 18 2 C 10 2 4 8 4 16 C 4 28 18 50 18 50 C 18 50 32 28 32 16 C 32 8 26 2 18 2 Z" 
-                  fill="hsl(250, 100%, 65%)" stroke="white" stroke-width="2"/>
-            <circle cx="18" cy="16" r="11" fill="white"/>
+          <svg width="48" height="56" viewBox="0 0 48 56" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="shadow-p" x="-20%" y="-10%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#6B4EFF" flood-opacity="0.35"/>
+              </filter>
+            </defs>
+            <path d="M 24 4 C 13 4 4 12 4 22 C 4 32 24 52 24 52 C 24 52 44 32 44 22 C 44 12 35 4 24 4 Z" 
+                  fill="#6B4EFF" filter="url(#shadow-p)"/>
+            <circle cx="24" cy="20" r="14" fill="white"/>
           </svg>`;
         const purpleUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(purpleSvg);
-        const purpleImg = new Image(36, 52);
+        const purpleImg = new Image(48, 56);
         purpleImg.onload = () => {
           try {
             (map.current as any).addImage(pinImageIdPurple, purpleImg, { pixelRatio: 2 });
