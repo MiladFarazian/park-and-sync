@@ -18,7 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 
 interface SpotWithRate {
   id: string;
-  title: string;
+  address: string;
   hourly_rate: number;
 }
 
@@ -113,7 +113,7 @@ const HostCalendar = () => {
     try {
       const { data: spotsData, error: spotsError } = await supabase
         .from('spots')
-        .select('id, title, hourly_rate')
+        .select('id, address, hourly_rate')
         .eq('host_id', user.id);
 
       if (spotsError) throw spotsError;
@@ -510,7 +510,7 @@ const HostCalendar = () => {
               <SelectItem key={spot.id} value={spot.id}>
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <span>{spot.title}</span>
+                  <span className="truncate">{spot.address}</span>
                   <span className="text-muted-foreground text-sm">(${spot.hourly_rate}/hr)</span>
                 </div>
               </SelectItem>
