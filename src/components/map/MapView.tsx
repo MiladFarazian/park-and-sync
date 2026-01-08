@@ -181,9 +181,19 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     }
   }, [emblaApi, sortedSpots]);
 
-  // Reset carousel index when spots array changes and index is out of bounds
+  // Sync carousel index when spots array changes - try to preserve current selection
   useEffect(() => {
     if (!emblaApi || !sortedSpots.length) return;
+    
+    // If we have a selected spot, try to find it in the new sorted spots
+    if (selectedSpot) {
+      const newIndex = sortedSpots.findIndex(s => s.id === selectedSpot.id);
+      if (newIndex !== -1 && newIndex !== currentSlideIndex) {
+        setCurrentSlideIndex(newIndex);
+        emblaApi.scrollTo(newIndex, true); // instant scroll, no animation
+        return;
+      }
+    }
     
     // If current index is out of bounds, reset to 0
     if (currentSlideIndex >= sortedSpots.length) {
@@ -193,7 +203,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         setSelectedSpot(sortedSpots[0]);
       }
     }
-  }, [sortedSpots.length, emblaApi, currentSlideIndex]);
+  }, [sortedSpots, emblaApi, currentSlideIndex, selectedSpot]);
 
   // Set up embla event listeners
   useEffect(() => {
