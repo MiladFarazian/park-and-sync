@@ -211,22 +211,20 @@ export const QuickAvailabilityActions = () => {
         <div className="grid grid-cols-2 gap-2">
           <Button
             variant="outline"
-            size="sm"
-            className="w-full justify-start h-auto py-2 px-3"
+            className="w-full h-auto py-3 px-3 flex flex-col items-center gap-1"
             onClick={() => openDialog('block')}
           >
-            <CalendarOff className="h-4 w-4 mr-2 text-destructive flex-shrink-0" />
-            <span className="text-xs font-medium">Unavailable today</span>
+            <CalendarOff className="h-5 w-5 text-destructive" />
+            <span className="text-xs font-medium">Unavailable Today</span>
           </Button>
 
           <Button
             variant="outline"
-            size="sm"
-            className="w-full justify-start h-auto py-2 px-3"
+            className="w-full h-auto py-3 px-3 flex flex-col items-center gap-1"
             onClick={() => openDialog('available')}
           >
-            <CalendarCheck className="h-4 w-4 mr-2 text-green-600 flex-shrink-0" />
-            <span className="text-xs font-medium">Available today</span>
+            <CalendarCheck className="h-5 w-5 text-green-600" />
+            <span className="text-xs font-medium">Available Today</span>
           </Button>
         </div>
         
