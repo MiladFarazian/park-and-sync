@@ -63,7 +63,7 @@ const HostCalendar = () => {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
   const [spots, setSpots] = useState<SpotWithRate[]>([]);
-  const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
+  const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null); // null means loading, 'all' means all spots
   const [bookings, setBookings] = useState<BookingForCalendar[]>([]);
   const [allBookings, setAllBookings] = useState<any[]>([]);
   const [overrides, setOverrides] = useState<CalendarOverride[]>([]);
@@ -144,32 +144,46 @@ const HostCalendar = () => {
         rangeEnd = endOfWeek(currentWeek, { weekStartsOn: 0 });
       }
 
-      // Fetch bookings for the selected spot
-      const { data: bookingsData, error: bookingsError } = await supabase
+      const isAllSpots = selectedSpotId === 'all';
+      const spotIds = isAllSpots ? spots.map(s => s.id) : [selectedSpotId];
+
+      // Fetch bookings for selected spot(s)
+      let bookingsQuery = supabase
         .from('bookings')
         .select(`
           id, spot_id, start_at, end_at, status, total_amount, is_guest, guest_full_name,
           renter:profiles!bookings_renter_id_fkey(first_name, last_name),
           spot:spots!bookings_spot_id_fkey(title, address)
         `)
-        .eq('spot_id', selectedSpotId)
         .gte('start_at', rangeStart.toISOString())
         .lte('start_at', rangeEnd.toISOString())
         .in('status', ['pending', 'paid', 'active', 'completed']);
 
+      if (isAllSpots) {
+        bookingsQuery = bookingsQuery.in('spot_id', spotIds);
+      } else {
+        bookingsQuery = bookingsQuery.eq('spot_id', selectedSpotId);
+      }
+
+      const { data: bookingsData, error: bookingsError } = await bookingsQuery;
+
       if (bookingsError) throw bookingsError;
       setBookings(bookingsData || []);
 
-      // Fetch calendar overrides for selected spot
-      const { data: overridesData, error: overridesError } = await supabase
-        .from('calendar_overrides')
-        .select('id, spot_id, override_date, is_available, custom_rate')
-        .eq('spot_id', selectedSpotId)
-        .gte('override_date', format(rangeStart, 'yyyy-MM-dd'))
-        .lte('override_date', format(rangeEnd, 'yyyy-MM-dd'));
+      // Fetch calendar overrides (only for single spot - skip for "all")
+      if (!isAllSpots) {
+        const { data: overridesData, error: overridesError } = await supabase
+          .from('calendar_overrides')
+          .select('id, spot_id, override_date, is_available, custom_rate')
+          .eq('spot_id', selectedSpotId)
+          .gte('override_date', format(rangeStart, 'yyyy-MM-dd'))
+          .lte('override_date', format(rangeEnd, 'yyyy-MM-dd'));
 
-      if (overridesError) throw overridesError;
-      setOverrides(overridesData || []);
+        if (overridesError) throw overridesError;
+        setOverrides(overridesData || []);
+      } else {
+        setOverrides([]);
+      }
 
     } catch (error) {
       console.error('Error fetching calendar data:', error);
@@ -192,8 +206,11 @@ const HostCalendar = () => {
       
       setUserReviews(new Set(reviewsData?.map(r => r.booking_id) || []));
 
-      // Fetch all bookings for the selected spot
-      const { data: hostBookings, error: hostError } = await supabase
+      const isAllSpots = selectedSpotId === 'all';
+      const spotIds = isAllSpots ? spots.map(s => s.id) : [selectedSpotId];
+
+      // Fetch all bookings for the selected spot(s)
+      let bookingsQuery = supabase
         .from('bookings')
         .select(`
           *,
@@ -207,8 +224,15 @@ const HostCalendar = () => {
             last_name
           )
         `)
-        .eq('spot_id', selectedSpotId)
         .order('start_at', { ascending: false });
+
+      if (isAllSpots) {
+        bookingsQuery = bookingsQuery.in('spot_id', spotIds);
+      } else {
+        bookingsQuery = bookingsQuery.eq('spot_id', selectedSpotId);
+      }
+
+      const { data: hostBookings, error: hostError } = await bookingsQuery;
 
       if (hostError) throw hostError;
       setAllBookings((hostBookings || []).map(b => ({ ...b, userRole: 'host' })));
@@ -267,6 +291,7 @@ const HostCalendar = () => {
 
   // Get data for a specific date (for the selected spot)
   const selectedSpot = spots.find(s => s.id === selectedSpotId);
+  const isAllSpotsView = selectedSpotId === 'all';
   
   const getDateData = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -279,14 +304,17 @@ const HostCalendar = () => {
       return isSameDay(bookingDate, date);
     });
 
-    // Get overrides for this date
+    // Get overrides for this date (only for single spot view)
     const dateOverrides = overrides.filter(o => o.override_date === dateStr);
     const hasUnavailable = dateOverrides.some(o => !o.is_available);
     
-    // Calculate rate to show (use custom rate if available, otherwise base rate from selected spot)
-    let displayRate = selectedSpot?.hourly_rate ?? null;
-    const customRate = dateOverrides.find(o => o.custom_rate)?.custom_rate;
-    if (customRate) displayRate = customRate;
+    // Calculate rate to show (only for single spot view, null for "all spots")
+    let displayRate: number | null = null;
+    if (!isAllSpotsView && selectedSpot) {
+      displayRate = selectedSpot.hourly_rate;
+      const customRate = dateOverrides.find(o => o.custom_rate)?.custom_rate;
+      if (customRate) displayRate = customRate;
+    }
 
     return {
       bookings: dateBookings,
@@ -518,6 +546,14 @@ const HostCalendar = () => {
             <SelectValue placeholder="Select a spot" />
           </SelectTrigger>
           <SelectContent>
+            {spots.length > 1 && (
+              <SelectItem value="all">
+                <div className="flex items-center gap-2 max-w-full overflow-hidden">
+                  <LayoutGrid className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <span className="font-medium">All Spots</span>
+                </div>
+              </SelectItem>
+            )}
             {spots.map(spot => (
               <SelectItem key={spot.id} value={spot.id}>
                 <div className="flex items-center gap-2 max-w-full overflow-hidden">
@@ -840,16 +876,18 @@ const HostCalendar = () => {
           {selectedDate && selectedDateData && (
             <div className="py-4 space-y-6 overflow-y-auto max-h-[calc(85vh-100px)]">
               {/* Quick Stats */}
-              <div className="grid grid-cols-2 gap-3">
-                <Card className="p-3">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                    <DollarSign className="h-4 w-4" />
-                    <span>Rate</span>
-                  </div>
-                  <div className="text-lg font-bold">
-                    {selectedDateData.rate ? `$${selectedDateData.rate}/hr` : 'N/A'}
-                  </div>
-                </Card>
+              <div className={cn("grid gap-3", isAllSpotsView ? "grid-cols-1" : "grid-cols-2")}>
+                {!isAllSpotsView && (
+                  <Card className="p-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                      <DollarSign className="h-4 w-4" />
+                      <span>Rate</span>
+                    </div>
+                    <div className="text-lg font-bold">
+                      {selectedDateData.rate ? `$${selectedDateData.rate}/hr` : 'N/A'}
+                    </div>
+                  </Card>
+                )}
                 <Card className="p-3">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                     <CalendarIcon className="h-4 w-4" />
