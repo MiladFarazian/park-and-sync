@@ -202,47 +202,42 @@ export const QuickAvailabilityActions = () => {
 
   return (
     <>
-      <Card className="p-4 space-y-3">
-        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+      <Card className="p-4 space-y-2">
+        <h3 className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">
           Quick Availability
         </h3>
-        <div className="grid grid-cols-1 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <Button
             variant="outline"
-            className="w-full justify-start h-auto py-3"
+            size="sm"
+            className="w-full justify-start h-auto py-2 px-3"
             onClick={() => openDialog('block')}
           >
-            <CalendarOff className="h-4 w-4 mr-3 text-destructive" />
-            <div className="text-left">
-              <div className="font-medium">Mark Today as Unavailable</div>
-              <div className="text-xs text-muted-foreground">Block all bookings for today</div>
-            </div>
+            <CalendarOff className="h-4 w-4 mr-2 text-destructive flex-shrink-0" />
+            <span className="text-xs font-medium truncate">Unavailable</span>
           </Button>
 
           <Button
             variant="outline"
-            className="w-full justify-start h-auto py-3"
+            size="sm"
+            className="w-full justify-start h-auto py-2 px-3"
             onClick={() => openDialog('available')}
           >
-            <CalendarCheck className="h-4 w-4 mr-3 text-green-600" />
-            <div className="text-left">
-              <div className="font-medium">Mark Today as Available</div>
-              <div className="text-xs text-muted-foreground">Open all day for bookings</div>
-            </div>
-          </Button>
-
-          <Button
-            variant="outline"
-            className="w-full justify-start h-auto py-3"
-            onClick={() => openDialog('manage')}
-          >
-            <Clock className="h-4 w-4 mr-3 text-primary" />
-            <div className="text-left">
-              <div className="font-medium">Manage Availability</div>
-              <div className="text-xs text-muted-foreground">Edit schedules & block dates</div>
-            </div>
+            <CalendarCheck className="h-4 w-4 mr-2 text-green-600 flex-shrink-0" />
+            <span className="text-xs font-medium truncate">Available</span>
           </Button>
         </div>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-center text-xs text-muted-foreground h-8"
+          onClick={() => openDialog('manage')}
+        >
+          <Clock className="h-3 w-3 mr-1.5" />
+          Manage Availability
+          <ChevronRight className="h-3 w-3 ml-1" />
+        </Button>
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
