@@ -415,7 +415,7 @@ const HostCalendar = () => {
           <div className="flex items-start justify-between gap-3 mb-3">
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors">
-                {booking.spots?.title || 'Parking Spot'}
+                {booking.spots?.address || 'Parking Spot'}
               </h3>
               <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
                 <User className="h-3.5 w-3.5 shrink-0" />
@@ -942,7 +942,7 @@ const HostCalendar = () => {
                             </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <MapPin className="h-4 w-4" />
-                              <span>{booking.spot?.title}</span>
+                              <span className="truncate">{booking.spot?.address}</span>
                             </div>
                           </div>
                           <div className="text-right">
