@@ -525,12 +525,15 @@ const Explore = () => {
       // Note: We do NOT clear parkingSpots here - "stale-while-revalidate" behavior
 
       // Use search-spots-lite for fast map pin loading
+      // Pass time range to filter out already-booked spots
       const { data, error } = await supabase.functions.invoke('search-spots-lite', {
         body: {
           latitude: center.lat,
           longitude: center.lng,
           radius: Math.ceil(radius),
-          limit: 500 // Limit results at low zoom
+          limit: 500,
+          start_time: startTime?.toISOString(),
+          end_time: endTime?.toISOString()
         }
       });
       
