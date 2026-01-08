@@ -166,22 +166,27 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       setSelectedSpot(sortedSpots[index]);
       setUserSelectedSpot(true);
       
-      // Pan map to selected spot - mark as carousel navigation to prevent refetch
-      if (map.current) {
-        isCarouselNavigationRef.current = true;
-        skipNextMapMoveRef.current = true;
-        map.current.flyTo({
-          center: [sortedSpots[index].lng, sortedSpots[index].lat],
-          zoom: Math.min(map.current.getZoom(), 13), // Zoom out to 13 max for better context
-          duration: 500
-        });
-        // Reset flag after updateVisibleSpots has had a chance to run for this move
-        map.current.once('moveend', () => {
-          requestAnimationFrame(() => {
-            isCarouselNavigationRef.current = false;
+        // Pan map to selected spot - mark as carousel navigation to prevent refetch
+        if (map.current) {
+          isCarouselNavigationRef.current = true;
+          skipNextMapMoveRef.current = true;
+
+          // IMPORTANT: keep the guard enabled until the next 'idle' event.
+          // Otherwise Mapbox's global `idle` listener will fire after flyTo and
+          // trigger `onMapMove`, which can refetch a narrower result set and make
+          // it look like only the last card exists.
+          map.current.once('idle', () => {
+            requestAnimationFrame(() => {
+              isCarouselNavigationRef.current = false;
+            });
           });
-        });
-      }
+
+          map.current.flyTo({
+            center: [sortedSpots[index].lng, sortedSpots[index].lat],
+            zoom: Math.min(map.current.getZoom(), 13), // Zoom out to 13 max for better context
+            duration: 500
+          });
+        }
     }
   }, [emblaApi, sortedSpots]);
 
@@ -1021,7 +1026,16 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           
           // Center map on the clicked spot without zooming in too much
           if (map.current) {
+            isCarouselNavigationRef.current = true;
             skipNextMapMoveRef.current = true;
+
+            // Keep guard through the map's next idle so we don't refetch and shrink results.
+            map.current.once('idle', () => {
+              requestAnimationFrame(() => {
+                isCarouselNavigationRef.current = false;
+              });
+            });
+
             map.current.flyTo({
               center: [spot.lng, spot.lat],
               zoom: Math.min(map.current.getZoom(), 13), // Keep zoomed out for context
