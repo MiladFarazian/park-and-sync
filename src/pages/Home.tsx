@@ -26,7 +26,10 @@ const Home = () => {
   const { user, isEmailVerified } = useAuth();
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  // currentLocation = driver's actual GPS location (used for "Nearby Spots")
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  // searchLocation = location selected for search (can differ from currentLocation)
+  const [searchLocation, setSearchLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationResolved, setLocationResolved] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false);
@@ -60,14 +63,16 @@ const Home = () => {
       : null;
 
     const applyLocation = (loc: { lat: number; lng: number }) => {
-      setUserLocation(loc);
+      setCurrentLocation(loc);
+      setSearchLocation(loc);
       setSearchQuery('');
       setLocationResolved(true);
       // Don't auto-set isUsingCurrentLocation - keep search bar blank
     };
 
     const useDefaultLocation = () => {
-      setUserLocation({ lat: 34.0224, lng: -118.2851 });
+      setCurrentLocation({ lat: 34.0224, lng: -118.2851 });
+      setSearchLocation({ lat: 34.0224, lng: -118.2851 });
       setSearchQuery('University Park, Los Angeles');
       setLocationResolved(true);
       setIsUsingCurrentLocation(false);
@@ -179,13 +184,13 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
-    if (locationResolved && userLocation) {
+    if (locationResolved && currentLocation) {
       fetchNearbySpots();
     }
-  }, [locationResolved, userLocation]);
+  }, [locationResolved, currentLocation]);
 
   const fetchNearbySpots = async () => {
-    if (!userLocation) return;
+    if (!currentLocation) return;
 
     try {
       setLoading(true);
@@ -194,8 +199,8 @@ const Home = () => {
 
       const { data, error } = await supabase.functions.invoke('search-spots', {
         body: {
-          latitude: userLocation.lat,
-          longitude: userLocation.lng,
+          latitude: currentLocation.lat,
+          longitude: currentLocation.lng,
           radius: 5000,
           start_time: today,
           end_time: tomorrow,
@@ -244,7 +249,7 @@ const Home = () => {
   };
 
   const handleSelectLocation = (location: { lat: number; lng: number; name: string }) => {
-    setUserLocation({ lat: location.lat, lng: location.lng });
+    setSearchLocation({ lat: location.lat, lng: location.lng });
     setSearchQuery(location.name);
     setIsUsingCurrentLocation(location.name === 'Current location');
   };
@@ -341,9 +346,9 @@ const Home = () => {
       return;
     }
 
-    if (userLocation) {
+    if (searchLocation) {
       navigate(
-        `/explore?lat=${userLocation.lat}&lng=${userLocation.lng}&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchQuery || 'Current location')}`
+        `/explore?lat=${searchLocation.lat}&lng=${searchLocation.lng}&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchQuery || 'Current location')}`
       );
     }
   };
@@ -355,9 +360,9 @@ const Home = () => {
       onClick: () => {
         const now = new Date();
         const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-        if (userLocation) {
+        if (searchLocation) {
           navigate(
-            `/explore?lat=${userLocation.lat}&lng=${userLocation.lng}&start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`
+            `/explore?lat=${searchLocation.lat}&lng=${searchLocation.lng}&start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`
           );
         } else {
           navigate('/explore');
@@ -560,12 +565,13 @@ const Home = () => {
         errorCode={locationErrorCode}
         onRetry={() => {
           // Trigger refetch of nearby spots
-          if (userLocation) {
+          if (currentLocation) {
             fetchNearbySpots();
           }
         }}
         onSuccess={(coords) => {
-          setUserLocation(coords);
+          setCurrentLocation(coords);
+          setSearchLocation(coords);
           setSearchQuery('');
           setIsUsingCurrentLocation(true);
           setLocationErrorCode(null);
