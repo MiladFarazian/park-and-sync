@@ -15,8 +15,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 
 interface Spot {
   id: string;
@@ -36,10 +34,6 @@ export const QuickAvailabilityActions = () => {
   const [actionType, setActionType] = useState<ActionType>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  // Time inputs for "Mark Today as Available"
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('17:00');
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const todayDisplay = format(new Date(), 'EEEE, MMMM d');
@@ -134,14 +128,6 @@ export const QuickAvailabilityActions = () => {
 
   const handleMakeAvailable = async () => {
     if (selectedSpots.length === 0) return;
-    if (!startTime || !endTime) {
-      toast.error('Please set both start and end times');
-      return;
-    }
-    if (startTime >= endTime) {
-      toast.error('End time must be after start time');
-      return;
-    }
 
     setSaving(true);
 
@@ -159,14 +145,14 @@ export const QuickAvailabilityActions = () => {
             spot_id: spotId,
             override_date: today,
             is_available: true,
-            start_time: startTime,
-            end_time: endTime,
+            start_time: '00:00',
+            end_time: '23:59',
           });
 
         if (error) throw error;
       }
 
-      toast.success(`Set availability for ${selectedSpots.length} spot${selectedSpots.length > 1 ? 's' : ''} today (${startTime} - ${endTime})`);
+      toast.success(`Marked ${selectedSpots.length} spot${selectedSpots.length > 1 ? 's' : ''} as available all day`);
       setDialogOpen(false);
     } catch (error) {
       console.error('Error setting availability:', error);
@@ -206,7 +192,7 @@ export const QuickAvailabilityActions = () => {
       case 'block':
         return `Block all bookings for ${todayDisplay}`;
       case 'available':
-        return `Set specific hours for ${todayDisplay}`;
+        return `Make spots available all day on ${todayDisplay}`;
       case 'manage':
         return 'Edit weekly schedules and date overrides';
       default:
@@ -241,7 +227,7 @@ export const QuickAvailabilityActions = () => {
             <CalendarCheck className="h-4 w-4 mr-3 text-green-600" />
             <div className="text-left">
               <div className="font-medium">Mark Today as Available</div>
-              <div className="text-xs text-muted-foreground">Set specific hours for today</div>
+              <div className="text-xs text-muted-foreground">Open all day for bookings</div>
             </div>
           </Button>
 
@@ -279,33 +265,6 @@ export const QuickAvailabilityActions = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Time inputs for "Make Available" */}
-              {actionType === 'available' && (
-                <div className="p-4 bg-muted/50 rounded-lg space-y-3">
-                  <p className="text-sm font-medium">Set hours for today:</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="start-time" className="text-xs">Start Time</Label>
-                      <Input
-                        id="start-time"
-                        type="time"
-                        value={startTime}
-                        onChange={(e) => setStartTime(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="end-time" className="text-xs">End Time</Label>
-                      <Input
-                        id="end-time"
-                        type="time"
-                        value={endTime}
-                        onChange={(e) => setEndTime(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
               <div className="space-y-1">
                 <p className="text-sm font-medium">Select spots to apply:</p>
               </div>
