@@ -1153,6 +1153,7 @@ const ListSpot = () => {
                     type="button"
                     className="flex-1"
                     onClick={() => setCurrentStep(6)}
+                    disabled={!canProceed()}
                   >
                     Next
                   </Button>
