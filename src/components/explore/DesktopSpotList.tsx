@@ -380,7 +380,7 @@ const DesktopSpotList = ({
                   }`}
                   onMouseEnter={() => onSpotHover?.(spot.id)}
                   onMouseLeave={() => onSpotHover?.(null)}
-                  onClick={() => onSpotClick?.(spot.id)}
+                  onClick={() => handleViewDetails(spot.id)}
                 >
                   <div className="flex gap-4">
                     {/* Image */}
