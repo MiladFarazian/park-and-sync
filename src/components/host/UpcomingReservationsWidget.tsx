@@ -200,7 +200,7 @@ const UpcomingReservationsWidget = () => {
                   <Clock className="h-3 w-3" />
                   <span>{format(new Date(reservation.start_at), 'h:mm a')}</span>
                   <span>•</span>
-                  <span className="truncate">{reservation.spot?.title}</span>
+                  <span className="truncate">{reservation.spot?.address}</span>
                 </div>
               </div>
 
