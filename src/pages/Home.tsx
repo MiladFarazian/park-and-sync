@@ -22,7 +22,7 @@ import EmailVerificationBanner from '@/components/auth/EmailVerificationBanner';
 const Home = () => {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
-  const { setMode } = useMode();
+  const { mode, setMode } = useMode();
   const { user, isEmailVerified } = useAuth();
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +39,13 @@ const Home = () => {
   const [mobileEndPickerOpen, setMobileEndPickerOpen] = useState(false);
   const [locationErrorCode, setLocationErrorCode] = useState<number | null>(null);
   const [showFixLocationDialog, setShowFixLocationDialog] = useState(false);
+
+  // Redirect to host-home if mode is host (prevents mode/content mismatch on app launch)
+  useEffect(() => {
+    if (mode === 'host') {
+      navigate('/host-home', { replace: true });
+    }
+  }, [mode, navigate]);
 
   const handleStartTimeChange = (date: Date) => {
     setStartTime(date);
