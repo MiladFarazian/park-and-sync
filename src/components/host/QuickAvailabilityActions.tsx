@@ -39,9 +39,11 @@ interface ConflictingBooking {
   id: string;
   renter_name: string;
   spot_address: string;
+  spot_id: string;
   total_amount: number;
   start_at: string;
   end_at: string;
+  isLive: boolean; // Currently in progress
 }
 
 type ActionType = 'block' | 'available' | 'manage' | null;
@@ -119,9 +121,10 @@ export const QuickAvailabilityActions = () => {
   const checkForConflictingBookings = async (): Promise<ConflictingBooking[]> => {
     if (selectedSpots.length === 0) return [];
 
-    const todayStart = startOfDay(new Date()).toISOString();
-    const todayEnd = endOfDay(new Date()).toISOString();
+    const now = new Date();
+    const todayEnd = endOfDay(now).toISOString();
 
+    // Fetch bookings that overlap with today and haven't ended yet
     const { data: bookings, error } = await supabase
       .from('bookings')
       .select(`
@@ -129,6 +132,7 @@ export const QuickAvailabilityActions = () => {
         total_amount,
         start_at,
         end_at,
+        spot_id,
         is_guest,
         guest_full_name,
         renter:profiles!bookings_renter_id_fkey (first_name, last_name),
@@ -137,23 +141,31 @@ export const QuickAvailabilityActions = () => {
       .in('spot_id', selectedSpots)
       .in('status', ['pending', 'paid', 'active', 'held'])
       .lte('start_at', todayEnd)
-      .gte('end_at', todayStart);
+      .gte('end_at', now.toISOString()); // Only bookings that haven't ended yet
 
     if (error) {
       console.error('Error checking for conflicts:', error);
       return [];
     }
 
-    return (bookings || []).map(b => ({
-      id: b.id,
-      renter_name: b.is_guest 
-        ? (b.guest_full_name || 'Guest') 
-        : `${(b.renter as any)?.first_name || ''} ${(b.renter as any)?.last_name || ''}`.trim() || 'Driver',
-      spot_address: getStreetAddress((b.spot as any)?.address),
-      total_amount: b.total_amount,
-      start_at: b.start_at,
-      end_at: b.end_at,
-    }));
+    return (bookings || []).map(b => {
+      const startAt = new Date(b.start_at);
+      const endAt = new Date(b.end_at);
+      const isLive = startAt <= now && now < endAt;
+
+      return {
+        id: b.id,
+        renter_name: b.is_guest 
+          ? (b.guest_full_name || 'Guest') 
+          : `${(b.renter as any)?.first_name || ''} ${(b.renter as any)?.last_name || ''}`.trim() || 'Driver',
+        spot_address: getStreetAddress((b.spot as any)?.address),
+        spot_id: b.spot_id,
+        total_amount: b.total_amount,
+        start_at: b.start_at,
+        end_at: b.end_at,
+        isLive,
+      };
+    });
   };
 
   const handleBlockToday = async () => {
@@ -164,7 +176,11 @@ export const QuickAvailabilityActions = () => {
       // Check for conflicting bookings first
       const conflicts = await checkForConflictingBookings();
       
-      if (conflicts.length > 0) {
+      // Separate live bookings from upcoming bookings
+      const liveBookings = conflicts.filter(b => b.isLive);
+      const upcomingBookings = conflicts.filter(b => !b.isLive);
+      
+      if (liveBookings.length > 0 || upcomingBookings.length > 0) {
         setConflictingBookings(conflicts);
         setShowConflictDialog(true);
         setSaving(false);
@@ -180,7 +196,7 @@ export const QuickAvailabilityActions = () => {
     }
   };
 
-  const blockTodayWithoutConflicts = async () => {
+  const blockTodayWithoutConflicts = async (liveBookingsEndTimes?: Map<string, Date>) => {
     try {
       for (const spotId of selectedSpots) {
         await supabase
@@ -189,17 +205,36 @@ export const QuickAvailabilityActions = () => {
           .eq('spot_id', spotId)
           .eq('override_date', today);
 
-        const { error } = await supabase
-          .from('calendar_overrides')
-          .insert({
-            spot_id: spotId,
-            override_date: today,
-            is_available: false,
-            start_time: null,
-            end_time: null,
-          });
-
-        if (error) throw error;
+        // Check if this spot has a live booking - if so, only block from after it ends
+        const liveEndTime = liveBookingsEndTimes?.get(spotId);
+        
+        if (liveEndTime) {
+          // Block from when the live booking ends until end of day
+          const endTimeStr = format(liveEndTime, 'HH:mm');
+          const { error } = await supabase
+            .from('calendar_overrides')
+            .insert({
+              spot_id: spotId,
+              override_date: today,
+              is_available: false,
+              start_time: endTimeStr,
+              end_time: '23:59',
+              reason: 'Blocked after live booking ends',
+            });
+          if (error) throw error;
+        } else {
+          // Block the entire day
+          const { error } = await supabase
+            .from('calendar_overrides')
+            .insert({
+              spot_id: spotId,
+              override_date: today,
+              is_available: false,
+              start_time: null,
+              end_time: null,
+            });
+          if (error) throw error;
+        }
       }
 
       toast.success(`Marked ${selectedSpots.length} spot${selectedSpots.length > 1 ? 's' : ''} as unavailable for today`);
@@ -217,8 +252,11 @@ export const QuickAvailabilityActions = () => {
     setCancellingBookings(true);
 
     try {
-      // Cancel and refund each conflicting booking
-      for (const booking of conflictingBookings) {
+      const liveBookings = conflictingBookings.filter(b => b.isLive);
+      const upcomingBookings = conflictingBookings.filter(b => !b.isLive);
+
+      // Cancel and refund only upcoming bookings (not live ones)
+      for (const booking of upcomingBookings) {
         const { error } = await supabase.functions.invoke('host-cancel-booking', {
           body: { 
             bookingId: booking.id,
@@ -232,10 +270,31 @@ export const QuickAvailabilityActions = () => {
         }
       }
 
-      // Now block the day
-      await blockTodayWithoutConflicts();
+      // Build a map of spot IDs to their live booking end times
+      const liveBookingsEndTimes = new Map<string, Date>();
+      for (const booking of liveBookings) {
+        const endTime = new Date(booking.end_at);
+        const existingEnd = liveBookingsEndTimes.get(booking.spot_id);
+        // Use the latest end time if there are multiple live bookings for a spot
+        if (!existingEnd || endTime > existingEnd) {
+          liveBookingsEndTimes.set(booking.spot_id, endTime);
+        }
+      }
+
+      // Now block the day (with adjustments for live bookings)
+      await blockTodayWithoutConflicts(liveBookingsEndTimes);
       
-      toast.success(`Cancelled ${conflictingBookings.length} booking${conflictingBookings.length > 1 ? 's' : ''} and marked spots as unavailable`);
+      const cancelledCount = upcomingBookings.length;
+      const liveCount = liveBookings.length;
+      
+      if (cancelledCount > 0 && liveCount > 0) {
+        toast.success(`Cancelled ${cancelledCount} booking${cancelledCount > 1 ? 's' : ''} and will block after ${liveCount} live session${liveCount > 1 ? 's end' : ' ends'}`);
+      } else if (cancelledCount > 0) {
+        toast.success(`Cancelled ${cancelledCount} booking${cancelledCount > 1 ? 's' : ''} and marked spots as unavailable`);
+      } else if (liveCount > 0) {
+        toast.success(`Will block spots after ${liveCount} live session${liveCount > 1 ? 's end' : ' ends'}`);
+      }
+      
       setShowConflictDialog(false);
       setConflictingBookings([]);
     } catch (error) {
@@ -321,7 +380,9 @@ export const QuickAvailabilityActions = () => {
     }
   };
 
-  const totalRefundAmount = conflictingBookings.reduce((sum, b) => sum + b.total_amount, 0);
+  const liveBookings = conflictingBookings.filter(b => b.isLive);
+  const upcomingBookings = conflictingBookings.filter(b => !b.isLive);
+  const totalRefundAmount = upcomingBookings.reduce((sum, b) => sum + b.total_amount, 0);
 
   return (
     <>
@@ -474,57 +535,104 @@ export const QuickAvailabilityActions = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Conflict Confirmation Dialog */}
       <AlertDialog open={showConflictDialog} onOpenChange={setShowConflictDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              Active Bookings Found
+              {liveBookings.length > 0 && upcomingBookings.length === 0 
+                ? 'Live Session in Progress'
+                : 'Bookings Found'}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
-                <p>
-                  You have {conflictingBookings.length} active booking{conflictingBookings.length > 1 ? 's' : ''} for today. 
-                  Marking your spot{selectedSpots.length > 1 ? 's' : ''} as unavailable will cancel and fully refund these bookings.
-                </p>
-                
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {conflictingBookings.map(booking => (
-                    <div key={booking.id} className="p-2 bg-muted rounded-lg text-sm">
-                      <div className="font-medium">{booking.renter_name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {getStreetAddress(booking.spot_address)} • ${booking.total_amount.toFixed(2)} refund
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {format(new Date(booking.start_at), 'h:mm a')} – {format(new Date(booking.end_at), 'h:mm a')}
-                      </div>
+                {/* Live Bookings Section */}
+                {liveBookings.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                      <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                        {liveBookings.length} parking session{liveBookings.length > 1 ? 's are' : ' is'} currently in progress. 
+                        These cannot be cancelled. The spot will be blocked after the session{liveBookings.length > 1 ? 's end' : ' ends'}.
+                      </p>
                     </div>
-                  ))}
-                </div>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {liveBookings.map(booking => (
+                        <div key={booking.id} className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-sm border border-amber-200 dark:border-amber-800">
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
+                            <span className="font-medium">{booking.renter_name}</span>
+                            <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">LIVE</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {getStreetAddress(booking.spot_address)} • Ends {format(new Date(booking.end_at), 'h:mm a')}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-                <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/20">
-                  <p className="text-sm font-medium text-destructive">
-                    Total refund amount: ${totalRefundAmount.toFixed(2)}
-                  </p>
-                </div>
+                {/* Upcoming Bookings Section */}
+                {upcomingBookings.length > 0 && (
+                  <div className="space-y-2">
+                    {liveBookings.length > 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        {upcomingBookings.length} upcoming booking{upcomingBookings.length > 1 ? 's' : ''} will be cancelled and refunded:
+                      </p>
+                    )}
+                    {liveBookings.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        You have {upcomingBookings.length} upcoming booking{upcomingBookings.length > 1 ? 's' : ''} for today. 
+                        Marking your spot{selectedSpots.length > 1 ? 's' : ''} as unavailable will cancel and fully refund {upcomingBookings.length > 1 ? 'these bookings' : 'this booking'}.
+                      </p>
+                    )}
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {upcomingBookings.map(booking => (
+                        <div key={booking.id} className="p-2 bg-muted rounded-lg text-sm">
+                          <div className="font-medium">{booking.renter_name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {getStreetAddress(booking.spot_address)} • ${booking.total_amount.toFixed(2)} refund
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {format(new Date(booking.start_at), 'h:mm a')} – {format(new Date(booking.end_at), 'h:mm a')}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+                      <p className="text-sm font-medium text-destructive">
+                        Total refund amount: ${totalRefundAmount.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={cancellingBookings}>Keep Bookings</AlertDialogCancel>
+            <AlertDialogCancel disabled={cancellingBookings}>
+              {liveBookings.length > 0 && upcomingBookings.length === 0 ? 'Cancel' : 'Keep Bookings'}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmCancelBookings}
               disabled={cancellingBookings}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className={upcomingBookings.length > 0 
+                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                : "bg-primary text-primary-foreground hover:bg-primary/90"
+              }
             >
               {cancellingBookings ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Cancelling...
+                  Processing...
                 </>
+              ) : upcomingBookings.length > 0 ? (
+                liveBookings.length > 0 
+                  ? 'Cancel Upcoming & Block After Live'
+                  : 'Cancel & Refund Bookings'
               ) : (
-                'Cancel & Refund Bookings'
+                'Block After Session Ends'
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
