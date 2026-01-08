@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronRight, Calendar, Clock, User, Car } from 'lucide-react';
+import { ChevronRight, Calendar, Clock, MessageCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, isToday, isTomorrow, isPast } from 'date-fns';
@@ -16,6 +17,8 @@ interface ReservationPreview {
   end_at: string;
   status: string;
   total_amount: number;
+  renter_id: string;
+  is_guest: boolean;
   renter: {
     first_name: string | null;
     last_name: string | null;
@@ -66,6 +69,8 @@ const UpcomingReservationsWidget = () => {
           end_at,
           status,
           total_amount,
+          renter_id,
+          is_guest,
           renter:profiles!bookings_renter_id_fkey (
             first_name,
             last_name
@@ -79,7 +84,7 @@ const UpcomingReservationsWidget = () => {
         .in('status', ['pending', 'paid', 'active'])
         .gte('end_at', new Date().toISOString())
         .order('start_at', { ascending: true })
-        .limit(3);
+        .limit(5);
 
       if (bookingsError) throw bookingsError;
 
@@ -89,6 +94,8 @@ const UpcomingReservationsWidget = () => {
         end_at: b.end_at,
         status: b.status,
         total_amount: b.total_amount,
+        renter_id: b.renter_id,
+        is_guest: b.is_guest || false,
         renter: b.renter as { first_name: string | null; last_name: string | null },
         spot: b.spot as { title: string; address: string }
       }));
@@ -119,9 +126,18 @@ const UpcomingReservationsWidget = () => {
       return <Badge variant="secondary" className="text-[10px]">Pending</Badge>;
     }
     if (isStarted) {
-      return <Badge className="bg-blue-500 text-white text-[10px]">Starting Soon</Badge>;
+      return <Badge className="bg-blue-500 text-white text-[10px]">In Progress</Badge>;
     }
     return <Badge variant="outline" className="text-[10px]">Confirmed</Badge>;
+  };
+
+  const handleMessage = (e: React.MouseEvent, reservation: ReservationPreview) => {
+    e.stopPropagation();
+    if (reservation.is_guest) {
+      navigate(`/messages?userId=guest:${reservation.id}`);
+    } else {
+      navigate(`/messages?userId=${reservation.renter_id}`);
+    }
   };
 
   if (loading) {
@@ -133,7 +149,7 @@ const UpcomingReservationsWidget = () => {
         </div>
         {[1, 2].map(i => (
           <div key={i} className="flex items-center gap-3 p-3 rounded-lg border">
-            <Skeleton className="h-10 w-10 rounded-lg" />
+            <Skeleton className="h-12 w-12 rounded-lg" />
             <div className="flex-1 space-y-1">
               <Skeleton className="h-4 w-24" />
               <Skeleton className="h-3 w-32" />
@@ -145,11 +161,11 @@ const UpcomingReservationsWidget = () => {
   }
 
   return (
-    <Card 
-      className="p-4 cursor-pointer hover:bg-muted/50 transition-colors group"
-      onClick={() => navigate('/host-calendar?tab=reservations')}
-    >
-      <div className="flex items-center justify-between mb-3">
+    <Card className="p-4">
+      <div 
+        className="flex items-center justify-between mb-3 cursor-pointer group"
+        onClick={() => navigate('/host-calendar?tab=reservations')}
+      >
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-primary" />
           <h3 className="font-semibold text-sm">Upcoming Reservations</h3>
@@ -171,45 +187,59 @@ const UpcomingReservationsWidget = () => {
             <div
               key={reservation.id}
               className={cn(
-                "flex items-center gap-3 p-3 rounded-lg border transition-all",
+                "p-3 rounded-lg border transition-all cursor-pointer hover:bg-muted/50",
                 reservation.status === 'active' && "border-green-500/50 bg-green-500/5"
               )}
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/booking/${reservation.id}`);
-              }}
+              onClick={() => navigate(`/booking/${reservation.id}`)}
             >
-              {/* Date Badge */}
-              <div className="flex flex-col items-center justify-center bg-primary/10 rounded-lg p-2 min-w-[50px]">
-                <span className="text-[10px] text-primary font-medium uppercase">
-                  {getDateLabel(reservation.start_at)}
-                </span>
-                <span className="text-lg font-bold text-primary">
-                  {format(new Date(reservation.start_at), 'd')}
-                </span>
-              </div>
-
-              {/* Details */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-medium truncate">
-                    {reservation.renter?.first_name || 'Guest'} {reservation.renter?.last_name?.[0] || ''}.
+              <div className="flex items-start gap-3">
+                {/* Date Badge */}
+                <div className="flex flex-col items-center justify-center bg-primary/10 rounded-lg p-2 min-w-[50px]">
+                  <span className="text-[10px] text-primary font-medium uppercase">
+                    {getDateLabel(reservation.start_at)}
                   </span>
-                  {getStatusBadge(reservation.status, reservation.start_at)}
+                  <span className="text-lg font-bold text-primary">
+                    {format(new Date(reservation.start_at), 'd')}
+                  </span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  <span>{format(new Date(reservation.start_at), 'h:mm a')}</span>
-                  <span>•</span>
-                  <span className="truncate">{getStreetAddress(reservation.spot?.address)}</span>
-                </div>
-              </div>
 
-              {/* Amount */}
-              <div className="text-right">
-                <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-                  ${reservation.total_amount.toFixed(0)}
-                </span>
+                {/* Details */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium truncate">
+                      {reservation.renter?.first_name || 'Guest'} {reservation.renter?.last_name?.[0] || ''}.
+                    </span>
+                    {getStatusBadge(reservation.status, reservation.start_at)}
+                  </div>
+                  
+                  {/* Time Range */}
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                    <Clock className="h-3 w-3 flex-shrink-0" />
+                    <span className="font-medium">
+                      {format(new Date(reservation.start_at), 'h:mm a')} – {format(new Date(reservation.end_at), 'h:mm a')}
+                    </span>
+                  </div>
+                  
+                  {/* Address */}
+                  <p className="text-xs text-muted-foreground truncate">
+                    {getStreetAddress(reservation.spot?.address)}
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-col items-end gap-2">
+                  <span className="text-sm font-semibold text-green-600 dark:text-green-400">
+                    ${reservation.total_amount.toFixed(0)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={(e) => handleMessage(e, reservation)}
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))}
