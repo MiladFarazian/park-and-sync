@@ -1317,7 +1317,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                   <Card className={`p-4 bg-background/95 backdrop-blur-sm transition-all duration-200 ${
                     isAnimating ? 'animate-selection-pulse' : ''
                   }`}>
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 cursor-pointer" onClick={() => navigate(buildSpotUrl(spot.id))}>
                       <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0">
                         <img 
                           src={spot.imageUrl || "/placeholder.svg"}
