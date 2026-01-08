@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, LayoutGrid, Clock, DollarSign, User, MapPin, Settings, List, MessageCircle, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addDays, a
 import { cn } from '@/lib/utils';
 import { ReviewModal } from '@/components/booking/ReviewModal';
 import { useToast } from '@/hooks/use-toast';
+import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 
 interface SpotWithRate {
   id: string;
@@ -304,6 +305,17 @@ const HostCalendar = () => {
 
   const selectedDateData = selectedDate ? getDateData(selectedDate) : null;
 
+  // Swipe navigation for calendar
+  const monthSwipeHandlers = useSwipeNavigation({
+    onSwipeLeft: useCallback(() => setCurrentMonth(prev => addMonths(prev, 1)), []),
+    onSwipeRight: useCallback(() => setCurrentMonth(prev => addMonths(prev, -1)), []),
+  });
+
+  const weekSwipeHandlers = useSwipeNavigation({
+    onSwipeLeft: useCallback(() => setCurrentWeek(prev => addWeeks(prev, 1)), []),
+    onSwipeRight: useCallback(() => setCurrentWeek(prev => addWeeks(prev, -1)), []),
+  });
+
   // Reservations helpers
   const now = new Date();
   const upcomingBookings = allBookings.filter(b => new Date(b.end_at) >= now && b.status !== 'canceled');
@@ -586,7 +598,10 @@ const HostCalendar = () => {
             )
           ) : viewMode === 'month' ? (
             // Month View
-            <div className="grid grid-cols-7 gap-1">
+            <div 
+              className="grid grid-cols-7 gap-1"
+              {...monthSwipeHandlers}
+            >
               {calendarDays.map(({ date, isCurrentMonth }, index) => {
                 const { bookings: dayBookings, isUnavailable, rate, isPast, hasBookings } = getDateData(date);
                 const isTodayDate = isToday(date);
@@ -658,7 +673,7 @@ const HostCalendar = () => {
             </div>
           ) : (
             // Week View - Vertical layout for mobile
-            <div className="space-y-2">
+            <div className="space-y-2" {...weekSwipeHandlers}>
               {weekDays.map((date, index) => {
                 const { bookings: dayBookings, isUnavailable, rate, isPast, hasBookings } = getDateData(date);
                 const isTodayDate = isToday(date);

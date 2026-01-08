@@ -16,6 +16,7 @@ import { ExtendParkingDialog } from '@/components/booking/ExtendParkingDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, isToday } from 'date-fns';
+import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 
 const Activity = () => {
   const navigate = useNavigate();
@@ -215,6 +216,12 @@ const Activity = () => {
   };
 
   const bookingsForSelectedDate = selectedDate ? getBookingsForDate(selectedDate) : [];
+
+  // Swipe navigation for calendar
+  const calendarSwipeHandlers = useSwipeNavigation({
+    onSwipeLeft: useCallback(() => setCalendarMonth(prev => addMonths(prev, 1)), []),
+    onSwipeRight: useCallback(() => setCalendarMonth(prev => subMonths(prev, 1)), []),
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -823,7 +830,7 @@ const Activity = () => {
                 </div>
 
                 {/* Calendar days */}
-                <div className="grid grid-cols-7 gap-1">
+                <div className="grid grid-cols-7 gap-1" {...calendarSwipeHandlers}>
                   {/* Empty cells for days before the first of the month */}
                   {Array.from({ length: calendarDays[0]?.getDay() || 0 }).map((_, i) => (
                     <div key={`empty-${i}`} className="aspect-square" />
