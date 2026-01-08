@@ -63,6 +63,8 @@ const Home = () => {
   };
 
   useEffect(() => {
+    // Skip location detection if we're in host mode (will redirect)
+    if (mode === 'host') return;
     // Get user's location
     const cachedRaw = localStorage.getItem('parkzy:lastLocation');
     const cached = cachedRaw
@@ -188,13 +190,15 @@ const Home = () => {
         timeout: 20000,
       }
     );
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
+    // Skip fetching if we're in host mode (will redirect)
+    if (mode === 'host') return;
     if (locationResolved && currentLocation) {
       fetchNearbySpots();
     }
-  }, [locationResolved, currentLocation]);
+  }, [locationResolved, currentLocation, mode]);
 
   const fetchNearbySpots = async () => {
     if (!currentLocation) return;
@@ -390,6 +394,11 @@ const Home = () => {
       onClick: () => navigate('/activity'),
     },
   ];
+
+  // Redirect to host-home if in host mode - return null to prevent flash
+  if (mode === 'host') {
+    return null;
+  }
 
   // Show desktop landing page on non-mobile
   if (!isMobile) {
