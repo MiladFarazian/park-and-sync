@@ -41,7 +41,8 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       // Use instant switch (no overlay) so mode updates before navigation
       setMode('driver', false);
     }
-    navigate('/');
+    // Pass state to prevent Home from redirecting back to host-home
+    navigate('/', { state: { fromLogoClick: true } });
   };
   
   return (

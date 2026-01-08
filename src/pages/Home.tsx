@@ -6,7 +6,7 @@ import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { format } from 'date-fns';
 import { CalendarIcon, Clock, Search } from 'lucide-react';
 import { Star, MapPin, Loader2, Plus, Activity, Zap, AlertCircle, Footprints } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useMode } from '@/contexts/ModeContext';
@@ -22,6 +22,7 @@ import EmailVerificationBanner from '@/components/auth/EmailVerificationBanner';
 const Home = () => {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const location = useLocation();
   const { mode, setMode } = useMode();
   const { user, isEmailVerified } = useAuth();
   const [parkingSpots, setParkingSpots] = useState<any[]>([]);
@@ -41,11 +42,13 @@ const Home = () => {
   const [showFixLocationDialog, setShowFixLocationDialog] = useState(false);
 
   // Redirect to host-home if mode is host (prevents mode/content mismatch on app launch)
+  // Skip redirect if coming from logo click (mode was just switched to driver)
   useEffect(() => {
-    if (mode === 'host') {
+    const fromLogoClick = (location.state as { fromLogoClick?: boolean })?.fromLogoClick;
+    if (mode === 'host' && !fromLogoClick) {
       navigate('/host-home', { replace: true });
     }
-  }, [mode, navigate]);
+  }, [mode, navigate, location.state]);
 
   const handleStartTimeChange = (date: Date) => {
     setStartTime(date);
@@ -396,7 +399,9 @@ const Home = () => {
   ];
 
   // Redirect to host-home if in host mode - return null to prevent flash
-  if (mode === 'host') {
+  // But allow rendering if we came from logo click (mode was just switched)
+  const fromLogoClick = (location.state as { fromLogoClick?: boolean })?.fromLogoClick;
+  if (mode === 'host' && !fromLogoClick) {
     return null;
   }
 
