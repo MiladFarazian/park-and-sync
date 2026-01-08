@@ -764,14 +764,21 @@ const HostCalendar = () => {
                                 "bg-blue-500/15"
                               )}
                             >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <User className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                                <span className="font-medium truncate">
-                                  {booking.renter?.first_name || 'Guest'}
-                                </span>
-                              </div>
-                              <div className="text-xs text-muted-foreground flex-shrink-0">
-                                {format(new Date(booking.start_at), 'h:mm a')}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <User className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                  <span className="font-medium truncate">
+                                    {booking.renter?.first_name || 'Guest'}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground flex-shrink-0">
+                                    {format(new Date(booking.start_at), 'h:mm a')}
+                                  </span>
+                                </div>
+                                {isAllSpotsView && booking.spot?.address && (
+                                  <div className="text-xs text-muted-foreground truncate mt-0.5 pl-5">
+                                    {getStreetAddress(booking.spot.address)}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           ))}
