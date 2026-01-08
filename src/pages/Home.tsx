@@ -531,6 +531,8 @@ const Home = () => {
           onConfirm={(date) => {
             handleStartTimeChange(date);
             setMobileStartPickerOpen(false);
+            // Automatically open end time picker after selecting start time
+            setTimeout(() => setMobileEndPickerOpen(true), 100);
           }}
           mode="start"
           initialValue={startTime}
