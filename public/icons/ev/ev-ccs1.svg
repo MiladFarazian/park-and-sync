@@ -1,20 +1,22 @@
 <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- CCS Combo Type 1 - J1772 top with 2 DC pins at bottom -->
+  <!-- CCS Combo Type 1 - J1772 top section + 2 DC pins at bottom -->
   <g stroke="#4CAF50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <!-- Upper J1772 section with handle -->
-    <path d="M32 6 C18 6 10 14 10 24 C10 34 16 38 32 38 C48 38 54 34 54 24 C54 14 46 6 32 6 M32 6 L32 4 L28 4 L28 6" />
-    <!-- J1772 top ground pin -->
-    <circle cx="32" cy="14" r="3.5" />
-    <!-- J1772 middle pins -->
+    <!-- Upper J1772 section - rounded with handle notch on left -->
+    <path d="M32 6 C44 6 52 12 52 22 C52 30 48 34 40 36 L40 38 L24 38 L24 36 C16 34 12 30 12 22 C12 12 20 6 32 6" />
+    <!-- Handle notch on left of upper section -->
+    <path d="M14 16 L10 16 L10 12 L14 12" />
+    <!-- J1772 top large pin -->
+    <circle cx="32" cy="14" r="4" />
+    <!-- J1772 middle two pins -->
     <circle cx="22" cy="22" r="3" />
     <circle cx="42" cy="22" r="3" />
-    <!-- J1772 bottom pins -->
-    <circle cx="26" cy="31" r="2.5" />
-    <circle cx="38" cy="31" r="2.5" />
-    <!-- Lower DC section -->
-    <path d="M18 42 C18 38 22 36 32 36 C42 36 46 38 46 42 C46 52 42 58 32 58 C22 58 18 52 18 42" />
+    <!-- J1772 bottom two smaller pins -->
+    <circle cx="26" cy="30" r="2.5" />
+    <circle cx="38" cy="30" r="2.5" />
+    <!-- Lower DC section - oval -->
+    <ellipse cx="32" cy="50" rx="18" ry="10" />
     <!-- Two large DC pins -->
-    <circle cx="26" cy="48" r="4" />
-    <circle cx="38" cy="48" r="4" />
+    <circle cx="24" cy="50" r="4" />
+    <circle cx="40" cy="50" r="4" />
   </g>
 </svg>
