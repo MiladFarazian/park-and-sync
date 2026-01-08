@@ -914,6 +914,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       animateBounce();
 
       // Price text centered inside the pin head (unclustered only)
+      // Pin is 54px tall, circle center at y=18, icon-anchor is bottom
+      // Text offset in ems from the anchor point (bottom of pin)
       (map.current as any).addLayer({
         id: labelId,
         type: 'symbol',
@@ -921,13 +923,11 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         filter: ['!', ['has', 'point_count']],
         layout: {
           'text-field': ['get', 'price'],
-          'text-size': 12,
+          'text-size': 11,
           'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
           'text-allow-overlap': true,
           'text-anchor': 'center',
-          'text-justify': 'center',
-          // Y offset is in "ems"; less-negative brings the label down into the circle.
-          'text-offset': [0, -1.2]
+          'text-offset': [0, -2.4] // Offset to center in the circle (18px from bottom = ~2.4em at 11px font)
         },
         paint: {
           'text-color': [
@@ -937,7 +937,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
             '#374151' // Dark gray text for unselected
           ],
           'text-halo-color': '#ffffff',
-          'text-halo-width': 0,
+          'text-halo-width': 0.5,
           'text-opacity': 1
         }
       } as any);
@@ -1088,16 +1088,21 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         }
       };
       
-      // White pin (default for unselected) - modern rounded pill shape
+      // White pin (default for unselected) - clean modern design
       if (!hasWhite) {
         const whiteSvg = `
-          <svg width="48" height="56" viewBox="0 0 48 56" xmlns="http://www.w3.org/2000/svg">
-            <path d="M 24 4 C 13 4 4 12 4 22 C 4 32 24 52 24 52 C 24 52 44 32 44 22 C 44 12 35 4 24 4 Z"
-                  fill="white" stroke="#E5E7EB" stroke-width="1.5"/>
-            <circle cx="24" cy="20" r="14" fill="#F9FAFB"/>
+          <svg width="44" height="54" viewBox="0 0 44 54" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="shadow-w" x="-20%" y="-10%" width="140%" height="130%">
+                <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#000" flood-opacity="0.12"/>
+              </filter>
+            </defs>
+            <path d="M22 52 C22 52 40 32 40 18 C40 8.059 31.941 0 22 0 C12.059 0 4 8.059 4 18 C4 32 22 52 22 52Z" 
+                  fill="white" filter="url(#shadow-w)"/>
+            <circle cx="22" cy="18" r="13" fill="white" stroke="#E5E7EB" stroke-width="1"/>
           </svg>`;
         const whiteUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(whiteSvg);
-        const whiteImg = new Image(48, 56);
+        const whiteImg = new Image(44, 54);
         whiteImg.onload = () => {
           try {
             (map.current as any).addImage(pinImageIdWhite, whiteImg, { pixelRatio: 2 });
@@ -1111,16 +1116,21 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         checkAndAddLayers();
       }
       
-      // Purple pin (for selected) - modern rounded pill shape
+      // Purple pin (for selected) - clean modern design
       if (!hasPurple) {
         const purpleSvg = `
-          <svg width="48" height="56" viewBox="0 0 48 56" xmlns="http://www.w3.org/2000/svg">
-            <path d="M 24 4 C 13 4 4 12 4 22 C 4 32 24 52 24 52 C 24 52 44 32 44 22 C 44 12 35 4 24 4 Z"
-                  fill="#6B4EFF" stroke="white" stroke-width="2"/>
-            <circle cx="24" cy="20" r="14" fill="white"/>
+          <svg width="44" height="54" viewBox="0 0 44 54" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="shadow-p" x="-20%" y="-10%" width="140%" height="130%">
+                <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#6B4EFF" flood-opacity="0.3"/>
+              </filter>
+            </defs>
+            <path d="M22 52 C22 52 40 32 40 18 C40 8.059 31.941 0 22 0 C12.059 0 4 8.059 4 18 C4 32 22 52 22 52Z" 
+                  fill="#6B4EFF" filter="url(#shadow-p)"/>
+            <circle cx="22" cy="18" r="13" fill="white"/>
           </svg>`;
         const purpleUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(purpleSvg);
-        const purpleImg = new Image(48, 56);
+        const purpleImg = new Image(44, 54);
         purpleImg.onload = () => {
           try {
             (map.current as any).addImage(pinImageIdPurple, purpleImg, { pixelRatio: 2 });
