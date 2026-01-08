@@ -164,51 +164,107 @@ serve(async (req) => {
       .sort((a, b) => a.distance - b.distance)
       .slice(0, limit);
 
-    // If time range is provided, filter out spots with conflicting bookings
+    // If time range is provided, filter out spots with conflicting bookings or unavailable overrides
     if (start_time && end_time) {
       const spotIds = spotsWithDistance.map(s => s.id);
       
       if (spotIds.length > 0) {
-        // Get all bookings that overlap with the requested time range
-        // A booking overlaps if: booking.start_at < end_time AND booking.end_at > start_time
-        const { data: conflictingBookings } = await supabase
-          .from('bookings')
-          .select('spot_id')
+        // Get dates covered by the search range for calendar override checks
+        const startDate = new Date(start_time);
+        const endDate = new Date(end_time);
+        const searchDates: string[] = [];
+        const currentDate = new Date(startDate);
+        currentDate.setHours(0, 0, 0, 0);
+        const endDateMidnight = new Date(endDate);
+        endDateMidnight.setHours(0, 0, 0, 0);
+        
+        while (currentDate <= endDateMidnight) {
+          searchDates.push(currentDate.toISOString().split('T')[0]);
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        // Get calendar overrides that mark spots as unavailable for the search dates
+        const { data: unavailableOverrides } = await supabase
+          .from('calendar_overrides')
+          .select('spot_id, override_date, start_time, end_time, is_available')
           .in('spot_id', spotIds)
-          .in('status', ['pending', 'held', 'paid', 'active'])
-          .lt('start_at', end_time)
-          .gt('end_at', start_time);
+          .in('override_date', searchDates)
+          .eq('is_available', false);
+
+        // Determine which spots are fully unavailable during the search time
+        const unavailableSpotIds = new Set<string>();
         
-        const bookedSpotIds = new Set((conflictingBookings || []).map(b => b.spot_id));
-        
-        // Filter out spots that have conflicting bookings (unless it's the current user's booking)
-        if (bookedSpotIds.size > 0) {
-          // If user is authenticated, check if any of the "conflicting" bookings are their own
-          let userBookedSpotIds = new Set<string>();
-          if (userId) {
-            const { data: userBookings } = await supabase
-              .from('bookings')
-              .select('spot_id')
-              .in('spot_id', Array.from(bookedSpotIds))
-              .eq('renter_id', userId)
-              .in('status', ['pending', 'held', 'paid', 'active'])
-              .lt('start_at', end_time)
-              .gt('end_at', start_time);
-            
-            userBookedSpotIds = new Set((userBookings || []).map(b => b.spot_id));
+        for (const override of unavailableOverrides || []) {
+          // If override has no time range (full day block), spot is unavailable
+          if (!override.start_time && !override.end_time) {
+            unavailableSpotIds.add(override.spot_id);
+            continue;
           }
           
-          // Remove spots that are booked by someone else
-          spotsWithDistance = spotsWithDistance.filter(spot => {
-            // If spot has no conflicting booking, keep it
-            if (!bookedSpotIds.has(spot.id)) return true;
-            // If the booking is the user's own, keep it (they can view their booking)
-            if (userBookedSpotIds.has(spot.id)) return true;
-            // Otherwise, filter it out
-            return false;
-          });
+          // Check if override time range overlaps with search time on that date
+          const overrideDate = override.override_date;
+          const overrideStart = override.start_time 
+            ? new Date(`${overrideDate}T${override.start_time}`) 
+            : new Date(`${overrideDate}T00:00:00`);
+          const overrideEnd = override.end_time 
+            ? new Date(`${overrideDate}T${override.end_time}`) 
+            : new Date(`${overrideDate}T23:59:59`);
           
-          console.log(`[search-spots-lite] Filtered out ${bookedSpotIds.size - userBookedSpotIds.size} booked spots`);
+          // Check overlap: override blocks if search range overlaps with blocked range
+          if (new Date(start_time) < overrideEnd && new Date(end_time) > overrideStart) {
+            unavailableSpotIds.add(override.spot_id);
+          }
+        }
+
+        if (unavailableSpotIds.size > 0) {
+          spotsWithDistance = spotsWithDistance.filter(spot => !unavailableSpotIds.has(spot.id));
+          console.log(`[search-spots-lite] Filtered out ${unavailableSpotIds.size} unavailable spots (calendar overrides)`);
+        }
+
+        // Get all bookings that overlap with the requested time range
+        // A booking overlaps if: booking.start_at < end_time AND booking.end_at > start_time
+        const remainingSpotIds = spotsWithDistance.map(s => s.id);
+        
+        if (remainingSpotIds.length > 0) {
+          const { data: conflictingBookings } = await supabase
+            .from('bookings')
+            .select('spot_id')
+            .in('spot_id', remainingSpotIds)
+            .in('status', ['pending', 'held', 'paid', 'active'])
+            .lt('start_at', end_time)
+            .gt('end_at', start_time);
+          
+          const bookedSpotIds = new Set((conflictingBookings || []).map(b => b.spot_id));
+          
+          // Filter out spots that have conflicting bookings (unless it's the current user's booking)
+          if (bookedSpotIds.size > 0) {
+            // If user is authenticated, check if any of the "conflicting" bookings are their own
+            let userBookedSpotIds = new Set<string>();
+            if (userId) {
+              const { data: userBookings } = await supabase
+                .from('bookings')
+                .select('spot_id')
+                .in('spot_id', Array.from(bookedSpotIds))
+                .eq('renter_id', userId)
+                .in('status', ['pending', 'held', 'paid', 'active'])
+                .lt('start_at', end_time)
+                .gt('end_at', start_time);
+              
+              userBookedSpotIds = new Set((userBookings || []).map(b => b.spot_id));
+            }
+            
+            // Remove spots that are booked by someone else
+            spotsWithDistance = spotsWithDistance.filter(spot => {
+              // If spot has no conflicting booking, keep it
+              if (!bookedSpotIds.has(spot.id)) return true;
+              // If the booking is the user's own, keep it (they can view their booking)
+              if (userBookedSpotIds.has(spot.id)) return true;
+              // Otherwise, filter it out
+              return false;
+            });
+            
+            console.log(`[search-spots-lite] Filtered out ${bookedSpotIds.size - userBookedSpotIds.size} booked spots`);
+          }
         }
       }
     }
