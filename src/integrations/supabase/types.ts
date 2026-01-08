@@ -788,6 +788,7 @@ export type Database = {
           created_at: string
           daily_rate: number | null
           description: string | null
+          ev_charger_type: string | null
           ev_charging_instructions: string | null
           ev_charging_premium_per_hour: number | null
           has_ev_charging: boolean | null
@@ -815,6 +816,7 @@ export type Database = {
           created_at?: string
           daily_rate?: number | null
           description?: string | null
+          ev_charger_type?: string | null
           ev_charging_instructions?: string | null
           ev_charging_premium_per_hour?: number | null
           has_ev_charging?: boolean | null
@@ -844,6 +846,7 @@ export type Database = {
           created_at?: string
           daily_rate?: number | null
           description?: string | null
+          ev_charger_type?: string | null
           ev_charging_instructions?: string | null
           ev_charging_premium_per_hour?: number | null
           has_ev_charging?: boolean | null
