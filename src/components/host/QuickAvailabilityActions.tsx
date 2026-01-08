@@ -1,0 +1,404 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { CalendarOff, CalendarCheck, Clock, Loader2, Check, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+
+interface Spot {
+  id: string;
+  title: string;
+  address: string;
+  hourly_rate: number;
+}
+
+type ActionType = 'block' | 'available' | 'manage' | null;
+
+export const QuickAvailabilityActions = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [spots, setSpots] = useState<Spot[]>([]);
+  const [loadingSpots, setLoadingSpots] = useState(false);
+  const [selectedSpots, setSelectedSpots] = useState<string[]>([]);
+  const [actionType, setActionType] = useState<ActionType>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Time inputs for "Mark Today as Available"
+  const [startTime, setStartTime] = useState('09:00');
+  const [endTime, setEndTime] = useState('17:00');
+
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const todayDisplay = format(new Date(), 'EEEE, MMMM d');
+
+  useEffect(() => {
+    if (dialogOpen && user) {
+      fetchSpots();
+    }
+  }, [dialogOpen, user]);
+
+  const fetchSpots = async () => {
+    if (!user) return;
+    setLoadingSpots(true);
+    try {
+      const { data, error } = await supabase
+        .from('spots')
+        .select('id, title, address, hourly_rate')
+        .eq('host_id', user.id)
+        .eq('status', 'active');
+
+      if (error) throw error;
+      setSpots(data || []);
+      // Auto-select all by default
+      if (data && data.length > 0) {
+        setSelectedSpots(data.map(s => s.id));
+      }
+    } catch (error) {
+      console.error('Error fetching spots:', error);
+      toast.error('Failed to load spots');
+    } finally {
+      setLoadingSpots(false);
+    }
+  };
+
+  const openDialog = (type: ActionType) => {
+    setActionType(type);
+    setDialogOpen(true);
+    setSelectedSpots([]);
+  };
+
+  const toggleSpot = (spotId: string) => {
+    setSelectedSpots(prev =>
+      prev.includes(spotId)
+        ? prev.filter(id => id !== spotId)
+        : [...prev, spotId]
+    );
+  };
+
+  const toggleAll = () => {
+    if (selectedSpots.length === spots.length) {
+      setSelectedSpots([]);
+    } else {
+      setSelectedSpots(spots.map(s => s.id));
+    }
+  };
+
+  const handleBlockToday = async () => {
+    if (selectedSpots.length === 0) return;
+    setSaving(true);
+
+    try {
+      // Delete any existing overrides for today, then insert blocking override
+      for (const spotId of selectedSpots) {
+        await supabase
+          .from('calendar_overrides')
+          .delete()
+          .eq('spot_id', spotId)
+          .eq('override_date', today);
+
+        const { error } = await supabase
+          .from('calendar_overrides')
+          .insert({
+            spot_id: spotId,
+            override_date: today,
+            is_available: false,
+            start_time: null,
+            end_time: null,
+          });
+
+        if (error) throw error;
+      }
+
+      toast.success(`Marked ${selectedSpots.length} spot${selectedSpots.length > 1 ? 's' : ''} as unavailable for today`);
+      setDialogOpen(false);
+    } catch (error) {
+      console.error('Error blocking today:', error);
+      toast.error('Failed to update availability');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleMakeAvailable = async () => {
+    if (selectedSpots.length === 0) return;
+    if (!startTime || !endTime) {
+      toast.error('Please set both start and end times');
+      return;
+    }
+    if (startTime >= endTime) {
+      toast.error('End time must be after start time');
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      for (const spotId of selectedSpots) {
+        await supabase
+          .from('calendar_overrides')
+          .delete()
+          .eq('spot_id', spotId)
+          .eq('override_date', today);
+
+        const { error } = await supabase
+          .from('calendar_overrides')
+          .insert({
+            spot_id: spotId,
+            override_date: today,
+            is_available: true,
+            start_time: startTime,
+            end_time: endTime,
+          });
+
+        if (error) throw error;
+      }
+
+      toast.success(`Set availability for ${selectedSpots.length} spot${selectedSpots.length > 1 ? 's' : ''} today (${startTime} - ${endTime})`);
+      setDialogOpen(false);
+    } catch (error) {
+      console.error('Error setting availability:', error);
+      toast.error('Failed to update availability');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleManageAvailability = () => {
+    if (selectedSpots.length === 0) return;
+
+    if (selectedSpots.length === 1) {
+      navigate(`/edit-spot/${selectedSpots[0]}/availability`);
+    } else {
+      const spotIdsParam = selectedSpots.join(',');
+      navigate(`/manage-availability/bulk?spots=${spotIdsParam}`);
+    }
+    setDialogOpen(false);
+  };
+
+  const getDialogTitle = () => {
+    switch (actionType) {
+      case 'block':
+        return 'Mark Today as Unavailable';
+      case 'available':
+        return 'Mark Today as Available';
+      case 'manage':
+        return 'Manage Availability';
+      default:
+        return '';
+    }
+  };
+
+  const getDialogDescription = () => {
+    switch (actionType) {
+      case 'block':
+        return `Block all bookings for ${todayDisplay}`;
+      case 'available':
+        return `Set specific hours for ${todayDisplay}`;
+      case 'manage':
+        return 'Edit weekly schedules and date overrides';
+      default:
+        return '';
+    }
+  };
+
+  return (
+    <>
+      <Card className="p-4 space-y-3">
+        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+          Quick Availability
+        </h3>
+        <div className="grid grid-cols-1 gap-2">
+          <Button
+            variant="outline"
+            className="w-full justify-start h-auto py-3"
+            onClick={() => openDialog('block')}
+          >
+            <CalendarOff className="h-4 w-4 mr-3 text-destructive" />
+            <div className="text-left">
+              <div className="font-medium">Mark Today as Unavailable</div>
+              <div className="text-xs text-muted-foreground">Block all bookings for today</div>
+            </div>
+          </Button>
+
+          <Button
+            variant="outline"
+            className="w-full justify-start h-auto py-3"
+            onClick={() => openDialog('available')}
+          >
+            <CalendarCheck className="h-4 w-4 mr-3 text-green-600" />
+            <div className="text-left">
+              <div className="font-medium">Mark Today as Available</div>
+              <div className="text-xs text-muted-foreground">Set specific hours for today</div>
+            </div>
+          </Button>
+
+          <Button
+            variant="outline"
+            className="w-full justify-start h-auto py-3"
+            onClick={() => openDialog('manage')}
+          >
+            <Clock className="h-4 w-4 mr-3 text-primary" />
+            <div className="text-left">
+              <div className="font-medium">Manage Availability</div>
+              <div className="text-xs text-muted-foreground">Edit schedules & block dates</div>
+            </div>
+          </Button>
+        </div>
+      </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{getDialogTitle()}</DialogTitle>
+            <DialogDescription>{getDialogDescription()}</DialogDescription>
+          </DialogHeader>
+
+          {loadingSpots ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : spots.length === 0 ? (
+            <div className="text-center py-6">
+              <p className="text-muted-foreground mb-4">You don't have any active spots.</p>
+              <Button onClick={() => { setDialogOpen(false); navigate('/list-spot'); }}>
+                List a Spot
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Time inputs for "Make Available" */}
+              {actionType === 'available' && (
+                <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+                  <p className="text-sm font-medium">Set hours for today:</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="start-time" className="text-xs">Start Time</Label>
+                      <Input
+                        id="start-time"
+                        type="time"
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="end-time" className="text-xs">End Time</Label>
+                      <Input
+                        id="end-time"
+                        type="time"
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Select spots to apply:</p>
+              </div>
+
+              {/* Select All */}
+              {spots.length > 1 && (
+                <div
+                  className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-accent/50 transition-colors"
+                  onClick={toggleAll}
+                >
+                  <Checkbox
+                    checked={selectedSpots.length === spots.length}
+                    onCheckedChange={toggleAll}
+                  />
+                  <span className="font-medium text-sm">
+                    {selectedSpots.length === spots.length ? 'Deselect All' : 'Select All Spots'}
+                  </span>
+                </div>
+              )}
+
+              {/* Spots List */}
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {spots.map(spot => (
+                  <div
+                    key={spot.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      selectedSpots.includes(spot.id)
+                        ? 'bg-primary/5 border-primary/30'
+                        : 'hover:bg-accent/50'
+                    }`}
+                    onClick={() => toggleSpot(spot.id)}
+                  >
+                    <Checkbox
+                      checked={selectedSpots.includes(spot.id)}
+                      onCheckedChange={() => toggleSpot(spot.id)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm">{spot.title}</div>
+                      <div className="text-xs text-muted-foreground truncate">{spot.address}</div>
+                    </div>
+                    {selectedSpots.includes(spot.id) && (
+                      <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                {actionType === 'block' && (
+                  <Button
+                    className="flex-1"
+                    disabled={selectedSpots.length === 0 || saving}
+                    onClick={handleBlockToday}
+                  >
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Block Today
+                  </Button>
+                )}
+                {actionType === 'available' && (
+                  <Button
+                    className="flex-1"
+                    disabled={selectedSpots.length === 0 || saving}
+                    onClick={handleMakeAvailable}
+                  >
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Set Available
+                  </Button>
+                )}
+                {actionType === 'manage' && (
+                  <Button
+                    className="flex-1"
+                    disabled={selectedSpots.length === 0}
+                    onClick={handleManageAvailability}
+                  >
+                    Continue
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
+
+export default QuickAvailabilityActions;
