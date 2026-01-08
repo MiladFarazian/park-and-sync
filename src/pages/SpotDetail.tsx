@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Heart, Share, Star, MapPin, Calendar, Navigation, MessageCircle, Phone, Camera, Clock, Shield, Zap, Loader2, Pencil, ChevronLeft, ChevronRight, Flag, BoltIcon, Accessibility, User, LogIn } from 'lucide-react';
+import { EVChargerBadge } from '@/components/ev/EVChargerBadge';
+import { getChargerTypeById } from '@/lib/evChargerTypes';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -497,7 +499,12 @@ const SpotDetail = () => {
         amenities: [
           ...(spotData.is_covered ? [{ icon: Shield, title: 'Covered Parking', subtitle: 'Protected from weather' }] : []),
           ...(spotData.is_secure ? [{ icon: Camera, title: 'Security', subtitle: 'Monitored parking area' }] : []),
-          ...(spotData.has_ev_charging ? [{ icon: Zap, title: 'EV Charging', subtitle: 'Electric vehicle charging available' }] : []),
+          ...(spotData.has_ev_charging ? [{ 
+            icon: Zap, 
+            title: 'EV Charging', 
+            subtitle: getChargerTypeById(spotData.ev_charger_type)?.name || 'Electric vehicle charging available',
+            chargerType: spotData.ev_charger_type
+          }] : []),
           ...(spotData.is_ada_accessible ? [{ icon: Accessibility, title: 'ADA Accessible', subtitle: 'Wheelchair accessible parking' }] : []),
           { icon: Clock, title: 'Easy Access', subtitle: 'Convenient location' }
         ],
@@ -865,8 +872,13 @@ const SpotDetail = () => {
                 <div className="p-2 bg-muted rounded-lg">
                   <amenity.icon className="h-5 w-5 text-primary" />
                 </div>
-                <div>
-                  <p className="font-medium">{amenity.title}</p>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-medium">{amenity.title}</p>
+                    {amenity.chargerType && (
+                      <EVChargerBadge chargerType={amenity.chargerType} showSpeed size="sm" />
+                    )}
+                  </div>
                   <p className="text-sm text-muted-foreground">{amenity.subtitle}</p>
                 </div>
               </div>

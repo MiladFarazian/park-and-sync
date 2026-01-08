@@ -20,6 +20,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { EVChargerTypeSelector } from '@/components/ev/EVChargerTypeSelector';
 const spotCategories = [
   'Residential Driveway',
   'Apartment / Condo Lot',
@@ -229,6 +230,7 @@ const EditSpot = () => {
   // EV Charging state
   const [evChargingInstructions, setEvChargingInstructions] = useState('');
   const [evChargingPremium, setEvChargingPremium] = useState('0');
+  const [evChargerType, setEvChargerType] = useState<string | null>(null);
   
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
@@ -340,6 +342,7 @@ const EditSpot = () => {
         // Load EV charging settings
         setEvChargingInstructions(spotData.ev_charging_instructions || '');
         setEvChargingPremium(spotData.ev_charging_premium_per_hour?.toString() || '0');
+        setEvChargerType(spotData.ev_charger_type || null);
         const {
           data: photosData,
           error: photosError
@@ -686,6 +689,7 @@ const EditSpot = () => {
         is_ada_accessible: selectedAmenities.includes('ada'),
         ev_charging_instructions: hasEvCharging ? evChargingInstructions : null,
         ev_charging_premium_per_hour: hasEvCharging ? parseFloat(evChargingPremium) || 0 : 0,
+        ev_charger_type: hasEvCharging ? evChargerType : null,
         updated_at: new Date().toISOString()
       };
       const {
@@ -844,6 +848,11 @@ const EditSpot = () => {
                         <Zap className="h-5 w-5 text-green-600 dark:text-green-400" />
                         <h3 className="font-semibold text-green-800 dark:text-green-300">EV Charging Settings</h3>
                       </div>
+                      
+                      <EVChargerTypeSelector
+                        value={evChargerType}
+                        onChange={setEvChargerType}
+                      />
                       
                       <div>
                         <Label htmlFor="evPremium">EV Charging Premium ($/hour) <span className="text-destructive">*</span></Label>

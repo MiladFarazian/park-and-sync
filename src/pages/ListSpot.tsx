@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { WeeklyScheduleGrid, AvailabilityRule } from '@/components/availability/WeeklyScheduleGrid';
 import { compressImage } from '@/lib/compressImage';
+import { EVChargerTypeSelector } from '@/components/ev/EVChargerTypeSelector';
 import { useAuth } from '@/contexts/AuthContext';
 
 const spotCategories = [
@@ -84,6 +85,7 @@ const ListSpot = () => {
   // EV Charging state
   const [evChargingInstructions, setEvChargingInstructions] = useState('');
   const [evChargingPremium, setEvChargingPremium] = useState('0');
+  const [evChargerType, setEvChargerType] = useState<string | null>(null);
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
@@ -396,6 +398,7 @@ const ListSpot = () => {
           size_constraints: ['compact', 'midsize'], // Default values
           ev_charging_instructions: hasEvCharging ? evChargingInstructions : null,
           ev_charging_premium_per_hour: hasEvCharging ? parseFloat(evChargingPremium) || 0 : 0,
+          ev_charger_type: hasEvCharging ? evChargerType : null,
         })
         .select()
         .single();
@@ -509,6 +512,13 @@ const ListSpot = () => {
     if (currentStep === 2) {
       return formData.description && formData.description.length >= 20 && 
              formData.parkingInstructions && formData.parkingInstructions.length >= 10;
+    }
+    if (currentStep === 3) {
+      // If EV charging is selected, require charger type and premium
+      if (selectedAmenities.includes('ev')) {
+        return evChargerType && evChargingPremium && parseFloat(evChargingPremium) > 0;
+      }
+      return true;
     }
     return true;
   };
@@ -852,6 +862,11 @@ const ListSpot = () => {
                         <Zap className="h-5 w-5 text-green-600 dark:text-green-400" />
                         <h3 className="font-semibold text-green-800 dark:text-green-300">EV Charging Settings</h3>
                       </div>
+                      
+                      <EVChargerTypeSelector
+                        value={evChargerType}
+                        onChange={setEvChargerType}
+                      />
                       
                       <div>
                         <Label htmlFor="evPremium">EV Charging Premium ($/hour) <span className="text-destructive">*</span></Label>
