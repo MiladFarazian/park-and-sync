@@ -520,6 +520,10 @@ const ListSpot = () => {
       }
       return true;
     }
+    if (currentStep === 5) {
+      // Require at least one photo
+      return photos.length > 0;
+    }
     return true;
   };
 
