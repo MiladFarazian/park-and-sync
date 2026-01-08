@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarOff, CalendarCheck, Clock, Loader2, Check, ChevronRight } from 'lucide-react';
+import { CalendarOff, CalendarCheck, Clock, Loader2, Check, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -10,17 +10,38 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay } from 'date-fns';
+import { getStreetAddress } from '@/lib/addressUtils';
 
 interface Spot {
   id: string;
   title: string;
   address: string;
   hourly_rate: number;
+}
+
+interface ConflictingBooking {
+  id: string;
+  renter_name: string;
+  spot_address: string;
+  total_amount: number;
+  start_at: string;
+  end_at: string;
 }
 
 type ActionType = 'block' | 'available' | 'manage' | null;
@@ -34,6 +55,11 @@ export const QuickAvailabilityActions = () => {
   const [actionType, setActionType] = useState<ActionType>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  
+  // Conflict handling state
+  const [conflictingBookings, setConflictingBookings] = useState<ConflictingBooking[]>([]);
+  const [showConflictDialog, setShowConflictDialog] = useState(false);
+  const [cancellingBookings, setCancellingBookings] = useState(false);
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const todayDisplay = format(new Date(), 'EEEE, MMMM d');
@@ -90,12 +116,72 @@ export const QuickAvailabilityActions = () => {
     }
   };
 
+  const checkForConflictingBookings = async (): Promise<ConflictingBooking[]> => {
+    if (selectedSpots.length === 0) return [];
+
+    const todayStart = startOfDay(new Date()).toISOString();
+    const todayEnd = endOfDay(new Date()).toISOString();
+
+    const { data: bookings, error } = await supabase
+      .from('bookings')
+      .select(`
+        id,
+        total_amount,
+        start_at,
+        end_at,
+        is_guest,
+        guest_full_name,
+        renter:profiles!bookings_renter_id_fkey (first_name, last_name),
+        spot:spots!bookings_spot_id_fkey (address)
+      `)
+      .in('spot_id', selectedSpots)
+      .in('status', ['pending', 'paid', 'active', 'held'])
+      .lte('start_at', todayEnd)
+      .gte('end_at', todayStart);
+
+    if (error) {
+      console.error('Error checking for conflicts:', error);
+      return [];
+    }
+
+    return (bookings || []).map(b => ({
+      id: b.id,
+      renter_name: b.is_guest 
+        ? (b.guest_full_name || 'Guest') 
+        : `${(b.renter as any)?.first_name || ''} ${(b.renter as any)?.last_name || ''}`.trim() || 'Driver',
+      spot_address: getStreetAddress((b.spot as any)?.address),
+      total_amount: b.total_amount,
+      start_at: b.start_at,
+      end_at: b.end_at,
+    }));
+  };
+
   const handleBlockToday = async () => {
     if (selectedSpots.length === 0) return;
     setSaving(true);
 
     try {
-      // Delete any existing overrides for today, then insert blocking override
+      // Check for conflicting bookings first
+      const conflicts = await checkForConflictingBookings();
+      
+      if (conflicts.length > 0) {
+        setConflictingBookings(conflicts);
+        setShowConflictDialog(true);
+        setSaving(false);
+        return;
+      }
+
+      // No conflicts, proceed with blocking
+      await blockTodayWithoutConflicts();
+    } catch (error) {
+      console.error('Error blocking today:', error);
+      toast.error('Failed to update availability');
+      setSaving(false);
+    }
+  };
+
+  const blockTodayWithoutConflicts = async () => {
+    try {
       for (const spotId of selectedSpots) {
         await supabase
           .from('calendar_overrides')
@@ -124,6 +210,39 @@ export const QuickAvailabilityActions = () => {
       toast.error('Failed to update availability');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleConfirmCancelBookings = async () => {
+    setCancellingBookings(true);
+
+    try {
+      // Cancel and refund each conflicting booking
+      for (const booking of conflictingBookings) {
+        const { error } = await supabase.functions.invoke('host-cancel-booking', {
+          body: { 
+            bookingId: booking.id,
+            reason: 'Host marked spot as unavailable for today'
+          },
+        });
+
+        if (error) {
+          console.error(`Error cancelling booking ${booking.id}:`, error);
+          toast.error(`Failed to cancel booking for ${booking.renter_name}`);
+        }
+      }
+
+      // Now block the day
+      await blockTodayWithoutConflicts();
+      
+      toast.success(`Cancelled ${conflictingBookings.length} booking${conflictingBookings.length > 1 ? 's' : ''} and marked spots as unavailable`);
+      setShowConflictDialog(false);
+      setConflictingBookings([]);
+    } catch (error) {
+      console.error('Error cancelling bookings:', error);
+      toast.error('Failed to cancel bookings');
+    } finally {
+      setCancellingBookings(false);
     }
   };
 
@@ -202,6 +321,8 @@ export const QuickAvailabilityActions = () => {
     }
   };
 
+  const totalRefundAmount = conflictingBookings.reduce((sum, b) => sum + b.total_amount, 0);
+
   return (
     <>
       <Card className="p-4 space-y-2">
@@ -240,6 +361,7 @@ export const QuickAvailabilityActions = () => {
         </Button>
       </Card>
 
+      {/* Spot Selection Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -298,7 +420,7 @@ export const QuickAvailabilityActions = () => {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm">{spot.title}</div>
-                      <div className="text-xs text-muted-foreground truncate">{spot.address}</div>
+                      <div className="text-xs text-muted-foreground truncate">{getStreetAddress(spot.address)}</div>
                     </div>
                     {selectedSpots.includes(spot.id) && (
                       <Check className="h-4 w-4 text-primary flex-shrink-0" />
@@ -351,6 +473,63 @@ export const QuickAvailabilityActions = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Conflict Confirmation Dialog */}
+      <AlertDialog open={showConflictDialog} onOpenChange={setShowConflictDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Active Bookings Found
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  You have {conflictingBookings.length} active booking{conflictingBookings.length > 1 ? 's' : ''} for today. 
+                  Marking your spot{selectedSpots.length > 1 ? 's' : ''} as unavailable will cancel and fully refund these bookings.
+                </p>
+                
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {conflictingBookings.map(booking => (
+                    <div key={booking.id} className="p-2 bg-muted rounded-lg text-sm">
+                      <div className="font-medium">{booking.renter_name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {getStreetAddress(booking.spot_address)} • ${booking.total_amount.toFixed(2)} refund
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {format(new Date(booking.start_at), 'h:mm a')} – {format(new Date(booking.end_at), 'h:mm a')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+                  <p className="text-sm font-medium text-destructive">
+                    Total refund amount: ${totalRefundAmount.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancellingBookings}>Keep Bookings</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmCancelBookings}
+              disabled={cancellingBookings}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {cancellingBookings ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Cancelling...
+                </>
+              ) : (
+                'Cancel & Refund Bookings'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
