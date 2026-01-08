@@ -609,22 +609,23 @@ const BookingContent = () => {
         return;
       }
 
-      // Double-check user doesn't already have a booking for this spot
-      const now = new Date().toISOString();
+      // Double-check user doesn't already have an OVERLAPPING booking for this spot
+      // (allow booking the same spot for different, non-overlapping times)
       const { data: existingBookingData } = await supabase
         .from('bookings')
         .select('id')
         .eq('spot_id', spotId)
         .eq('renter_id', user.id)
         .in('status', ['paid', 'active'])
-        .gte('end_at', now)
+        .lt('start_at', endDateTime.toISOString())
+        .gt('end_at', startDateTime.toISOString())
         .limit(1)
         .maybeSingle();
 
       if (existingBookingData) {
         toast({
-          title: "You already have a booking",
-          description: "Redirecting to your existing booking...",
+          title: "You already have a booking for this time",
+          description: "Your existing booking overlaps with this time slot.",
         });
         navigate(`/booking/${existingBookingData.id}`);
         return;
