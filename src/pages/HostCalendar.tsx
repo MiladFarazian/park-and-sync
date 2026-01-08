@@ -801,19 +801,28 @@ const HostCalendar = () => {
           )}
 
           {/* Legend */}
-          <div className="flex flex-wrap items-center justify-center gap-3 mt-4 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded bg-green-500/20 border" />
-              <span>Booked</span>
+          <div className="flex flex-col items-center gap-2 mt-4">
+            <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded bg-green-500/20 border" />
+                <span>Booked</span>
+              </div>
+              {!isAllSpotsView && (
+                <div className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded bg-destructive/10 border" />
+                  <span>Blocked</span>
+                </div>
+              )}
+              <div className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded bg-muted/50 border" />
+                <span>Past</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded bg-destructive/10 border" />
-              <span>Blocked</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded bg-muted/50 border" />
-              <span>Past</span>
-            </div>
+            {isAllSpotsView && (
+              <p className="text-xs text-muted-foreground text-center">
+                Select a specific spot from the dropdown to view availability and pricing.
+              </p>
+            )}
           </div>
         </Card>
       )}
