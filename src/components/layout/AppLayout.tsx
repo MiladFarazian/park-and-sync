@@ -38,7 +38,8 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       return;
     }
     if (mode === 'host') {
-      setMode('driver');
+      // Use instant switch (no overlay) so mode updates before navigation
+      setMode('driver', false);
     }
     navigate('/');
   };
