@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,13 @@ const Home = () => {
   const [locationErrorCode, setLocationErrorCode] = useState<number | null>(null);
   const [showFixLocationDialog, setShowFixLocationDialog] = useState(false);
 
+  // Prevent duplicate location application + rate-limited spam calls
+  const lastAppliedLocationKeyRef = useRef<string | null>(null);
+  const lastNearbySearchKeyRef = useRef<string | null>(null);
+  const lastNearbySearchAtRef = useRef<number>(0);
+  const isFetchingNearbyRef = useRef(false);
+  const lastRateLimitToastAtRef = useRef<number>(0);
+
   // Redirect to host-home if mode is host (prevents mode/content mismatch on app launch)
   // Skip redirect if coming from logo click (mode was just switched to driver)
   useEffect(() => {
@@ -75,6 +82,11 @@ const Home = () => {
       : null;
 
     const applyLocation = (loc: { lat: number; lng: number }) => {
+      // De-dupe location updates (quick geolocation + GPS fix can both succeed)
+      const key = `${loc.lat.toFixed(4)},${loc.lng.toFixed(4)}`;
+      if (lastAppliedLocationKeyRef.current === key) return;
+      lastAppliedLocationKeyRef.current = key;
+
       setCurrentLocation(loc);
       setSearchLocation(loc);
       setSearchQuery('');
@@ -206,6 +218,19 @@ const Home = () => {
   const fetchNearbySpots = async () => {
     if (!currentLocation) return;
 
+    const nowMs = Date.now();
+    const locationKey = `${currentLocation.lat.toFixed(4)},${currentLocation.lng.toFixed(4)}`;
+
+    // Prevent duplicate calls during rapid location updates / rerenders
+    if (isFetchingNearbyRef.current) return;
+    if (lastNearbySearchKeyRef.current === locationKey && nowMs - lastNearbySearchAtRef.current < 30_000) {
+      return;
+    }
+
+    isFetchingNearbyRef.current = true;
+    lastNearbySearchKeyRef.current = locationKey;
+    lastNearbySearchAtRef.current = nowMs;
+
     try {
       setLoading(true);
       const today = new Date().toISOString();
@@ -223,6 +248,13 @@ const Home = () => {
 
       if (error) {
         console.error('Search error:', error);
+        if (error.message?.includes('429') || error.message?.includes('Too many requests')) {
+          // Avoid toast spam
+          if (nowMs - lastRateLimitToastAtRef.current > 5000) {
+            lastRateLimitToastAtRef.current = nowMs;
+            toast.error('Too many requests. Please wait a moment and try again.', { duration: 5000 });
+          }
+        }
         return;
       }
 
@@ -258,6 +290,7 @@ const Home = () => {
     } catch (err) {
       console.error('Unexpected error:', err);
     } finally {
+      isFetchingNearbyRef.current = false;
       setLoading(false);
     }
   };
