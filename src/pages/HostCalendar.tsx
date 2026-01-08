@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addDays, addMonths, addWeeks, isSameDay, isBefore, startOfDay, isToday, startOfWeek, endOfWeek } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { getStreetAddress } from '@/lib/addressUtils';
 import { ReviewModal } from '@/components/booking/ReviewModal';
 import { useToast } from '@/hooks/use-toast';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
@@ -415,7 +416,7 @@ const HostCalendar = () => {
           <div className="flex items-start justify-between gap-3 mb-3">
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors">
-                {booking.spots?.address || 'Parking Spot'}
+                {getStreetAddress(booking.spots?.address) || 'Parking Spot'}
               </h3>
               <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
                 <User className="h-3.5 w-3.5 shrink-0" />
@@ -942,7 +943,7 @@ const HostCalendar = () => {
                             </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <MapPin className="h-4 w-4" />
-                              <span className="truncate">{booking.spot?.address}</span>
+                              <span className="truncate">{getStreetAddress(booking.spot?.address)}</span>
                             </div>
                           </div>
                           <div className="text-right">
