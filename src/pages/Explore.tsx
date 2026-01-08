@@ -16,27 +16,44 @@ const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 
 // Grid-based cache key - divides the map into ~1km tiles for efficient regional caching
 // At this scale, nearby areas share cache keys, reducing redundant API calls
-const getRegionalCacheKey = (lat: number, lng: number, radius: number): string => {
+const getRegionalCacheKey = (lat: number, lng: number, radius: number, timeKey = ''): string => {
   // Use different grid sizes based on zoom level (radius)
   // Smaller radius = more zoomed in = finer grid
   const gridSize = radius < 5000 ? 0.01 : radius < 15000 ? 0.02 : 0.05; // ~1km, ~2km, ~5km tiles
   const gridLat = Math.floor(lat / gridSize) * gridSize;
   const gridLng = Math.floor(lng / gridSize) * gridSize;
   const radiusBucket = radius < 5000 ? 'sm' : radius < 15000 ? 'md' : 'lg';
-  return `explore-region-${gridLat.toFixed(3)}-${gridLng.toFixed(3)}-${radiusBucket}`;
+  const timeSuffix = timeKey ? `-${timeKey}` : '';
+  return `explore-region-${gridLat.toFixed(3)}-${gridLng.toFixed(3)}-${radiusBucket}${timeSuffix}`;
+};
+
+// Bucket time ranges so cache stays useful but doesn't serve stale availability
+const getTimeBucketKey = (start?: Date | null, end?: Date | null): string => {
+  if (!start || !end) return '';
+
+  const to15MinBucket = (d: Date) => {
+    const dt = new Date(d);
+    const minutes = dt.getUTCMinutes();
+    const bucketMinutes = Math.floor(minutes / 15) * 15;
+    dt.setUTCMinutes(bucketMinutes, 0, 0);
+    // YYYY-MM-DDTHH:MM (UTC)
+    return dt.toISOString().slice(0, 16);
+  };
+
+  return `t-${to15MinBucket(start)}-${to15MinBucket(end)}`;
 };
 
 // Get all cache keys that might contain spots for a given region
-const getNearbyCacheKeys = (lat: number, lng: number, radius: number): string[] => {
+const getNearbyCacheKeys = (lat: number, lng: number, radius: number, timeKey = ''): string[] => {
   const gridSize = radius < 5000 ? 0.01 : radius < 15000 ? 0.02 : 0.05;
   const keys: string[] = [];
-  
+
   // Check current tile and adjacent tiles (3x3 grid)
   for (let latOffset = -1; latOffset <= 1; latOffset++) {
     for (let lngOffset = -1; lngOffset <= 1; lngOffset++) {
       const checkLat = lat + latOffset * gridSize;
       const checkLng = lng + lngOffset * gridSize;
-      keys.push(getRegionalCacheKey(checkLat, checkLng, radius));
+      keys.push(getRegionalCacheKey(checkLat, checkLng, radius, timeKey));
     }
   }
   return keys;
@@ -79,25 +96,25 @@ const setCachedSpots = (key: string, spots: any[], center: { lat: number; lng: n
 };
 
 // Check if a cached region covers the requested area
-const findCoveringCache = (lat: number, lng: number, radius: number): any[] | null => {
-  const keys = getNearbyCacheKeys(lat, lng, radius);
-  
+const findCoveringCache = (lat: number, lng: number, radius: number, timeKey = ''): any[] | null => {
+  const keys = getNearbyCacheKeys(lat, lng, radius, timeKey);
+
   for (const key of keys) {
     const cached = getCachedSpots(key);
     if (!cached) continue;
-    
+
     // Check if the cached region's center is close enough and radius is large enough
     const latDiff = Math.abs(cached.center.lat - lat) * 111000;
     const lngDiff = Math.abs(cached.center.lng - lng) * 111000 * Math.cos(lat * Math.PI / 180);
     const distance = Math.sqrt(latDiff ** 2 + lngDiff ** 2);
-    
+
     // If we're within 30% of the cached radius from its center, the cache likely covers our area
     if (distance < cached.radius * 0.3 && cached.radius >= radius * 0.7) {
       console.log('[Cache] Hit! Using cached data from', key);
       return cached.data;
     }
   }
-  
+
   return null;
 };
 
@@ -233,6 +250,8 @@ const Explore = () => {
     if (start) setStartTime(startDate);
     if (end) setEndTime(endDate);
 
+    const initialTimeKey = getTimeBucketKey(start ? startDate : null, end ? endDate : null);
+
     // Only load spots if URL has a lat/lng (searched location)
     if (lat && lng) {
       const desired = {
@@ -250,15 +269,15 @@ const Explore = () => {
         });
       }
 
-      // Check cache first for instant render
-      const cachedSpots = findCoveringCache(desired.lat, desired.lng, 15000);
+      // Check cache first for instant render (time-bucketed)
+      const cachedSpots = findCoveringCache(desired.lat, desired.lng, 15000, initialTimeKey);
       if (cachedSpots) {
         setParkingSpots(cachedSpots);
         setSpotsLoading(false);
         // Still fetch fresh data in background
-        fetchNearbySpots(desired, 15000, false);
+        fetchNearbySpots(desired, 15000, false, { start: start ? startDate : null, end: end ? endDate : null });
       } else {
-        fetchNearbySpots(desired, 15000, true);
+        fetchNearbySpots(desired, 15000, true, { start: start ? startDate : null, end: end ? endDate : null });
       }
     } else {
       // No URL lat/lng: show empty state, user needs to search
@@ -502,21 +521,30 @@ const Explore = () => {
     setSuggestions([]);
     setShowSuggestions(false);
   };
-  const fetchNearbySpots = useCallback(async (center: { lat: number; lng: number }, radius = 15000, isInitialLoad = true) => {
+  const fetchNearbySpots = useCallback(async (
+    center: { lat: number; lng: number },
+    radius = 15000,
+    isInitialLoad = true,
+    timeOverride?: { start: Date | null; end: Date | null }
+  ) => {
     if (!center) return;
-    
+
+    const effectiveStartTime = timeOverride?.start ?? startTime;
+    const effectiveEndTime = timeOverride?.end ?? endTime;
+    const timeKey = getTimeBucketKey(effectiveStartTime, effectiveEndTime);
+
     // Check regional cache first - skip API call if we have fresh data
-    const cachedData = findCoveringCache(center.lat, center.lng, radius);
+    const cachedData = findCoveringCache(center.lat, center.lng, radius, timeKey);
     if (cachedData && !isInitialLoad) {
       // For map movements, use cache silently without API call
       setParkingSpots(cachedData);
       setSpotsLoading(false);
       return;
     }
-    
+
     // Increment request ID and capture it for this request
     const requestId = ++latestRequestIdRef.current;
-    
+
     try {
       // Only show loading spinner on initial load when no cached data
       if (isInitialLoad && parkingSpots.length === 0) {
@@ -532,17 +560,17 @@ const Explore = () => {
           longitude: center.lng,
           radius: Math.ceil(radius),
           limit: 500,
-          start_time: startTime?.toISOString(),
-          end_time: endTime?.toISOString()
+          start_time: effectiveStartTime ? effectiveStartTime.toISOString() : undefined,
+          end_time: effectiveEndTime ? effectiveEndTime.toISOString() : undefined,
         }
       });
-      
+
       // Check if this request is still the latest one
       if (requestId !== latestRequestIdRef.current) {
         console.log('[Explore] Discarding stale response', { requestId, latest: latestRequestIdRef.current });
         return;
       }
-      
+
       if (error) {
         console.error('Search error:', error);
         // Check for rate limit error (429)
@@ -553,7 +581,7 @@ const Explore = () => {
         }
         return;
       }
-      
+
       const transformedSpots = data.spots?.map((spot: any) => ({
         id: spot.id,
         title: spot.title,
@@ -572,18 +600,18 @@ const Explore = () => {
         userBooking: null, // Not available in lite endpoint
         instantBook: spot.instant_book !== false
       })) || [];
-      
+
       setParkingSpots(transformedSpots);
-      
-      // Cache the results for instant back/forward navigation
-      const cacheKey = getRegionalCacheKey(center.lat, center.lng, radius);
+
+      // Cache the results for instant back/forward navigation (time-bucketed)
+      const cacheKey = getRegionalCacheKey(center.lat, center.lng, radius, timeKey);
       setCachedSpots(cacheKey, transformedSpots, center, radius);
     } catch (err) {
       console.error('Unexpected error:', err);
     } finally {
       setSpotsLoading(false);
     }
-  }, [searchLocation, parkingSpots.length]);
+  }, [parkingSpots.length, startTime, endTime]);
   
   const handleMapMove = (center: {
     lat: number;
@@ -634,10 +662,10 @@ const Explore = () => {
   };
   const handleDateTimeUpdate = (newStartTime?: Date, newEndTime?: Date) => {
     if (!searchLocation) return;
-    
+
     const effectiveStartTime = newStartTime || startTime;
     const effectiveEndTime = newEndTime || endTime;
-    
+
     // Update URL params
     const params = new URLSearchParams();
     params.set('lat', searchLocation.lat.toString());
@@ -647,8 +675,11 @@ const Explore = () => {
     if (searchQuery) params.set('q', searchQuery);
     navigate(`/explore?${params.toString()}`, { replace: true });
 
-    // Refetch spots with new times around the current search location
-    fetchNearbySpots(searchLocation, 15000, false);
+    // Refetch spots with the effective time range
+    fetchNearbySpots(searchLocation, 15000, false, {
+      start: effectiveStartTime ?? null,
+      end: effectiveEndTime ?? null,
+    });
   };
   const formatDateDisplay = (date: Date) => {
     return isToday(date) ? 'Today' : format(date, 'MMM dd');
