@@ -508,10 +508,9 @@ const HostCalendar = () => {
           <SelectContent>
             {spots.map(spot => (
               <SelectItem key={spot.id} value={spot.id}>
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                <div className="flex items-center gap-2 max-w-full overflow-hidden">
+                  <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   <span className="truncate">{spot.address}</span>
-                  <span className="text-muted-foreground text-sm">(${spot.hourly_rate}/hr)</span>
                 </div>
               </SelectItem>
             ))}
