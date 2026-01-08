@@ -118,6 +118,7 @@ export const QuickAvailabilityActions = () => {
 
       toast.success(`Marked ${selectedSpots.length} spot${selectedSpots.length > 1 ? 's' : ''} as unavailable for today`);
       setDialogOpen(false);
+      navigate('/host-calendar');
     } catch (error) {
       console.error('Error blocking today:', error);
       toast.error('Failed to update availability');
@@ -154,6 +155,7 @@ export const QuickAvailabilityActions = () => {
 
       toast.success(`Marked ${selectedSpots.length} spot${selectedSpots.length > 1 ? 's' : ''} as available all day`);
       setDialogOpen(false);
+      navigate('/host-calendar');
     } catch (error) {
       console.error('Error setting availability:', error);
       toast.error('Failed to update availability');
@@ -214,7 +216,7 @@ export const QuickAvailabilityActions = () => {
             onClick={() => openDialog('block')}
           >
             <CalendarOff className="h-4 w-4 mr-2 text-destructive flex-shrink-0" />
-            <span className="text-xs font-medium truncate">Unavailable</span>
+            <span className="text-xs font-medium">Unavailable today</span>
           </Button>
 
           <Button
@@ -224,7 +226,7 @@ export const QuickAvailabilityActions = () => {
             onClick={() => openDialog('available')}
           >
             <CalendarCheck className="h-4 w-4 mr-2 text-green-600 flex-shrink-0" />
-            <span className="text-xs font-medium truncate">Available</span>
+            <span className="text-xs font-medium">Available today</span>
           </Button>
         </div>
         
