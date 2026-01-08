@@ -13,11 +13,11 @@ const RATE_LIMIT_PER_HOUR = 100;
 // Check rate limit using database
 async function checkRateLimit(
   supabase: any,
-  clientIp: string
+  keyPrefix: string
 ): Promise<{ allowed: boolean; retryAfter: number }> {
   const functionName = 'search-spots';
-  const minuteKey = `ip:${clientIp}:${functionName}:min`;
-  const hourKey = `ip:${clientIp}:${functionName}:hour`;
+  const minuteKey = `${keyPrefix}:${functionName}:min`;
+  const hourKey = `${keyPrefix}:${functionName}:hour`;
 
   try {
     // Check minute limit
@@ -35,12 +35,12 @@ async function checkRateLimit(
     });
 
     if (!minuteOk) {
-      console.warn(`[rate-limit] ${functionName} minute limit exceeded for IP: ${clientIp.substring(0, 8)}...`);
+      console.warn(`[rate-limit] ${functionName} minute limit exceeded for ${keyPrefix}`);
       return { allowed: false, retryAfter: 60 };
     }
     
     if (!hourOk) {
-      console.warn(`[rate-limit] ${functionName} hour limit exceeded for IP: ${clientIp.substring(0, 8)}...`);
+      console.warn(`[rate-limit] ${functionName} hour limit exceeded for ${keyPrefix}`);
       return { allowed: false, retryAfter: 3600 };
     }
 
@@ -153,8 +153,24 @@ serve(async (req) => {
       || req.headers.get('x-real-ip')
       || 'unknown';
 
+    // Try to get authenticated user (optional for search)
+    const authHeader = req.headers.get('Authorization');
+    let userId: string | null = null;
+    if (authHeader?.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.replace('Bearer ', '');
+        const { data: userData } = await supabase.auth.getUser(token);
+        userId = userData.user?.id || null;
+      } catch {
+        // Ignore auth errors for search - it's optional
+      }
+    }
+
+    // Rate limit by user when authenticated (avoids shared-IP throttling), otherwise by IP.
+    const limiterKeyPrefix = userId ? `user:${userId}` : `ip:${clientIp}`;
+
     // Check rate limit
-    const rateLimit = await checkRateLimit(supabase, clientIp);
+    const rateLimit = await checkRateLimit(supabase, limiterKeyPrefix);
     if (!rateLimit.allowed) {
       return new Response(JSON.stringify({ 
         error: 'Too many requests. Please try again later.',
@@ -171,19 +187,6 @@ serve(async (req) => {
 
     // Clean up expired holds first
     await supabase.rpc('cleanup_expired_holds');
-
-    // Try to get authenticated user (optional for search)
-    const authHeader = req.headers.get('Authorization');
-    let userId = null;
-    if (authHeader) {
-      try {
-        const token = authHeader.replace('Bearer ', '');
-        const { data: userData } = await supabase.auth.getUser(token);
-        userId = userData.user?.id || null;
-      } catch (e) {
-        // Ignore auth errors for search - it's optional
-      }
-    }
 
     const {
       latitude,
