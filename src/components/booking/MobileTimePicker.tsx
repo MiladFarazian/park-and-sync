@@ -51,21 +51,31 @@ export const MobileTimePicker = ({
   const getInitialValues = () => {
     let baseTime = initialValue || (mode === 'end' && startTime ? addMinutes(startTime, 15) : now);
 
-    // For start mode: if the provided initialValue is in the past (e.g. it was rounded down
-    // elsewhere), start from "now" instead so the default selection is actually selectable.
+    // Ensure start defaults are always in the future
     if (mode === 'start' && isBefore(baseTime, now)) {
       baseTime = now;
     }
 
-    // For start mode, round UP to the next 15-minute increment so we never default
-    // to a time that has already passed.
-    if (mode === 'start') {
-      const minuteOfHour = baseTime.getMinutes();
-      const remainder = minuteOfHour % 15;
-      baseTime = remainder === 0 ? addMinutes(baseTime, 15) : addMinutes(baseTime, 15 - remainder);
+    // Ensure end defaults are always >= start + 15 minutes and in the future
+    if (mode === 'end') {
+      if (startTime) {
+        const minEnd = addMinutes(startTime, 15);
+        if (isBefore(baseTime, minEnd)) baseTime = minEnd;
+      }
+      if (isBefore(baseTime, now)) baseTime = now;
     }
 
-    const dayIndex = days.findIndex(d =>
+    // Snap baseTime to the next 15-minute increment so the default selection is never
+    // a greyed-out "already passed" time, and minutes always align with our picker.
+    const remainder = baseTime.getMinutes() % 15;
+    if (remainder !== 0) {
+      baseTime = addMinutes(baseTime, 15 - remainder);
+    } else if (mode === 'start') {
+      // If we're exactly on the quarter hour for "start", default to the NEXT slot.
+      baseTime = addMinutes(baseTime, 15);
+    }
+
+    const dayIndex = days.findIndex((d) =>
       format(d.date, 'yyyy-MM-dd') === format(baseTime, 'yyyy-MM-dd')
     );
 
@@ -79,7 +89,7 @@ export const MobileTimePicker = ({
       dayIndex: dayIndex >= 0 ? dayIndex : 0,
       hour,
       minute,
-      period
+      period,
     };
   };
 
