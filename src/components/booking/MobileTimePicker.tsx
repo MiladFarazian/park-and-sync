@@ -50,27 +50,31 @@ export const MobileTimePicker = ({
   // Initialize with current time or passed initial value
   const getInitialValues = () => {
     let baseTime = initialValue || (mode === 'end' && startTime ? addMinutes(startTime, 15) : now);
-    
-    // For start mode without an initial value, round UP to next 15-minute increment
-    // so we never suggest a time that has already passed
-    if (mode === 'start' && !initialValue) {
+
+    // For start mode: if the provided initialValue is in the past (e.g. it was rounded down
+    // elsewhere), start from "now" instead so the default selection is actually selectable.
+    if (mode === 'start' && isBefore(baseTime, now)) {
+      baseTime = now;
+    }
+
+    // For start mode, round UP to the next 15-minute increment so we never default
+    // to a time that has already passed.
+    if (mode === 'start') {
       const minuteOfHour = baseTime.getMinutes();
       const remainder = minuteOfHour % 15;
-      if (remainder > 0) {
-        baseTime = addMinutes(baseTime, 15 - remainder);
-      }
+      baseTime = remainder === 0 ? addMinutes(baseTime, 15) : addMinutes(baseTime, 15 - remainder);
     }
-    
-    const dayIndex = days.findIndex(d => 
+
+    const dayIndex = days.findIndex(d =>
       format(d.date, 'yyyy-MM-dd') === format(baseTime, 'yyyy-MM-dd')
     );
-    
+
     let hour = baseTime.getHours();
     const period = hour >= 12 ? 'PM' : 'AM';
     hour = hour % 12 || 12;
-    
+
     const minute = baseTime.getMinutes();
-    
+
     return {
       dayIndex: dayIndex >= 0 ? dayIndex : 0,
       hour,
