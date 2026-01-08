@@ -8,7 +8,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMode } from '@/contexts/ModeContext';
 import { toast } from 'sonner';
-import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
 import EarningsAnalytics from '@/components/host/EarningsAnalytics';
 import RecentReviews from '@/components/host/RecentReviews';
 import UpcomingReservationsWidget from '@/components/host/UpcomingReservationsWidget';
@@ -191,15 +190,14 @@ const HostHome = () => {
         <p className="text-muted-foreground">Your hosting overview</p>
       </div>
 
-      <ActiveBookingBanner />
+      {/* Upcoming Reservations Widget */}
+      <UpcomingReservationsWidget />
 
       {/* Quick Availability Actions */}
       <div className="animate-fade-in">
         <QuickAvailabilityActions />
       </div>
 
-      {/* Upcoming Reservations Widget */}
-      <UpcomingReservationsWidget />
       <div className="grid grid-cols-1 gap-4 animate-fade-in">
         <Card className="p-6 bg-primary text-primary-foreground">
           <div className="space-y-2">
