@@ -208,6 +208,12 @@ export const ExtendParkingDialog = ({
     return Math.round((booking.hourly_rate || 5) * hrs * 100) / 100;
   };
 
+  const getNewEndTime = (hrs: number) => {
+    if (!booking) return null;
+    const currentEnd = new Date(booking.end_at);
+    return new Date(currentEnd.getTime() + hrs * 60 * 60 * 1000);
+  };
+
   const calculateCustomExtensionCost = () => {
     if (!booking) return { hours: 0, cost: 0 };
     const selectedDate = getSelectedDate();
@@ -472,29 +478,39 @@ export const ExtendParkingDialog = ({
               Select how long you'd like to extend:
             </p>
 
-            {QUICK_EXTEND_OPTIONS.map((option) => (
-              <Button
-                key={option.hours}
-                variant="outline"
-                className={`w-full justify-between h-auto py-3 px-4 transition-colors ${
-                  selectedExtendHours === option.hours
-                    ? 'bg-primary/10 border-primary ring-1 ring-primary/30'
-                    : 'hover:bg-primary/5 hover:border-primary/30'
-                }`}
-                onClick={() => setSelectedExtendHours(option.hours)}
-                disabled={extending}
-              >
-                <span className="font-medium">{option.label}</span>
-                <span className="flex items-center gap-2">
-                  <span className={selectedExtendHours === option.hours ? 'text-primary font-semibold' : 'text-primary font-semibold'}>
-                    +${getExtensionCost(option.hours).toFixed(2)}
+            {QUICK_EXTEND_OPTIONS.map((option) => {
+              const newEnd = getNewEndTime(option.hours);
+              return (
+                <Button
+                  key={option.hours}
+                  variant="outline"
+                  className={`w-full justify-between h-auto py-3 px-4 transition-colors ${
+                    selectedExtendHours === option.hours
+                      ? 'bg-primary/10 border-primary ring-1 ring-primary/30'
+                      : 'hover:bg-primary/5 hover:border-primary/30'
+                  }`}
+                  onClick={() => setSelectedExtendHours(option.hours)}
+                  disabled={extending}
+                >
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium">{option.label}</span>
+                    {newEnd && (
+                      <span className="text-xs text-muted-foreground">
+                        Until {format(newEnd, 'h:mm a')}
+                      </span>
+                    )}
+                  </div>
+                  <span className="flex items-center gap-2">
+                    <span className={selectedExtendHours === option.hours ? 'text-primary font-semibold' : 'text-primary font-semibold'}>
+                      +${getExtensionCost(option.hours).toFixed(2)}
+                    </span>
+                    {selectedExtendHours === option.hours && (
+                      <Check className="h-4 w-4 text-primary" />
+                    )}
                   </span>
-                  {selectedExtendHours === option.hours && (
-                    <Check className="h-4 w-4 text-primary" />
-                  )}
-                </span>
-              </Button>
-            ))}
+                </Button>
+              );
+            })}
 
             {/* Confirm Button */}
             <Button
