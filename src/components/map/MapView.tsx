@@ -99,6 +99,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
   const searchMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const spotsRef = useRef<Spot[]>([]); // Keep current spots for event handlers
   const isCarouselNavigationRef = useRef(false); // Track carousel-initiated map movements
+  const skipNextMapMoveRef = useRef(false); // Prevent refetch on programmatic flyTo (carousel/marker)
   const pendingCarouselSpotIdRef = useRef<string | null>(null); // Ensure marker-click selection always syncs to carousel
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [nearestSpotId, setNearestSpotId] = useState<string | null>(null);
@@ -168,14 +169,17 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       // Pan map to selected spot - mark as carousel navigation to prevent refetch
       if (map.current) {
         isCarouselNavigationRef.current = true;
+        skipNextMapMoveRef.current = true;
         map.current.flyTo({
           center: [sortedSpots[index].lng, sortedSpots[index].lat],
           zoom: Math.min(map.current.getZoom(), 13), // Zoom out to 13 max for better context
           duration: 500
         });
-        // Reset flag after animation completes
+        // Reset flag after updateVisibleSpots has had a chance to run for this move
         map.current.once('moveend', () => {
-          isCarouselNavigationRef.current = false;
+          requestAnimationFrame(() => {
+            isCarouselNavigationRef.current = false;
+          });
         });
       }
     }
@@ -493,7 +497,13 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     // Update visible spots count and notify parent when map moves
     const updateVisibleSpots = () => {
       if (!map.current) return;
-      
+
+      // Skip the next map-move update when the movement was triggered by us (carousel/marker)
+      if (skipNextMapMoveRef.current) {
+        skipNextMapMoveRef.current = false;
+        return;
+      }
+
       // Skip API call if this movement was from carousel navigation
       if (isCarouselNavigationRef.current) {
         return;
@@ -1011,6 +1021,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           
           // Center map on the clicked spot without zooming in too much
           if (map.current) {
+            skipNextMapMoveRef.current = true;
             map.current.flyTo({
               center: [spot.lng, spot.lat],
               zoom: Math.min(map.current.getZoom(), 13), // Keep zoomed out for context
