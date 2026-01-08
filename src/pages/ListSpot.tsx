@@ -1002,6 +1002,9 @@ const ListSpot = () => {
                   <p className="text-sm text-muted-foreground">
                     Add photos to showcase your parking spot
                   </p>
+                  <p className="text-sm text-destructive mt-1">
+                    * At least one photo is required
+                  </p>
                 </div>
 
                 <div>
