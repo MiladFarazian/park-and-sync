@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.9.6";
+import { Resend } from "npm:resend@2.0.0";
 import { Resend } from "npm:resend@2.0.0";
 
 const corsHeaders = {
@@ -149,11 +151,11 @@ serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Verify JWT and get authenticated user
+    // Verify JWT and get authenticated user (edge-safe: validate via JWKS)
     const authHeader = req.headers.get('Authorization');
     console.log('[link-guest-bookings] Request received, auth header present:', !!authHeader);
-    
-    if (!authHeader) {
+
+    if (!authHeader?.startsWith('Bearer ')) {
       console.warn('[link-guest-bookings] Missing Authorization header');
       return new Response(
         JSON.stringify({ error: 'Missing session token - user must be signed in to link guest bookings' }),
@@ -161,22 +163,31 @@ serve(async (req) => {
       );
     }
 
-    // Use service role to verify the token
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { persistSession: false }
-    });
-
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
-    if (authError || !authUser) {
-      console.warn('[link-guest-bookings] Failed to get authenticated user:', authError?.message);
+    let authenticatedUserId: string | undefined;
+    try {
+      const jwks = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
+      const { payload } = await jwtVerify(token, jwks, {
+        issuer: `${supabaseUrl}/auth/v1`,
+      });
+      authenticatedUserId = payload.sub;
+    } catch (e) {
+      console.warn('[link-guest-bookings] Failed to verify JWT:', e);
       return new Response(
         JSON.stringify({ error: 'Invalid or expired session' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    if (!authenticatedUserId) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired session' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const authUser = { id: authenticatedUserId };
     console.log('[link-guest-bookings] Authenticated user:', authUser.id);
 
     // Parse request body
