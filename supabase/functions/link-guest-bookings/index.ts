@@ -1,8 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.9.6";
 import { Resend } from "npm:resend@2.0.0";
-import { Resend } from "npm:resend@2.0.0";
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -151,11 +150,13 @@ serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Verify JWT and get authenticated user (edge-safe: validate via JWKS)
+    // Verify JWT and get authenticated user
     const authHeader = req.headers.get('Authorization');
     console.log('[link-guest-bookings] Request received, auth header present:', !!authHeader);
 
-    if (!authHeader?.startsWith('Bearer ')) {
+    const token = authHeader?.split(/\s+/)?.[1];
+
+    if (!token) {
       console.warn('[link-guest-bookings] Missing Authorization header');
       return new Response(
         JSON.stringify({ error: 'Missing session token - user must be signed in to link guest bookings' }),
@@ -163,31 +164,22 @@ serve(async (req) => {
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
+    // Validate token via Supabase Auth (works even when JWKS is empty for HS256 projects)
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: authHeader! } }
+    });
 
-    let authenticatedUserId: string | undefined;
-    try {
-      const jwks = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
-      const { payload } = await jwtVerify(token, jwks, {
-        issuer: `${supabaseUrl}/auth/v1`,
-      });
-      authenticatedUserId = payload.sub;
-    } catch (e) {
-      console.warn('[link-guest-bookings] Failed to verify JWT:', e);
+    const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser(token);
+
+    if (authError || !authUser) {
+      console.warn('[link-guest-bookings] Failed to get authenticated user:', authError?.message);
       return new Response(
         JSON.stringify({ error: 'Invalid or expired session' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (!authenticatedUserId) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid or expired session' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const authUser = { id: authenticatedUserId };
     console.log('[link-guest-bookings] Authenticated user:', authUser.id);
 
     // Parse request body
