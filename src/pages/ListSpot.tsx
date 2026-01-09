@@ -17,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { WeeklyScheduleGrid, AvailabilityRule } from '@/components/availability/WeeklyScheduleGrid';
 import { compressImage } from '@/lib/compressImage';
 import { EVChargerTypeSelector } from '@/components/ev/EVChargerTypeSelector';
+import { evChargerTypes } from '@/lib/evChargerTypes';
 import { useAuth } from '@/contexts/AuthContext';
 
 const spotCategories = [
@@ -1177,20 +1178,44 @@ const ListSpot = () => {
                   <div className="p-4 rounded-lg bg-muted/50">
                     <h3 className="font-semibold text-sm mb-3">Basic Information</h3>
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Type:</span>
-                        <span className="font-medium">{formData.category}</span>
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground shrink-0">Type:</span>
+                        <span className="font-medium text-right">{formData.category}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Address:</span>
-                        <span className="font-medium">{formData.address}</span>
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground shrink-0">Address:</span>
+                        <span className="font-medium text-right">{formData.address}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Hourly Rate:</span>
-                        <span className="font-medium">${formData.hourlyRate}/hr</span>
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground shrink-0">Hourly Rate:</span>
+                        <span className="font-medium text-right">${formData.hourlyRate}/hr</span>
                       </div>
                     </div>
                   </div>
+
+                  {selectedAmenities.includes('ev') && (
+                    <div className="p-4 rounded-lg bg-muted/50">
+                      <h3 className="font-semibold text-sm mb-3">EV Charging</h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between gap-4">
+                          <span className="text-muted-foreground shrink-0">Charger Type:</span>
+                          <span className="font-medium text-right">
+                            {evChargerTypes.find(t => t.id === evChargerType)?.name || 'Not specified'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-muted-foreground shrink-0">Charging Premium:</span>
+                          <span className="font-medium text-right">${evChargingPremium}/hr</span>
+                        </div>
+                        {evChargingInstructions && (
+                          <div className="pt-2 border-t border-border">
+                            <span className="text-muted-foreground">Charging Instructions:</span>
+                            <p className="font-medium mt-1">{evChargingInstructions}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="p-4 rounded-lg bg-muted/50">
                     <h3 className="font-semibold text-sm mb-3">Description</h3>
