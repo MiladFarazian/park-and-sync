@@ -1111,7 +1111,10 @@ const Explore = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-5 sm:justify-center">
-            <AlertDialogAction className="rounded-full px-6">
+            <AlertDialogAction 
+              className="rounded-full px-6"
+              onClick={() => setShowEvFallbackDialog(false)}
+            >
               Got it
             </AlertDialogAction>
           </AlertDialogFooter>
