@@ -22,40 +22,31 @@ serve(async (req) => {
       );
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    // Validate JWT using getClaims
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
-    
-    if (claimsError || !claimsData?.claims) {
-      console.error("JWT validation failed:", claimsError);
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
-    const userId = claimsData.claims.sub;
-    if (!userId) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Get user profile using service role for reliability
-    const adminClient = createClient(
+    // Use service role client to verify the user from token
+    const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
     );
 
-    const { data: profile, error: profileError } = await adminClient
+    // Use getUser with the token to verify it
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError || !user) {
+      console.error("JWT validation failed:", userError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const userId = user.id;
+    console.log("[create-stripe-connect-link] Authenticated user:", userId);
+
+    // Get user profile
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("*")
       .eq("user_id", userId)
@@ -89,7 +80,7 @@ serve(async (req) => {
       accountId = account.id;
 
       // Save account ID to profile
-      await adminClient
+      await supabaseAdmin
         .from("profiles")
         .update({ stripe_account_id: accountId })
         .eq("user_id", userId);
