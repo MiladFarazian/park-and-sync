@@ -176,10 +176,10 @@ const Explore = () => {
   // EV charger filter state (from URL params)
   const [evChargerType, setEvChargerType] = useState<string | null>(null);
   const [evFilterFallbackShown, setEvFilterFallbackShown] = useState(false);
+  const evFilterFallbackShownRef = useRef(false);
   const [showEvFallbackDialog, setShowEvFallbackDialog] = useState(false);
   const [evFallbackChargerName, setEvFallbackChargerName] = useState('');
   
-  // Request ID guard to prevent stale responses from overwriting newer ones
   const latestRequestIdRef = useRef(0);
   
   // Guard to prevent duplicate initial fetches
@@ -617,11 +617,13 @@ const Explore = () => {
       }
 
       // Show fallback dialog if EV filter was applied but no matches found
-      if (data.ev_filter_applied && data.ev_match_count === 0 && !evFilterFallbackShown) {
+      if (data.ev_filter_applied && data.ev_match_count === 0 && !evFilterFallbackShownRef.current) {
+        evFilterFallbackShownRef.current = true;
         setEvFilterFallbackShown(true);
         const chargerName = getChargerDisplayName(evChargerTypeFilter);
         setEvFallbackChargerName(chargerName);
-        setShowEvFallbackDialog(true);
+        // Let the map render first so the dialog appears over the dimmed map (not a blank backdrop)
+        setTimeout(() => setShowEvFallbackDialog(true), 50);
       }
 
       const transformedSpots = data.spots?.map((spot: any) => ({
@@ -657,7 +659,7 @@ const Explore = () => {
     } finally {
       setSpotsLoading(false);
     }
-  }, [parkingSpots.length, startTime, endTime]);
+  }, [parkingSpots.length, startTime, endTime, evFilterFallbackShown]);
   
   const handleMapMove = (center: {
     lat: number;
