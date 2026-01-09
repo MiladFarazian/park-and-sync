@@ -364,9 +364,46 @@ const Profile = () => {
       } = await supabase.functions.invoke('create-stripe-connect-link');
       if (error) throw error;
 
-      // Open Stripe onboarding in new tab
-      window.open(data.url, '_blank');
-      toast.success('Opening Stripe onboarding...');
+      const url: string | undefined = data?.url;
+      if (!url) {
+        throw new Error('No Stripe onboarding URL returned');
+      }
+
+      // Check if running as PWA/standalone mode
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone === true;
+
+      if (isStandalone) {
+        // iOS standalone apps are restrictive about leaving the app
+        // Try opening in Safari; if blocked, offer Share/Copy fallback
+        const opened = window.open(url, '_blank', 'noopener,noreferrer');
+
+        if (!opened) {
+          try {
+            const nav: any = window.navigator;
+            if (nav?.share) {
+              await nav.share({ url, title: 'Complete Stripe setup' });
+            } else if (nav?.clipboard?.writeText) {
+              await nav.clipboard.writeText(url);
+              toast.info('Stripe link copied — open Safari and paste it to continue.');
+              return;
+            }
+          } catch {
+            // Share cancelled or failed, try clipboard
+            if ((navigator as any)?.clipboard?.writeText) {
+              await (navigator as any).clipboard.writeText(url);
+              toast.info('Stripe link copied — open Safari and paste it to continue.');
+              return;
+            }
+          }
+        }
+
+        toast.info('Finish Stripe setup in Safari, then return here.');
+        return;
+      }
+
+      // Regular browser: direct redirect
+      window.location.href = url;
     } catch (error: any) {
       toast.error('Failed to connect Stripe: ' + error.message);
     } finally {
