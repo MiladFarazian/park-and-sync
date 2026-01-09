@@ -147,16 +147,18 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    // Create service-role client for auth validation AND database ops
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false }
+    });
 
     // Verify JWT and get authenticated user
     const authHeader = req.headers.get('Authorization');
     console.log('[link-guest-bookings] Request received, auth header present:', !!authHeader);
 
-    const token = authHeader?.split(/\s+/)?.[1];
-
-    if (!token) {
+    if (!authHeader) {
       console.warn('[link-guest-bookings] Missing Authorization header');
       return new Response(
         JSON.stringify({ error: 'Missing session token - user must be signed in to link guest bookings' }),
@@ -164,13 +166,8 @@ serve(async (req) => {
       );
     }
 
-    // Validate token via Supabase Auth (works even when JWKS is empty for HS256 projects)
-    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false },
-      global: { headers: { Authorization: authHeader! } }
-    });
-
-    const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser(token);
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser(token);
 
     if (authError || !authUser) {
       console.warn('[link-guest-bookings] Failed to get authenticated user:', authError?.message);
@@ -195,8 +192,8 @@ serve(async (req) => {
       );
     }
 
-    // Use service role client for privileged database operations
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Reuse the service role client for privileged database operations
+    const supabase = supabaseClient;
 
     if (!user_id) {
       return new Response(
