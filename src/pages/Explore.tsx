@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2, Search, X, MapPin, Calendar, Clock, ArrowRight, Navigation } from 'lucide-react';
+import { Loader2, Search, X, MapPin, Calendar, Clock, ArrowRight, Navigation, BatteryCharging } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,6 +10,7 @@ import { format, isToday } from 'date-fns';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
+import { evChargerTypes, getChargerDisplayName } from '@/lib/evChargerTypes';
 
 // Session cache utilities for instant back/forward navigation and regional caching
 const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
@@ -162,6 +163,10 @@ const Explore = () => {
     vehicleSize: null,
   });
   
+  // EV charger filter state (from URL params)
+  const [evChargerType, setEvChargerType] = useState<string | null>(null);
+  const [evFilterFallbackShown, setEvFilterFallbackShown] = useState(false);
+  
   // Request ID guard to prevent stale responses from overwriting newer ones
   const latestRequestIdRef = useRef(0);
   
@@ -243,6 +248,13 @@ const Explore = () => {
     const start = searchParams.get('start');
     const end = searchParams.get('end');
     const query = searchParams.get('q');
+    const evParam = searchParams.get('ev');
+    const chargerTypeParam = searchParams.get('chargerType');
+
+    // Set EV filter state from URL
+    if (evParam === 'true' && chargerTypeParam) {
+      setEvChargerType(chargerTypeParam);
+    }
 
     // Parse times first
     const startDate = start ? new Date(start) : new Date();
@@ -269,15 +281,20 @@ const Explore = () => {
         });
       }
 
-      // Check cache first for instant render (time-bucketed)
-      const cachedSpots = findCoveringCache(desired.lat, desired.lng, 15000, initialTimeKey);
-      if (cachedSpots) {
-        setParkingSpots(cachedSpots);
-        setSpotsLoading(false);
-        // Still fetch fresh data in background
-        fetchNearbySpots(desired, 15000, false, { start: start ? startDate : null, end: end ? endDate : null });
+      // Skip cache when EV filter is applied to get accurate fallback notification
+      if (evParam === 'true' && chargerTypeParam) {
+        fetchNearbySpots(desired, 15000, true, { start: start ? startDate : null, end: end ? endDate : null }, chargerTypeParam);
       } else {
-        fetchNearbySpots(desired, 15000, true, { start: start ? startDate : null, end: end ? endDate : null });
+        // Check cache first for instant render (time-bucketed)
+        const cachedSpots = findCoveringCache(desired.lat, desired.lng, 15000, initialTimeKey);
+        if (cachedSpots) {
+          setParkingSpots(cachedSpots);
+          setSpotsLoading(false);
+          // Still fetch fresh data in background
+          fetchNearbySpots(desired, 15000, false, { start: start ? startDate : null, end: end ? endDate : null });
+        } else {
+          fetchNearbySpots(desired, 15000, true, { start: start ? startDate : null, end: end ? endDate : null });
+        }
       }
     } else {
       // No URL lat/lng: show empty state, user needs to search
@@ -525,7 +542,8 @@ const Explore = () => {
     center: { lat: number; lng: number },
     radius = 15000,
     isInitialLoad = true,
-    timeOverride?: { start: Date | null; end: Date | null }
+    timeOverride?: { start: Date | null; end: Date | null },
+    evChargerTypeFilter?: string | null
   ) => {
     if (!center) return;
 
@@ -533,13 +551,16 @@ const Explore = () => {
     const effectiveEndTime = timeOverride?.end ?? endTime;
     const timeKey = getTimeBucketKey(effectiveStartTime, effectiveEndTime);
 
-    // Check regional cache first - skip API call if we have fresh data
-    const cachedData = findCoveringCache(center.lat, center.lng, radius, timeKey);
-    if (cachedData && !isInitialLoad) {
-      // For map movements, use cache silently without API call
-      setParkingSpots(cachedData);
-      setSpotsLoading(false);
-      return;
+    // Skip cache when EV filter is applied to get accurate fallback notification
+    if (!evChargerTypeFilter) {
+      // Check regional cache first - skip API call if we have fresh data
+      const cachedData = findCoveringCache(center.lat, center.lng, radius, timeKey);
+      if (cachedData && !isInitialLoad) {
+        // For map movements, use cache silently without API call
+        setParkingSpots(cachedData);
+        setSpotsLoading(false);
+        return;
+      }
     }
 
     // Increment request ID and capture it for this request
@@ -562,6 +583,7 @@ const Explore = () => {
           limit: 500,
           start_time: effectiveStartTime ? effectiveStartTime.toISOString() : undefined,
           end_time: effectiveEndTime ? effectiveEndTime.toISOString() : undefined,
+          ev_charger_type: evChargerTypeFilter || undefined,
         }
       });
 
@@ -582,6 +604,19 @@ const Explore = () => {
         return;
       }
 
+      // Show fallback notification if EV filter was applied but no matches found
+      if (data.ev_filter_applied && data.ev_match_count === 0 && !evFilterFallbackShown) {
+        setEvFilterFallbackShown(true);
+        const chargerName = getChargerDisplayName(evChargerTypeFilter);
+        toast.info(
+          `No spots with ${chargerName} chargers available for this period. Showing all nearby parking instead.`,
+          { 
+            duration: 6000,
+            icon: <BatteryCharging className="h-5 w-5 text-yellow-500" />
+          }
+        );
+      }
+
       const transformedSpots = data.spots?.map((spot: any) => ({
         id: spot.id,
         title: spot.title,
@@ -598,14 +633,18 @@ const Explore = () => {
         hostId: spot.host_id,
         sizeConstraints: spot.size_constraints || [],
         userBooking: null, // Not available in lite endpoint
-        instantBook: spot.instant_book !== false
+        instantBook: spot.instant_book !== false,
+        evChargerType: spot.ev_charger_type
       })) || [];
 
       setParkingSpots(transformedSpots);
 
       // Cache the results for instant back/forward navigation (time-bucketed)
-      const cacheKey = getRegionalCacheKey(center.lat, center.lng, radius, timeKey);
-      setCachedSpots(cacheKey, transformedSpots, center, radius);
+      // Skip caching when EV filter is applied to avoid stale fallback data
+      if (!evChargerTypeFilter) {
+        const cacheKey = getRegionalCacheKey(center.lat, center.lng, radius, timeKey);
+        setCachedSpots(cacheKey, transformedSpots, center, radius);
+      }
     } catch (err) {
       console.error('Unexpected error:', err);
     } finally {
