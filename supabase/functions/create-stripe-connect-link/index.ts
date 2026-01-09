@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.9.6";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,34 +14,35 @@ serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
+    const parts = authHeader?.trim().split(/\s+/) ?? [];
+    const token = parts.length >= 2 ? parts[1] : undefined;
+
+    console.log("[create-stripe-connect-link] auth header present:", !!authHeader);
+    console.log("[create-stripe-connect-link] token present:", !!token);
+    if (token) console.log("[create-stripe-connect-link] token prefix:", token.slice(0, 16));
+
+    if (!token) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const token = authHeader.replace("Bearer ", "");
-
-    // Verify Supabase JWT via JWKS (works in edge runtime; no session storage required)
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const jwks = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
 
-    let userId: string | undefined;
-    try {
-      const { payload } = await jwtVerify(token, jwks, {
-        issuer: `${supabaseUrl}/auth/v1`,
-      });
-      userId = payload.sub;
-    } catch (e) {
-      console.error("[create-stripe-connect-link] JWT verify failed:", e);
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Validate token by asking Supabase Auth (do NOT try to JWKS-verify: projects using HS256 have empty JWKS)
+    const supabaseAuth = createClient(
+      supabaseUrl,
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { auth: { persistSession: false }, global: { headers: { Authorization: authHeader! } } }
+    );
 
-    if (!userId) {
+    console.log("[create-stripe-connect-link] validating token via supabaseAuth.auth.getUser(token)");
+    const { data: userData, error: userError } = await supabaseAuth.auth.getUser(token);
+    const user = userData?.user;
+
+    if (userError || !user) {
+      console.error("[create-stripe-connect-link] Invalid token:", userError);
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -58,7 +58,7 @@ serve(async (req) => {
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("*")
-      .eq("user_id", userId)
+      .eq("user_id", user.id)
       .single();
 
     if (profileError || !profile) {
@@ -96,7 +96,7 @@ serve(async (req) => {
       await supabaseAdmin
         .from("profiles")
         .update({ stripe_account_id: accountId })
-        .eq("user_id", userId);
+        .eq("user_id", user.id);
     }
 
     const origin = req.headers.get("origin") || "http://localhost:5173";
