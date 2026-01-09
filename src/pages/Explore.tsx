@@ -1093,25 +1093,26 @@ const Explore = () => {
 
       {/* EV Charger Fallback Dialog */}
       <AlertDialog open={showEvFallbackDialog} onOpenChange={setShowEvFallbackDialog}>
-        <AlertDialogContent className="max-w-sm">
-          <AlertDialogHeader>
-            <div className="flex items-center justify-center mb-4">
-              <div className="w-16 h-16 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-                <AlertTriangle className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
+        <AlertDialogContent className="max-w-[320px] rounded-2xl p-6 gap-0">
+          <AlertDialogHeader className="space-y-4">
+            <div className="flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-100 to-yellow-200 dark:from-amber-900/40 dark:to-yellow-800/30 flex items-center justify-center shadow-sm">
+                <BatteryCharging className="h-7 w-7 text-amber-600 dark:text-amber-400" />
               </div>
             </div>
-            <AlertDialogTitle className="text-center">
-              No {evFallbackChargerName} Chargers Available
+            <AlertDialogTitle className="text-center text-lg font-semibold">
+              No {evFallbackChargerName} Chargers
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-center">
-              We couldn't find any spots with <strong>{evFallbackChargerName}</strong> chargers available for your selected time period in this area.
-              <br /><br />
-              The spots shown below are <strong>parking only</strong> and do not have EV charging.
+            <AlertDialogDescription className="text-center text-sm leading-relaxed">
+              No spots with <span className="font-medium text-foreground">{evFallbackChargerName}</span> chargers are available for this time.
+              <span className="block mt-3 text-xs text-muted-foreground">
+                Showing parking-only spots instead.
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="sm:justify-center">
-            <AlertDialogAction className="w-full sm:w-auto">
-              I Understand – Show Parking
+          <AlertDialogFooter className="mt-5 sm:justify-center">
+            <AlertDialogAction className="rounded-full px-6">
+              Got it
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
