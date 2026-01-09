@@ -17,6 +17,7 @@ interface WeeklyScheduleGridProps {
   initialRules?: AvailabilityRule[];
   onChange?: (rules: AvailabilityRule[]) => void;
   baseRate?: number;
+  compact?: boolean;
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -49,6 +50,7 @@ const formatTimeDisplay = (hour: number): string => {
 export const WeeklyScheduleGrid = ({
   initialRules = [],
   onChange,
+  compact = false,
 }: WeeklyScheduleGridProps) => {
   // Grid state: 7 days x 48 slots (30-min each)
   const [grid, setGrid] = useState<boolean[][]>(() => {
@@ -296,9 +298,10 @@ export const WeeklyScheduleGrid = ({
           onMouseLeave={handleMouseUp}
           onTouchEnd={handleTouchEnd}
           onTouchMove={handleTouchMove}
+          className={cn(compact && "max-h-[50vh] overflow-y-auto")}
         >
           {/* Header Row */}
-          <div className="flex border-b bg-muted/30">
+          <div className={cn("flex border-b bg-muted/30", compact && "sticky top-0 z-10")}>
             <div className="w-8 sm:w-14 shrink-0 p-1 sm:p-2 text-[10px] sm:text-xs font-medium text-muted-foreground border-r">
               <span className="hidden sm:inline">Time</span>
             </div>
@@ -311,9 +314,11 @@ export const WeeklyScheduleGrid = ({
                   <span className="sm:hidden">{DAYS_SHORT[dayIndex]}</span>
                   <span className="hidden sm:inline">{day}</span>
                 </div>
-                <div className="hidden sm:block text-[10px] text-muted-foreground mt-0.5">
-                  {getDaySummary(dayIndex)}
-                </div>
+                {!compact && (
+                  <div className="hidden sm:block text-[10px] text-muted-foreground mt-0.5">
+                    {getDaySummary(dayIndex)}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -323,7 +328,10 @@ export const WeeklyScheduleGrid = ({
             {HOURS.map((hour) => (
               <div key={hour} className="flex border-b last:border-b-0">
                 {/* Time Label */}
-                <div className="w-8 sm:w-14 shrink-0 p-0.5 sm:p-1 text-[8px] sm:text-[10px] text-muted-foreground border-r flex items-start justify-end pr-0.5 sm:pr-2">
+                <div className={cn(
+                  "w-8 sm:w-14 shrink-0 text-[8px] sm:text-[10px] text-muted-foreground border-r flex items-start justify-end pr-0.5 sm:pr-2",
+                  compact ? "p-0 py-0.5" : "p-0.5 sm:p-1"
+                )}>
                   {formatTimeDisplay(hour)}
                 </div>
                 
@@ -345,7 +353,8 @@ export const WeeklyScheduleGrid = ({
                           onMouseEnter={() => handleMouseEnter(dayIndex, slot)}
                           onTouchStart={(e) => handleTouchStart(dayIndex, slot, e)}
                           className={cn(
-                            "h-2.5 sm:h-3 border-b border-border/30 last:border-b-0 cursor-pointer transition-colors",
+                            "border-b border-border/30 last:border-b-0 cursor-pointer transition-colors",
+                            compact ? "h-1.5 sm:h-2" : "h-2.5 sm:h-3",
                             isActive && !inRange && "bg-primary",
                             inRange && dragMode === 'add' && "bg-primary/70",
                             inRange && dragMode === 'remove' && "bg-destructive/30",
