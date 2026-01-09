@@ -73,7 +73,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.create-stripe-connect-link]
-verify_jwt = true
+verify_jwt = false
 
 [functions.check-stripe-connect-status]
 verify_jwt = true
