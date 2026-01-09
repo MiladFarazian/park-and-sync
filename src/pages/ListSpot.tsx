@@ -565,15 +565,10 @@ const ListSpot = () => {
                             (window.navigator as any).standalone === true;
         
         if (isStandalone) {
-          // PWA mode: open in system browser
-          const link = document.createElement('a');
-          link.href = data.url;
-          link.target = '_blank';
-          link.rel = 'noopener noreferrer';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          toast.info('Complete Stripe setup in your browser, then return to the app');
+          // PWA mode: use window.open which works better on iOS PWAs
+          // The '_system' target hints to open in Safari on iOS
+          window.open(data.url, '_system');
+          toast.info('Complete Stripe setup in Safari, then return to the app and tap "I\'ve completed Stripe setup"');
         } else {
           // Regular browser: direct redirect
           window.location.href = data.url;
