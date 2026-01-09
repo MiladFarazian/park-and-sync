@@ -17,7 +17,6 @@ interface WeeklyScheduleGridProps {
   initialRules?: AvailabilityRule[];
   onChange?: (rules: AvailabilityRule[]) => void;
   baseRate?: number;
-  compact?: boolean;
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -50,7 +49,6 @@ const formatTimeDisplay = (hour: number): string => {
 export const WeeklyScheduleGrid = ({
   initialRules = [],
   onChange,
-  compact = false,
 }: WeeklyScheduleGridProps) => {
   // Grid state: 7 days x 48 slots (30-min each)
   const [grid, setGrid] = useState<boolean[][]>(() => {
@@ -267,107 +265,6 @@ export const WeeklyScheduleGrid = ({
     return ranges.length > 2 ? `${ranges.length} slots` : ranges.join(', ');
   };
 
-  // Compact mode: Simple button-based UI without the full grid
-  if (compact) {
-    const totalActiveSlots = grid.flat().filter(Boolean).length;
-    const is24_7 = totalActiveSlots === 7 * TOTAL_SLOTS;
-    const is9to5 = (() => {
-      for (let day = 0; day < 7; day++) {
-        const daySlots = grid[day];
-        if (day >= 1 && day <= 5) {
-          // Mon-Fri: should be 9-5 only
-          for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
-            const should = slot >= timeToSlot('09:00') && slot < timeToSlot('17:00');
-            if (daySlots[slot] !== should) return false;
-          }
-        } else {
-          // Sat-Sun: should be empty
-          if (daySlots.some(Boolean)) return false;
-        }
-      }
-      return true;
-    })();
-    const isEmpty = totalActiveSlots === 0;
-
-    return (
-      <div className="space-y-4">
-        <p className="text-xs text-muted-foreground">
-          Choose a preset or leave blank to manage via Host Calendar later.
-        </p>
-
-        {/* Quick preset buttons */}
-        <div className="grid grid-cols-2 gap-3">
-          <Button
-            type="button"
-            variant={is24_7 ? "default" : "outline"}
-            className="h-16 flex-col gap-1"
-            onClick={set24_7}
-          >
-            <CalendarClock className="h-5 w-5" />
-            <span className="text-sm font-medium">24/7</span>
-            <span className="text-[10px] text-muted-foreground">Always available</span>
-          </Button>
-          <Button
-            type="button"
-            variant={is9to5 ? "default" : "outline"}
-            className="h-16 flex-col gap-1"
-            onClick={set9to5MF}
-          >
-            <Briefcase className="h-5 w-5" />
-            <span className="text-sm font-medium">M-F 9-5</span>
-            <span className="text-[10px] text-muted-foreground">Business hours</span>
-          </Button>
-        </div>
-
-        {/* Clear button if something is set */}
-        {!isEmpty && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="w-full"
-            onClick={() => {
-              saveToHistory();
-              setGrid(Array.from({ length: 7 }, () => Array(TOTAL_SLOTS).fill(false)));
-              toast.success('Cleared availability');
-            }}
-          >
-            Clear selection
-          </Button>
-        )}
-
-        {/* Summary row */}
-        <Card className="p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Weekly Schedule</span>
-            <span className="text-xs text-muted-foreground">
-              {isEmpty ? 'Not set' : is24_7 ? '24/7' : is9to5 ? 'Mon-Fri 9am-5pm' : 'Custom'}
-            </span>
-          </div>
-          {!isEmpty && (
-            <div className="flex gap-1 mt-2">
-              {DAYS_SHORT.map((d, i) => {
-                const hasAvailability = grid[i].some(Boolean);
-                return (
-                  <div
-                    key={i}
-                    className={cn(
-                      "flex-1 h-6 rounded text-[10px] flex items-center justify-center font-medium",
-                      hasAvailability ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                    )}
-                  >
-                    {d}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-      </div>
-    );
-  }
-
-  // Full grid mode (non-compact)
   return (
     <div className="space-y-4">
       {/* Instructions & Legend */}
