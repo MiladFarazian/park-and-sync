@@ -24,7 +24,9 @@ const ModeSwitcher = ({ variant = 'default', navigate: shouldNavigate = true }: 
         return;
       }
       
-      setMode(newMode, shouldNavigate); // Only show overlay when navigating
+      // Use instant switch (no overlay delay) to prevent race condition
+      setMode(newMode, false);
+      
       if (shouldNavigate) {
         if (newMode === 'host') {
           navigate('/host-home');
@@ -35,7 +37,7 @@ const ModeSwitcher = ({ variant = 'default', navigate: shouldNavigate = true }: 
           } else if (location.pathname === '/profile') {
             navigate('/profile');
           } else {
-            navigate('/');
+            navigate('/', { state: { fromLogoClick: true } });
           }
         }
       }
