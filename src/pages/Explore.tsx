@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Loader2, Search, X, MapPin, Calendar, Clock, ArrowRight, Navigation, BatteryCharging, AlertTriangle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import MapView from '@/components/map/MapView';
 import DesktopSpotList, { SpotFilters } from '@/components/explore/DesktopSpotList';
+import MobileFilterSheet from '@/components/explore/MobileFilterSheet';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { format, isToday } from 'date-fns';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
@@ -750,6 +751,18 @@ const Explore = () => {
   const formatDateDisplay = (date: Date) => {
     return isToday(date) ? 'Today' : format(date, 'MMM dd');
   };
+  // Filter spots based on selected filters (for both desktop list and mobile carousel)
+  const filteredSpots = useMemo(() => {
+    return parkingSpots.filter((spot) => {
+      if (filters.covered && !spot.amenities?.includes('Covered')) return false;
+      if (filters.evCharging && !spot.amenities?.includes('EV Charging')) return false;
+      if (filters.secure && !spot.amenities?.includes('Secure')) return false;
+      if (filters.adaAccessible && !spot.amenities?.includes('ADA Accessible')) return false;
+      if (filters.vehicleSize && spot.sizeConstraints && !spot.sizeConstraints.includes(filters.vehicleSize)) return false;
+      return true;
+    });
+  }, [parkingSpots, filters]);
+
   const exploreParams = searchLocation ? {
     lat: searchLocation.lat.toString(),
     lng: searchLocation.lng.toString(),
@@ -903,7 +916,7 @@ const Explore = () => {
 
           {searchLocation && (
             <MapView 
-              spots={parkingSpots} 
+              spots={filteredSpots} 
               searchCenter={searchLocation} 
               currentLocation={currentLocation || searchLocation}
               onVisibleSpotsChange={() => {}} 
@@ -1052,6 +1065,16 @@ const Explore = () => {
             </Card>
           </div>
         )}
+        
+        {/* Filter Button */}
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+          <MobileFilterSheet
+            filters={filters}
+            onFiltersChange={setFilters}
+            totalSpots={parkingSpots.length}
+            filteredCount={filteredSpots.length}
+          />
+        </div>
       </div>
 
       {/* Current Location Button */}
@@ -1072,7 +1095,7 @@ const Explore = () => {
 
       {searchLocation && (
         <MapView 
-          spots={parkingSpots} 
+          spots={filteredSpots} 
           searchCenter={searchLocation} 
           currentLocation={currentLocation || searchLocation}
           onVisibleSpotsChange={() => {}} 
