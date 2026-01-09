@@ -21,21 +21,19 @@ export const ModeProvider = ({ children }: { children: ReactNode }) => {
   const [targetMode, setTargetMode] = useState<Mode | null>(null);
 
   const setMode = (newMode: Mode, showOverlay: boolean = true) => {
+    // Always update mode immediately to prevent race conditions
+    setModeState(newMode);
+    localStorage.setItem('parkway-mode', newMode);
+    
     if (showOverlay) {
+      // Show visual feedback overlay
       setIsLoading(true);
       setTargetMode(newMode);
       
-      // Simulate mode switch loading
       setTimeout(() => {
-        setModeState(newMode);
-        localStorage.setItem('parkway-mode', newMode);
         setIsLoading(false);
         setTargetMode(null);
       }, 300);
-    } else {
-      // Instant switch without overlay
-      setModeState(newMode);
-      localStorage.setItem('parkway-mode', newMode);
     }
   };
 
