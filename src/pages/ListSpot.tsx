@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
+import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -620,8 +621,25 @@ const ListSpot = () => {
   // Show Stripe Connect requirement on final step (step 6) if not set up
   const showStripeSetup = currentStep === 6 && !stripeConnected && !isCheckingStripe;
 
+  // Swipe navigation for multi-step form
+  const swipeHandlers = useSwipeNavigation({
+    onSwipeLeft: () => {}, // No action on swipe left
+    onSwipeRight: () => {
+      if (currentStep === 1) {
+        navigate('/dashboard');
+      } else {
+        setCurrentStep(currentStep - 1);
+      }
+    },
+    threshold: 50,
+  });
+
   return (
-    <div className="bg-background">
+    <div 
+      className="bg-background min-h-screen"
+      onTouchStart={swipeHandlers.onTouchStart}
+      onTouchEnd={swipeHandlers.onTouchEnd}
+    >
       <div className="p-4 space-y-6 max-w-2xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3">
