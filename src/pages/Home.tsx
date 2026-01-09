@@ -2,10 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { format } from 'date-fns';
-import { CalendarIcon, Clock, Search } from 'lucide-react';
-import { Star, MapPin, Loader2, Plus, Activity, Zap, AlertCircle, Footprints } from 'lucide-react';
+import { CalendarIcon, Clock, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { Star, MapPin, Loader2, Plus, Activity, Zap, AlertCircle, Footprints, BatteryCharging } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -18,6 +20,7 @@ import { calculateDriverPrice } from '@/lib/pricing';
 import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
 import FixLocationDialog from '@/components/location/FixLocationDialog';
 import EmailVerificationBanner from '@/components/auth/EmailVerificationBanner';
+import { evChargerTypes } from '@/lib/evChargerTypes';
 
 const Home = () => {
   const isMobile = useIsMobile();
@@ -40,6 +43,9 @@ const Home = () => {
   const [mobileEndPickerOpen, setMobileEndPickerOpen] = useState(false);
   const [locationErrorCode, setLocationErrorCode] = useState<number | null>(null);
   const [showFixLocationDialog, setShowFixLocationDialog] = useState(false);
+  const [needsEvCharging, setNeedsEvCharging] = useState(false);
+  const [selectedChargerType, setSelectedChargerType] = useState<string | null>(null);
+  const [showChargerTypes, setShowChargerTypes] = useState(false);
 
   // Prevent duplicate location application + rate-limited spam calls
   const lastAppliedLocationKeyRef = useRef<string | null>(null);
@@ -393,10 +399,19 @@ const Home = () => {
       return;
     }
 
+    if (needsEvCharging && !selectedChargerType) {
+      toast.error('Please select a charger type');
+      return;
+    }
+
     if (searchLocation) {
-      navigate(
-        `/explore?lat=${searchLocation.lat}&lng=${searchLocation.lng}&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchQuery || 'Current location')}`
-      );
+      let url = `/explore?lat=${searchLocation.lat}&lng=${searchLocation.lng}&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchQuery || 'Current location')}`;
+      
+      if (needsEvCharging && selectedChargerType) {
+        url += `&ev=true&chargerType=${encodeURIComponent(selectedChargerType)}`;
+      }
+      
+      navigate(url);
     }
   };
 
@@ -518,6 +533,83 @@ const Home = () => {
                 </div>
               </button>
             </div>
+          </div>
+
+          {/* EV Charging Toggle */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BatteryCharging className="h-5 w-5 text-green-600" />
+                <Label htmlFor="ev-charging" className="font-semibold cursor-pointer">
+                  I need EV charging
+                </Label>
+              </div>
+              <Switch
+                id="ev-charging"
+                checked={needsEvCharging}
+                onCheckedChange={(checked) => {
+                  setNeedsEvCharging(checked);
+                  if (checked) {
+                    setShowChargerTypes(true);
+                  } else {
+                    setSelectedChargerType(null);
+                    setShowChargerTypes(false);
+                  }
+                }}
+              />
+            </div>
+
+            {/* Charger Type Selector */}
+            {needsEvCharging && (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setShowChargerTypes(!showChargerTypes)}
+                  className="w-full flex items-center justify-between p-3 rounded-lg border bg-background"
+                >
+                  <span className="text-sm">
+                    {selectedChargerType 
+                      ? evChargerTypes.find(c => c.id === selectedChargerType)?.name 
+                      : 'Select charger type'}
+                  </span>
+                  {showChargerTypes ? (
+                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </button>
+
+                {showChargerTypes && (
+                  <div className="space-y-2 p-3 rounded-lg border bg-muted/30">
+                    {evChargerTypes.map((charger) => (
+                      <button
+                        key={charger.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedChargerType(charger.id);
+                          setShowChargerTypes(false);
+                        }}
+                        className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors text-left ${
+                          selectedChargerType === charger.id
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border bg-background hover:bg-accent'
+                        }`}
+                      >
+                        <img 
+                          src={charger.iconPath} 
+                          alt={charger.name}
+                          className="w-8 h-8"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium">{charger.name}</div>
+                          <div className="text-xs text-muted-foreground">{charger.chargingSpeed}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <Button onClick={handleSearch} className="w-full h-12 text-base" size="lg">

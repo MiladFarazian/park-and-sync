@@ -56,6 +56,7 @@ interface SearchRequest {
   limit?: number;
   start_time?: string;
   end_time?: string;
+  ev_charger_type?: string; // Filter for specific EV charger type
 }
 
 serve(async (req) => {
@@ -110,14 +111,15 @@ serve(async (req) => {
       radius = 15000,
       limit = 500,
       start_time,
-      end_time
+      end_time,
+      ev_charger_type
     }: SearchRequest = await req.json();
 
-    console.log('[search-spots-lite] Request:', { latitude, longitude, radius, limit, start_time, end_time, userId });
+    console.log('[search-spots-lite] Request:', { latitude, longitude, radius, limit, start_time, end_time, ev_charger_type, userId });
     const startTime = Date.now();
 
     // Simple query for active spots only - no availability checks, no pricing rules
-    const { data: spots, error } = await supabase
+    let query = supabase
       .from('spots')
       .select(`
         id,
@@ -129,6 +131,7 @@ serve(async (req) => {
         longitude,
         hourly_rate,
         has_ev_charging,
+        ev_charger_type,
         is_covered,
         is_secure,
         is_ada_accessible,
@@ -139,6 +142,8 @@ serve(async (req) => {
         )
       `)
       .eq('status', 'active');
+
+    const { data: spots, error } = await query;
 
     if (error) throw error;
 
@@ -163,6 +168,25 @@ serve(async (req) => {
       .filter(spot => spot.distance <= radius)
       .sort((a, b) => a.distance - b.distance)
       .slice(0, limit);
+
+    // Track if EV filter was applied and how many matched
+    let evFilterApplied = false;
+    let evMatchCount = 0;
+    
+    // If EV charger type filter is specified, filter spots
+    if (ev_charger_type) {
+      evFilterApplied = true;
+      const evSpots = spotsWithDistance.filter(spot => 
+        spot.has_ev_charging && spot.ev_charger_type === ev_charger_type
+      );
+      evMatchCount = evSpots.length;
+      
+      // If no EV spots found, keep all spots but flag it
+      if (evSpots.length > 0) {
+        spotsWithDistance = evSpots;
+      }
+      // If no matches, spotsWithDistance stays as-is (fallback to all spots)
+    }
 
     // If time range is provided, filter out spots with conflicting bookings or unavailable overrides
     if (start_time && end_time) {
@@ -329,6 +353,7 @@ serve(async (req) => {
         spot_review_count: stats.count,
         primary_photo_url: primaryPhoto,
         has_ev_charging: spot.has_ev_charging,
+        ev_charger_type: spot.ev_charger_type,
         is_covered: spot.is_covered,
         is_secure: spot.is_secure,
         is_ada_accessible: spot.is_ada_accessible,
@@ -342,7 +367,9 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       spots: transformedSpots,
-      total: transformedSpots.length
+      total: transformedSpots.length,
+      ev_filter_applied: evFilterApplied,
+      ev_match_count: evMatchCount
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
