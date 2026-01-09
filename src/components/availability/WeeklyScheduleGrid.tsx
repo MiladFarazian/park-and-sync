@@ -267,6 +267,107 @@ export const WeeklyScheduleGrid = ({
     return ranges.length > 2 ? `${ranges.length} slots` : ranges.join(', ');
   };
 
+  // Compact mode: Simple button-based UI without the full grid
+  if (compact) {
+    const totalActiveSlots = grid.flat().filter(Boolean).length;
+    const is24_7 = totalActiveSlots === 7 * TOTAL_SLOTS;
+    const is9to5 = (() => {
+      for (let day = 0; day < 7; day++) {
+        const daySlots = grid[day];
+        if (day >= 1 && day <= 5) {
+          // Mon-Fri: should be 9-5 only
+          for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
+            const should = slot >= timeToSlot('09:00') && slot < timeToSlot('17:00');
+            if (daySlots[slot] !== should) return false;
+          }
+        } else {
+          // Sat-Sun: should be empty
+          if (daySlots.some(Boolean)) return false;
+        }
+      }
+      return true;
+    })();
+    const isEmpty = totalActiveSlots === 0;
+
+    return (
+      <div className="space-y-4">
+        <p className="text-xs text-muted-foreground">
+          Choose a preset or leave blank to manage via Host Calendar later.
+        </p>
+
+        {/* Quick preset buttons */}
+        <div className="grid grid-cols-2 gap-3">
+          <Button
+            type="button"
+            variant={is24_7 ? "default" : "outline"}
+            className="h-16 flex-col gap-1"
+            onClick={set24_7}
+          >
+            <CalendarClock className="h-5 w-5" />
+            <span className="text-sm font-medium">24/7</span>
+            <span className="text-[10px] text-muted-foreground">Always available</span>
+          </Button>
+          <Button
+            type="button"
+            variant={is9to5 ? "default" : "outline"}
+            className="h-16 flex-col gap-1"
+            onClick={set9to5MF}
+          >
+            <Briefcase className="h-5 w-5" />
+            <span className="text-sm font-medium">M-F 9-5</span>
+            <span className="text-[10px] text-muted-foreground">Business hours</span>
+          </Button>
+        </div>
+
+        {/* Clear button if something is set */}
+        {!isEmpty && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full"
+            onClick={() => {
+              saveToHistory();
+              setGrid(Array.from({ length: 7 }, () => Array(TOTAL_SLOTS).fill(false)));
+              toast.success('Cleared availability');
+            }}
+          >
+            Clear selection
+          </Button>
+        )}
+
+        {/* Summary row */}
+        <Card className="p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Weekly Schedule</span>
+            <span className="text-xs text-muted-foreground">
+              {isEmpty ? 'Not set' : is24_7 ? '24/7' : is9to5 ? 'Mon-Fri 9am-5pm' : 'Custom'}
+            </span>
+          </div>
+          {!isEmpty && (
+            <div className="flex gap-1 mt-2">
+              {DAYS_SHORT.map((d, i) => {
+                const hasAvailability = grid[i].some(Boolean);
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      "flex-1 h-6 rounded text-[10px] flex items-center justify-center font-medium",
+                      hasAvailability ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {d}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      </div>
+    );
+  }
+
+  // Full grid mode (non-compact)
   return (
     <div className="space-y-4">
       {/* Instructions & Legend */}
@@ -313,11 +414,9 @@ export const WeeklyScheduleGrid = ({
                   <span className="sm:hidden">{DAYS_SHORT[dayIndex]}</span>
                   <span className="hidden sm:inline">{day}</span>
                 </div>
-                {!compact && (
-                  <div className="hidden sm:block text-[10px] text-muted-foreground mt-0.5">
-                    {getDaySummary(dayIndex)}
-                  </div>
-                )}
+                <div className="hidden sm:block text-[10px] text-muted-foreground mt-0.5">
+                  {getDaySummary(dayIndex)}
+                </div>
               </div>
             ))}
           </div>
@@ -327,10 +426,7 @@ export const WeeklyScheduleGrid = ({
             {HOURS.map((hour) => (
               <div key={hour} className="flex border-b last:border-b-0">
                 {/* Time Label */}
-                <div className={cn(
-                  "w-8 sm:w-14 shrink-0 text-[8px] sm:text-[10px] text-muted-foreground border-r flex items-start justify-end pr-0.5 sm:pr-2",
-                  compact ? "p-0 py-0.5" : "p-0.5 sm:p-1"
-                )}>
+                <div className="w-8 sm:w-14 shrink-0 p-0.5 sm:p-1 text-[8px] sm:text-[10px] text-muted-foreground border-r flex items-start justify-end pr-0.5 sm:pr-2">
                   {formatTimeDisplay(hour)}
                 </div>
                 
@@ -352,8 +448,7 @@ export const WeeklyScheduleGrid = ({
                           onMouseEnter={() => handleMouseEnter(dayIndex, slot)}
                           onTouchStart={(e) => handleTouchStart(dayIndex, slot, e)}
                           className={cn(
-                            "border-b border-border/30 last:border-b-0 cursor-pointer transition-colors",
-                            compact ? "h-1.5 sm:h-2" : "h-2.5 sm:h-3",
+                            "h-2.5 sm:h-3 border-b border-border/30 last:border-b-0 cursor-pointer transition-colors",
                             isActive && !inRange && "bg-primary",
                             inRange && dragMode === 'add' && "bg-primary/70",
                             inRange && dragMode === 'remove' && "bg-destructive/30",
