@@ -69,22 +69,21 @@ const MobileFilterSheet = ({
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="bg-background/95 backdrop-blur-sm shadow-lg rounded-full px-3 gap-1.5"
+        <button 
+          type="button"
+          className="flex items-center gap-1.5 px-2 py-1.5 rounded-md active:bg-accent/50 transition-colors touch-scroll-safe"
         >
-          <SlidersHorizontal className="h-4 w-4" />
-          <span className="text-sm">Filters</span>
+          <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-xs font-medium">Filters</span>
           {activeFilterCount > 0 && (
             <Badge 
               variant="secondary" 
-              className="h-5 w-5 p-0 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-xs"
+              className="h-4 w-4 p-0 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px]"
             >
               {activeFilterCount}
             </Badge>
           )}
-        </Button>
+        </button>
       </SheetTrigger>
       <SheetContent side="bottom" className="rounded-t-2xl h-auto max-h-[70vh]">
         <SheetHeader className="pb-4">
