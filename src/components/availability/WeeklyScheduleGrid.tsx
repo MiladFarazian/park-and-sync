@@ -17,7 +17,6 @@ interface WeeklyScheduleGridProps {
   initialRules?: AvailabilityRule[];
   onChange?: (rules: AvailabilityRule[]) => void;
   baseRate?: number;
-  compact?: boolean;
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -50,7 +49,6 @@ const formatTimeDisplay = (hour: number): string => {
 export const WeeklyScheduleGrid = ({
   initialRules = [],
   onChange,
-  compact = false,
 }: WeeklyScheduleGridProps) => {
   // Grid state: 7 days x 48 slots (30-min each)
   const [grid, setGrid] = useState<boolean[][]>(() => {
@@ -347,8 +345,7 @@ export const WeeklyScheduleGrid = ({
                           onMouseEnter={() => handleMouseEnter(dayIndex, slot)}
                           onTouchStart={(e) => handleTouchStart(dayIndex, slot, e)}
                           className={cn(
-                            "border-b border-border/30 last:border-b-0 cursor-pointer transition-colors",
-                            compact ? "h-1.5 sm:h-2" : "h-2.5 sm:h-3",
+                            "h-2.5 sm:h-3 border-b border-border/30 last:border-b-0 cursor-pointer transition-colors",
                             isActive && !inRange && "bg-primary",
                             inRange && dragMode === 'add' && "bg-primary/70",
                             inRange && dragMode === 'remove' && "bg-destructive/30",

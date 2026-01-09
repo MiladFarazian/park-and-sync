@@ -14,8 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Star, ChevronLeft, ChevronRight, X, Loader2, CreditCard, ExternalLink, BoltIcon, Accessibility } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { MobileAvailabilityPicker } from '@/components/availability/MobileAvailabilityPicker';
-import { AvailabilityRule } from '@/components/availability/WeeklyScheduleGrid';
+import { WeeklyScheduleGrid, AvailabilityRule } from '@/components/availability/WeeklyScheduleGrid';
 import { compressImage } from '@/lib/compressImage';
 import { EVChargerTypeSelector } from '@/components/ev/EVChargerTypeSelector';
 import { evChargerTypes } from '@/lib/evChargerTypes';
@@ -973,21 +972,24 @@ const ListSpot = () => {
 
           {/* Step 4: Availability */}
           {currentStep === 4 && (
-            <Card>
-              <CardContent className="p-5 space-y-5">
-                <div>
-                  <h2 className="text-lg font-semibold mb-1">Set Your Schedule</h2>
+            <Card className="flex flex-col h-[calc(100vh-12rem)] overflow-hidden">
+              <CardContent className="p-6 flex flex-col flex-1 min-h-0">
+                <div className="shrink-0 mb-4">
+                  <h2 className="text-xl font-semibold mb-2">Availability</h2>
                   <p className="text-sm text-muted-foreground">
-                    Toggle days on/off and set hours. Leave all days off to manage availability per-date after listing.
+                    Set your recurring weekly schedule. Leave blank if you prefer to manage availability on a per-date basis after listing.
                   </p>
                 </div>
 
-                <MobileAvailabilityPicker
-                  initialRules={availabilityRules}
-                  onChange={setAvailabilityRules}
-                />
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <WeeklyScheduleGrid
+                    initialRules={availabilityRules}
+                    onChange={setAvailabilityRules}
+                    baseRate={Number(formData.hourlyRate) || 0}
+                  />
+                </div>
 
-                <div className="flex gap-3 pt-2">
+                <div className="flex gap-3 pt-4 shrink-0">
                   <Button
                     type="button"
                     variant="outline"
