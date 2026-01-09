@@ -1028,12 +1028,11 @@ const Explore = () => {
           </div>
         </div>
         
-        {/* Time Selector + Filters Row */}
-        <div className="max-w-md mx-auto">
-          <Card className="p-2.5 bg-background/95 backdrop-blur-sm shadow-lg">
-            <div className="flex items-center gap-2 text-sm">
-              {/* Time Range */}
-              <div className="flex items-center gap-2 flex-1 justify-center">
+        {/* Time Selector */}
+        {(startTime || endTime) && (
+          <div className="max-w-md mx-auto">
+            <Card className="p-2.5 bg-background/95 backdrop-blur-sm shadow-lg">
+              <div className="flex items-center gap-2 text-sm justify-center">
                 {startTime && (
                   <button 
                     type="button"
@@ -1064,19 +1063,18 @@ const Explore = () => {
                   </button>
                 )}
               </div>
-              
-              {/* Divider */}
-              <div className="h-6 w-px bg-border flex-shrink-0" />
-              
-              {/* Filter Button */}
-              <MobileFilterSheet
-                filters={filters}
-                onFiltersChange={setFilters}
-                totalSpots={parkingSpots.length}
-                filteredCount={filteredSpots.length}
-              />
-            </div>
-          </Card>
+            </Card>
+          </div>
+        )}
+        
+        {/* Filter Button - Below time selector */}
+        <div className="max-w-md mx-auto flex justify-center">
+          <MobileFilterSheet
+            filters={filters}
+            onFiltersChange={setFilters}
+            totalSpots={parkingSpots.length}
+            filteredCount={filteredSpots.length}
+          />
         </div>
       </div>
 
