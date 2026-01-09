@@ -14,7 +14,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ArrowLeft, Shield, Clock, Zap, Car, Lightbulb, Camera, MapPin, DollarSign, Star, ChevronLeft, ChevronRight, X, Loader2, CreditCard, ExternalLink, BoltIcon, Accessibility } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { WeeklyScheduleGrid, AvailabilityRule } from '@/components/availability/WeeklyScheduleGrid';
+import { MobileAvailabilityPicker } from '@/components/availability/MobileAvailabilityPicker';
+import { AvailabilityRule } from '@/components/availability/WeeklyScheduleGrid';
 import { compressImage } from '@/lib/compressImage';
 import { EVChargerTypeSelector } from '@/components/ev/EVChargerTypeSelector';
 import { evChargerTypes } from '@/lib/evChargerTypes';
@@ -973,22 +974,20 @@ const ListSpot = () => {
           {/* Step 4: Availability */}
           {currentStep === 4 && (
             <Card>
-              <CardContent className="p-4 space-y-4">
+              <CardContent className="p-5 space-y-5">
                 <div>
-                  <h2 className="text-lg font-semibold mb-1">Availability</h2>
-                  <p className="text-xs text-muted-foreground">
-                    Set your recurring weekly schedule. Leave blank to manage availability per-date after listing.
+                  <h2 className="text-lg font-semibold mb-1">Set Your Schedule</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Toggle days on/off and set hours. Leave all days off to manage availability per-date after listing.
                   </p>
                 </div>
 
-                <WeeklyScheduleGrid
+                <MobileAvailabilityPicker
                   initialRules={availabilityRules}
                   onChange={setAvailabilityRules}
-                  baseRate={Number(formData.hourlyRate) || 0}
-                  compact
                 />
 
-                <div className="flex gap-3">
+                <div className="flex gap-3 pt-2">
                   <Button
                     type="button"
                     variant="outline"
