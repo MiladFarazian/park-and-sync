@@ -24,8 +24,8 @@ const ModeSwitcher = ({ variant = 'default', navigate: shouldNavigate = true }: 
         return;
       }
       
-      // Use instant switch (no overlay delay) to prevent race condition
-      setMode(newMode, false);
+      // Show overlay animation during switch
+      setMode(newMode, shouldNavigate);
       
       if (shouldNavigate) {
         if (newMode === 'host') {
