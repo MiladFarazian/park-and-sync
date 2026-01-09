@@ -558,24 +558,43 @@ const ListSpot = () => {
     try {
       const { data, error } = await supabase.functions.invoke('create-stripe-connect-link');
       if (error) throw error;
-      
-      if (data?.url) {
-        // Check if running as PWA/standalone mode
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-                            (window.navigator as any).standalone === true;
-        
-        if (isStandalone) {
-          // PWA mode: use window.open which works better on iOS PWAs
-          // The '_system' target hints to open in Safari on iOS
-          window.open(data.url, '_system');
-          toast.info('Complete Stripe setup in Safari, then return to the app and tap "I\'ve completed Stripe setup"');
-        } else {
-          // Regular browser: direct redirect
-          window.location.href = data.url;
-        }
-      } else {
+
+      const url: string | undefined = data?.url;
+      if (!url) {
         throw new Error('No Stripe onboarding URL returned');
       }
+
+      // Check if running as PWA/standalone mode
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone === true;
+
+      // iOS standalone apps are very restrictive about leaving the app.
+      // Best-effort approach: try opening a new Safari tab; if blocked, offer Share/Copy.
+      if (isStandalone) {
+        const opened = window.open(url, '_blank', 'noopener,noreferrer');
+
+        if (!opened) {
+          try {
+            const nav: any = window.navigator;
+            if (nav?.share) {
+              // Lets the user choose Safari explicitly from the share sheet.
+              await nav.share({ url, title: 'Complete Stripe setup' });
+            } else if (nav?.clipboard?.writeText) {
+              await nav.clipboard.writeText(url);
+              toast.info('Stripe link copied — open Safari and paste it to continue.');
+              return;
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        toast.info('Finish Stripe setup in Safari, then return here and tap "I\'ve completed Stripe setup".');
+        return;
+      }
+
+      // Regular browser: direct redirect
+      window.location.href = url;
     } catch (error) {
       console.error('Error creating Stripe connect link:', error);
       toast.error('Failed to start Stripe setup');
