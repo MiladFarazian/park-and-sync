@@ -177,6 +177,7 @@ const Explore = () => {
   const [evChargerType, setEvChargerType] = useState<string | null>(null);
   const [evFilterFallbackShown, setEvFilterFallbackShown] = useState(false);
   const evFilterFallbackShownRef = useRef(false);
+  const [pendingEvFallbackDialog, setPendingEvFallbackDialog] = useState(false);
   const [showEvFallbackDialog, setShowEvFallbackDialog] = useState(false);
   const [evFallbackChargerName, setEvFallbackChargerName] = useState('');
   
@@ -617,13 +618,21 @@ const Explore = () => {
       }
 
       // Show fallback dialog if EV filter was applied but no matches found
-      if (data.ev_filter_applied && data.ev_match_count === 0 && !evFilterFallbackShownRef.current) {
-        evFilterFallbackShownRef.current = true;
-        setEvFilterFallbackShown(true);
-        const chargerName = getChargerDisplayName(evChargerTypeFilter);
-        setEvFallbackChargerName(chargerName);
-        // Let the map render first so the dialog appears over the dimmed map (not a blank backdrop)
-        setTimeout(() => setShowEvFallbackDialog(true), 50);
+      if (data.ev_filter_applied && data.ev_match_count === 0) {
+        // Persist across React 18 StrictMode remounts so it cannot appear twice
+        const evKey = evChargerTypeFilter
+          ? `ev-fallback-v1:${center.lat.toFixed(4)}:${center.lng.toFixed(4)}:${timeKey}:${evChargerTypeFilter}`
+          : null;
+
+        const alreadyShownForThisSearch = evKey ? sessionStorage.getItem(evKey) === '1' : evFilterFallbackShownRef.current;
+
+        if (!alreadyShownForThisSearch) {
+          if (evKey) sessionStorage.setItem(evKey, '1');
+          evFilterFallbackShownRef.current = true;
+          setEvFilterFallbackShown(true);
+          setEvFallbackChargerName(getChargerDisplayName(evChargerTypeFilter));
+          setPendingEvFallbackDialog(true);
+        }
       }
 
       const transformedSpots = data.spots?.map((spot: any) => ({
@@ -659,7 +668,16 @@ const Explore = () => {
     } finally {
       setSpotsLoading(false);
     }
-  }, [parkingSpots.length, startTime, endTime, evFilterFallbackShown]);
+  }, [parkingSpots.length, startTime, endTime]);
+
+  // Open EV fallback dialog only after the map/list has rendered (prevents a "black" backdrop flash)
+  useEffect(() => {
+    if (!pendingEvFallbackDialog) return;
+    if (spotsLoading) return;
+
+    setShowEvFallbackDialog(true);
+    setPendingEvFallbackDialog(false);
+  }, [pendingEvFallbackDialog, spotsLoading]);
   
   const handleMapMove = (center: {
     lat: number;
