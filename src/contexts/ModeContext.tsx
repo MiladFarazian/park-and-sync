@@ -33,7 +33,7 @@ export const ModeProvider = ({ children }: { children: ReactNode }) => {
       setTimeout(() => {
         setIsLoading(false);
         setTargetMode(null);
-      }, 300);
+      }, 600);
     }
   };
 
