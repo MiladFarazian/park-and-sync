@@ -161,12 +161,13 @@ serve(async (req) => {
       );
     }
 
-    // Create client with user's JWT to verify identity
-    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
+    // Use service role to verify the token
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false }
     });
 
-    const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser();
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
     if (authError || !authUser) {
       console.warn('[link-guest-bookings] Failed to get authenticated user:', authError?.message);
