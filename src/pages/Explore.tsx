@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2, Search, X, MapPin, Calendar, Clock, ArrowRight, Navigation, BatteryCharging } from 'lucide-react';
+import { Loader2, Search, X, MapPin, Calendar, Clock, ArrowRight, Navigation, BatteryCharging, AlertTriangle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import MapView from '@/components/map/MapView';
 import DesktopSpotList, { SpotFilters } from '@/components/explore/DesktopSpotList';
@@ -11,6 +12,15 @@ import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
 import { evChargerTypes, getChargerDisplayName } from '@/lib/evChargerTypes';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 // Session cache utilities for instant back/forward navigation and regional caching
 const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
@@ -166,6 +176,8 @@ const Explore = () => {
   // EV charger filter state (from URL params)
   const [evChargerType, setEvChargerType] = useState<string | null>(null);
   const [evFilterFallbackShown, setEvFilterFallbackShown] = useState(false);
+  const [showEvFallbackDialog, setShowEvFallbackDialog] = useState(false);
+  const [evFallbackChargerName, setEvFallbackChargerName] = useState('');
   
   // Request ID guard to prevent stale responses from overwriting newer ones
   const latestRequestIdRef = useRef(0);
@@ -604,17 +616,12 @@ const Explore = () => {
         return;
       }
 
-      // Show fallback notification if EV filter was applied but no matches found
+      // Show fallback dialog if EV filter was applied but no matches found
       if (data.ev_filter_applied && data.ev_match_count === 0 && !evFilterFallbackShown) {
         setEvFilterFallbackShown(true);
         const chargerName = getChargerDisplayName(evChargerTypeFilter);
-        toast.info(
-          `No spots with ${chargerName} chargers available for this period. Showing all nearby parking instead.`,
-          { 
-            duration: 6000,
-            icon: <BatteryCharging className="h-5 w-5 text-yellow-500" />
-          }
-        );
+        setEvFallbackChargerName(chargerName);
+        setShowEvFallbackDialog(true);
       }
 
       const transformedSpots = data.spots?.map((spot: any) => ({
@@ -1083,6 +1090,32 @@ const Explore = () => {
           initialValue={endTime}
         />
       )}
+
+      {/* EV Charger Fallback Dialog */}
+      <AlertDialog open={showEvFallbackDialog} onOpenChange={setShowEvFallbackDialog}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
+                <AlertTriangle className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
+              </div>
+            </div>
+            <AlertDialogTitle className="text-center">
+              No {evFallbackChargerName} Chargers Available
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-center">
+              We couldn't find any spots with <strong>{evFallbackChargerName}</strong> chargers available for your selected time period in this area.
+              <br /><br />
+              The spots shown below are <strong>parking only</strong> and do not have EV charging.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center">
+            <AlertDialogAction className="w-full sm:w-auto">
+              I Understand – Show Parking
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
