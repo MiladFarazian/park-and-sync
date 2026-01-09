@@ -972,22 +972,24 @@ const ListSpot = () => {
 
           {/* Step 4: Availability */}
           {currentStep === 4 && (
-            <Card>
-              <CardContent className="p-6 space-y-6">
-                <div>
+            <Card className="flex flex-col h-[calc(100vh-12rem)] overflow-hidden">
+              <CardContent className="p-6 flex flex-col flex-1 min-h-0">
+                <div className="shrink-0 mb-4">
                   <h2 className="text-xl font-semibold mb-2">Availability</h2>
                   <p className="text-sm text-muted-foreground">
-                    Set when your parking spot is available
+                    Set your recurring weekly schedule. Leave blank if you prefer to manage availability on a per-date basis after listing.
                   </p>
                 </div>
 
-                <WeeklyScheduleGrid
-                  initialRules={availabilityRules}
-                  onChange={setAvailabilityRules}
-                  baseRate={Number(formData.hourlyRate) || 0}
-                />
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <WeeklyScheduleGrid
+                    initialRules={availabilityRules}
+                    onChange={setAvailabilityRules}
+                    baseRate={Number(formData.hourlyRate) || 0}
+                  />
+                </div>
 
-                <div className="flex gap-3">
+                <div className="flex gap-3 pt-4 shrink-0">
                   <Button
                     type="button"
                     variant="outline"
