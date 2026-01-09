@@ -1068,7 +1068,7 @@ const Explore = () => {
         )}
         
         {/* Filter Button - Below time selector */}
-        <div className="max-w-md mx-auto flex justify-center">
+        <div className="flex justify-end px-4">
           <MobileFilterSheet
             filters={filters}
             onFiltersChange={setFilters}
