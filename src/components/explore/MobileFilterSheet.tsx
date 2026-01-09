@@ -71,7 +71,7 @@ const MobileFilterSheet = ({
       <SheetTrigger asChild>
         <button 
           type="button"
-          className="flex items-center gap-1.5 px-2 py-1.5 rounded-md active:bg-accent/50 transition-colors touch-scroll-safe"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background/95 backdrop-blur-sm shadow-lg active:bg-accent/50 transition-colors touch-scroll-safe"
         >
           <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-xs font-medium">Filters</span>
