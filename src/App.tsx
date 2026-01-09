@@ -52,6 +52,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ModeProvider } from "./contexts/ModeContext";
 import { MessagesProvider } from "./contexts/MessagesContext";
 import { SupportRedirect } from "./components/auth/SupportRedirect";
+import RequireHostMode from "./components/auth/RequireHostMode";
 
 const queryClient = new QueryClient();
 
@@ -109,15 +110,15 @@ const App = () => {
                   <Routes>
                     <Route path="/" element={<Home />} />
                     <Route path="/explore" element={<Explore />} />
-                    <Route path="/list-spot" element={<ListSpot />} />
-                    <Route path="/edit-availability/:spotId" element={<EditSpotAvailability />} />
-                    <Route path="/edit-spot/:spotId" element={<EditSpot />} />
+                    <Route path="/list-spot" element={<RequireHostMode><ListSpot /></RequireHostMode>} />
+                    <Route path="/edit-availability/:spotId" element={<RequireHostMode><EditSpotAvailability /></RequireHostMode>} />
+                    <Route path="/edit-spot/:spotId" element={<RequireHostMode><EditSpot /></RequireHostMode>} />
                     <Route path="/activity" element={<Activity />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/host-home" element={<HostHome />} />
-                    <Route path="/host-calendar" element={<HostCalendar />} />
-                    <Route path="/manage-availability" element={<ManageAvailabilitySelect />} />
-                    <Route path="/manage-availability/bulk" element={<BulkAvailabilityEditor />} />
+                    <Route path="/dashboard" element={<RequireHostMode><Dashboard /></RequireHostMode>} />
+                    <Route path="/host-home" element={<RequireHostMode><HostHome /></RequireHostMode>} />
+                    <Route path="/host-calendar" element={<RequireHostMode><HostCalendar /></RequireHostMode>} />
+                    <Route path="/manage-availability" element={<RequireHostMode><ManageAvailabilitySelect /></RequireHostMode>} />
+                    <Route path="/manage-availability/bulk" element={<RequireHostMode><BulkAvailabilityEditor /></RequireHostMode>} />
                     <Route path="/messages" element={<Messages />} />
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/reviews" element={<Reviews />} />
@@ -125,7 +126,7 @@ const App = () => {
                     <Route path="/book/:spotId" element={<Booking />} />
                     <Route path="/booking/:bookingId" element={<BookingDetail />} />
                     <Route path="/booking-confirmation/:bookingId" element={<BookingConfirmation />} />
-                    <Route path="/host-booking-confirmation/:bookingId" element={<HostBookingConfirmation />} />
+                    <Route path="/host-booking-confirmation/:bookingId" element={<RequireHostMode><HostBookingConfirmation /></RequireHostMode>} />
                     <Route path="/admin" element={<AdminDashboard />} />
                     <Route path="/support-home" element={<SupportHome />} />
                     <Route path="/support-messages" element={<SupportMessages />} />
