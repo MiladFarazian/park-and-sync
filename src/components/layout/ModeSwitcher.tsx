@@ -29,7 +29,14 @@ const ModeSwitcher = ({ variant = 'default', navigate: shouldNavigate = true }: 
         if (newMode === 'host') {
           navigate('/host-home');
         } else {
-          navigate('/');
+          // When switching to driver, stay on Messages/Profile if currently there
+          if (location.pathname === '/messages' || location.pathname.startsWith('/messages/')) {
+            navigate('/messages');
+          } else if (location.pathname === '/profile') {
+            navigate('/profile');
+          } else {
+            navigate('/');
+          }
         }
       }
     }
