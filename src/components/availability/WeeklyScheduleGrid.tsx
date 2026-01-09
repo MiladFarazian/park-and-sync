@@ -298,10 +298,9 @@ export const WeeklyScheduleGrid = ({
           onMouseLeave={handleMouseUp}
           onTouchEnd={handleTouchEnd}
           onTouchMove={handleTouchMove}
-          className={cn(compact && "max-h-[50vh] overflow-y-auto")}
         >
           {/* Header Row */}
-          <div className={cn("flex border-b bg-muted/30", compact && "sticky top-0 z-10")}>
+          <div className="flex border-b bg-muted/30">
             <div className="w-8 sm:w-14 shrink-0 p-1 sm:p-2 text-[10px] sm:text-xs font-medium text-muted-foreground border-r">
               <span className="hidden sm:inline">Time</span>
             </div>
