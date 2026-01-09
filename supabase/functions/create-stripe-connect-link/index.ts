@@ -13,34 +13,23 @@ serve(async (req) => {
   }
 
   try {
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+
     const authHeader = req.headers.get("Authorization");
-    const parts = authHeader?.trim().split(/\s+/) ?? [];
-    const token = parts.length >= 2 ? parts[1] : undefined;
-
-    console.log("[create-stripe-connect-link] auth header present:", !!authHeader);
-    console.log("[create-stripe-connect-link] token present:", !!token);
-    if (token) console.log("[create-stripe-connect-link] token prefix:", token.slice(0, 16));
-
-    if (!token) {
+    if (!authHeader) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-
-    // Validate token by asking Supabase Auth (do NOT try to JWKS-verify: projects using HS256 have empty JWKS)
-    const supabaseAuth = createClient(
-      supabaseUrl,
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { auth: { persistSession: false }, global: { headers: { Authorization: authHeader! } } }
-    );
-
-    console.log("[create-stripe-connect-link] validating token via supabaseAuth.auth.getUser(token)");
-    const { data: userData, error: userError } = await supabaseAuth.auth.getUser(token);
-    const user = userData?.user;
-
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+    
     if (userError || !user) {
       console.error("[create-stripe-connect-link] Invalid token:", userError);
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -49,20 +38,15 @@ serve(async (req) => {
       });
     }
 
-    const supabaseAdmin = createClient(
-      supabaseUrl,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
-    );
-
-    const { data: profile, error: profileError } = await supabaseAdmin
+    // Get user profile
+    const { data: profile, error: profileError } = await supabaseClient
       .from("profiles")
       .select("*")
       .eq("user_id", user.id)
       .single();
 
     if (profileError || !profile) {
-      console.error("[create-stripe-connect-link] Profile not found:", profileError?.message);
+      console.error("[create-stripe-connect-link] Profile not found:", profileError);
       return new Response(JSON.stringify({ error: "Profile not found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -79,12 +63,13 @@ serve(async (req) => {
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
-    let accountId = (profile.stripe_account_id as string | null) ?? null;
+    let accountId = profile.stripe_account_id;
 
+    // Create Stripe Connect account if doesn't exist
     if (!accountId) {
       const account = await stripe.accounts.create({
         type: "express",
-        email: profile.email ?? undefined,
+        email: profile.email,
         capabilities: {
           transfers: { requested: true },
         },
@@ -93,14 +78,15 @@ serve(async (req) => {
 
       accountId = account.id;
 
-      await supabaseAdmin
+      // Save account ID to profile
+      await supabaseClient
         .from("profiles")
         .update({ stripe_account_id: accountId })
         .eq("user_id", user.id);
     }
 
+    // Create account link for onboarding
     const origin = req.headers.get("origin") || "http://localhost:5173";
-
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
       refresh_url: `${origin}/profile`,
@@ -108,16 +94,21 @@ serve(async (req) => {
       type: "account_onboarding",
     });
 
-    return new Response(JSON.stringify({ url: accountLink.url }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ url: accountLink.url }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      }
+    );
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error("[create-stripe-connect-link] Error:", message);
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("Error creating Stripe Connect link:", error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      }
+    );
   }
 });
