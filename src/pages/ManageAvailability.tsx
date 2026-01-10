@@ -45,6 +45,7 @@ const ManageAvailability = () => {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const dateParam = searchParams.get('date');
+  const spotIdParam = searchParams.get('spotId'); // Specific spot from HostCalendar
   
   const [spots, setSpots] = useState<Spot[]>([]);
   const [selectedSpots, setSelectedSpots] = useState<string[]>([]);
@@ -100,9 +101,15 @@ const ManageAvailability = () => {
       if (error) throw error;
       setSpots(data || []);
       
-      // Auto-select all spots by default
+      // Pre-select spots based on URL param
       if (data && data.length > 0) {
-        setSelectedSpots(data.map(s => s.id));
+        if (spotIdParam && data.some(s => s.id === spotIdParam)) {
+          // If specific spot was passed from HostCalendar, only select that spot
+          setSelectedSpots([spotIdParam]);
+        } else {
+          // Otherwise select all spots (came from "All Spots" view)
+          setSelectedSpots(data.map(s => s.id));
+        }
       }
     } catch (error) {
       console.error('Error fetching spots:', error);

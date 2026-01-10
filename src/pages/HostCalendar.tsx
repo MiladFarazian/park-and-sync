@@ -1010,7 +1010,7 @@ const HostCalendar = () => {
                 <Button 
                   variant="outline" 
                   className="w-full"
-                  onClick={() => navigate(`/manage-availability?date=${format(selectedDate, 'yyyy-MM-dd')}`)}
+                  onClick={() => navigate(`/manage-availability?date=${format(selectedDate, 'yyyy-MM-dd')}${selectedSpotId && selectedSpotId !== 'all' ? `&spotId=${selectedSpotId}` : ''}`)}
                 >
                   <Settings className="h-4 w-4 mr-2" />
                   Manage Availability for This Day
