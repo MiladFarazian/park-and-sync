@@ -551,7 +551,7 @@ const HostCalendar = () => {
   }
 
   return (
-    <div className="p-4 pb-24 space-y-4">
+    <div className="h-full overflow-hidden flex flex-col gap-4 p-4 pb-20 pb-[calc(5rem+env(safe-area-inset-bottom))]">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

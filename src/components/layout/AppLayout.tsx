@@ -28,7 +28,8 @@ const AppLayout = ({ children }: AppLayoutProps) => {
     location.pathname === '/explore' ||
     location.pathname === '/messages' ||
     location.pathname === '/support-messages' ||
-    location.pathname === '/reviews';
+    location.pathname === '/reviews' ||
+    location.pathname === '/host-calendar';
   // Initialize notifications hook to set up realtime listeners
   useNotifications();
   
