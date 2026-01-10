@@ -132,10 +132,12 @@ serve(async (req) => {
         hourly_rate,
         has_ev_charging,
         ev_charger_type,
+        ev_charging_premium_per_hour,
         is_covered,
         is_secure,
         is_ada_accessible,
         instant_book,
+        size_constraints,
         spot_photos (
           url,
           is_primary
@@ -349,6 +351,7 @@ serve(async (req) => {
         latitude: spot.latitude,
         longitude: spot.longitude,
         hourly_rate: driverPrice,
+        ev_charging_premium_per_hour: spot.ev_charging_premium_per_hour || 0,
         spot_rating: Number(stats.avgRating.toFixed(2)),
         spot_review_count: stats.count,
         primary_photo_url: primaryPhoto,
@@ -358,7 +361,8 @@ serve(async (req) => {
         is_secure: spot.is_secure,
         is_ada_accessible: spot.is_ada_accessible,
         instant_book: spot.instant_book,
-        distance: spot.distance
+        distance: spot.distance,
+        size_constraints: spot.size_constraints
       };
     });
 

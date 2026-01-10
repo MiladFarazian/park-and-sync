@@ -642,6 +642,7 @@ const Explore = () => {
         category: spot.category,
         address: spot.address,
         hourlyRate: spot.hourly_rate, // Already includes platform fee from lite endpoint
+        evChargingPremium: spot.ev_charging_premium_per_hour || 0,
         rating: spot.spot_rating || 0,
         reviews: spot.spot_review_count || 0,
         lat: parseFloat(spot.latitude),
@@ -653,7 +654,8 @@ const Explore = () => {
         sizeConstraints: spot.size_constraints || [],
         userBooking: null, // Not available in lite endpoint
         instantBook: spot.instant_book !== false,
-        evChargerType: spot.ev_charger_type
+        evChargerType: spot.ev_charger_type,
+        hasEvCharging: spot.has_ev_charging
       })) || [];
 
       setParkingSpots(transformedSpots);

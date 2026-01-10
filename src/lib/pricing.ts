@@ -25,6 +25,15 @@ export function calculateEvChargingFee(premiumPerHour: number, hours: number): n
 }
 
 /**
+ * Calculate combined hourly rate including EV charging premium.
+ * Used for displaying combined price when EV charging is selected.
+ */
+export function calculateCombinedHourlyRate(hostHourlyRate: number, evChargingPremium: number = 0): number {
+  const driverRate = calculateDriverPrice(hostHourlyRate);
+  return Math.round((driverRate + evChargingPremium) * 100) / 100;
+}
+
+/**
  * Calculate total booking cost for driver.
  * - driverSubtotal: driver_rate × hours (includes invisible upcharge)
  * - serviceFee: 20% of host earnings or $1 min (visible to driver)
