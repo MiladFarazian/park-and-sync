@@ -1,9 +1,11 @@
-import React, { useEffect, useRef } from 'react';
-import { Star, MapPin, Footprints, Umbrella, Zap, Shield, Car, X, BoltIcon, Clock, Accessibility } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Star, MapPin, Footprints, Umbrella, Zap, Shield, Car, X, BoltIcon, Clock, Accessibility, Check, ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { EVChargerBadge } from '@/components/ev/EVChargerBadge';
+import { evChargerTypes } from '@/lib/evChargerTypes';
+import { cn } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -11,6 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 interface UserBooking {
   id: string;
@@ -44,6 +51,7 @@ interface Spot {
 export interface SpotFilters {
   covered: boolean;
   evCharging: boolean;
+  evChargerTypes: string[];
   secure: boolean;
   adaAccessible: boolean;
   vehicleSize: string | null;
@@ -149,13 +157,28 @@ const DesktopSpotList = ({
     }
   }, [selectedSpotId]);
 
-  const toggleFilter = (key: keyof Omit<SpotFilters, 'vehicleSize'>) => {
-    onFiltersChange({ ...filters, [key]: !filters[key] });
+  const toggleFilter = (key: keyof Omit<SpotFilters, 'vehicleSize' | 'evChargerTypes'>) => {
+    const newFilters = { ...filters, [key]: !filters[key] };
+    // If turning off EV charging, clear charger types
+    if (key === 'evCharging' && filters.evCharging) {
+      newFilters.evChargerTypes = [];
+    }
+    onFiltersChange(newFilters);
+  };
+
+  const toggleChargerType = (chargerTypeId: string) => {
+    const currentTypes = filters.evChargerTypes || [];
+    const newTypes = currentTypes.includes(chargerTypeId)
+      ? currentTypes.filter(t => t !== chargerTypeId)
+      : [...currentTypes, chargerTypeId];
+    onFiltersChange({ ...filters, evChargerTypes: newTypes });
   };
 
   const setVehicleSize = (size: string | null) => {
     onFiltersChange({ ...filters, vehicleSize: size });
   };
+
+  const [chargerPopoverOpen, setChargerPopoverOpen] = useState(false);
 
   const activeFilterCount = [
     filters.covered,
@@ -163,12 +186,14 @@ const DesktopSpotList = ({
     filters.secure,
     filters.adaAccessible,
     filters.vehicleSize !== null,
+    (filters.evChargerTypes?.length || 0) > 0,
   ].filter(Boolean).length;
 
   const clearAllFilters = () => {
     onFiltersChange({
       covered: false,
       evCharging: false,
+      evChargerTypes: [],
       secure: false,
       adaAccessible: false,
       vehicleSize: null,
@@ -179,6 +204,12 @@ const DesktopSpotList = ({
   const filteredSpots = spots.filter((spot) => {
     if (filters.covered && !spot.amenities?.includes('Covered')) return false;
     if (filters.evCharging && !spot.amenities?.includes('EV Charging')) return false;
+    // Filter by specific EV charger types if any are selected
+    if (filters.evChargerTypes?.length > 0) {
+      if (!spot.evChargerType || !filters.evChargerTypes.includes(spot.evChargerType)) {
+        return false;
+      }
+    }
     if (filters.secure && !spot.amenities?.includes('Secure')) return false;
     if (filters.adaAccessible && !spot.amenities?.includes('ADA Accessible')) return false;
     if (filters.vehicleSize && spot.sizeConstraints && !spot.sizeConstraints.includes(filters.vehicleSize)) return false;
@@ -273,6 +304,78 @@ const DesktopSpotList = ({
             <Zap className="h-3.5 w-3.5" />
             EV Charging
           </button>
+          
+          {/* EV Charger Type Selector - Show when EV Charging is enabled */}
+          {filters.evCharging && (
+            <Popover open={chargerPopoverOpen} onOpenChange={setChargerPopoverOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  onMouseDown={e => e.preventDefault()}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors touch-scroll-safe',
+                    filters.evChargerTypes?.length > 0
+                      ? 'bg-green-600 text-white'
+                      : 'bg-muted active:bg-muted/80 text-foreground'
+                  )}
+                >
+                  <BoltIcon className="h-3.5 w-3.5" />
+                  {filters.evChargerTypes?.length > 0 
+                    ? `${filters.evChargerTypes.length} type${filters.evChargerTypes.length > 1 ? 's' : ''}`
+                    : 'Charger Type'
+                  }
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-3" align="start">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Select charger types</p>
+                  <p className="text-xs text-muted-foreground mb-3">Choose which connectors work for your vehicle</p>
+                  <div className="space-y-1.5">
+                    {evChargerTypes.map((charger) => {
+                      const isSelected = filters.evChargerTypes?.includes(charger.id);
+                      return (
+                        <button
+                          key={charger.id}
+                          type="button"
+                          onClick={() => toggleChargerType(charger.id)}
+                          className={cn(
+                            'w-full flex items-center gap-3 p-2 rounded-lg border transition-all text-left',
+                            isSelected
+                              ? 'border-primary bg-primary/5'
+                              : 'border-transparent hover:bg-muted'
+                          )}
+                        >
+                          <div className="flex-shrink-0 w-7 h-7 flex items-center justify-center">
+                            <img 
+                              src={charger.iconPath} 
+                              alt={charger.name}
+                              className="w-6 h-6"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={cn(
+                              'font-medium text-sm',
+                              isSelected ? 'text-primary' : 'text-foreground'
+                            )}>
+                              {charger.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {charger.chargingSpeed}
+                            </p>
+                          </div>
+                          {isSelected && (
+                            <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+          
           <button
             type="button"
             onClick={() => toggleFilter('secure')}

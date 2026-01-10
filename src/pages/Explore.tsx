@@ -169,6 +169,7 @@ const Explore = () => {
   const [filters, setFilters] = useState<SpotFilters>({
     covered: false,
     evCharging: false,
+    evChargerTypes: [],
     secure: false,
     adaAccessible: false,
     vehicleSize: null,
@@ -268,6 +269,12 @@ const Explore = () => {
     // Set EV filter state from URL
     if (evParam === 'true' && chargerTypeParam) {
       setEvChargerType(chargerTypeParam);
+      // Also set in the filters for UI sync
+      setFilters(prev => ({
+        ...prev,
+        evCharging: true,
+        evChargerTypes: [chargerTypeParam],
+      }));
     }
 
     // Parse times first
@@ -758,6 +765,12 @@ const Explore = () => {
     return parkingSpots.filter((spot) => {
       if (filters.covered && !spot.amenities?.includes('Covered')) return false;
       if (filters.evCharging && !spot.amenities?.includes('EV Charging')) return false;
+      // Filter by specific EV charger types if any are selected
+      if (filters.evChargerTypes?.length > 0) {
+        if (!spot.evChargerType || !filters.evChargerTypes.includes(spot.evChargerType)) {
+          return false;
+        }
+      }
       if (filters.secure && !spot.amenities?.includes('Secure')) return false;
       if (filters.adaAccessible && !spot.amenities?.includes('ADA Accessible')) return false;
       if (filters.vehicleSize && spot.sizeConstraints && !spot.sizeConstraints.includes(filters.vehicleSize)) return false;

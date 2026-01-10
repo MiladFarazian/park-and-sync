@@ -1,5 +1,5 @@
 import React from 'react';
-import { Umbrella, Zap, Shield, Accessibility, Car, X, SlidersHorizontal } from 'lucide-react';
+import { Umbrella, Zap, Shield, Accessibility, Car, X, SlidersHorizontal, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -17,6 +17,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { SpotFilters } from './DesktopSpotList';
+import { evChargerTypes } from '@/lib/evChargerTypes';
+import { cn } from '@/lib/utils';
 
 interface MobileFilterSheetProps {
   filters: SpotFilters;
@@ -40,8 +42,21 @@ const MobileFilterSheet = ({
 }: MobileFilterSheetProps) => {
   const [open, setOpen] = React.useState(false);
 
-  const toggleFilter = (key: keyof Omit<SpotFilters, 'vehicleSize'>) => {
-    onFiltersChange({ ...filters, [key]: !filters[key] });
+  const toggleFilter = (key: keyof Omit<SpotFilters, 'vehicleSize' | 'evChargerTypes'>) => {
+    const newFilters = { ...filters, [key]: !filters[key] };
+    // If turning off EV charging, clear charger types
+    if (key === 'evCharging' && filters.evCharging) {
+      newFilters.evChargerTypes = [];
+    }
+    onFiltersChange(newFilters);
+  };
+
+  const toggleChargerType = (chargerTypeId: string) => {
+    const currentTypes = filters.evChargerTypes || [];
+    const newTypes = currentTypes.includes(chargerTypeId)
+      ? currentTypes.filter(t => t !== chargerTypeId)
+      : [...currentTypes, chargerTypeId];
+    onFiltersChange({ ...filters, evChargerTypes: newTypes });
   };
 
   const setVehicleSize = (size: string | null) => {
@@ -54,12 +69,14 @@ const MobileFilterSheet = ({
     filters.secure,
     filters.adaAccessible,
     filters.vehicleSize !== null,
+    (filters.evChargerTypes?.length || 0) > 0,
   ].filter(Boolean).length;
 
   const clearAllFilters = () => {
     onFiltersChange({
       covered: false,
       evCharging: false,
+      evChargerTypes: [],
       secure: false,
       adaAccessible: false,
       vehicleSize: null,
@@ -85,7 +102,7 @@ const MobileFilterSheet = ({
           )}
         </button>
       </SheetTrigger>
-      <SheetContent side="bottom" className="rounded-t-2xl h-auto max-h-[70vh]">
+      <SheetContent side="bottom" className="rounded-t-2xl h-auto max-h-[85vh] overflow-y-auto">
         <SheetHeader className="pb-4">
           <div className="flex items-center justify-between">
             <SheetTitle>Filter Spots</SheetTitle>
@@ -161,6 +178,54 @@ const MobileFilterSheet = ({
               </button>
             </div>
           </div>
+
+          {/* EV Charger Type Selection - Show when EV Charging is enabled */}
+          {filters.evCharging && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-muted-foreground">Charger Type (optional)</h3>
+              <p className="text-xs text-muted-foreground">Select which charger types work for your vehicle</p>
+              <div className="grid gap-2">
+                {evChargerTypes.map((charger) => {
+                  const isSelected = filters.evChargerTypes?.includes(charger.id);
+                  return (
+                    <button
+                      key={charger.id}
+                      type="button"
+                      onClick={() => toggleChargerType(charger.id)}
+                      className={cn(
+                        'relative flex items-center gap-3 p-3 rounded-lg border transition-all text-left',
+                        isSelected
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border bg-background'
+                      )}
+                    >
+                      <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
+                        <img 
+                          src={charger.iconPath} 
+                          alt={charger.name}
+                          className="w-7 h-7"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={cn(
+                          'font-medium text-sm',
+                          isSelected ? 'text-primary' : 'text-foreground'
+                        )}>
+                          {charger.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {charger.chargingSpeed}
+                        </p>
+                      </div>
+                      {isSelected && (
+                        <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Vehicle Size Filter */}
           <div className="space-y-3">
