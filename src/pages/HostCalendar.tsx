@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, LayoutGrid, Clock, DollarSign, User, MapPin, Settings, List, MessageCircle, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, LayoutGrid, Clock, DollarSign, User, MapPin, Settings, List, MessageCircle, Star, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +33,8 @@ interface BookingForCalendar {
   total_amount: number;
   is_guest?: boolean;
   guest_full_name?: string | null;
+  will_use_ev_charging?: boolean | null;
+  ev_charging_fee?: number | null;
   renter?: {
     first_name: string | null;
     last_name: string | null;
@@ -509,7 +511,15 @@ const HostCalendar = () => {
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-lg font-bold text-primary">${Number(booking.total_amount).toFixed(2)}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-bold text-primary">${Number(booking.total_amount).toFixed(2)}</span>
+              {booking.will_use_ev_charging && (
+                <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-xs px-1.5 py-0.5">
+                  <Zap className="h-3 w-3 mr-0.5" />
+                  EV
+                </Badge>
+              )}
+            </div>
             <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
               <Button 
                 variant="outline" 

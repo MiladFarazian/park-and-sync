@@ -24,6 +24,8 @@ interface Spot {
   category?: string;
   address: string;
   hourlyRate: number;
+  evChargingPremium?: number;
+  hasEvCharging?: boolean;
   lat: number;
   lng: number;
   rating?: number;
@@ -428,8 +430,20 @@ const DesktopSpotList = ({
                           )}
                         </div>
                         <div className="text-right flex-shrink-0">
-                          <p className="font-bold text-lg">${spot.hourlyRate.toFixed(2)}</p>
-                          <p className="text-xs text-muted-foreground">per hour</p>
+                          {filters.evCharging && spot.hasEvCharging && (spot.evChargingPremium ?? 0) > 0 ? (
+                            <>
+                              <p className="font-bold text-lg">${(spot.hourlyRate + (spot.evChargingPremium ?? 0)).toFixed(2)}</p>
+                              <p className="text-xs text-muted-foreground flex items-center justify-end gap-0.5">
+                                <Zap className="h-3 w-3 text-green-600" />
+                                incl. charging
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="font-bold text-lg">${spot.hourlyRate.toFixed(2)}</p>
+                              <p className="text-xs text-muted-foreground">per hour</p>
+                            </>
+                          )}
                         </div>
                       </div>
 

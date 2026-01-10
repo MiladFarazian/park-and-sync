@@ -395,21 +395,51 @@ const BookingConfirmationContent = () => {
 
         {/* Booking Summary Card */}
         <Card className="p-6">
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
+          <h3 className="font-bold mb-4">Payment Details</h3>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground">Booking ID</span>
-              <span className="font-bold">{bookingNumber}</span>
+              <span className="font-medium">{bookingNumber}</span>
             </div>
             <Separator />
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground">Duration</span>
-              <span className="font-bold">{duration} hours</span>
+              <span className="font-medium">{duration} hours</span>
             </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Parking ({duration} hrs × ${(booking.hourly_rate || 0).toFixed(2)}/hr)</span>
+              <span className="font-medium">${booking.subtotal?.toFixed(2) || '0.00'}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Service fee</span>
+              <span className="font-medium">${booking.platform_fee?.toFixed(2) || '0.00'}</span>
+            </div>
+            {booking.will_use_ev_charging && (booking.ev_charging_fee ?? 0) > 0 && (
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <Zap className="h-3 w-3 text-green-600" />
+                  EV Charging
+                </span>
+                <span className="font-medium">${(booking.ev_charging_fee ?? 0).toFixed(2)}</span>
+              </div>
+            )}
+            {(booking.extension_charges ?? 0) > 0 && (
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Extensions</span>
+                <span className="font-medium">${(booking.extension_charges ?? 0).toFixed(2)}</span>
+              </div>
+            )}
             <Separator />
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Total Paid</span>
-              <span className="font-bold text-lg">${booking.total_amount.toFixed(2)}</span>
+            <div className="flex justify-between items-center text-lg">
+              <span className="font-bold">Total Paid</span>
+              <span className="font-bold text-primary">${booking.total_amount.toFixed(2)}</span>
             </div>
+            {booking.will_use_ev_charging && (
+              <div className="flex items-center gap-2 pt-2 text-sm text-green-700 dark:text-green-400">
+                <Zap className="h-4 w-4" />
+                <span>EV Charging included in this booking</span>
+              </div>
+            )}
           </div>
         </Card>
 

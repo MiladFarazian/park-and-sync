@@ -3,7 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Star, MapPin, Navigation, Footprints, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Star, MapPin, Navigation, Footprints, Pencil, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,6 +24,8 @@ interface Spot {
   category?: string;
   address: string;
   hourlyRate: number;
+  evChargingPremium?: number;
+  hasEvCharging?: boolean;
   lat: number;
   lng: number;
   rating?: number;
@@ -1341,7 +1343,17 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                             )}
                           </div>
                           <div className="text-right flex-shrink-0">
-                            <p className="font-bold text-primary text-lg">${spot.hourlyRate}/hr</p>
+                            {spot.hasEvCharging && (spot.evChargingPremium ?? 0) > 0 ? (
+                              <>
+                                <p className="font-bold text-primary text-lg">${(spot.hourlyRate + (spot.evChargingPremium ?? 0)).toFixed(2)}/hr</p>
+                                <p className="text-xs text-muted-foreground flex items-center justify-end gap-0.5">
+                                  <Zap className="h-3 w-3 text-green-600" />
+                                  w/ charging
+                                </p>
+                              </>
+                            ) : (
+                              <p className="font-bold text-primary text-lg">${spot.hourlyRate}/hr</p>
+                            )}
                           </div>
                         </div>
                         
