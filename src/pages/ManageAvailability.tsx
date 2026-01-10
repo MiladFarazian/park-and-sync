@@ -508,7 +508,7 @@ const ManageAvailability = () => {
       </div>
 
       {/* Fixed Bottom Save Button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t safe-area-inset-bottom">
+      <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-background border-t pb-safe">
         <Button 
           className="w-full" 
           size="lg"
