@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Heart, Share, Star, MapPin, Calendar, Navigation, MessageCircle, Phone, Camera, Clock, Shield, Zap, Loader2, Pencil, ChevronLeft, ChevronRight, Flag, BoltIcon, Accessibility, User, LogIn } from 'lucide-react';
+import { ArrowLeft, Heart, Share, Star, MapPin, Calendar, Navigation, MessageCircle, Phone, Camera, Clock, Shield, Zap, Loader2, Pencil, ChevronLeft, ChevronRight, Flag, BoltIcon, Accessibility, User, LogIn, Car, Truck } from 'lucide-react';
 import { EVChargerBadge } from '@/components/ev/EVChargerBadge';
 import { getChargerTypeById } from '@/lib/evChargerTypes';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import { useMode } from '@/contexts/ModeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { calculateDriverPrice } from '@/lib/pricing';
+import { vehicleSizes } from '@/lib/vehicleSizes';
 
 // Import the generated images
 import uscGarage from '@/assets/usc-garage.jpg';
@@ -901,6 +902,55 @@ const SpotDetail = () => {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Vehicle Sizes Section */}
+        <div>
+          <h2 className="text-xl font-semibold mb-3">Vehicle Size Compatibility</h2>
+          <div className="p-4 bg-muted/50 rounded-lg">
+            {spot.size_constraints && spot.size_constraints.length > 0 ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 mb-3">
+                  <Car className="h-5 w-5 text-primary" />
+                  <p className="font-medium">This spot accommodates:</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {spot.size_constraints.map((size: string) => {
+                    const sizeInfo = vehicleSizes.find(v => v.value === size);
+                    return sizeInfo ? (
+                      <TooltipProvider key={size}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge 
+                              variant="secondary" 
+                              className="cursor-help px-3 py-1.5 text-sm bg-primary/10 text-primary border-primary/20"
+                            >
+                              {size === 'compact' || size === 'midsize' ? (
+                                <Car className="h-3.5 w-3.5 mr-1.5" />
+                              ) : (
+                                <Truck className="h-3.5 w-3.5 mr-1.5" />
+                              )}
+                              {sizeInfo.shortLabel}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[250px] p-3">
+                            <p className="font-medium mb-1">{sizeInfo.label}</p>
+                            <p className="text-xs text-muted-foreground">{sizeInfo.description}</p>
+                            <p className="text-xs text-muted-foreground mt-1">e.g., {sizeInfo.examples}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Car className="h-5 w-5" />
+                <p>Size not specified - contact host for details</p>
+              </div>
+            )}
           </div>
         </div>
 
