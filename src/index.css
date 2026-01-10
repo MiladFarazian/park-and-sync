@@ -197,3 +197,25 @@ All colors MUST be HSL.
 .touch-action-pan-y {
   touch-action: pan-y;
 }
+
+/* Portrait orientation lock for mobile devices */
+@media screen and (orientation: landscape) and (max-width: 896px) {
+  html {
+    transform: rotate(-90deg);
+    transform-origin: left top;
+    width: 100vh;
+    height: 100vw;
+    overflow-x: hidden;
+    position: absolute;
+    top: 100%;
+    left: 0;
+  }
+}
+
+/* Prevent horizontal overflow on mobile */
+@media screen and (max-width: 896px) {
+  body {
+    width: 100vw;
+    overflow-x: hidden;
+  }
+}
