@@ -872,23 +872,8 @@ const ListSpot = () => {
           {/* Step 3: Amenities & Vehicle Size */}
           {currentStep === 3 && (
             <Card>
-              <CardContent className="p-6 space-y-6">
-                {/* Vehicle Size Section - Required */}
+              <CardContent className="p-4 sm:p-6 space-y-6">
                 <div>
-                  <h2 className="text-xl font-semibold mb-2">
-                    Vehicle Sizes <span className="text-destructive">*</span>
-                  </h2>
-                  <VehicleSizeSelector
-                    selectedSizes={selectedVehicleSizes}
-                    onSizesChange={(sizes) => {
-                      setSelectedVehicleSizes(sizes);
-                      setVehicleSizeError(sizes.length === 0 ? 'Please select at least one vehicle size' : '');
-                    }}
-                    error={vehicleSizeError}
-                  />
-                </div>
-
-                <div className="border-t pt-6">
                   <h2 className="text-xl font-semibold mb-2">Amenities</h2>
                   <p className="text-sm text-muted-foreground">
                     Select all amenities that apply to your spot
@@ -994,6 +979,21 @@ const ListSpot = () => {
                       onCheckedChange={setInstantBook}
                     />
                   </div>
+                </div>
+
+                {/* Vehicle Size Section - Required */}
+                <div className="border-t pt-6">
+                  <h2 className="text-xl font-semibold mb-2">
+                    Vehicle Sizes <span className="text-destructive">*</span>
+                  </h2>
+                  <VehicleSizeSelector
+                    selectedSizes={selectedVehicleSizes}
+                    onSizesChange={(sizes) => {
+                      setSelectedVehicleSizes(sizes);
+                      setVehicleSizeError(sizes.length === 0 ? 'Please select at least one vehicle size' : '');
+                    }}
+                    error={vehicleSizeError}
+                  />
                 </div>
 
                 <div className="flex gap-3">
