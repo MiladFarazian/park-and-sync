@@ -20,6 +20,8 @@ import { compressImage } from '@/lib/compressImage';
 import { EVChargerTypeSelector } from '@/components/ev/EVChargerTypeSelector';
 import { evChargerTypes } from '@/lib/evChargerTypes';
 import { useAuth } from '@/contexts/AuthContext';
+import VehicleSizeSelector from '@/components/spot/VehicleSizeSelector';
+import { vehicleSizes as vehicleSizeOptions } from '@/lib/vehicleSizes';
 
 const spotCategories = [
   'Residential Driveway',
@@ -88,6 +90,10 @@ const ListSpot = () => {
   const [evChargingInstructions, setEvChargingInstructions] = useState('');
   const [evChargingPremium, setEvChargingPremium] = useState('0');
   const [evChargerType, setEvChargerType] = useState<string | null>(null);
+  
+  // Vehicle Size state
+  const [selectedVehicleSizes, setSelectedVehicleSizes] = useState<string[]>([]);
+  const [vehicleSizeError, setVehicleSizeError] = useState<string>('');
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
@@ -378,6 +384,10 @@ const ListSpot = () => {
 
       // Create the spot with proper coordinates
       const hasEvCharging = selectedAmenities.includes('ev');
+      const sizeConstraintsValue = selectedVehicleSizes.length > 0 
+        ? selectedVehicleSizes 
+        : ['compact', 'midsize', 'suv', 'truck'];
+      
       const { data: spotData, error: spotError } = await supabase
         .from('spots')
         .insert({
@@ -397,7 +407,7 @@ const ListSpot = () => {
           is_secure: selectedAmenities.includes('security'),
           has_ev_charging: hasEvCharging,
           is_ada_accessible: selectedAmenities.includes('ada'),
-          size_constraints: ['compact', 'midsize'], // Default values
+          size_constraints: sizeConstraintsValue as any,
           ev_charging_instructions: hasEvCharging ? evChargingInstructions : null,
           ev_charging_premium_per_hour: hasEvCharging ? parseFloat(evChargingPremium) || 0 : 0,
           ev_charger_type: hasEvCharging ? evChargerType : null,
@@ -516,6 +526,10 @@ const ListSpot = () => {
              formData.parkingInstructions && formData.parkingInstructions.length >= 10;
     }
     if (currentStep === 3) {
+      // Require at least one vehicle size
+      if (selectedVehicleSizes.length === 0) {
+        return false;
+      }
       // If EV charging is selected, require charger type and premium
       if (selectedAmenities.includes('ev')) {
         return evChargerType && evChargingPremium && parseFloat(evChargingPremium) > 0;
@@ -855,11 +869,26 @@ const ListSpot = () => {
             </Card>
           )}
 
-          {/* Step 3: Amenities */}
+          {/* Step 3: Amenities & Vehicle Size */}
           {currentStep === 3 && (
             <Card>
               <CardContent className="p-6 space-y-6">
+                {/* Vehicle Size Section - Required */}
                 <div>
+                  <h2 className="text-xl font-semibold mb-2">
+                    Vehicle Sizes <span className="text-destructive">*</span>
+                  </h2>
+                  <VehicleSizeSelector
+                    selectedSizes={selectedVehicleSizes}
+                    onSizesChange={(sizes) => {
+                      setSelectedVehicleSizes(sizes);
+                      setVehicleSizeError(sizes.length === 0 ? 'Please select at least one vehicle size' : '');
+                    }}
+                    error={vehicleSizeError}
+                  />
+                </div>
+
+                <div className="border-t pt-6">
                   <h2 className="text-xl font-semibold mb-2">Amenities</h2>
                   <p className="text-sm text-muted-foreground">
                     Select all amenities that apply to your spot
@@ -979,7 +1008,15 @@ const ListSpot = () => {
                   <Button
                     type="button"
                     className="flex-1"
-                    onClick={() => setCurrentStep(4)}
+                    onClick={() => {
+                      if (selectedVehicleSizes.length === 0) {
+                        setVehicleSizeError('Please select at least one vehicle size');
+                        toast.error('Please select at least one vehicle size that can fit in your spot');
+                        return;
+                      }
+                      setCurrentStep(4);
+                    }}
+                    disabled={!canProceed()}
                   >
                     Next
                   </Button>
@@ -1259,6 +1296,26 @@ const ListSpot = () => {
                   <div className="p-4 rounded-lg bg-muted/50">
                     <h3 className="font-semibold text-sm mb-3">Parking Instructions</h3>
                     <p className="text-sm text-muted-foreground">{formData.parkingInstructions}</p>
+                  </div>
+
+                  <div className="p-4 rounded-lg bg-muted/50">
+                    <h3 className="font-semibold text-sm mb-3">Vehicle Sizes Accommodated</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedVehicleSizes.map((size) => {
+                        const sizeInfo = vehicleSizeOptions.find((s) => s.value === size);
+                        return (
+                          <span
+                            key={size}
+                            className="px-3 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-full"
+                          >
+                            {sizeInfo?.shortLabel || size}
+                          </span>
+                        );
+                      })}
+                      {selectedVehicleSizes.length === 0 && (
+                        <span className="text-sm text-muted-foreground">No sizes selected</span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="p-4 rounded-lg bg-muted/50">
