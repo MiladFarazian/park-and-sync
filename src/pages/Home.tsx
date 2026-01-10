@@ -274,6 +274,9 @@ const Home = () => {
             category: spot.category,
             address: spot.address,
             hourlyRate: parseFloat(spot.hourly_rate),
+            evChargingPremium: spot.ev_charging_premium_per_hour || 0,
+            hasEvCharging: spot.has_ev_charging,
+            evChargerType: spot.ev_charger_type,
             rating: spot.spot_rating || 0,
             reviews: spot.spot_review_count || 0,
             lat: parseFloat(spot.latitude),
@@ -312,81 +315,94 @@ const Home = () => {
     setIsUsingCurrentLocation(false);
   };
 
-  const SpotCard = ({ spot }: { spot: any }) => (
-    <Card
-      className="p-4 cursor-pointer transition-all hover:shadow-md"
-      onClick={() => navigate(`/spot/${spot.id}?from=home`)}
-    >
-      <div className="flex gap-3">
-        <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
-          {spot.imageUrl ? (
-            <img
-              src={spot.imageUrl}
-              alt={spot.title}
-              loading="lazy"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full bg-muted" />
-          )}
-        </div>
-
-        <div className="flex-1 space-y-2 min-w-0">
-          <div className="flex justify-between items-start gap-2">
-            <div className="flex-1">
-              {spot.category && (
-                <Badge variant="secondary" className="text-xs px-2 py-0.5 mb-1">
-                  {spot.category}
-                </Badge>
-              )}
-            </div>
-            <div className="text-right flex-shrink-0">
-              <p className="font-bold text-primary text-lg">${calculateDriverPrice(spot.hourlyRate).toFixed(2)}/hr</p>
-            </div>
+  const SpotCard = ({ spot, showEvPrice }: { spot: any; showEvPrice?: boolean }) => {
+    const basePrice = calculateDriverPrice(spot.hourlyRate);
+    const evPremium = spot.evChargingPremium || 0;
+    const showCombinedPrice = showEvPrice && spot.hasEvCharging && evPremium > 0;
+    const displayPrice = showCombinedPrice ? basePrice + evPremium : basePrice;
+    
+    return (
+      <Card
+        className="p-4 cursor-pointer transition-all hover:shadow-md"
+        onClick={() => navigate(`/spot/${spot.id}?from=home`)}
+      >
+        <div className="flex gap-3">
+          <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
+            {spot.imageUrl ? (
+              <img
+                src={spot.imageUrl}
+                alt={spot.title}
+                loading="lazy"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-muted" />
+            )}
           </div>
 
-          <div className="flex items-start gap-1 text-xs text-muted-foreground">
-            <MapPin className="h-3 w-3 flex-shrink-0 mt-0.5" />
-            <span className="leading-tight line-clamp-1">{spot.address}</span>
-          </div>
-
-          {spot.distanceMiles && (
-            <div className="flex items-center gap-3 text-sm">
-              <div className="flex items-center gap-1">
-                <MapPin className="h-3.5 w-3.5 text-primary" />
-                <span className="font-semibold text-foreground">{spot.distanceMiles.toFixed(1)} mi</span>
+          <div className="flex-1 space-y-2 min-w-0">
+            <div className="flex justify-between items-start gap-2">
+              <div className="flex-1">
+                {spot.category && (
+                  <Badge variant="secondary" className="text-xs px-2 py-0.5 mb-1">
+                    {spot.category}
+                  </Badge>
+                )}
               </div>
-              {spot.walkTime && (
+              <div className="text-right flex-shrink-0">
+                <p className="font-bold text-primary text-lg">${displayPrice.toFixed(2)}/hr</p>
+                {showCombinedPrice && (
+                  <p className="text-xs text-muted-foreground flex items-center justify-end gap-0.5">
+                    <Zap className="h-3 w-3 text-green-600" />
+                    incl. charging
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-start gap-1 text-xs text-muted-foreground">
+              <MapPin className="h-3 w-3 flex-shrink-0 mt-0.5" />
+              <span className="leading-tight line-clamp-1">{spot.address}</span>
+            </div>
+
+            {spot.distanceMiles && (
+              <div className="flex items-center gap-3 text-sm">
                 <div className="flex items-center gap-1">
-                  <Footprints className="h-3.5 w-3.5 text-primary" />
-                  <span className="font-semibold text-foreground">{spot.walkTime} min walk</span>
+                  <MapPin className="h-3.5 w-3.5 text-primary" />
+                  <span className="font-semibold text-foreground">{spot.distanceMiles.toFixed(1)} mi</span>
                 </div>
-              )}
-            </div>
-          )}
+                {spot.walkTime && (
+                  <div className="flex items-center gap-1">
+                    <Footprints className="h-3.5 w-3.5 text-primary" />
+                    <span className="font-semibold text-foreground">{spot.walkTime} min walk</span>
+                  </div>
+                )}
+              </div>
+            )}
 
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-              <span className="font-medium text-sm">{spot.rating}</span>
-              <span className="text-muted-foreground text-sm">({spot.reviews})</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                <span className="font-medium text-sm">{spot.rating}</span>
+                <span className="text-muted-foreground text-sm">({spot.reviews})</span>
+              </div>
             </div>
+
+            {spot.amenities && spot.amenities.length > 0 && (
+              <div className="flex gap-1 flex-wrap">
+                {spot.amenities.slice(0, 3).map((amenity: string, index: number) => (
+                  <Badge key={index} variant="outline" className="text-xs px-1.5 py-0.5">
+                    {amenity}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
-
-          {spot.amenities && spot.amenities.length > 0 && (
-            <div className="flex gap-1 flex-wrap">
-              {spot.amenities.slice(0, 3).map((amenity: string, index: number) => (
-                <Badge key={index} variant="outline" className="text-xs px-1.5 py-0.5">
-                  {amenity}
-                </Badge>
-              ))}
-            </div>
-          )}
         </div>
-      </div>
-    </Card>
-  );
+      </Card>
+    );
+  };
 
   const handleSearch = () => {
     if (!searchQuery.trim() && !isUsingCurrentLocation) {
@@ -668,7 +684,7 @@ const Home = () => {
           <div className="space-y-3">
             <h2 className="text-lg font-semibold">Nearby Spots</h2>
             {parkingSpots.map((spot) => (
-              <SpotCard key={spot.id} spot={spot} />
+              <SpotCard key={spot.id} spot={spot} showEvPrice={needsEvCharging} />
             ))}
           </div>
         )}

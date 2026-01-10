@@ -778,8 +778,20 @@ const SpotDetail = () => {
               </TooltipProvider>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-bold text-primary">${calculateDriverPrice(spot.hourlyRate).toFixed(2)}</p>
-              <p className="text-sm text-muted-foreground">per hour</p>
+              {spot.has_ev_charging && spot.ev_charging_premium_per_hour > 0 ? (
+                <>
+                  <p className="text-2xl font-bold text-primary">${(calculateDriverPrice(spot.hourlyRate) + spot.ev_charging_premium_per_hour).toFixed(2)}</p>
+                  <p className="text-sm text-muted-foreground flex items-center justify-end gap-0.5">
+                    <Zap className="h-3 w-3 text-green-600" />
+                    per hour incl. charging
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-2xl font-bold text-primary">${calculateDriverPrice(spot.hourlyRate).toFixed(2)}</p>
+                  <p className="text-sm text-muted-foreground">per hour</p>
+                </>
+              )}
             </div>
           </div>
           
@@ -1079,7 +1091,17 @@ const SpotDetail = () => {
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 z-10">
         <div className="max-w-md mx-auto flex items-center justify-between gap-4">
           <div>
-            <p className="text-lg font-bold">${calculateDriverPrice(spot.hourlyRate).toFixed(2)} / hour</p>
+            {spot.has_ev_charging && spot.ev_charging_premium_per_hour > 0 ? (
+              <>
+                <p className="text-lg font-bold">${(calculateDriverPrice(spot.hourlyRate) + spot.ev_charging_premium_per_hour).toFixed(2)} / hour</p>
+                <p className="text-xs text-muted-foreground flex items-center gap-0.5">
+                  <Zap className="h-3 w-3 text-green-600" />
+                  incl. EV charging
+                </p>
+              </>
+            ) : (
+              <p className="text-lg font-bold">${calculateDriverPrice(spot.hourlyRate).toFixed(2)} / hour</p>
+            )}
             <div className="flex items-center gap-1">
               <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
               <span className="text-sm font-medium">
