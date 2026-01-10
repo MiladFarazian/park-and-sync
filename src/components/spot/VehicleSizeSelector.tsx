@@ -39,11 +39,11 @@ const VehicleSizeSelector = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <p className="text-sm text-muted-foreground">
           Select all vehicle sizes that can fit in your parking spot
         </p>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <button
             type="button"
             onClick={selectAll}
@@ -71,7 +71,7 @@ const VehicleSizeSelector = ({
               type="button"
               onClick={() => toggleSize(size.value)}
               className={cn(
-                'relative flex items-start gap-4 p-4 rounded-xl border-2 transition-all text-left',
+                'relative flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border-2 transition-all text-left touch-scroll-safe',
                 isSelected
                   ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
                   : 'border-border bg-background hover:border-muted-foreground/30'
@@ -79,7 +79,7 @@ const VehicleSizeSelector = ({
             >
               <div
                 className={cn(
-                  'flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center transition-colors',
+                  'flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center transition-colors',
                   isSelected
                     ? 'bg-primary/10 text-primary'
                     : 'bg-muted text-muted-foreground'
@@ -88,29 +88,27 @@ const VehicleSizeSelector = ({
                 {sizeIcons[size.value]}
               </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p
-                    className={cn(
-                      'font-semibold',
-                      isSelected ? 'text-primary' : 'text-foreground'
-                    )}
-                  >
-                    {size.label}
-                  </p>
-                </div>
-                <p className="text-sm text-muted-foreground mt-0.5">
+              <div className="flex-1 min-w-0 pr-6">
+                <p
+                  className={cn(
+                    'font-semibold text-sm sm:text-base',
+                    isSelected ? 'text-primary' : 'text-foreground'
+                  )}
+                >
+                  {size.label}
+                </p>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 line-clamp-2">
                   {size.description}
                 </p>
-                <p className="text-xs text-muted-foreground/80 mt-1">
+                <p className="text-xs text-muted-foreground/80 mt-1 line-clamp-1">
                   e.g., {size.examples}
                 </p>
               </div>
 
               {isSelected && (
-                <div className="absolute top-3 right-3">
-                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                    <Check className="h-4 w-4 text-primary-foreground" />
+                <div className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3">
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-primary flex items-center justify-center">
+                    <Check className="h-3 w-3 sm:h-4 sm:w-4 text-primary-foreground" />
                   </div>
                 </div>
               )}
