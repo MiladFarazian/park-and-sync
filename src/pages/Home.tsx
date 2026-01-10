@@ -289,7 +289,8 @@ const Home = () => {
             amenities: [
               ...(spot.has_ev_charging ? ['EV Charging'] : []),
               ...(spot.is_covered ? ['Covered'] : []),
-              ...(spot.is_secure ? ['Secure'] : []),
+              ...(spot.is_secure ? ['Security Camera'] : []),
+              ...(spot.is_ada_accessible ? ['ADA Accessible'] : []),
             ],
             hostId: spot.host_id,
           };

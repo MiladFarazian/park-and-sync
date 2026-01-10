@@ -1,5 +1,5 @@
 import React from 'react';
-import { Umbrella, Zap, Shield, Accessibility, Car, X, SlidersHorizontal, Check } from 'lucide-react';
+import { Umbrella, Zap, Shield, Accessibility, Car, X, SlidersHorizontal, Check, Camera, Clock, Lightbulb, BoltIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -65,9 +65,13 @@ const MobileFilterSheet = ({
 
   const activeFilterCount = [
     filters.covered,
+    filters.securityCamera,
+    filters.twentyFourSevenAccess,
     filters.evCharging,
-    filters.secure,
+    filters.easyAccess,
+    filters.wellLit,
     filters.adaAccessible,
+    filters.instantBook,
     filters.vehicleSize !== null,
     (filters.evChargerTypes?.length || 0) > 0,
   ].filter(Boolean).length;
@@ -75,10 +79,14 @@ const MobileFilterSheet = ({
   const clearAllFilters = () => {
     onFiltersChange({
       covered: false,
+      securityCamera: false,
+      twentyFourSevenAccess: false,
       evCharging: false,
       evChargerTypes: [],
-      secure: false,
+      easyAccess: false,
+      wellLit: false,
       adaAccessible: false,
+      instantBook: false,
       vehicleSize: null,
     });
   };
@@ -142,6 +150,30 @@ const MobileFilterSheet = ({
               </button>
               <button
                 type="button"
+                onClick={() => toggleFilter('securityCamera')}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-colors ${
+                  filters.securityCamera
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-foreground'
+                }`}
+              >
+                <Camera className="h-4 w-4" />
+                Security Camera
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleFilter('twentyFourSevenAccess')}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-colors ${
+                  filters.twentyFourSevenAccess
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-foreground'
+                }`}
+              >
+                <Clock className="h-4 w-4" />
+                24/7 Access
+              </button>
+              <button
+                type="button"
                 onClick={() => toggleFilter('evCharging')}
                 className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-colors ${
                   filters.evCharging
@@ -154,15 +186,27 @@ const MobileFilterSheet = ({
               </button>
               <button
                 type="button"
-                onClick={() => toggleFilter('secure')}
+                onClick={() => toggleFilter('easyAccess')}
                 className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-colors ${
-                  filters.secure
+                  filters.easyAccess
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-foreground'
                 }`}
               >
-                <Shield className="h-4 w-4" />
-                Secure
+                <Car className="h-4 w-4" />
+                Easy Access
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleFilter('wellLit')}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-colors ${
+                  filters.wellLit
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-foreground'
+                }`}
+              >
+                <Lightbulb className="h-4 w-4" />
+                Well Lit
               </button>
               <button
                 type="button"
@@ -226,6 +270,25 @@ const MobileFilterSheet = ({
               </div>
             </div>
           )}
+
+          {/* Booking Options */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-muted-foreground">Booking Options</h3>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => toggleFilter('instantBook')}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-colors ${
+                  filters.instantBook
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-foreground'
+                }`}
+              >
+                <BoltIcon className="h-4 w-4" />
+                Instant Book
+              </button>
+            </div>
+          </div>
 
           {/* Vehicle Size Filter */}
           <div className="space-y-3">

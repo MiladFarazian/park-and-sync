@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Star, MapPin, Footprints, Umbrella, Zap, Shield, Car, X, BoltIcon, Clock, Accessibility, Check, ChevronDown } from 'lucide-react';
+import { Star, MapPin, Footprints, Umbrella, Zap, Shield, Car, X, BoltIcon, Clock, Accessibility, Check, ChevronDown, Camera, Lightbulb } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -50,10 +50,14 @@ interface Spot {
 
 export interface SpotFilters {
   covered: boolean;
+  securityCamera: boolean;
+  twentyFourSevenAccess: boolean;
   evCharging: boolean;
   evChargerTypes: string[];
-  secure: boolean;
+  easyAccess: boolean;
+  wellLit: boolean;
   adaAccessible: boolean;
+  instantBook: boolean;
   vehicleSize: string | null;
 }
 
@@ -182,9 +186,13 @@ const DesktopSpotList = ({
 
   const activeFilterCount = [
     filters.covered,
+    filters.securityCamera,
+    filters.twentyFourSevenAccess,
     filters.evCharging,
-    filters.secure,
+    filters.easyAccess,
+    filters.wellLit,
     filters.adaAccessible,
+    filters.instantBook,
     filters.vehicleSize !== null,
     (filters.evChargerTypes?.length || 0) > 0,
   ].filter(Boolean).length;
@@ -192,10 +200,14 @@ const DesktopSpotList = ({
   const clearAllFilters = () => {
     onFiltersChange({
       covered: false,
+      securityCamera: false,
+      twentyFourSevenAccess: false,
       evCharging: false,
       evChargerTypes: [],
-      secure: false,
+      easyAccess: false,
+      wellLit: false,
       adaAccessible: false,
+      instantBook: false,
       vehicleSize: null,
     });
   };
@@ -210,8 +222,12 @@ const DesktopSpotList = ({
         return false;
       }
     }
-    if (filters.secure && !spot.amenities?.includes('Secure')) return false;
+    if (filters.securityCamera && !spot.amenities?.includes('Security Camera')) return false;
+    if (filters.twentyFourSevenAccess && !spot.amenities?.includes('24/7 Access')) return false;
+    if (filters.easyAccess && !spot.amenities?.includes('Easy Access')) return false;
+    if (filters.wellLit && !spot.amenities?.includes('Well Lit')) return false;
     if (filters.adaAccessible && !spot.amenities?.includes('ADA Accessible')) return false;
+    if (filters.instantBook && !spot.instantBook) return false;
     if (filters.vehicleSize && spot.sizeConstraints && !spot.sizeConstraints.includes(filters.vehicleSize)) return false;
     return true;
   });
@@ -378,16 +394,55 @@ const DesktopSpotList = ({
           
           <button
             type="button"
-            onClick={() => toggleFilter('secure')}
+            onClick={() => toggleFilter('securityCamera')}
             onMouseDown={e => e.preventDefault()}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors touch-scroll-safe ${
-              filters.secure
+              filters.securityCamera
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-muted active:bg-muted/80 text-foreground'
             }`}
           >
-            <Shield className="h-3.5 w-3.5" />
-            Secure
+            <Camera className="h-3.5 w-3.5" />
+            Security Camera
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleFilter('twentyFourSevenAccess')}
+            onMouseDown={e => e.preventDefault()}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors touch-scroll-safe ${
+              filters.twentyFourSevenAccess
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted active:bg-muted/80 text-foreground'
+            }`}
+          >
+            <Clock className="h-3.5 w-3.5" />
+            24/7 Access
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleFilter('easyAccess')}
+            onMouseDown={e => e.preventDefault()}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors touch-scroll-safe ${
+              filters.easyAccess
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted active:bg-muted/80 text-foreground'
+            }`}
+          >
+            <Car className="h-3.5 w-3.5" />
+            Easy Access
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleFilter('wellLit')}
+            onMouseDown={e => e.preventDefault()}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors touch-scroll-safe ${
+              filters.wellLit
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted active:bg-muted/80 text-foreground'
+            }`}
+          >
+            <Lightbulb className="h-3.5 w-3.5" />
+            Well Lit
           </button>
           <button
             type="button"
@@ -401,6 +456,19 @@ const DesktopSpotList = ({
           >
             <Accessibility className="h-3.5 w-3.5" />
             ADA Accessible
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleFilter('instantBook')}
+            onMouseDown={e => e.preventDefault()}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors touch-scroll-safe ${
+              filters.instantBook
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted active:bg-muted/80 text-foreground'
+            }`}
+          >
+            <BoltIcon className="h-3.5 w-3.5" />
+            Instant Book
           </button>
           
           {/* Vehicle Size Dropdown */}
