@@ -40,8 +40,7 @@ import EditSpotAvailability from "./pages/EditSpotAvailability";
 import EditSpot from "./pages/EditSpot";
 import Reviews from "./pages/Reviews";
 import AdminDashboard from "./pages/AdminDashboard";
-import ManageAvailabilitySelect from "./pages/ManageAvailabilitySelect";
-import BulkAvailabilityEditor from "./pages/BulkAvailabilityEditor";
+import ManageAvailability from "./pages/ManageAvailability";
 import SupportHome from "./pages/SupportHome";
 import SupportMessages from "./pages/SupportMessages";
 import SupportReservations from "./pages/SupportReservations";
@@ -117,8 +116,7 @@ const App = () => {
                     <Route path="/dashboard" element={<RequireHostMode><Dashboard /></RequireHostMode>} />
                     <Route path="/host-home" element={<RequireHostMode><HostHome /></RequireHostMode>} />
                     <Route path="/host-calendar" element={<RequireHostMode><HostCalendar /></RequireHostMode>} />
-                    <Route path="/manage-availability" element={<RequireHostMode><ManageAvailabilitySelect /></RequireHostMode>} />
-                    <Route path="/manage-availability/bulk" element={<RequireHostMode><BulkAvailabilityEditor /></RequireHostMode>} />
+                    <Route path="/manage-availability" element={<RequireHostMode><ManageAvailability /></RequireHostMode>} />
                     <Route path="/messages" element={<Messages />} />
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/reviews" element={<Reviews />} />
