@@ -3,6 +3,7 @@ import { Star, MapPin, Footprints, Umbrella, Zap, Shield, Car, X, BoltIcon, Cloc
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { EVChargerBadge } from '@/components/ev/EVChargerBadge';
 import {
   Select,
   SelectContent,
@@ -26,6 +27,7 @@ interface Spot {
   hourlyRate: number;
   evChargingPremium?: number;
   hasEvCharging?: boolean;
+  evChargerType?: string;
   lat: number;
   lng: number;
   rating?: number;
@@ -447,20 +449,23 @@ const DesktopSpotList = ({
                         </div>
                       </div>
 
-                      {/* Rating */}
-                      <div className="flex items-center gap-1 mb-1">
+                      {/* Rating & EV Charger Badge */}
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         {spot.rating !== undefined && spot.rating > 0 ? (
-                          <>
+                          <div className="flex items-center gap-1">
                             <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
                             <span className="text-sm font-medium">{spot.rating.toFixed(1)}</span>
                             {spot.reviews !== undefined && (
                               <span className="text-sm text-muted-foreground">({spot.reviews})</span>
                             )}
-                          </>
+                          </div>
                         ) : (
                           <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
                             New
                           </Badge>
+                        )}
+                        {spot.hasEvCharging && spot.evChargerType && (
+                          <EVChargerBadge chargerType={spot.evChargerType} size="sm" />
                         )}
                       </div>
 
