@@ -48,7 +48,17 @@ interface CalendarOverride {
   spot_id: string;
   override_date: string;
   is_available: boolean;
+  start_time?: string | null;
+  end_time?: string | null;
   custom_rate?: number;
+}
+
+interface AvailabilityRule {
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  is_available: boolean | null;
+  custom_rate: number | null;
 }
 
 type ViewMode = 'month' | 'week' | 'reservations';
@@ -68,6 +78,7 @@ const HostCalendar = () => {
   const [bookings, setBookings] = useState<BookingForCalendar[]>([]);
   const [allBookings, setAllBookings] = useState<any[]>([]);
   const [overrides, setOverrides] = useState<CalendarOverride[]>([]);
+  const [availabilityRules, setAvailabilityRules] = useState<AvailabilityRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [reservationsLoading, setReservationsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -175,15 +186,25 @@ const HostCalendar = () => {
       if (!isAllSpots) {
         const { data: overridesData, error: overridesError } = await supabase
           .from('calendar_overrides')
-          .select('id, spot_id, override_date, is_available, custom_rate')
+          .select('id, spot_id, override_date, is_available, start_time, end_time, custom_rate')
           .eq('spot_id', selectedSpotId)
           .gte('override_date', format(rangeStart, 'yyyy-MM-dd'))
           .lte('override_date', format(rangeEnd, 'yyyy-MM-dd'));
 
         if (overridesError) throw overridesError;
         setOverrides(overridesData || []);
+
+        // Fetch availability rules for the spot
+        const { data: rulesData, error: rulesError } = await supabase
+          .from('availability_rules')
+          .select('day_of_week, start_time, end_time, is_available, custom_rate')
+          .eq('spot_id', selectedSpotId);
+
+        if (rulesError) throw rulesError;
+        setAvailabilityRules(rulesData || []);
       } else {
         setOverrides([]);
+        setAvailabilityRules([]);
       }
 
     } catch (error) {
@@ -293,11 +314,21 @@ const HostCalendar = () => {
   // Get data for a specific date (for the selected spot)
   const selectedSpot = spots.find(s => s.id === selectedSpotId);
   const isAllSpotsView = selectedSpotId === 'all';
+
+  // Helper to format time from HH:MM:SS to readable format
+  const formatTimeDisplay = (time: string): string => {
+    const [hours, minutes] = time.split(':');
+    const h = parseInt(hours);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
+  };
   
   const getDateData = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const today = startOfDay(new Date());
     const isPast = isBefore(date, today);
+    const dayOfWeek = getDay(date);
     
     // Get bookings for this date
     const dateBookings = bookings.filter(b => {
@@ -307,7 +338,11 @@ const HostCalendar = () => {
 
     // Get overrides for this date (only for single spot view)
     const dateOverrides = overrides.filter(o => o.override_date === dateStr);
+    const override = dateOverrides[0];
     const hasUnavailable = dateOverrides.some(o => !o.is_available);
+    
+    // Get weekly rule for this day
+    const dayRule = availabilityRules.find(r => r.day_of_week === dayOfWeek);
     
     // Calculate rate to show (only for single spot view, null for "all spots")
     let displayRate: number | null = null;
@@ -315,6 +350,31 @@ const HostCalendar = () => {
       displayRate = selectedSpot.hourly_rate;
       const customRate = dateOverrides.find(o => o.custom_rate)?.custom_rate;
       if (customRate) displayRate = customRate;
+      else if (dayRule?.custom_rate) displayRate = dayRule.custom_rate;
+    }
+
+    // Determine available hours display
+    let availableHours: string | null = null;
+    if (!isAllSpotsView) {
+      if (override) {
+        // Date override takes precedence
+        if (!override.is_available) {
+          availableHours = 'Blocked';
+        } else if (override.start_time && override.end_time) {
+          availableHours = `${formatTimeDisplay(override.start_time)} - ${formatTimeDisplay(override.end_time)}`;
+        } else {
+          availableHours = 'Available all day';
+        }
+      } else if (dayRule) {
+        // Fall back to weekly rule
+        if (dayRule.is_available === false) {
+          availableHours = 'Blocked (recurring)';
+        } else {
+          availableHours = `${formatTimeDisplay(dayRule.start_time)} - ${formatTimeDisplay(dayRule.end_time)} (recurring)`;
+        }
+      } else {
+        availableHours = 'No schedule set';
+      }
     }
 
     return {
@@ -323,7 +383,8 @@ const HostCalendar = () => {
       isUnavailable: hasUnavailable,
       rate: displayRate,
       isPast,
-      hasBookings: dateBookings.length > 0
+      hasBookings: dateBookings.length > 0,
+      availableHours
     };
   };
 
@@ -892,6 +953,34 @@ const HostCalendar = () => {
           
           {selectedDate && selectedDateData && (
             <div className="py-4 space-y-6 overflow-y-auto max-h-[calc(85vh-100px)]">
+              {/* Availability Status */}
+              {!isAllSpotsView && selectedDateData.availableHours && (
+                <Card className={cn(
+                  "p-4",
+                  selectedDateData.isUnavailable 
+                    ? "bg-destructive/10 border-destructive/30" 
+                    : "bg-green-500/10 border-green-500/30"
+                )}>
+                  <div className="flex items-center gap-3">
+                    <Clock className={cn(
+                      "h-5 w-5",
+                      selectedDateData.isUnavailable ? "text-destructive" : "text-green-600"
+                    )} />
+                    <div>
+                      <div className="font-semibold">
+                        {selectedDateData.isUnavailable ? 'Unavailable' : 'Available Hours'}
+                      </div>
+                      <div className={cn(
+                        "text-sm",
+                        selectedDateData.isUnavailable ? "text-destructive" : "text-green-600"
+                      )}>
+                        {selectedDateData.availableHours}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
               {/* Quick Stats */}
               <div className={cn("grid gap-3", isAllSpotsView ? "grid-cols-1" : "grid-cols-2")}>
                 {!isAllSpotsView && (
