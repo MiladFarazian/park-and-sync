@@ -358,10 +358,7 @@ const Profile = () => {
   const handleStripeConnect = async () => {
     setIsLoadingStripe(true);
     try {
-      const {
-        data,
-        error
-      } = await supabase.functions.invoke('create-stripe-connect-link');
+      const { data, error } = await supabase.functions.invoke('create-stripe-connect-link');
       if (error) throw error;
 
       const url: string | undefined = data?.url;
@@ -369,41 +366,25 @@ const Profile = () => {
         throw new Error('No Stripe onboarding URL returned');
       }
 
-      // Check if running as PWA/standalone mode
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-        (window.navigator as any).standalone === true;
-
-      if (isStandalone) {
-        // iOS standalone apps are restrictive about leaving the app
-        // Try opening in Safari; if blocked, offer Share/Copy fallback
-        const opened = window.open(url, '_blank', 'noopener,noreferrer');
-
-        if (!opened) {
-          try {
-            const nav: any = window.navigator;
-            if (nav?.share) {
-              await nav.share({ url, title: 'Complete Stripe setup' });
-            } else if (nav?.clipboard?.writeText) {
-              await nav.clipboard.writeText(url);
-              toast.info('Stripe link copied — open Safari and paste it to continue.');
-              return;
-            }
-          } catch {
-            // Share cancelled or failed, try clipboard
-            if ((navigator as any)?.clipboard?.writeText) {
-              await (navigator as any).clipboard.writeText(url);
-              toast.info('Stripe link copied — open Safari and paste it to continue.');
-              return;
-            }
-          }
-        }
-
-        toast.info('Finish Stripe setup in Safari, then return here.');
-        return;
+      // Open Stripe in new tab/external browser
+      // Using window.open with _blank works across all contexts:
+      // - Desktop: Opens new tab
+      // - Mobile web: Opens in default browser
+      // - PWA: Opens externally in Safari/Chrome
+      const opened = window.open(url, '_blank', 'noopener,noreferrer');
+      
+      if (!opened) {
+        // Fallback: try anchor element click for better mobile support
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       }
 
-      // Regular browser: direct redirect
-      window.location.href = url;
+      toast.info('Complete Stripe setup in the new window, then return here.');
     } catch (error: any) {
       toast.error('Failed to connect Stripe: ' + error.message);
     } finally {

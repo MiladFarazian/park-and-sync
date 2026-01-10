@@ -579,40 +579,28 @@ const ListSpot = () => {
         throw new Error('No Stripe onboarding URL returned');
       }
 
-      // Check if running as PWA/standalone mode
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-        (window.navigator as any).standalone === true;
-
-      // iOS standalone apps are very restrictive about leaving the app.
-      // Best-effort approach: try opening a new Safari tab; if blocked, offer Share/Copy.
-      if (isStandalone) {
-        const opened = window.open(url, '_blank', 'noopener,noreferrer');
-
-        if (!opened) {
-          try {
-            const nav: any = window.navigator;
-            if (nav?.share) {
-              // Lets the user choose Safari explicitly from the share sheet.
-              await nav.share({ url, title: 'Complete Stripe setup' });
-            } else if (nav?.clipboard?.writeText) {
-              await nav.clipboard.writeText(url);
-              toast.info('Stripe link copied — open Safari and paste it to continue.');
-              return;
-            }
-          } catch {
-            // ignore
-          }
-        }
-
-        toast.info('Finish Stripe setup in Safari, then return here and tap "I\'ve completed Stripe setup".');
-        return;
+      // Open Stripe in new tab/external browser
+      // Using window.open with _blank works across all contexts:
+      // - Desktop: Opens new tab
+      // - Mobile web: Opens in default browser
+      // - PWA: Opens externally in Safari/Chrome
+      const opened = window.open(url, '_blank', 'noopener,noreferrer');
+      
+      if (!opened) {
+        // Fallback: try anchor element click for better mobile support
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       }
 
-      // Regular browser: direct redirect
-      window.location.href = url;
+      toast.info('Complete Stripe setup in the new window, then return here and tap "I\'ve completed Stripe setup".');
     } catch (error) {
       console.error('Error creating Stripe connect link:', error);
-      toast.error('Failed to start Stripe setup');
+      toast.error('Failed to start Stripe setup. Please try again.');
     } finally {
       setIsConnectingStripe(false);
     }
