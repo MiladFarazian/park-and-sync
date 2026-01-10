@@ -779,13 +779,19 @@ const SpotDetail = () => {
             </div>
             <div className="text-right">
               {spot.has_ev_charging && spot.ev_charging_premium_per_hour > 0 ? (
-                <>
-                  <p className="text-2xl font-bold text-primary">${(calculateDriverPrice(spot.hourlyRate) + spot.ev_charging_premium_per_hour).toFixed(2)}</p>
-                  <p className="text-sm text-muted-foreground flex items-center justify-end gap-0.5">
-                    <Zap className="h-3 w-3 text-green-600" />
-                    per hour incl. charging
-                  </p>
-                </>
+                <div className="flex items-baseline gap-3 justify-end">
+                  <div className="text-muted-foreground">
+                    <p className="text-lg font-semibold">${calculateDriverPrice(spot.hourlyRate).toFixed(2)}</p>
+                    <p className="text-xs">parking only</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-primary">${(calculateDriverPrice(spot.hourlyRate) + spot.ev_charging_premium_per_hour).toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground flex items-center justify-end gap-0.5">
+                      <Zap className="h-3 w-3 text-green-600" />
+                      w/ charging
+                    </p>
+                  </div>
+                </div>
               ) : (
                 <>
                   <p className="text-2xl font-bold text-primary">${calculateDriverPrice(spot.hourlyRate).toFixed(2)}</p>
