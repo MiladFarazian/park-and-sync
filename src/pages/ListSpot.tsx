@@ -579,25 +579,19 @@ const ListSpot = () => {
         throw new Error('No Stripe onboarding URL returned');
       }
 
-      // Open Stripe in new tab/external browser
-      // Using window.open with _blank works across all contexts:
-      // - Desktop: Opens new tab
-      // - Mobile web: Opens in default browser
-      // - PWA: Opens externally in Safari/Chrome
-      const opened = window.open(url, '_blank', 'noopener,noreferrer');
+      // Import dynamically to avoid circular dependencies
+      const { navigateToStripe, isStandaloneMode } = await import('@/lib/stripeSetupFlow');
       
-      if (!opened) {
-        // Fallback: try anchor element click for better mobile support
-        const link = document.createElement('a');
-        link.href = url;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
+      // Navigate to Stripe with proper PWA handling
+      navigateToStripe(url, {
+        returnRoute: '/list-spot',
+        context: 'list_spot',
+      });
 
-      toast.info('Complete Stripe setup in the new window, then return here and tap "I\'ve completed Stripe setup".');
+      // Only show toast if not in standalone mode (they'll be redirected)
+      if (!isStandaloneMode()) {
+        toast.info('Complete Stripe setup in the new window, then return here and tap "I\'ve completed Stripe setup".');
+      }
     } catch (error) {
       console.error('Error creating Stripe connect link:', error);
       toast.error('Failed to start Stripe setup. Please try again.');

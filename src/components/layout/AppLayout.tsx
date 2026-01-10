@@ -8,6 +8,7 @@ import ModeLoadingOverlay from './ModeLoadingOverlay';
 import NotificationPermissionBanner from './NotificationPermissionBanner';
 import { NotificationBell } from './NotificationBell';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useStripeReturnFlow } from '@/hooks/useStripeReturnFlow';
 import { useMode } from '@/contexts/ModeContext';
 import { useSupportRole } from '@/hooks/useSupportRole';
 import { Shield } from 'lucide-react';
@@ -32,6 +33,9 @@ const AppLayout = ({ children }: AppLayoutProps) => {
     location.pathname === '/host-calendar';
   // Initialize notifications hook to set up realtime listeners
   useNotifications();
+  
+  // Handle return from Stripe setup in PWA/standalone mode
+  useStripeReturnFlow();
   
   const handleLogoClick = () => {
     if (isSupport) {
