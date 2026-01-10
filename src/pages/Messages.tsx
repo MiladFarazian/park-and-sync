@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Search, Send, Loader2, ArrowLeft, Paperclip, X, Check, CheckCheck, PenSquare, User } from 'lucide-react';
 import { useMessages, Message } from '@/contexts/MessagesContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMode } from '@/contexts/ModeContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -496,6 +497,7 @@ interface BookingContact {
 
 const MessagesContent = () => {
   const { user } = useAuth();
+  const { mode } = useMode();
   const [searchParams, setSearchParams] = useSearchParams();
   const { conversations, loading, markAsRead } = useMessages();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
@@ -577,52 +579,52 @@ const MessagesContent = () => {
     if (!user?.id) return;
     setLoadingContacts(true);
     try {
-      // Get bookings where user is renter (to message hosts)
-      const { data: renterBookings } = await supabase
-        .from('bookings')
-        .select(`
-          spot_id,
-          start_at,
-          spots!inner(title, host_id)
-        `)
-        .eq('renter_id', user.id)
-        .in('status', ['paid', 'active', 'completed']);
-
-      // Get bookings where user is host (to message renters)
-      const { data: hostBookings } = await supabase
-        .from('bookings')
-        .select(`
-          renter_id,
-          start_at,
-          spots!inner(title, host_id)
-        `)
-        .eq('spots.host_id', user.id)
-        .in('status', ['paid', 'active', 'completed']);
-
       const contactUserIds = new Set<string>();
       const contactsMap = new Map<string, { spot_title: string; booking_date: string }>();
 
-      // Add hosts from renter bookings
-      renterBookings?.forEach((b: any) => {
-        const hostId = b.spots?.host_id;
-        if (hostId && hostId !== user.id) {
-          contactUserIds.add(hostId);
-          if (!contactsMap.has(hostId)) {
-            contactsMap.set(hostId, { spot_title: b.spots?.title || 'Parking Spot', booking_date: b.start_at });
-          }
-        }
-      });
+      if (mode === 'driver') {
+        // Driver mode: get hosts of spots user has booked
+        const { data: renterBookings } = await supabase
+          .from('bookings')
+          .select(`
+            spot_id,
+            start_at,
+            spots!inner(title, host_id)
+          `)
+          .eq('renter_id', user.id)
+          .in('status', ['paid', 'active', 'completed']);
 
-      // Add renters from host bookings
-      hostBookings?.forEach((b: any) => {
-        const renterId = b.renter_id;
-        if (renterId && renterId !== user.id) {
-          contactUserIds.add(renterId);
-          if (!contactsMap.has(renterId)) {
-            contactsMap.set(renterId, { spot_title: b.spots?.title || 'Parking Spot', booking_date: b.start_at });
+        renterBookings?.forEach((b: any) => {
+          const hostId = b.spots?.host_id;
+          if (hostId && hostId !== user.id) {
+            contactUserIds.add(hostId);
+            if (!contactsMap.has(hostId)) {
+              contactsMap.set(hostId, { spot_title: b.spots?.title || 'Parking Spot', booking_date: b.start_at });
+            }
           }
-        }
-      });
+        });
+      } else {
+        // Host mode: get renters who have booked user's spots
+        const { data: hostBookings } = await supabase
+          .from('bookings')
+          .select(`
+            renter_id,
+            start_at,
+            spots!inner(title, host_id)
+          `)
+          .eq('spots.host_id', user.id)
+          .in('status', ['paid', 'active', 'completed']);
+
+        hostBookings?.forEach((b: any) => {
+          const renterId = b.renter_id;
+          if (renterId && renterId !== user.id) {
+            contactUserIds.add(renterId);
+            if (!contactsMap.has(renterId)) {
+              contactsMap.set(renterId, { spot_title: b.spots?.title || 'Parking Spot', booking_date: b.start_at });
+            }
+          }
+        });
+      }
 
       if (contactUserIds.size === 0) {
         setBookingContacts([]);
