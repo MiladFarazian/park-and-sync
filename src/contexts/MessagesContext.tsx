@@ -13,6 +13,9 @@ export interface BookingContext {
   status: string;
 }
 
+// All bookings between two users
+export type BookingsByPartner = Map<string, BookingContext[]>;
+
 export interface Conversation {
   id: string;
   user_id: string;
@@ -25,8 +28,8 @@ export interface Conversation {
   is_guest_conversation?: boolean;
   booking_id?: string;
   guest_name?: string;
-  // Booking context - most recent relevant booking
-  booking_context?: BookingContext;
+  // All bookings with this partner (sorted by start_at desc)
+  bookings?: BookingContext[];
   // User role in this conversation
   partner_role?: 'host' | 'driver';
 }
@@ -91,18 +94,18 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const lastModeRef = useRef<string>(mode);
 
   // Track mode-relevant user IDs and booking context (hosts when driver, renters when host)
-  const relevantUserIdsRef = useRef<{ ids: Set<string>; bookingsByPartner: Map<string, BookingContext> }>({ ids: new Set(), bookingsByPartner: new Map() });
+  const relevantUserIdsRef = useRef<{ ids: Set<string>; bookingsByPartner: BookingsByPartner }>({ ids: new Set(), bookingsByPartner: new Map() });
 
-  // Fetch relevant user IDs and their booking context based on mode
+  // Fetch relevant user IDs and ALL their bookings based on mode
   const fetchRelevantUserIds = useCallback(async (): Promise<{
     ids: Set<string>;
-    bookingsByPartner: Map<string, BookingContext>;
+    bookingsByPartner: BookingsByPartner;
   }> => {
     if (!user) return { ids: new Set(), bookingsByPartner: new Map() };
 
     try {
       const relevantIds = new Set<string>();
-      const bookingsByPartner = new Map<string, BookingContext>();
+      const bookingsByPartner: BookingsByPartner = new Map();
 
       if (mode === 'driver') {
         // Driver mode: get hosts of spots user has booked
@@ -123,20 +126,20 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           const hostId = b.spots?.host_id;
           if (hostId) {
             relevantIds.add(hostId);
-            // Keep the most recent booking for each host
+            // Collect ALL bookings for each host
             if (!bookingsByPartner.has(hostId)) {
-              bookingsByPartner.set(hostId, {
-                id: b.id,
-                spot_title: b.spots.title,
-                spot_address: b.spots.address,
-                start_at: b.start_at,
-                end_at: b.end_at,
-                status: b.status,
-              });
+              bookingsByPartner.set(hostId, []);
             }
+            bookingsByPartner.get(hostId)!.push({
+              id: b.id,
+              spot_title: b.spots.title,
+              spot_address: b.spots.address,
+              start_at: b.start_at,
+              end_at: b.end_at,
+              status: b.status,
+            });
           }
         });
-      } else {
         // Host mode: get renters who have booked user's spots
         const { data: hostSpots } = await supabase
           .from('spots')
@@ -157,19 +160,20 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           bookings?.forEach(b => {
             if (b.renter_id) {
               relevantIds.add(b.renter_id);
-              // Keep the most recent booking for each renter
+              // Collect ALL bookings for each renter
               if (!bookingsByPartner.has(b.renter_id)) {
-                const spot = spotMap.get(b.spot_id);
-                if (spot) {
-                  bookingsByPartner.set(b.renter_id, {
-                    id: b.id,
-                    spot_title: spot.title,
-                    spot_address: spot.address,
-                    start_at: b.start_at,
-                    end_at: b.end_at,
-                    status: b.status,
-                  });
-                }
+                bookingsByPartner.set(b.renter_id, []);
+              }
+              const spot = spotMap.get(b.spot_id);
+              if (spot) {
+                bookingsByPartner.get(b.renter_id)!.push({
+                  id: b.id,
+                  spot_title: spot.title,
+                  spot_address: spot.address,
+                  start_at: b.start_at,
+                  end_at: b.end_at,
+                  status: b.status,
+                });
               }
             }
           });
@@ -270,7 +274,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     allMessages: any[], 
     profiles: any[], 
     guestConvs: Conversation[] = [], 
-    relevantData: { ids: Set<string>; bookingsByPartner: Map<string, BookingContext> }
+    relevantData: { ids: Set<string>; bookingsByPartner: BookingsByPartner }
   ): Promise<Conversation[]> => {
     if (!user) return [];
     
@@ -326,8 +330,8 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )[0];
       
-      // Get booking context for this partner
-      const bookingContext = bookingsByPartner.get(partnerId);
+      // Get all bookings for this partner
+      const partnerBookings = bookingsByPartner.get(partnerId) || [];
       
       convs.push({
         id: partnerId,
@@ -337,7 +341,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         last_message: getMessagePreview(lastMsg, user.id, profileName),
         last_message_at: conv.last_message_at,
         unread_count: conv.unread_count,
-        booking_context: bookingContext,
+        bookings: partnerBookings,
         partner_role: mode === 'driver' ? 'host' : 'driver',
       });
     }
@@ -502,7 +506,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     const { bookingsByPartner } = relevantUserIdsRef.current;
-    const bookingContext = bookingsByPartner.get(partnerId);
+    const partnerBookings = bookingsByPartner.get(partnerId) || [];
 
     setConversations(prev => {
       const existing = prev.find(c => c.user_id === partnerId);
@@ -521,7 +525,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         last_message: isNewer ? getMessagePreview(msg, user.id, existing?.name) : (existing?.last_message || getMessagePreview(msg, user.id, existing?.name)),
         last_message_at: isNewer ? msg.created_at : (existing ? existing.last_message_at : msg.created_at),
         unread_count: unread,
-        booking_context: existing?.booking_context || bookingContext,
+        bookings: existing?.bookings || partnerBookings,
         partner_role: existing?.partner_role,
       };
 

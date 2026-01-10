@@ -125,7 +125,7 @@ function ChatPane({
   displayAvatar,
   messagesCacheRef,
   markAsRead,
-  bookingContext,
+  bookings,
   partnerRole,
 }: {
   conversationId: string;
@@ -135,7 +135,7 @@ function ChatPane({
   displayAvatar?: string;
   messagesCacheRef: React.MutableRefObject<Map<string, Message[]>>;
   markAsRead: (otherUserId: string) => Promise<void> | void;
-  bookingContext?: BookingContext;
+  bookings?: BookingContext[];
   partnerRole?: 'host' | 'driver';
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -145,7 +145,10 @@ function ChatPane({
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [showNewMessageButton, setShowNewMessageButton] = useState(false);
-
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(
+    bookings && bookings.length > 0 ? bookings[0].id : null
+  );
+  
   // Typing indicator
   const { isPartnerTyping, broadcastTyping, broadcastStoppedTyping } = useTypingIndicator(conversationId, userId);
   const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -385,9 +388,11 @@ function ChatPane({
       </div>
       
       {/* Booking Context Header */}
-      {bookingContext && (
+      {bookings && bookings.length > 0 && (
         <BookingContextHeader 
-          booking={bookingContext} 
+          bookings={bookings}
+          selectedBookingId={selectedBookingId}
+          onSelectBooking={setSelectedBookingId}
           partnerName={displayName}
           partnerRole={partnerRole}
         />
@@ -831,14 +836,17 @@ const MessagesContent = () => {
                           {formatDistanceToNow(new Date(conversation.last_message_at), { addSuffix: true })}
                         </span>
                       </div>
-                      {/* Booking context subtitle */}
-                      {conversation.booking_context && (
+                      {/* Booking context subtitle - show most recent booking */}
+                      {conversation.bookings && conversation.bookings.length > 0 && (
                         <div className="flex items-center gap-1 text-xs text-muted-foreground mb-0.5">
                           <MapPin className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{getStreetAddress(conversation.booking_context.spot_address)}</span>
+                          <span className="truncate">{getStreetAddress(conversation.bookings[0].spot_address)}</span>
                           <span className="shrink-0">•</span>
                           <Calendar className="h-3 w-3 shrink-0" />
-                          <span className="shrink-0">{format(new Date(conversation.booking_context.start_at), 'MMM d')}</span>
+                          <span className="shrink-0">{format(new Date(conversation.bookings[0].start_at), 'MMM d')}</span>
+                          {conversation.bookings.length > 1 && (
+                            <span className="shrink-0 text-muted-foreground/70">+{conversation.bookings.length - 1}</span>
+                          )}
                         </div>
                       )}
                       <p className={`text-sm truncate ${conversation.unread_count > 0 ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
@@ -879,7 +887,7 @@ const MessagesContent = () => {
               displayAvatar={displayAvatar}
               messagesCacheRef={messagesCacheRef}
               markAsRead={markAsRead}
-              bookingContext={selectedConvData?.booking_context}
+              bookings={selectedConvData?.bookings}
               partnerRole={selectedConvData?.partner_role}
             />
           )
