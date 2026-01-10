@@ -2,6 +2,17 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMode } from '@/contexts/ModeContext';
+
+// Booking context for conversations
+export interface BookingContext {
+  id: string;
+  spot_title: string;
+  spot_address: string;
+  start_at: string;
+  end_at: string;
+  status: string;
+}
+
 export interface Conversation {
   id: string;
   user_id: string;
@@ -14,6 +25,10 @@ export interface Conversation {
   is_guest_conversation?: boolean;
   booking_id?: string;
   guest_name?: string;
+  // Booking context - most recent relevant booking
+  booking_context?: BookingContext;
+  // User role in this conversation
+  partner_role?: 'host' | 'driver';
 }
 
 export interface Message {
@@ -27,6 +42,7 @@ export interface Message {
   media_url: string | null;
   media_type: string | null;
   client_id?: string | null;
+  booking_id?: string | null;
 }
 
 export interface MessagesContextType {
@@ -74,49 +90,87 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const lastDataHashRef = useRef<string>('');
   const lastModeRef = useRef<string>(mode);
 
-  // Track mode-relevant user IDs (hosts when driver, renters when host)
-  const relevantUserIdsRef = useRef<Set<string>>(new Set());
+  // Track mode-relevant user IDs and booking context (hosts when driver, renters when host)
+  const relevantUserIdsRef = useRef<{ ids: Set<string>; bookingsByPartner: Map<string, BookingContext> }>({ ids: new Set(), bookingsByPartner: new Map() });
 
-  // Fetch relevant user IDs based on mode
-  const fetchRelevantUserIds = useCallback(async (): Promise<Set<string>> => {
-    if (!user) return new Set();
+  // Fetch relevant user IDs and their booking context based on mode
+  const fetchRelevantUserIds = useCallback(async (): Promise<{
+    ids: Set<string>;
+    bookingsByPartner: Map<string, BookingContext>;
+  }> => {
+    if (!user) return { ids: new Set(), bookingsByPartner: new Map() };
 
     try {
       const relevantIds = new Set<string>();
+      const bookingsByPartner = new Map<string, BookingContext>();
 
       if (mode === 'driver') {
         // Driver mode: get hosts of spots user has booked
         const { data: bookings } = await supabase
           .from('bookings')
           .select(`
-            spots!inner(host_id)
+            id,
+            start_at,
+            end_at,
+            status,
+            spots!inner(host_id, title, address)
           `)
           .eq('renter_id', user.id)
-          .in('status', ['paid', 'active', 'completed', 'pending']);
+          .in('status', ['paid', 'active', 'completed', 'pending'])
+          .order('start_at', { ascending: false });
 
         bookings?.forEach((b: any) => {
-          if (b.spots?.host_id) {
-            relevantIds.add(b.spots.host_id);
+          const hostId = b.spots?.host_id;
+          if (hostId) {
+            relevantIds.add(hostId);
+            // Keep the most recent booking for each host
+            if (!bookingsByPartner.has(hostId)) {
+              bookingsByPartner.set(hostId, {
+                id: b.id,
+                spot_title: b.spots.title,
+                spot_address: b.spots.address,
+                start_at: b.start_at,
+                end_at: b.end_at,
+                status: b.status,
+              });
+            }
           }
         });
       } else {
         // Host mode: get renters who have booked user's spots
         const { data: hostSpots } = await supabase
           .from('spots')
-          .select('id')
+          .select('id, title, address')
           .eq('host_id', user.id);
 
         if (hostSpots && hostSpots.length > 0) {
           const spotIds = hostSpots.map(s => s.id);
+          const spotMap = new Map(hostSpots.map(s => [s.id, s]));
+          
           const { data: bookings } = await supabase
             .from('bookings')
-            .select('renter_id')
+            .select('id, renter_id, spot_id, start_at, end_at, status')
             .in('spot_id', spotIds)
-            .in('status', ['paid', 'active', 'completed', 'pending']);
+            .in('status', ['paid', 'active', 'completed', 'pending'])
+            .order('start_at', { ascending: false });
 
           bookings?.forEach(b => {
             if (b.renter_id) {
               relevantIds.add(b.renter_id);
+              // Keep the most recent booking for each renter
+              if (!bookingsByPartner.has(b.renter_id)) {
+                const spot = spotMap.get(b.spot_id);
+                if (spot) {
+                  bookingsByPartner.set(b.renter_id, {
+                    id: b.id,
+                    spot_title: spot.title,
+                    spot_address: spot.address,
+                    start_at: b.start_at,
+                    end_at: b.end_at,
+                    status: b.status,
+                  });
+                }
+              }
             }
           });
         }
@@ -125,10 +179,10 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       // Always include support user
       relevantIds.add('00000000-0000-0000-0000-000000000001');
 
-      return relevantIds;
+      return { ids: relevantIds, bookingsByPartner };
     } catch (error) {
       console.error('Error fetching relevant user IDs:', error);
-      return new Set();
+      return { ids: new Set(), bookingsByPartner: new Map() };
     }
   }, [user, mode]);
 
@@ -212,10 +266,16 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [user]);
 
   // Build conversations from messages (shared logic)
-  const buildConversations = useCallback(async (allMessages: any[], profiles: any[], guestConvs: Conversation[] = [], relevantIds: Set<string>): Promise<Conversation[]> => {
+  const buildConversations = useCallback(async (
+    allMessages: any[], 
+    profiles: any[], 
+    guestConvs: Conversation[] = [], 
+    relevantData: { ids: Set<string>; bookingsByPartner: Map<string, BookingContext> }
+  ): Promise<Conversation[]> => {
     if (!user) return [];
     
     const conversationMap = new Map<string, any>();
+    const { ids: relevantIds, bookingsByPartner } = relevantData;
     
     for (const msg of allMessages || []) {
       const partnerId = msg.sender_id === user.id ? msg.recipient_id : msg.sender_id;
@@ -266,6 +326,9 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )[0];
       
+      // Get booking context for this partner
+      const bookingContext = bookingsByPartner.get(partnerId);
+      
       convs.push({
         id: partnerId,
         user_id: partnerId,
@@ -273,7 +336,9 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         avatar_url: profileAvatar,
         last_message: getMessagePreview(lastMsg, user.id, profileName),
         last_message_at: conv.last_message_at,
-        unread_count: conv.unread_count
+        unread_count: conv.unread_count,
+        booking_context: bookingContext,
+        partner_role: mode === 'driver' ? 'host' : 'driver',
       });
     }
 
@@ -293,7 +358,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!user || !mountedRef.current) return;
 
     try {
-      const [messagesResult, guestConvs, relevantIds] = await Promise.all([
+      const [messagesResult, guestConvs, relevantData] = await Promise.all([
         supabase
           .from('messages')
           .select('*')
@@ -306,8 +371,8 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const { data: allMessages, error } = messagesResult;
       if (error || !mountedRef.current) return;
 
-      // Store relevantIds for use in upsertConversationFromMessage
-      relevantUserIdsRef.current = relevantIds;
+      // Store relevantData for use in upsertConversationFromMessage
+      relevantUserIdsRef.current = relevantData;
 
       const partnerIds = [...new Set((allMessages || []).map(m => 
         m.sender_id === user.id ? m.recipient_id : m.sender_id
@@ -322,7 +387,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         profiles = data || [];
       }
 
-      const newConvs = await buildConversations(allMessages || [], profiles, guestConvs, relevantIds);
+      const newConvs = await buildConversations(allMessages || [], profiles, guestConvs, relevantData);
       
       setConversations(prev => {
         const newHash = hashConversations(newConvs);
@@ -347,7 +412,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
       lastModeRef.current = mode;
       
-      const [messagesResult, guestConvs, relevantIds] = await Promise.all([
+      const [messagesResult, guestConvs, relevantData] = await Promise.all([
         supabase
           .from('messages')
           .select('*')
@@ -361,8 +426,8 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (error) throw error;
       if (!mountedRef.current) return;
 
-      // Store relevantIds for use in upsertConversationFromMessage
-      relevantUserIdsRef.current = relevantIds;
+      // Store relevantData for use in upsertConversationFromMessage
+      relevantUserIdsRef.current = relevantData;
 
       const partnerIds = [...new Set((allMessages || []).map(m => 
         m.sender_id === user.id ? m.recipient_id : m.sender_id
@@ -377,7 +442,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         profiles = data || [];
       }
 
-      const convs = await buildConversations(allMessages || [], profiles, guestConvs, relevantIds);
+      const convs = await buildConversations(allMessages || [], profiles, guestConvs, relevantData);
       lastDataHashRef.current = hashConversations(convs);
       
       if (mountedRef.current) {
@@ -431,9 +496,13 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const partnerId = msg.sender_id === user.id ? msg.recipient_id : msg.sender_id;
 
     // Filter by relevant IDs - don't add conversations that don't match current mode
-    if (relevantUserIdsRef.current.size > 0 && !relevantUserIdsRef.current.has(partnerId)) {
+    const { ids: relevantIds } = relevantUserIdsRef.current;
+    if (relevantIds.size > 0 && !relevantIds.has(partnerId)) {
       return;
     }
+
+    const { bookingsByPartner } = relevantUserIdsRef.current;
+    const bookingContext = bookingsByPartner.get(partnerId);
 
     setConversations(prev => {
       const existing = prev.find(c => c.user_id === partnerId);
@@ -452,6 +521,8 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         last_message: isNewer ? getMessagePreview(msg, user.id, existing?.name) : (existing?.last_message || getMessagePreview(msg, user.id, existing?.name)),
         last_message_at: isNewer ? msg.created_at : (existing ? existing.last_message_at : msg.created_at),
         unread_count: unread,
+        booking_context: existing?.booking_context || bookingContext,
+        partner_role: existing?.partner_role,
       };
 
       const others = prev.filter(c => c.user_id !== partnerId);

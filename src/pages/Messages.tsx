@@ -5,18 +5,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, Send, Loader2, ArrowLeft, Paperclip, X, Check, CheckCheck, PenSquare, User } from 'lucide-react';
-import { useMessages, Message } from '@/contexts/MessagesContext';
+import { Search, Send, Loader2, ArrowLeft, Paperclip, X, Check, CheckCheck, PenSquare, User, MapPin, Calendar } from 'lucide-react';
+import { useMessages, Message, BookingContext } from '@/contexts/MessagesContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMode } from '@/contexts/ModeContext';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import { sendMessage as sendMessageLib } from '@/lib/sendMessage';
 import { compressImage } from '@/lib/compressImage';
+import { getStreetAddress } from '@/lib/addressUtils';
 import { Virtuoso } from 'react-virtuoso';
 import {
   Dialog,
@@ -33,6 +34,7 @@ import {
 import RequireAuth from '@/components/auth/RequireAuth';
 import RequireVerifiedAuth from '@/components/auth/RequireVerifiedAuth';
 import GuestChatPaneHost from '@/components/guest/GuestChatPaneHost';
+import BookingContextHeader from '@/components/messages/BookingContextHeader';
 
 // Helper to format display name (First Name + Last Initial)
 const formatDisplayName = (firstName?: string | null, lastName?: string | null): string => {
@@ -123,6 +125,8 @@ function ChatPane({
   displayAvatar,
   messagesCacheRef,
   markAsRead,
+  bookingContext,
+  partnerRole,
 }: {
   conversationId: string;
   userId: string;
@@ -131,6 +135,8 @@ function ChatPane({
   displayAvatar?: string;
   messagesCacheRef: React.MutableRefObject<Map<string, Message[]>>;
   markAsRead: (otherUserId: string) => Promise<void> | void;
+  bookingContext?: BookingContext;
+  partnerRole?: 'host' | 'driver';
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -354,6 +360,11 @@ function ChatPane({
                   Support
                 </span>
               )}
+              {partnerRole && (
+                <Badge variant="outline" className="text-xs">
+                  {partnerRole === 'host' ? 'Host' : 'Driver'}
+                </Badge>
+              )}
             </p>
             <p className="text-sm text-muted-foreground">
               {isPartnerTyping ? (
@@ -372,6 +383,16 @@ function ChatPane({
           </div>
         </div>
       </div>
+      
+      {/* Booking Context Header */}
+      {bookingContext && (
+        <BookingContextHeader 
+          booking={bookingContext} 
+          partnerName={displayName}
+          partnerRole={partnerRole}
+        />
+      )}
+      
       <div className="flex-1 overflow-y-auto">
         {(loadingMessages && !(messagesCacheRef.current.get(conversationId)?.length)) ? (
           <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -792,7 +813,7 @@ const MessagesContent = () => {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center justify-between mb-0.5">
                         <div className="flex items-center gap-2">
                           <p className={`font-semibold text-sm truncate ${conversation.unread_count > 0 ? 'text-foreground' : ''}`}>
                             {conversation.name}
@@ -800,11 +821,26 @@ const MessagesContent = () => {
                           {conversation.is_guest_conversation && (
                             <Badge variant="outline" className="text-xs shrink-0">Guest</Badge>
                           )}
+                          {conversation.partner_role && !conversation.is_guest_conversation && (
+                            <Badge variant="secondary" className="text-xs shrink-0">
+                              {conversation.partner_role === 'host' ? 'Host' : 'Driver'}
+                            </Badge>
+                          )}
                         </div>
                         <span className={`text-xs shrink-0 ${conversation.unread_count > 0 ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
                           {formatDistanceToNow(new Date(conversation.last_message_at), { addSuffix: true })}
                         </span>
                       </div>
+                      {/* Booking context subtitle */}
+                      {conversation.booking_context && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mb-0.5">
+                          <MapPin className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{getStreetAddress(conversation.booking_context.spot_address)}</span>
+                          <span className="shrink-0">•</span>
+                          <Calendar className="h-3 w-3 shrink-0" />
+                          <span className="shrink-0">{format(new Date(conversation.booking_context.start_at), 'MMM d')}</span>
+                        </div>
+                      )}
                       <p className={`text-sm truncate ${conversation.unread_count > 0 ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
                         {conversation.last_message}
                       </p>
@@ -843,6 +879,8 @@ const MessagesContent = () => {
               displayAvatar={displayAvatar}
               messagesCacheRef={messagesCacheRef}
               markAsRead={markAsRead}
+              bookingContext={selectedConvData?.booking_context}
+              partnerRole={selectedConvData?.partner_role}
             />
           )
         ) : (
