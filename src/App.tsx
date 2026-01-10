@@ -52,10 +52,14 @@ import { ModeProvider } from "./contexts/ModeContext";
 import { MessagesProvider } from "./contexts/MessagesContext";
 import { SupportRedirect } from "./components/auth/SupportRedirect";
 import RequireHostMode from "./components/auth/RequireHostMode";
+import { useOrientationLock } from "./hooks/useOrientationLock";
 
 const queryClient = new QueryClient();
 
 const App = () => {
+  // Lock orientation to portrait on mobile devices
+  useOrientationLock();
+
   // Environment verification for debugging cross-build issues
   useEffect(() => {
     console.log('[ENV] VITE_SUPABASE_URL =', import.meta.env.VITE_SUPABASE_URL);
