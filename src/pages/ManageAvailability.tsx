@@ -294,7 +294,7 @@ const ManageAvailability = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <div className="min-h-screen bg-background pb-24">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-3">
@@ -505,27 +505,24 @@ const ManageAvailability = () => {
               </div>
             )}
           </Card>
-        </section>
-      </div>
 
-      {/* Fixed Bottom Save Button */}
-      <div className="fixed bottom-20 left-0 right-0 z-50 p-4 bg-background border-t"
-           style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
-        <Button 
-          className="w-full" 
-          size="lg"
-          disabled={selectedSpots.length === 0 || isSaving}
-          onClick={handleSave}
-        >
-          {isSaving ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              Saving...
-            </>
-          ) : (
-            `Save Changes for ${selectedSpots.length} Spot${selectedSpots.length !== 1 ? 's' : ''}`
-          )}
-        </Button>
+          {/* Save Button - inline after Set Availability */}
+          <Button 
+            className="w-full mt-4" 
+            size="lg"
+            disabled={selectedSpots.length === 0 || isSaving}
+            onClick={handleSave}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Saving...
+              </>
+            ) : (
+              `Save Changes for ${selectedSpots.length} Spot${selectedSpots.length !== 1 ? 's' : ''}`
+            )}
+          </Button>
+        </section>
       </div>
 
       {/* Mobile Time Pickers for Custom Hours */}
