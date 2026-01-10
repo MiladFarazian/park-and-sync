@@ -12,8 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { format, parseISO, getDay } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { TimePicker } from '@/components/ui/time-picker';
-
+import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 interface Spot {
   id: string;
   title: string;
@@ -69,6 +68,10 @@ const ManageAvailability = () => {
     d.setHours(17, 0, 0, 0);
     return d;
   });
+  
+  // Time picker state
+  const [startTimePickerOpen, setStartTimePickerOpen] = useState(false);
+  const [endTimePickerOpen, setEndTimePickerOpen] = useState(false);
   
   // Existing availability data per spot
   const [spotAvailability, setSpotAvailability] = useState<Record<string, {
@@ -475,27 +478,25 @@ const ManageAvailability = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Start Time</Label>
-                    <TimePicker 
-                      date={customStartTime} 
-                      setDate={setCustomStartTime}
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => setStartTimePickerOpen(true)}
                     >
-                      <Button variant="outline" className="w-full justify-start">
-                        <Clock className="h-4 w-4 mr-2" />
-                        {format(customStartTime, 'h:mm a')}
-                      </Button>
-                    </TimePicker>
+                      <Clock className="h-4 w-4 mr-2" />
+                      {format(customStartTime, 'h:mm a')}
+                    </Button>
                   </div>
                   <div className="space-y-2">
                     <Label>End Time</Label>
-                    <TimePicker 
-                      date={customEndTime} 
-                      setDate={setCustomEndTime}
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => setEndTimePickerOpen(true)}
                     >
-                      <Button variant="outline" className="w-full justify-start">
-                        <Clock className="h-4 w-4 mr-2" />
-                        {format(customEndTime, 'h:mm a')}
-                      </Button>
-                    </TimePicker>
+                      <Clock className="h-4 w-4 mr-2" />
+                      {format(customEndTime, 'h:mm a')}
+                    </Button>
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground">
@@ -508,7 +509,8 @@ const ManageAvailability = () => {
       </div>
 
       {/* Fixed Bottom Save Button */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-background border-t pb-safe">
+      <div className="fixed bottom-20 left-0 right-0 z-50 p-4 bg-background border-t"
+           style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
         <Button 
           className="w-full" 
           size="lg"
@@ -525,6 +527,30 @@ const ManageAvailability = () => {
           )}
         </Button>
       </div>
+
+      {/* Mobile Time Pickers for Custom Hours */}
+      <MobileTimePicker
+        isOpen={startTimePickerOpen}
+        onClose={() => setStartTimePickerOpen(false)}
+        onConfirm={(date) => {
+          setCustomStartTime(date);
+          setStartTimePickerOpen(false);
+        }}
+        mode="start"
+        initialValue={customStartTime}
+      />
+      
+      <MobileTimePicker
+        isOpen={endTimePickerOpen}
+        onClose={() => setEndTimePickerOpen(false)}
+        onConfirm={(date) => {
+          setCustomEndTime(date);
+          setEndTimePickerOpen(false);
+        }}
+        mode="end"
+        startTime={customStartTime}
+        initialValue={customEndTime}
+      />
     </div>
   );
 };
