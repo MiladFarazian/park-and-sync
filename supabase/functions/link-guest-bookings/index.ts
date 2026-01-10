@@ -202,12 +202,6 @@ serve(async (req) => {
 
     // Reuse the service role client for privileged database operations
     const supabase = supabaseClient;
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Reuse the service role client for privileged database operations
-    const supabase = supabaseClient;
 
     if (!user_id) {
       return new Response(
