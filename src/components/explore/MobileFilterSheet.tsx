@@ -1,5 +1,5 @@
 import React from 'react';
-import { Umbrella, Zap, Shield, Accessibility, Car, X, SlidersHorizontal, Check, Camera, Clock, Lightbulb, BoltIcon } from 'lucide-react';
+import { Umbrella, Zap, Shield, Accessibility, Car, X, SlidersHorizontal, Check, Camera, Clock, Lightbulb, BoltIcon, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import type { SpotFilters } from './DesktopSpotList';
 import { evChargerTypes } from '@/lib/evChargerTypes';
+import { vehicleSizes } from '@/lib/vehicleSizes';
 import { cn } from '@/lib/utils';
 
 interface MobileFilterSheetProps {
@@ -27,12 +28,7 @@ interface MobileFilterSheetProps {
   filteredCount: number;
 }
 
-const vehicleSizes = [
-  { value: 'compact', label: 'Compact' },
-  { value: 'midsize', label: 'Midsize' },
-  { value: 'suv', label: 'SUV' },
-  { value: 'truck', label: 'Truck' },
-];
+// Use the imported vehicleSizes from lib
 
 const MobileFilterSheet = ({
   filters,

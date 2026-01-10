@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Star, MapPin, Footprints, Umbrella, Zap, Shield, Car, X, BoltIcon, Clock, Accessibility, Check, ChevronDown, Camera, Lightbulb } from 'lucide-react';
+import { Star, MapPin, Footprints, Umbrella, Zap, Shield, Car, X, BoltIcon, Clock, Accessibility, Check, ChevronDown, Camera, Lightbulb, Truck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { EVChargerBadge } from '@/components/ev/EVChargerBadge';
 import { evChargerTypes } from '@/lib/evChargerTypes';
+import { vehicleSizes, getVehicleSizeShortLabel } from '@/lib/vehicleSizes';
 import { cn } from '@/lib/utils';
 import {
   Select,
@@ -125,12 +126,7 @@ const calculateWalkTime = (distanceMiles: number): number => {
   return Math.round((distanceMiles / 3) * 60);
 };
 
-const vehicleSizes = [
-  { value: 'compact', label: 'Compact' },
-  { value: 'midsize', label: 'Midsize' },
-  { value: 'suv', label: 'SUV' },
-  { value: 'truck', label: 'Truck' },
-];
+// Use the imported vehicleSizes from lib
 
 const DesktopSpotList = ({
   spots,
