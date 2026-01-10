@@ -220,6 +220,8 @@ serve(async (req) => {
         hourly_rate,
         daily_rate,
         has_ev_charging,
+        ev_charger_type,
+        ev_charging_premium_per_hour,
         is_covered,
         is_secure,
         is_ada_accessible,
