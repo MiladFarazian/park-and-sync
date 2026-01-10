@@ -168,10 +168,14 @@ const Explore = () => {
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null);
   const [filters, setFilters] = useState<SpotFilters>({
     covered: false,
+    securityCamera: false,
+    twentyFourSevenAccess: false,
     evCharging: false,
     evChargerTypes: [],
-    secure: false,
+    easyAccess: false,
+    wellLit: false,
     adaAccessible: false,
+    instantBook: false,
     vehicleSize: null,
   });
   
@@ -656,7 +660,13 @@ const Explore = () => {
         lng: parseFloat(spot.longitude),
         imageUrl: spot.primary_photo_url,
         distance: spot.distance ? `${(spot.distance / 1000).toFixed(1)} km` : undefined,
-        amenities: [...(spot.has_ev_charging ? ['EV Charging'] : []), ...(spot.is_covered ? ['Covered'] : []), ...(spot.is_secure ? ['Secure'] : []), ...(spot.is_ada_accessible ? ['ADA Accessible'] : [])],
+        amenities: [
+          ...(spot.has_ev_charging ? ['EV Charging'] : []), 
+          ...(spot.is_covered ? ['Covered'] : []), 
+          ...(spot.is_secure ? ['Security Camera'] : []), 
+          ...(spot.is_ada_accessible ? ['ADA Accessible'] : []),
+          // Note: 24/7 Access, Easy Access, Well Lit are not stored in DB yet
+        ],
         hostId: spot.host_id,
         sizeConstraints: spot.size_constraints || [],
         userBooking: null, // Not available in lite endpoint
@@ -771,8 +781,12 @@ const Explore = () => {
           return false;
         }
       }
-      if (filters.secure && !spot.amenities?.includes('Secure')) return false;
+      if (filters.securityCamera && !spot.amenities?.includes('Security Camera')) return false;
+      if (filters.twentyFourSevenAccess && !spot.amenities?.includes('24/7 Access')) return false;
+      if (filters.easyAccess && !spot.amenities?.includes('Easy Access')) return false;
+      if (filters.wellLit && !spot.amenities?.includes('Well Lit')) return false;
       if (filters.adaAccessible && !spot.amenities?.includes('ADA Accessible')) return false;
+      if (filters.instantBook && !spot.instantBook) return false;
       if (filters.vehicleSize && spot.sizeConstraints && !spot.sizeConstraints.includes(filters.vehicleSize)) return false;
       return true;
     });
