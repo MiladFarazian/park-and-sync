@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-
+import { useMode } from '@/contexts/ModeContext';
 export interface Conversation {
   id: string;
   user_id: string;
@@ -65,12 +65,72 @@ const getMessagePreview = (msg: Message, currentUserId: string, senderName?: str
 
 export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  const { mode } = useMode();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const mountedRef = useRef(true);
   const profileCacheRef = useRef<Map<string, { name: string; avatar_url?: string }>>(new Map());
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastDataHashRef = useRef<string>('');
+  const lastModeRef = useRef<string>(mode);
+
+  // Track mode-relevant user IDs (hosts when driver, renters when host)
+  const relevantUserIdsRef = useRef<Set<string>>(new Set());
+
+  // Fetch relevant user IDs based on mode
+  const fetchRelevantUserIds = useCallback(async (): Promise<Set<string>> => {
+    if (!user) return new Set();
+
+    try {
+      const relevantIds = new Set<string>();
+
+      if (mode === 'driver') {
+        // Driver mode: get hosts of spots user has booked
+        const { data: bookings } = await supabase
+          .from('bookings')
+          .select(`
+            spots!inner(host_id)
+          `)
+          .eq('renter_id', user.id)
+          .in('status', ['paid', 'active', 'completed', 'pending']);
+
+        bookings?.forEach((b: any) => {
+          if (b.spots?.host_id) {
+            relevantIds.add(b.spots.host_id);
+          }
+        });
+      } else {
+        // Host mode: get renters who have booked user's spots
+        const { data: hostSpots } = await supabase
+          .from('spots')
+          .select('id')
+          .eq('host_id', user.id);
+
+        if (hostSpots && hostSpots.length > 0) {
+          const spotIds = hostSpots.map(s => s.id);
+          const { data: bookings } = await supabase
+            .from('bookings')
+            .select('renter_id')
+            .in('spot_id', spotIds)
+            .in('status', ['paid', 'active', 'completed', 'pending']);
+
+          bookings?.forEach(b => {
+            if (b.renter_id) {
+              relevantIds.add(b.renter_id);
+            }
+          });
+        }
+      }
+
+      // Always include support user
+      relevantIds.add('00000000-0000-0000-0000-000000000001');
+
+      return relevantIds;
+    } catch (error) {
+      console.error('Error fetching relevant user IDs:', error);
+      return new Set();
+    }
+  }, [user, mode]);
 
   // Fetch guest conversations for hosts
   const fetchGuestConversations = useCallback(async (): Promise<Conversation[]> => {
@@ -152,13 +212,18 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [user]);
 
   // Build conversations from messages (shared logic)
-  const buildConversations = useCallback(async (allMessages: any[], profiles: any[], guestConvs: Conversation[] = []): Promise<Conversation[]> => {
+  const buildConversations = useCallback(async (allMessages: any[], profiles: any[], guestConvs: Conversation[] = [], relevantIds: Set<string>): Promise<Conversation[]> => {
     if (!user) return [];
     
     const conversationMap = new Map<string, any>();
     
     for (const msg of allMessages || []) {
       const partnerId = msg.sender_id === user.id ? msg.recipient_id : msg.sender_id;
+      
+      // Filter by relevant IDs (booking-related contacts for current mode)
+      if (relevantIds.size > 0 && !relevantIds.has(partnerId)) {
+        continue;
+      }
       
       if (!conversationMap.has(partnerId)) {
         conversationMap.set(partnerId, {
@@ -212,11 +277,11 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       });
     }
 
-    // Add guest conversations
-    const allConvs = [...convs, ...guestConvs];
+    // Add guest conversations only in host mode
+    const allConvs = mode === 'host' ? [...convs, ...guestConvs] : convs;
     allConvs.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
     return allConvs;
-  }, [user]);
+  }, [user, mode]);
 
   // Create a hash of conversations for comparison
   const hashConversations = (convs: Conversation[]): string => {
@@ -228,17 +293,21 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!user || !mountedRef.current) return;
 
     try {
-      const [messagesResult, guestConvs] = await Promise.all([
+      const [messagesResult, guestConvs, relevantIds] = await Promise.all([
         supabase
           .from('messages')
           .select('*')
           .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
           .order('created_at', { ascending: false }),
-        fetchGuestConversations()
+        mode === 'host' ? fetchGuestConversations() : Promise.resolve([]),
+        fetchRelevantUserIds()
       ]);
 
       const { data: allMessages, error } = messagesResult;
       if (error || !mountedRef.current) return;
+
+      // Store relevantIds for use in upsertConversationFromMessage
+      relevantUserIdsRef.current = relevantIds;
 
       const partnerIds = [...new Set((allMessages || []).map(m => 
         m.sender_id === user.id ? m.recipient_id : m.sender_id
@@ -253,7 +322,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         profiles = data || [];
       }
 
-      const newConvs = await buildConversations(allMessages || [], profiles, guestConvs);
+      const newConvs = await buildConversations(allMessages || [], profiles, guestConvs, relevantIds);
       
       setConversations(prev => {
         const newHash = hashConversations(newConvs);
@@ -266,29 +335,34 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (error) {
       // Silent fail for background refresh
     }
-  }, [user, buildConversations, fetchGuestConversations]);
+  }, [user, mode, buildConversations, fetchGuestConversations, fetchRelevantUserIds]);
 
   // Initial load with loading indicator
   const loadConversations = useCallback(async () => {
     if (!user) return;
 
     try {
-      if (conversations.length === 0) {
+      if (conversations.length === 0 || lastModeRef.current !== mode) {
         setLoading(true);
       }
+      lastModeRef.current = mode;
       
-      const [messagesResult, guestConvs] = await Promise.all([
+      const [messagesResult, guestConvs, relevantIds] = await Promise.all([
         supabase
           .from('messages')
           .select('*')
           .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
           .order('created_at', { ascending: false }),
-        fetchGuestConversations()
+        mode === 'host' ? fetchGuestConversations() : Promise.resolve([]),
+        fetchRelevantUserIds()
       ]);
 
       const { data: allMessages, error } = messagesResult;
       if (error) throw error;
       if (!mountedRef.current) return;
+
+      // Store relevantIds for use in upsertConversationFromMessage
+      relevantUserIdsRef.current = relevantIds;
 
       const partnerIds = [...new Set((allMessages || []).map(m => 
         m.sender_id === user.id ? m.recipient_id : m.sender_id
@@ -303,7 +377,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         profiles = data || [];
       }
 
-      const convs = await buildConversations(allMessages || [], profiles, guestConvs);
+      const convs = await buildConversations(allMessages || [], profiles, guestConvs, relevantIds);
       lastDataHashRef.current = hashConversations(convs);
       
       if (mountedRef.current) {
@@ -316,7 +390,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setLoading(false);
       }
     }
-  }, [user, buildConversations, conversations.length, fetchGuestConversations]);
+  }, [user, mode, buildConversations, conversations.length, fetchGuestConversations, fetchRelevantUserIds]);
 
   // Helpers for realtime incremental updates
   const ensureProfileLoaded = useCallback(async (partnerId: string) => {
@@ -355,6 +429,11 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const upsertConversationFromMessage = useCallback((msg: Message) => {
     if (!user) return;
     const partnerId = msg.sender_id === user.id ? msg.recipient_id : msg.sender_id;
+
+    // Filter by relevant IDs - don't add conversations that don't match current mode
+    if (relevantUserIdsRef.current.size > 0 && !relevantUserIdsRef.current.has(partnerId)) {
+      return;
+    }
 
     setConversations(prev => {
       const existing = prev.find(c => c.user_id === partnerId);
@@ -431,6 +510,12 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       console.error('Error marking messages as read:', error);
     }
   }, [user]);
+
+  // Reload conversations when mode changes
+  useEffect(() => {
+    if (!user) return;
+    loadConversations();
+  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Set up real-time subscription
   useEffect(() => {
