@@ -14,7 +14,7 @@ import ModeSwitcher from './ModeSwitcher';
 import { NotificationBell } from './NotificationBell';
 import { useMode } from '@/contexts/ModeContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMessages } from '@/contexts/MessagesContext';
+import { MessagesContext } from '@/contexts/MessagesContext';
 import { useSupportRole } from '@/hooks/useSupportRole';
 import { Badge } from '@/components/ui/badge';
 
@@ -22,7 +22,9 @@ const DesktopHeader = () => {
   const navigate = useNavigate();
   const { mode, setMode } = useMode();
   const { user, signOut } = useAuth();
-  const { totalUnreadCount } = useMessages();
+  // Safe access to messages context - may not be available on all routes
+  const messagesContext = React.useContext(MessagesContext);
+  const totalUnreadCount = messagesContext?.totalUnreadCount ?? 0;
   const { isSupport } = useSupportRole();
 
   const handleLogoClick = () => {
