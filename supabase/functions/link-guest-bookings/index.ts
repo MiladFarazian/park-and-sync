@@ -147,19 +147,15 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Create service-role client for auth validation AND database ops
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { persistSession: false }
-    });
-
-    // Verify JWT and get authenticated user
+    // Verify JWT using anon client with getClaims
     const authHeader = req.headers.get('Authorization');
     console.log('[link-guest-bookings] Request received, auth header present:', !!authHeader);
 
-    if (!authHeader) {
-      console.warn('[link-guest-bookings] Missing Authorization header');
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.warn('[link-guest-bookings] Missing or invalid Authorization header');
       return new Response(
         JSON.stringify({ error: 'Missing session token - user must be signed in to link guest bookings' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -167,27 +163,45 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser(token);
+    
+    // Create anon client to validate JWT with getClaims
+    const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    
+    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
 
-    if (authError || !authUser) {
-      console.warn('[link-guest-bookings] Failed to get authenticated user:', authError?.message);
+    if (claimsError || !claimsData?.claims?.sub) {
+      console.warn('[link-guest-bookings] Failed to get claims:', claimsError?.message);
       return new Response(
         JSON.stringify({ error: 'Invalid or expired session' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('[link-guest-bookings] Authenticated user:', authUser.id);
+    const authUserId = claimsData.claims.sub as string;
+    console.log('[link-guest-bookings] Authenticated user:', authUserId);
+    
+    // Create service-role client for database operations
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false }
+    });
 
     // Parse request body
     const { user_id, email, phone, first_name }: LinkRequest = await req.json();
     console.log('[link-guest-bookings] Requested user_id:', user_id);
 
     // CRITICAL: Verify the user_id matches the authenticated user
-    if (user_id !== authUser.id) {
-      console.warn(`[link-guest-bookings] User ID mismatch: requested ${user_id}, authenticated ${authUser.id}`);
+    if (user_id !== authUserId) {
+      console.warn(`[link-guest-bookings] User ID mismatch: requested ${user_id}, authenticated ${authUserId}`);
       return new Response(
         JSON.stringify({ error: 'Cannot link bookings for another user' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Reuse the service role client for privileged database operations
+    const supabase = supabaseClient;
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
