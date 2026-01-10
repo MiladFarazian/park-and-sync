@@ -4,6 +4,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Star, MapPin, Navigation, Footprints, Pencil, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
+import { EVChargerBadge } from '@/components/ev/EVChargerBadge';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,6 +27,7 @@ interface Spot {
   hourlyRate: number;
   evChargingPremium?: number;
   hasEvCharging?: boolean;
+  evChargerType?: string;
   lat: number;
   lng: number;
   rating?: number;
@@ -1376,10 +1378,15 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                         )}
                         
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1">
-                            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                            <span className="font-medium text-sm">{spot.rating || 'New'}</span>
-                            <span className="text-muted-foreground text-sm">({spot.reviews || 0})</span>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
+                              <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                              <span className="font-medium text-sm">{spot.rating || 'New'}</span>
+                              <span className="text-muted-foreground text-sm">({spot.reviews || 0})</span>
+                            </div>
+                            {spot.hasEvCharging && spot.evChargerType && (
+                              <EVChargerBadge chargerType={spot.evChargerType} size="sm" />
+                            )}
                           </div>
                         </div>
                       </div>
