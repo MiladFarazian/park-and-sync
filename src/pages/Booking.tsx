@@ -70,8 +70,9 @@ const BookingContent = () => {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const [showProfileComplete, setShowProfileComplete] = useState(false);
   
-  // EV Charging state
-  const [useEvCharging, setUseEvCharging] = useState(false);
+  // EV Charging state - initialize from URL param (set on home page or explore filters)
+  const evParamFromUrl = searchParams.get('ev') === 'true';
+  const [useEvCharging, setUseEvCharging] = useState(evParamFromUrl);
   
   // Check if profile is incomplete using centralized check (first_name + email required)
   const isProfileIncomplete = !isProfileComplete(profile);
