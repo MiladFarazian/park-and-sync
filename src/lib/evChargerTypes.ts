@@ -1,10 +1,10 @@
-// EV Charger types commonly used in the USA
+// EV Charger types commonly used
 export interface EVChargerType {
   id: string;
   name: string;
   description: string;
   chargingSpeed: string;
-  iconPath: string; // SVG path in public folder
+  iconPath: string; // PNG path in public folder
 }
 
 export const evChargerTypes: EVChargerType[] = [
@@ -13,35 +13,49 @@ export const evChargerTypes: EVChargerType[] = [
     name: 'Tesla / NACS',
     description: 'Tesla proprietary connector (now NACS standard)',
     chargingSpeed: 'Up to 250 kW DC / 11 kW AC',
-    iconPath: '/icons/ev/ev-tesla-supercharger.svg',
+    iconPath: '/icons/ev/ev-tesla.png',
   },
   {
     id: 'j1772',
     name: 'J1772 (Type 1)',
     description: 'Standard Level 1/2 AC charging for non-Tesla vehicles',
     chargingSpeed: 'Up to 19 kW AC',
-    iconPath: '/icons/ev/ev-type1-j1772.svg',
+    iconPath: '/icons/ev/ev-type1-j1772.png',
+  },
+  {
+    id: 'type2_mennekes',
+    name: 'Type 2 (Mennekes)',
+    description: 'European standard AC charging connector',
+    chargingSpeed: 'Up to 22 kW AC',
+    iconPath: '/icons/ev/ev-type2-mennekes.png',
   },
   {
     id: 'ccs1',
     name: 'CCS1 (Combo)',
-    description: 'Combined Charging System for DC fast charging',
+    description: 'Combined Charging System for DC fast charging (North America)',
     chargingSpeed: 'Up to 350 kW DC',
-    iconPath: '/icons/ev/ev-ccs1.svg',
+    iconPath: '/icons/ev/ev-ccs1.png',
+  },
+  {
+    id: 'ccs2',
+    name: 'CCS2 (Combo)',
+    description: 'Combined Charging System for DC fast charging (Europe)',
+    chargingSpeed: 'Up to 350 kW DC',
+    iconPath: '/icons/ev/ev-ccs2.png',
   },
   {
     id: 'chademo',
     name: 'CHAdeMO',
     description: 'DC fast charging (Nissan, older Mitsubishi)',
     chargingSpeed: 'Up to 100 kW DC',
-    iconPath: '/icons/ev/ev-chademo.svg',
+    iconPath: '/icons/ev/ev-chademo.png',
   },
   {
     id: 'nema_14_50',
     name: 'NEMA 14-50 Outlet',
     description: '240V outlet - bring your own mobile charger',
     chargingSpeed: 'Up to 9.6 kW AC',
-    iconPath: '/icons/ev/ev-nema-14-50.svg',
+    iconPath: '/icons/ev/ev-nema-14-50.png',
   },
 ];
 
