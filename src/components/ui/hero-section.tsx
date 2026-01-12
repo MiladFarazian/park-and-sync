@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Shield, Calendar, ChevronRight } from 'lucide-react';
+import { MapPin, Clock, Shield, Calendar, ChevronRight, Zap } from 'lucide-react';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { useNavigate } from 'react-router-dom';
 import { format, addHours } from 'date-fns';
 import heroImage from '@/assets/hero-parking.jpg';
 import LocationSearchInput from '@/components/ui/location-search-input';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 const HeroSection = () => {
   const navigate = useNavigate();
@@ -16,6 +18,7 @@ const HeroSection = () => {
   const [endTime, setEndTime] = useState<Date>(addHours(new Date(), 3));
   const [mobileStartPickerOpen, setMobileStartPickerOpen] = useState(false);
   const [mobileEndPickerOpen, setMobileEndPickerOpen] = useState(false);
+  const [needsEvCharging, setNeedsEvCharging] = useState(false);
 
   const handleSelectLocation = (location: { lat: number; lng: number; name: string }) => {
     setSearchCoords({ lat: location.lat, lng: location.lng });
@@ -31,12 +34,13 @@ const HeroSection = () => {
   };
 
   const handleSearch = () => {
+    const evParam = needsEvCharging ? '&ev=true' : '';
     if (searchCoords) {
-      navigate(`/explore?lat=${searchCoords.lat}&lng=${searchCoords.lng}&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchLocation || 'Current location')}`);
+      navigate(`/explore?lat=${searchCoords.lat}&lng=${searchCoords.lng}&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchLocation || 'Current location')}${evParam}`);
     } else if (searchLocation.trim()) {
-      navigate(`/explore?start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchLocation)}`);
+      navigate(`/explore?start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchLocation)}${evParam}`);
     } else {
-      navigate(`/explore?lat=34.0224&lng=-118.2851&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=University Park, Los Angeles`);
+      navigate(`/explore?lat=34.0224&lng=-118.2851&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=University Park, Los Angeles${evParam}`);
     }
   };
 
@@ -110,6 +114,23 @@ const HeroSection = () => {
                     </div>
                   </div>
                 </button>
+              </div>
+
+              {/* EV Charging Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-xl border border-muted bg-muted/30">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-full bg-green-500/10 flex items-center justify-center">
+                    <Zap className="h-5 w-5 text-green-500" />
+                  </div>
+                  <Label htmlFor="ev-charging-hero" className="text-sm font-medium cursor-pointer">
+                    I need EV charging
+                  </Label>
+                </div>
+                <Switch
+                  id="ev-charging-hero"
+                  checked={needsEvCharging}
+                  onCheckedChange={setNeedsEvCharging}
+                />
               </div>
 
               {/* Search Button */}
