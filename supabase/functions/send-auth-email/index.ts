@@ -18,6 +18,7 @@ interface AuthEmailPayload {
   user: {
     id: string;
     email: string;
+    email_new?: string; // Sent for email_change events - contains the new email address
     user_metadata?: {
       first_name?: string;
       last_name?: string;
@@ -213,7 +214,26 @@ const handler = async (req: Request): Promise<Response> => {
     const { user, email_data } = data;
     const { token, token_hash, redirect_to, email_action_type } = email_data;
 
-    console.log(`[send-auth-email] Processing ${email_action_type} for ${user.email}`);
+    // For email_change events, the new email is in user.email_new (user.email may be empty for phone-only users)
+    const recipientEmail = email_action_type === 'email_change' && user.email_new
+      ? user.email_new
+      : user.email;
+
+    // Validate we have an email before proceeding
+    if (!recipientEmail) {
+      console.error('[send-auth-email] No recipient email found - user.email:', user.email, 'user.email_new:', user.email_new);
+      return new Response(
+        JSON.stringify({
+          error: {
+            http_code: 400,
+            message: 'No recipient email address provided',
+          },
+        }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    console.log(`[send-auth-email] Processing ${email_action_type} for ${recipientEmail}`);
 
     // Build a confirmation URL that goes to our app (not /auth/v1/verify).
     // This avoids email-client link scanners accidentally consuming one-time verification links.
@@ -232,10 +252,10 @@ const handler = async (req: Request): Promise<Response> => {
     const { subject, html } = getEmailTemplate(email_action_type, firstName, confirmUrl, token);
 
     // Send the branded email via Resend
-    console.log(`[send-auth-email] Sending email via Resend...`);
+    console.log(`[send-auth-email] Sending email to ${recipientEmail} via Resend...`);
     const { data: emailResult, error } = await resend.emails.send({
       from: fromEmail,
-      to: [user.email],
+      to: [recipientEmail],
       subject: subject,
       html: html,
     });
