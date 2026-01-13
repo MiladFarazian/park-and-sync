@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Mail, User, Car } from 'lucide-react';
+import { Loader2, Mail, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,10 +19,9 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
-    email: '',
-    carModel: ''
+    email: ''
   });
-  const [errors, setErrors] = useState<{ fullName?: string; email?: string; carModel?: string }>({});
+  const [errors, setErrors] = useState<{ fullName?: string; email?: string }>({});
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -41,7 +40,7 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
   };
 
   const validateForm = (): boolean => {
-    const newErrors: { fullName?: string; email?: string; carModel?: string } = {};
+    const newErrors: { fullName?: string; email?: string } = {};
     
     if (!formData.fullName.trim()) {
       newErrors.fullName = 'Full name is required';
@@ -52,8 +51,6 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
     } else if (!validateEmail(formData.email)) {
       newErrors.email = 'Please enter a valid email address';
     }
-    
-    // Car model is optional - do not block profile completion
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -103,23 +100,6 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
         return;
       }
 
-      // Create vehicle record only if car model was provided
-      if (formData.carModel.trim()) {
-        const { error: vehicleError } = await supabase
-          .from('vehicles')
-          .insert({
-            user_id: user.id,
-            model: formData.carModel,
-            license_plate: 'PENDING', // Will be updated later
-            size_class: 'midsize',
-            is_primary: true
-          });
-
-        if (vehicleError) {
-          console.error('[CompleteProfile] Vehicle save error:', vehicleError);
-          // Non-blocking - continue anyway
-        }
-      }
 
       // Also update auth email if needed
       if (formData.email && user.email !== formData.email) {
@@ -208,26 +188,6 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
             {errors.email && (
               <p className="text-sm text-destructive">{errors.email}</p>
             )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="carModel" className="text-sm font-medium">
-              Car model <span className="text-muted-foreground">(optional)</span>
-            </Label>
-            <div className="relative">
-              <Car className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="carModel"
-                type="text"
-                placeholder="Toyota Camry"
-                value={formData.carModel}
-                onChange={(e) => {
-                  setFormData({ ...formData, carModel: e.target.value });
-                  if (errors.carModel) setErrors({ ...errors, carModel: undefined });
-                }}
-                className="pl-10 h-12 rounded-xl border-2"
-              />
-            </div>
           </div>
 
           <Button
