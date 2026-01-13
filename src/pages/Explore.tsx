@@ -690,6 +690,41 @@ const Explore = () => {
     }
   }, [parkingSpots.length, startTime, endTime]);
 
+  // Re-fetch spots when EV filter is toggled - ensures we get full results when filter is removed
+  const prevEvChargingRef = useRef(filters.evCharging);
+  const prevEvChargerTypesRef = useRef(filters.evChargerTypes);
+  
+  useEffect(() => {
+    const prevEvCharging = prevEvChargingRef.current;
+    const prevEvChargerTypes = prevEvChargerTypesRef.current;
+    
+    // Update refs
+    prevEvChargingRef.current = filters.evCharging;
+    prevEvChargerTypesRef.current = filters.evChargerTypes;
+    
+    // Skip on initial mount or if no search location
+    if (!searchLocation) return;
+    if (!didInitialFetchRef.current) return;
+    
+    // Detect if EV filter was toggled off (was on, now off)
+    const evWasOn = prevEvCharging || (prevEvChargerTypes && prevEvChargerTypes.length > 0);
+    const evIsNowOff = !filters.evCharging && (!filters.evChargerTypes || filters.evChargerTypes.length === 0);
+    
+    // Detect if EV charger types changed
+    const chargerTypesChanged = JSON.stringify(prevEvChargerTypes) !== JSON.stringify(filters.evChargerTypes);
+    
+    if (evWasOn && evIsNowOff) {
+      // EV filter removed - refetch without EV filter to get all spots
+      setEvChargerType(null);
+      fetchNearbySpots(searchLocation, 15000, false);
+    } else if (chargerTypesChanged && filters.evChargerTypes && filters.evChargerTypes.length > 0) {
+      // Charger type changed - refetch with new filter
+      const newChargerType = filters.evChargerTypes[0]; // Use first selected type for API
+      setEvChargerType(newChargerType);
+      fetchNearbySpots(searchLocation, 15000, false, undefined, newChargerType);
+    }
+  }, [filters.evCharging, filters.evChargerTypes, searchLocation, fetchNearbySpots]);
+
   // Open EV fallback dialog only after the map/list has rendered (prevents a "black" backdrop flash)
   useEffect(() => {
     if (!pendingEvFallbackDialog) return;
