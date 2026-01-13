@@ -716,9 +716,18 @@ const Profile = () => {
                           if (isResendingEmail || resendCooldown > 0) return;
                           setIsResendingEmail(true);
                           try {
+                            // Use email_change for phone-verified users who added email later
+                            // Use signup for users who signed up with email
+                            const resendType = user?.phone_confirmed_at && !user?.email_confirmed_at 
+                              ? 'email_change' 
+                              : 'signup';
+                            
                             const { error } = await supabase.auth.resend({
-                              type: 'signup',
+                              type: resendType,
                               email: profile.email!,
+                              options: {
+                                emailRedirectTo: `${window.location.origin}/email-confirmation`
+                              }
                             });
                             if (error) throw error;
                             toast.success('Verification email sent! Check your inbox.');

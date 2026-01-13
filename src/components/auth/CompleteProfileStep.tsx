@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Mail, User } from 'lucide-react';
+import { Loader2, Mail, User, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,6 +22,89 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
     email: ''
   });
   const [errors, setErrors] = useState<{ fullName?: string; email?: string }>({});
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  const [emailIsValid, setEmailIsValid] = useState(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced email uniqueness check
+  const checkEmailExists = useCallback(async (email: string) => {
+    if (!email || !validateEmail(email)) {
+      setEmailIsValid(false);
+      return;
+    }
+    
+    setIsCheckingEmail(true);
+    setEmailIsValid(false);
+    
+    try {
+      // Check profiles table for existing email (excluding current user)
+      const { data } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('email', email.toLowerCase().trim())
+        .neq('user_id', user?.id || '')
+        .maybeSingle();
+      
+      if (data) {
+        setErrors(prev => ({ 
+          ...prev, 
+          email: 'This email is already associated with a Parkzy account' 
+        }));
+        setEmailIsValid(false);
+      } else {
+        // Clear email error if it was the uniqueness error
+        setErrors(prev => {
+          if (prev.email === 'This email is already associated with a Parkzy account') {
+            return { ...prev, email: undefined };
+          }
+          return prev;
+        });
+        setEmailIsValid(true);
+      }
+    } catch (error) {
+      console.error('[CompleteProfile] Email check error:', error);
+    } finally {
+      setIsCheckingEmail(false);
+    }
+  }, [user?.id]);
+
+  // Handle email change with debounce
+  const handleEmailChange = (email: string) => {
+    setFormData(prev => ({ ...prev, email }));
+    setEmailIsValid(false);
+    
+    // Clear previous timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    // Clear uniqueness error while typing
+    if (errors.email === 'This email is already associated with a Parkzy account') {
+      setErrors(prev => ({ ...prev, email: undefined }));
+    }
+    
+    // Validate format first
+    if (email && !validateEmail(email)) {
+      setErrors(prev => ({ ...prev, email: 'Please enter a valid email address' }));
+      return;
+    } else if (email) {
+      setErrors(prev => ({ ...prev, email: undefined }));
+    }
+    
+    // Debounce the uniqueness check
+    debounceTimerRef.current = setTimeout(() => {
+      checkEmailExists(email);
+    }, 500);
+  };
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -101,14 +184,28 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
       }
 
 
-      // Also update auth email if needed
+      // Also update auth email - this triggers verification email
       if (formData.email && user.email !== formData.email) {
         const { error: authError } = await supabase.auth.updateUser({
           email: formData.email
         });
         if (authError) {
           console.warn('[CompleteProfile] Auth email update error:', authError);
-          // Non-blocking - the profile email is saved
+          // Check if it's a duplicate email error from Supabase Auth
+          if (authError.message.toLowerCase().includes('already registered') || 
+              authError.message.toLowerCase().includes('already in use') ||
+              authError.message.toLowerCase().includes('already exists')) {
+            setErrors({ email: 'This email is already associated with a Parkzy account' });
+            setLoading(false);
+            return;
+          }
+          // Other errors are non-blocking - the profile email is saved
+        } else {
+          // Email update triggered - verification email will be sent automatically
+          toast({
+            title: 'Verification email sent',
+            description: `Please check ${formData.email} to verify your email address.`
+          });
         }
       }
 
@@ -178,12 +275,21 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
                 type="email"
                 placeholder="john@example.com"
                 value={formData.email}
-                onChange={(e) => {
-                  setFormData({ ...formData, email: e.target.value });
-                  if (errors.email) setErrors({ ...errors, email: undefined });
+                onChange={(e) => handleEmailChange(e.target.value)}
+                onBlur={() => {
+                  // Trigger check on blur if not already checked
+                  if (formData.email && validateEmail(formData.email) && !emailIsValid && !isCheckingEmail) {
+                    checkEmailExists(formData.email);
+                  }
                 }}
-                className={`pl-10 h-12 rounded-xl border-2 ${errors.email ? 'border-destructive' : ''}`}
+                className={`pl-10 pr-10 h-12 rounded-xl border-2 ${errors.email ? 'border-destructive' : emailIsValid ? 'border-green-500' : ''}`}
               />
+              {isCheckingEmail && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
+              )}
+              {emailIsValid && !isCheckingEmail && (
+                <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />
+              )}
             </div>
             {errors.email && (
               <p className="text-sm text-destructive">{errors.email}</p>
@@ -193,7 +299,7 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
           <Button
             type="submit"
             className="w-full h-14 text-base font-semibold rounded-xl mt-6"
-            disabled={loading}
+            disabled={loading || isCheckingEmail || !!errors.email}
           >
             {loading ? (
               <>
