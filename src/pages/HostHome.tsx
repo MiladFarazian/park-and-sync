@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, TrendingUp, Calendar, MapPin, Car } from 'lucide-react';
+import { Plus, TrendingUp, Calendar, MapPin, Car, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -197,16 +197,22 @@ const HostHome = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-4 animate-fade-in">
-        <Card className="p-6 bg-primary text-primary-foreground">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              <span className="text-sm opacity-90">Total Earnings</span>
+        <Card 
+          className="p-6 bg-primary text-primary-foreground cursor-pointer hover:opacity-90 transition-opacity"
+          onClick={() => navigate('/host-earnings-history')}
+        >
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                <span className="text-sm opacity-90">Total Earnings</span>
+              </div>
+              <div>
+                <p className="text-3xl font-bold">${stats.totalEarnings.toFixed(2)}</p>
+                <p className="text-sm opacity-75">Lifetime earnings</p>
+              </div>
             </div>
-            <div>
-              <p className="text-3xl font-bold">${stats.totalEarnings.toFixed(2)}</p>
-              <p className="text-sm opacity-75">Lifetime earnings</p>
-            </div>
+            <ChevronRight className="h-5 w-5 opacity-75" />
           </div>
         </Card>
         
