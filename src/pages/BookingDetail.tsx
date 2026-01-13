@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { calculateBookingTotal, calculateDriverPrice } from '@/lib/pricing';
+import { getHostNetEarnings, getParkzyFee } from '@/lib/hostEarnings';
 import RequireAuth from '@/components/auth/RequireAuth';
 
 interface BookingDetails {
@@ -39,6 +40,7 @@ interface BookingDetails {
   extension_charges: number | null;
   will_use_ev_charging: boolean | null;
   ev_charging_fee: number | null;
+  host_earnings: number | null;
   is_guest?: boolean;
   guest_full_name?: string | null;
   guest_car_model?: string | null;
@@ -166,6 +168,7 @@ const BookingDetailContent = () => {
           extension_charges,
           will_use_ev_charging,
           ev_charging_fee,
+          host_earnings,
           is_guest,
           guest_full_name,
           guest_car_model,
@@ -848,61 +851,86 @@ const BookingDetailContent = () => {
           </div>
         </Card>
 
-        {/* Payment Details */}
+        {/* Payment Details - Different view for Host vs Driver */}
         <Card className="p-4 space-y-3">
-          <h3 className="font-semibold">Payment Details</h3>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">
-                {(() => {
-                  const durationMs = new Date(booking.end_at).getTime() - new Date(booking.start_at).getTime();
-                  const totalMinutes = Math.round(durationMs / (1000 * 60));
-                  const hours = Math.floor(totalMinutes / 60);
-                  const minutes = totalMinutes % 60;
-                  if (hours === 0) return `${minutes}min`;
-                  if (minutes === 0) return `${hours}h`;
-                  return `${hours}h ${minutes}min`;
-                })()} × ${calculateDriverPrice(booking.hourly_rate).toFixed(2)}/hr
-              </span>
-              <span className="font-medium">${booking.subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Service fee</span>
-              <span className="font-medium">${booking.platform_fee.toFixed(2)}</span>
-            </div>
-            {(booking.ev_charging_fee ?? 0) > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-1">
-                  <Zap className="h-3 w-3 text-green-500" />
-                  EV Charging
-                </span>
-                <span className="font-medium">${(booking.ev_charging_fee ?? 0).toFixed(2)}</span>
+          <h3 className="font-semibold">{isHost ? 'Earnings' : 'Payment Details'}</h3>
+          
+          {isHost ? (
+            // HOST VIEW: Show only what they earned
+            <div className="space-y-2">
+              <div className="flex justify-between text-base font-semibold text-green-600 dark:text-green-400">
+                <span>You earned</span>
+                <span>${getHostNetEarnings(booking).toFixed(2)}</span>
               </div>
-            )}
-            {extensionChargesToShow > 0.01 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-1">
-                  <AlarmClockPlus className="h-3 w-3" />
-                  Extension Charges
-                </span>
-                <span className="font-medium">${extensionChargesToShow.toFixed(2)}</span>
+              
+              {/* Optional earnings breakdown for transparency */}
+              <Separator />
+              <div className="text-xs text-muted-foreground space-y-1">
+                <div className="flex justify-between">
+                  <span>Driver paid</span>
+                  <span>${(booking.total_amount + booking.overstay_charge_amount).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Parkzy fee</span>
+                  <span>-${getParkzyFee(booking).toFixed(2)}</span>
+                </div>
               </div>
-            )}
-            {booking.overstay_charge_amount > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-destructive flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  Overstay Charges
-                </span>
-                <span className="font-medium text-destructive">${booking.overstay_charge_amount.toFixed(2)}</span>
-              </div>
-            )}
-            <Separator />
-            <div className="flex justify-between text-base font-semibold">
-              <span>Total</span>
-              <span>${(booking.total_amount + booking.overstay_charge_amount).toFixed(2)}</span>
             </div>
-          </div>
+          ) : (
+            // DRIVER VIEW: Show full payment breakdown
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {(() => {
+                    const durationMs = new Date(booking.end_at).getTime() - new Date(booking.start_at).getTime();
+                    const totalMinutes = Math.round(durationMs / (1000 * 60));
+                    const hours = Math.floor(totalMinutes / 60);
+                    const minutes = totalMinutes % 60;
+                    if (hours === 0) return `${minutes}min`;
+                    if (minutes === 0) return `${hours}h`;
+                    return `${hours}h ${minutes}min`;
+                  })()} × ${calculateDriverPrice(booking.hourly_rate).toFixed(2)}/hr
+                </span>
+                <span className="font-medium">${booking.subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Service fee</span>
+                <span className="font-medium">${booking.platform_fee.toFixed(2)}</span>
+              </div>
+              {(booking.ev_charging_fee ?? 0) > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <Zap className="h-3 w-3 text-green-500" />
+                    EV Charging
+                  </span>
+                  <span className="font-medium">${(booking.ev_charging_fee ?? 0).toFixed(2)}</span>
+                </div>
+              )}
+              {extensionChargesToShow > 0.01 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <AlarmClockPlus className="h-3 w-3" />
+                    Extension Charges
+                  </span>
+                  <span className="font-medium">${extensionChargesToShow.toFixed(2)}</span>
+                </div>
+              )}
+              {booking.overstay_charge_amount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-destructive flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Overstay Charges
+                  </span>
+                  <span className="font-medium text-destructive">${booking.overstay_charge_amount.toFixed(2)}</span>
+                </div>
+              )}
+              <Separator />
+              <div className="flex justify-between text-base font-semibold">
+                <span>Total</span>
+                <span>${(booking.total_amount + booking.overstay_charge_amount).toFixed(2)}</span>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Host/Driver Info - Show different content based on viewer role */}

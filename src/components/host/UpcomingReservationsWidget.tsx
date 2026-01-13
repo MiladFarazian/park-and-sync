@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { format, isToday, isTomorrow, isPast } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { getStreetAddress } from '@/lib/addressUtils';
+import { getHostNetEarnings } from '@/lib/hostEarnings';
 
 interface ReservationPreview {
   id: string;
@@ -232,7 +233,7 @@ const UpcomingReservationsWidget = () => {
                 {/* Actions */}
                 <div className="flex flex-col items-end gap-2">
                   <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-                    ${(reservation.host_earnings ?? reservation.total_amount).toFixed(0)}
+                    ${getHostNetEarnings(reservation).toFixed(2)}
                   </span>
                   <Button
                     variant="outline"
