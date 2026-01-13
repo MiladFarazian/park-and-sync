@@ -210,6 +210,7 @@ serve(async (req) => {
       // Update the booking with new end time and track extension charges
       const currentExtensionCharges = booking.extension_charges || 0;
       const originalTotal = booking.original_total_amount || booking.total_amount;
+      const currentHostEarnings = booking.host_earnings || 0;
       
       const { error: updateError } = await supabase
         .from('bookings')
@@ -218,6 +219,7 @@ serve(async (req) => {
           total_amount: booking.total_amount + extensionCost,
           original_total_amount: originalTotal,
           extension_charges: currentExtensionCharges + extensionCost,
+          host_earnings: currentHostEarnings + hostEarnings,
           updated_at: new Date().toISOString(),
         })
         .eq('id', bookingId);
@@ -395,6 +397,7 @@ serve(async (req) => {
     // Update booking on success and track extension charges
     const currentExtensionCharges = booking.extension_charges || 0;
     const originalTotal = booking.original_total_amount || booking.total_amount;
+    const currentHostEarnings = booking.host_earnings || 0;
     
     const { error: updateError } = await supabase
       .from('bookings')
@@ -403,6 +406,7 @@ serve(async (req) => {
         total_amount: booking.total_amount + extensionCost,
         original_total_amount: originalTotal,
         extension_charges: currentExtensionCharges + extensionCost,
+        host_earnings: currentHostEarnings + hostEarnings,
         updated_at: new Date().toISOString(),
       })
       .eq('id', bookingId);

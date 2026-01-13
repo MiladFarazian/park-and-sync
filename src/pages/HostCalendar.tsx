@@ -33,6 +33,8 @@ interface BookingForCalendar {
   status: string;
   total_amount: number;
   host_earnings?: number | null;
+  hourly_rate?: number;
+  extension_charges?: number | null;
   is_guest?: boolean;
   guest_full_name?: string | null;
   will_use_ev_charging?: boolean | null;
@@ -167,7 +169,7 @@ const HostCalendar = () => {
       let bookingsQuery = supabase
         .from('bookings')
         .select(`
-          id, spot_id, start_at, end_at, status, total_amount, host_earnings, is_guest, guest_full_name,
+          id, spot_id, start_at, end_at, status, total_amount, host_earnings, hourly_rate, extension_charges, is_guest, guest_full_name,
           renter:profiles!bookings_renter_id_fkey(first_name, last_name),
           spot:spots!bookings_spot_id_fkey(title, address)
         `)
@@ -1071,8 +1073,8 @@ const HostCalendar = () => {
                             }>
                               {booking.status}
                             </Badge>
-                            <div className="text-sm font-semibold mt-1">
-                              ${booking.total_amount.toFixed(2)}
+                            <div className="text-sm font-semibold mt-1 text-green-600 dark:text-green-400">
+                              ${getHostNetEarnings(booking).toFixed(2)}
                             </div>
                           </div>
                         </div>
