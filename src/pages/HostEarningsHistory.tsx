@@ -88,10 +88,8 @@ const HostEarningsHistory = () => {
       const typedBookings = (bookingsData || []) as unknown as BookingWithDetails[];
       setBookings(typedBookings);
 
-      // Calculate total earnings from completed bookings only
-      const total = typedBookings
-        .filter(b => b.status === 'completed')
-        .reduce((sum, b) => sum + getHostNetEarnings(b), 0);
+      // Calculate total earnings from all displayed bookings (completed, active, paid)
+      const total = typedBookings.reduce((sum, b) => sum + getHostNetEarnings(b), 0);
       setTotalEarnings(total);
     } catch (error) {
       console.error('Error fetching bookings:', error);
