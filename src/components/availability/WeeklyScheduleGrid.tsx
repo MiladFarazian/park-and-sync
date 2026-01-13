@@ -266,9 +266,9 @@ export const WeeklyScheduleGrid = ({
   };
 
   return (
-    <div className="flex flex-col h-full space-y-2">
+    <div className="flex flex-col h-full">
       {/* Instructions & Legend - Compact */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 shrink-0 mb-1">
         <p className="text-[10px] sm:text-xs text-muted-foreground">
           Click and drag to select hours
         </p>
@@ -284,15 +284,15 @@ export const WeeklyScheduleGrid = ({
         </div>
       </div>
 
-      {/* Grid Container - Flex to fill available space */}
-      <Card className="overflow-hidden flex-1 min-h-0 flex flex-col">
+      {/* Grid Container - Takes only needed height, scrolls internally */}
+      <Card className="overflow-hidden flex-1 min-h-0">
         <div 
           ref={gridRef}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onTouchEnd={handleTouchEnd}
           onTouchMove={handleTouchMove}
-          className="flex flex-col h-full"
+          className="h-full overflow-y-auto"
         >
           {/* Header Row */}
           <div className="flex border-b bg-muted/30 shrink-0">
@@ -312,8 +312,8 @@ export const WeeklyScheduleGrid = ({
             ))}
           </div>
 
-          {/* Time Grid - Scrollable if needed but designed to fit */}
-          <div className="flex-1 min-h-0 overflow-y-auto">
+          {/* Time Grid */}
+          <div>
             {HOURS.map((hour) => (
               <div key={hour} className="flex border-b last:border-b-0">
                 {/* Time Label */}
@@ -358,7 +358,7 @@ export const WeeklyScheduleGrid = ({
       </Card>
 
       {/* Quick Actions - Compact */}
-      <div className="flex gap-2 shrink-0">
+      <div className="flex gap-2 shrink-0 mt-2">
         <Button
           type="button"
           variant="outline"
