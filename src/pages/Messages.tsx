@@ -448,7 +448,7 @@ function ChatPane({
           )
         )}
       </div>
-      <div className="p-4 border-t flex-shrink-0 pb-20 md:pb-4">
+      <div className="p-4 border-t flex-shrink-0 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-4">
         {mediaPreview && (
           <div className="mb-2 relative inline-block">
             <div className="relative">
@@ -739,7 +739,7 @@ const MessagesContent = () => {
   );
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-[calc(100vh-3.5rem-5rem)] md:h-full">
       {/* Conversations List */}
       <div className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col overflow-hidden border-r bg-card`}>
         <div className="p-4 border-b flex-shrink-0">
