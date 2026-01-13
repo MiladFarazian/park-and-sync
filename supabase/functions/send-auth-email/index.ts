@@ -71,8 +71,9 @@ const getEmailTemplate = (
     }
   };
 
-  // Use the white logo from the public folder for email headers
-  const logoUrl = `${appUrl}/parkzy-logo-white.png`;
+  // Use the white logo from Supabase Storage (more reliable for email clients)
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://mqbupmusmciijsjmzbcu.supabase.co';
+  const logoUrl = `${supabaseUrl}/storage/v1/object/public/assets/parkzy-logo-white.png`;
 
   const template = templates[type] || templates.signup;
   const displayName = firstName || 'there';
