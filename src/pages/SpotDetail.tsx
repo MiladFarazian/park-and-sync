@@ -20,6 +20,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { calculateDriverPrice } from '@/lib/pricing';
 import { vehicleSizes } from '@/lib/vehicleSizes';
+import { useFavoriteSpots } from '@/hooks/useFavoriteSpots';
+import { cn } from '@/lib/utils';
 
 // Import the generated images
 import uscGarage from '@/assets/usc-garage.jpg';
@@ -74,6 +76,10 @@ const SpotDetail = () => {
   const [submittingReport, setSubmittingReport] = useState(false);
   const [userBooking, setUserBooking] = useState<{ id: string; start_at: string; end_at: string; status: string } | null>(null);
   const [guestBookingModalOpen, setGuestBookingModalOpen] = useState(false);
+  
+  // Favorites hook
+  const { isFavorite, toggleFavorite, isLoading: favoriteLoading } = useFavoriteSpots();
+  const spotIsFavorited = id ? isFavorite(id) : false;
 
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) => 
@@ -681,8 +687,13 @@ const SpotDetail = () => {
                 <Pencil className="h-4 w-4" />
               </Button>
             )}
-            <Button variant="secondary" size="sm">
-              <Heart className="h-4 w-4" />
+            <Button 
+              variant="secondary" 
+              size="sm"
+              onClick={() => id && toggleFavorite(id)}
+              disabled={favoriteLoading}
+            >
+              <Heart className={cn("h-4 w-4", spotIsFavorited && "fill-red-500 text-red-500")} />
             </Button>
             <Button variant="secondary" size="sm" onClick={handleShare}>
               <Share className="h-4 w-4" />
