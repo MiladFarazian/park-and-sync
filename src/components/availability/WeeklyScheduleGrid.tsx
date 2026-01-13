@@ -266,64 +266,58 @@ export const WeeklyScheduleGrid = ({
   };
 
   return (
-    <div className="space-y-4">
-      {/* Instructions & Legend */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <p className="text-xs text-muted-foreground">
-          Click and drag to select available hours. Click on selected cells to remove.
+    <div className="flex flex-col h-full space-y-2">
+      {/* Instructions & Legend - Compact */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 shrink-0">
+        <p className="text-[10px] sm:text-xs text-muted-foreground">
+          Click and drag to select hours
         </p>
-        <div className="flex items-center gap-3 text-xs">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-primary" />
+        <div className="flex items-center gap-2 text-[10px] sm:text-xs">
+          <div className="flex items-center gap-1">
+            <div className="w-2.5 h-2.5 rounded-sm bg-primary" />
             <span className="text-muted-foreground">Available</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-muted border border-border" />
+          <div className="flex items-center gap-1">
+            <div className="w-2.5 h-2.5 rounded-sm bg-muted border border-border" />
             <span className="text-muted-foreground">Unavailable</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-primary/70" />
-            <span className="text-muted-foreground">Selecting</span>
           </div>
         </div>
       </div>
 
-      {/* Grid Container */}
-      <Card className="overflow-hidden">
+      {/* Grid Container - Flex to fill available space */}
+      <Card className="overflow-hidden flex-1 min-h-0 flex flex-col">
         <div 
           ref={gridRef}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onTouchEnd={handleTouchEnd}
           onTouchMove={handleTouchMove}
+          className="flex flex-col h-full"
         >
           {/* Header Row */}
-          <div className="flex border-b bg-muted/30">
-            <div className="w-8 sm:w-14 shrink-0 p-1 sm:p-2 text-[10px] sm:text-xs font-medium text-muted-foreground border-r">
+          <div className="flex border-b bg-muted/30 shrink-0">
+            <div className="w-7 sm:w-12 shrink-0 p-0.5 sm:p-1.5 text-[9px] sm:text-xs font-medium text-muted-foreground border-r">
               <span className="hidden sm:inline">Time</span>
             </div>
             {DAYS.map((day, dayIndex) => (
               <div 
                 key={day} 
-                className="flex-1 min-w-0 p-1 sm:p-2 text-center border-r last:border-r-0"
+                className="flex-1 min-w-0 p-0.5 sm:p-1.5 text-center border-r last:border-r-0"
               >
-                <div className="text-[10px] sm:text-xs font-medium">
+                <div className="text-[9px] sm:text-xs font-medium">
                   <span className="sm:hidden">{DAYS_SHORT[dayIndex]}</span>
                   <span className="hidden sm:inline">{day}</span>
-                </div>
-                <div className="hidden sm:block text-[10px] text-muted-foreground mt-0.5">
-                  {getDaySummary(dayIndex)}
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Time Grid */}
-          <div className="relative">
+          {/* Time Grid - Scrollable if needed but designed to fit */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
             {HOURS.map((hour) => (
               <div key={hour} className="flex border-b last:border-b-0">
                 {/* Time Label */}
-                <div className="w-8 sm:w-14 shrink-0 p-0.5 sm:p-1 text-[8px] sm:text-[10px] text-muted-foreground border-r flex items-start justify-end pr-0.5 sm:pr-2">
+                <div className="w-7 sm:w-12 shrink-0 text-[7px] sm:text-[9px] text-muted-foreground border-r flex items-start justify-end pr-0.5 sm:pr-1.5 pt-px">
                   {formatTimeDisplay(hour)}
                 </div>
                 
@@ -331,30 +325,30 @@ export const WeeklyScheduleGrid = ({
                 {DAYS.map((_, dayIndex) => (
                   <div key={dayIndex} className="flex-1 min-w-0 flex flex-col border-r last:border-r-0">
                     {/* Two 30-minute slots per hour */}
-                    {[0, 1].map((halfHour) => {
-                      const slot = hour * SLOTS_PER_HOUR + halfHour;
-                      const isActive = grid[dayIndex][slot];
-                      const inRange = isInDragRange(dayIndex, slot);
+                        {[0, 1].map((halfHour) => {
+                          const slot = hour * SLOTS_PER_HOUR + halfHour;
+                          const isActive = grid[dayIndex][slot];
+                          const inRange = isInDragRange(dayIndex, slot);
 
-                      return (
-                        <div
-                          key={halfHour}
-                          data-day={dayIndex}
-                          data-slot={slot}
-                          onMouseDown={(e) => handleMouseDown(dayIndex, slot, e)}
-                          onMouseEnter={() => handleMouseEnter(dayIndex, slot)}
-                          onTouchStart={(e) => handleTouchStart(dayIndex, slot, e)}
-                          className={cn(
-                            "h-2.5 sm:h-3 border-b border-border/30 last:border-b-0 cursor-pointer transition-colors",
-                            isActive && !inRange && "bg-primary",
-                            inRange && dragMode === 'add' && "bg-primary/70",
-                            inRange && dragMode === 'remove' && "bg-destructive/30",
-                            !isActive && !inRange && "hover:bg-muted",
-                            halfHour === 0 && "border-t border-border/50"
-                          )}
-                        />
-                      );
-                    })}
+                          return (
+                            <div
+                              key={halfHour}
+                              data-day={dayIndex}
+                              data-slot={slot}
+                              onMouseDown={(e) => handleMouseDown(dayIndex, slot, e)}
+                              onMouseEnter={() => handleMouseEnter(dayIndex, slot)}
+                              onTouchStart={(e) => handleTouchStart(dayIndex, slot, e)}
+                              className={cn(
+                                "h-2 sm:h-2.5 border-b border-border/30 last:border-b-0 cursor-pointer transition-colors",
+                                isActive && !inRange && "bg-primary",
+                                inRange && dragMode === 'add' && "bg-primary/70",
+                                inRange && dragMode === 'remove' && "bg-destructive/30",
+                                !isActive && !inRange && "hover:bg-muted",
+                                halfHour === 0 && "border-t border-border/50"
+                              )}
+                            />
+                          );
+                        })}
                   </div>
                 ))}
               </div>
@@ -363,37 +357,37 @@ export const WeeklyScheduleGrid = ({
         </div>
       </Card>
 
-      {/* Quick Actions - Below Grid */}
-      <div className="flex gap-2">
+      {/* Quick Actions - Compact */}
+      <div className="flex gap-2 shrink-0">
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="flex-1 h-9"
+          className="flex-1 h-8 text-xs"
           onClick={set24_7}
         >
-          <CalendarClock className="h-4 w-4 mr-1.5" />
+          <CalendarClock className="h-3.5 w-3.5 mr-1" />
           24/7
         </Button>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="flex-1 h-9"
+          className="flex-1 h-8 text-xs"
           onClick={set9to5MF}
         >
-          <Briefcase className="h-4 w-4 mr-1.5" />
+          <Briefcase className="h-3.5 w-3.5 mr-1" />
           M-F 9-5
         </Button>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="flex-1 h-9"
+          className="flex-1 h-8 text-xs"
           onClick={undo}
           disabled={history.length === 0}
         >
-          <Undo2 className="h-4 w-4 mr-1.5" />
+          <Undo2 className="h-3.5 w-3.5 mr-1" />
           Undo
         </Button>
       </div>
