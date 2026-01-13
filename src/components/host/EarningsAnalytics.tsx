@@ -77,8 +77,7 @@ const EarningsAnalytics = () => {
           const bookingDate = format(new Date(b.end_at), 'yyyy-MM-dd');
           return bookingDate === dayStr;
         }).reduce((sum, b) => {
-          const earnings = b.host_earnings ? Number(b.host_earnings) : Number(b.total_amount);
-          return sum + earnings;
+          return sum + Number(b.host_earnings || 0);
         }, 0) || 0;
 
         return {
@@ -99,8 +98,7 @@ const EarningsAnalytics = () => {
           const bookingDate = new Date(b.end_at);
           return bookingDate >= weekStart && bookingDate <= weekEnd;
         }).reduce((sum, b) => {
-          const earnings = b.host_earnings ? Number(b.host_earnings) : Number(b.total_amount);
-          return sum + earnings;
+          return sum + Number(b.host_earnings || 0);
         }, 0) || 0;
 
         weeklyEarnings.push({

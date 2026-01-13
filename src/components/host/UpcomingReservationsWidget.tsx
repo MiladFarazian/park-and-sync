@@ -17,6 +17,7 @@ interface ReservationPreview {
   end_at: string;
   status: string;
   total_amount: number;
+  host_earnings: number | null;
   renter_id: string;
   is_guest: boolean;
   renter: {
@@ -69,6 +70,7 @@ const UpcomingReservationsWidget = () => {
           end_at,
           status,
           total_amount,
+          host_earnings,
           renter_id,
           is_guest,
           renter:profiles!bookings_renter_id_fkey (
@@ -94,6 +96,7 @@ const UpcomingReservationsWidget = () => {
         end_at: b.end_at,
         status: b.status,
         total_amount: b.total_amount,
+        host_earnings: b.host_earnings,
         renter_id: b.renter_id,
         is_guest: b.is_guest || false,
         renter: b.renter as { first_name: string | null; last_name: string | null },
@@ -229,7 +232,7 @@ const UpcomingReservationsWidget = () => {
                 {/* Actions */}
                 <div className="flex flex-col items-end gap-2">
                   <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-                    ${reservation.total_amount.toFixed(0)}
+                    ${(reservation.host_earnings ?? reservation.total_amount).toFixed(0)}
                   </span>
                   <Button
                     variant="outline"

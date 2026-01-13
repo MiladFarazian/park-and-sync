@@ -31,6 +31,7 @@ interface BookingForCalendar {
   end_at: string;
   status: string;
   total_amount: number;
+  host_earnings?: number | null;
   is_guest?: boolean;
   guest_full_name?: string | null;
   will_use_ev_charging?: boolean | null;
@@ -165,7 +166,7 @@ const HostCalendar = () => {
       let bookingsQuery = supabase
         .from('bookings')
         .select(`
-          id, spot_id, start_at, end_at, status, total_amount, is_guest, guest_full_name,
+          id, spot_id, start_at, end_at, status, total_amount, host_earnings, is_guest, guest_full_name,
           renter:profiles!bookings_renter_id_fkey(first_name, last_name),
           spot:spots!bookings_spot_id_fkey(title, address)
         `)
@@ -512,7 +513,7 @@ const HostCalendar = () => {
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-lg font-bold text-primary">${Number(booking.total_amount).toFixed(2)}</span>
+              <span className="text-lg font-bold text-primary">${Number(booking.host_earnings || booking.total_amount).toFixed(2)}</span>
               {booking.will_use_ev_charging && (
                 <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-xs px-1.5 py-0.5">
                   <Zap className="h-3 w-3 mr-0.5" />
