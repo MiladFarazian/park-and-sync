@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { formatAvailability } from '@/lib/formatAvailability';
 import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
+import { getHostNetEarnings } from '@/lib/hostEarnings';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('listings');
@@ -94,11 +95,11 @@ const Dashboard = () => {
         (spotsData || []).map(async (spot) => {
           const { data: bookings } = await supabase
             .from('bookings')
-            .select('host_earnings, status')
+            .select('host_earnings, hourly_rate, start_at, end_at, status')
             .eq('spot_id', spot.id)
             .eq('status', 'completed');
 
-          const earnings = bookings?.reduce((sum, b) => sum + Number(b.host_earnings || 0), 0) || 0;
+          const earnings = bookings?.reduce((sum, b) => sum + getHostNetEarnings(b), 0) || 0;
           const primaryPhoto = spot.spot_photos?.find((p: any) => p.is_primary) || spot.spot_photos?.[0];
 
           return {

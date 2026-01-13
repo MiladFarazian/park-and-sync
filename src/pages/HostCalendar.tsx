@@ -17,6 +17,7 @@ import { getStreetAddress } from '@/lib/addressUtils';
 import { ReviewModal } from '@/components/booking/ReviewModal';
 import { useToast } from '@/hooks/use-toast';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
+import { getHostNetEarnings } from '@/lib/hostEarnings';
 
 interface SpotWithRate {
   id: string;
@@ -513,7 +514,7 @@ const HostCalendar = () => {
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-lg font-bold text-primary">${Number(booking.host_earnings || booking.total_amount).toFixed(2)}</span>
+              <span className="text-lg font-bold text-primary">${getHostNetEarnings(booking).toFixed(2)}</span>
               {booking.will_use_ev_charging && (
                 <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-xs px-1.5 py-0.5">
                   <Zap className="h-3 w-3 mr-0.5" />

@@ -14,6 +14,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { format, subDays, startOfWeek, endOfWeek, eachDayOfInterval, addDays } from 'date-fns';
+import { getHostNetEarnings } from '@/lib/hostEarnings';
 
 interface EarningData {
   date: string;
@@ -58,7 +59,7 @@ const EarningsAnalytics = () => {
       const thirtyDaysAgo = subDays(new Date(), 30);
       const { data: bookings, error: bookingsError } = await supabase
         .from('bookings')
-        .select('host_earnings, total_amount, end_at, created_at')
+        .select('host_earnings, hourly_rate, start_at, end_at, created_at')
         .in('spot_id', spotIds)
         .eq('status', 'completed')
         .gte('end_at', thirtyDaysAgo.toISOString());
@@ -76,9 +77,7 @@ const EarningsAnalytics = () => {
         const dayEarnings = bookings?.filter(b => {
           const bookingDate = format(new Date(b.end_at), 'yyyy-MM-dd');
           return bookingDate === dayStr;
-        }).reduce((sum, b) => {
-          return sum + Number(b.host_earnings || 0);
-        }, 0) || 0;
+        }).reduce((sum, b) => sum + getHostNetEarnings(b), 0) || 0;
 
         return {
           date: format(day, 'MMM d'),
@@ -97,9 +96,7 @@ const EarningsAnalytics = () => {
         const weekEarnings = bookings?.filter(b => {
           const bookingDate = new Date(b.end_at);
           return bookingDate >= weekStart && bookingDate <= weekEnd;
-        }).reduce((sum, b) => {
-          return sum + Number(b.host_earnings || 0);
-        }, 0) || 0;
+        }).reduce((sum, b) => sum + getHostNetEarnings(b), 0) || 0;
 
         weeklyEarnings.push({
           date: format(weekStart, 'MMM d'),

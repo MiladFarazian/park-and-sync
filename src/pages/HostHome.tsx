@@ -12,6 +12,7 @@ import EarningsAnalytics from '@/components/host/EarningsAnalytics';
 import RecentReviews from '@/components/host/RecentReviews';
 import UpcomingReservationsWidget from '@/components/host/UpcomingReservationsWidget';
 import QuickAvailabilityActions from '@/components/host/QuickAvailabilityActions';
+import { getHostNetEarnings } from '@/lib/hostEarnings';
 
 const HostHome = () => {
   const navigate = useNavigate();
@@ -60,16 +61,14 @@ const HostHome = () => {
       // Fetch completed bookings for earnings
       const { data: completedBookings, error: bookingsError } = await supabase
         .from('bookings')
-        .select('host_earnings, total_amount, status')
+        .select('host_earnings, hourly_rate, start_at, end_at, status')
         .in('spot_id', spotIds)
         .eq('status', 'completed');
 
       if (bookingsError) throw bookingsError;
 
       // Calculate total earnings using host_earnings field (net earnings after platform fee)
-      const totalEarnings = completedBookings?.reduce((sum, b) => {
-        return sum + Number(b.host_earnings || 0);
-      }, 0) || 0;
+      const totalEarnings = completedBookings?.reduce((sum, b) => sum + getHostNetEarnings(b), 0) || 0;
 
       setStats({
         totalEarnings,
