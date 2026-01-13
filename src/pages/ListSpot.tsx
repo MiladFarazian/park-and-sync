@@ -637,28 +637,30 @@ const ListSpot = () => {
       onTouchEnd={swipeHandlers.onTouchEnd}
     >
       <div className="p-4 space-y-6 max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              if (currentStep === 1) {
-                navigate('/dashboard');
-              } else {
-                setCurrentStep(currentStep - 1);
-              }
-            }}
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">List Your Spot</h1>
-            <p className="text-sm text-muted-foreground">
-              Step {currentStep} of 6
-            </p>
+        {/* Header - Hidden on Step 4 for fullscreen calendar */}
+        {currentStep !== 4 && (
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                if (currentStep === 1) {
+                  navigate('/dashboard');
+                } else {
+                  setCurrentStep(currentStep - 1);
+                }
+              }}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">List Your Spot</h1>
+              <p className="text-sm text-muted-foreground">
+                Step {currentStep} of 6
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)}>
           {/* Step 1: Basic Information */}
@@ -1007,18 +1009,33 @@ const ListSpot = () => {
             </Card>
           )}
 
-          {/* Step 4: Availability */}
+          {/* Step 4: Availability - Fullscreen layout */}
           {currentStep === 4 && (
-            <Card className="flex flex-col h-[calc(100vh-12rem)] overflow-hidden">
-              <CardContent className="p-6 flex flex-col flex-1 min-h-0">
-                <div className="shrink-0 mb-4">
-                  <h2 className="text-xl font-semibold mb-2">Availability</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Set your recurring weekly schedule. Leave blank if you prefer to manage availability on a per-date basis after listing.
+            <Card className="flex flex-col h-[calc(100vh-2rem)] overflow-hidden">
+              <CardContent className="p-3 sm:p-4 flex flex-col flex-1 min-h-0">
+                {/* Compact header with back button */}
+                <div className="flex items-center justify-between shrink-0 mb-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2"
+                    onClick={() => setCurrentStep(3)}
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-1" />
+                    Back
+                  </Button>
+                  <span className="text-xs text-muted-foreground">Step 4 of 6</span>
+                </div>
+
+                <div className="shrink-0 mb-2">
+                  <h2 className="text-lg font-semibold">Weekly Schedule</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Set your recurring availability. <span className="font-medium text-primary">Leave blank</span> to manage on a per-date basis after listing.
                   </p>
                 </div>
 
-                <div className="flex-1 min-h-0 overflow-y-auto">
+                <div className="flex-1 min-h-0 overflow-hidden">
                   <WeeklyScheduleGrid
                     initialRules={availabilityRules}
                     onChange={setAvailabilityRules}
@@ -1026,15 +1043,7 @@ const ListSpot = () => {
                   />
                 </div>
 
-                <div className="flex gap-3 pt-4 shrink-0">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setCurrentStep(3)}
-                  >
-                    Back
-                  </Button>
+                <div className="flex gap-3 pt-3 shrink-0">
                   <Button
                     type="button"
                     className="flex-1"
