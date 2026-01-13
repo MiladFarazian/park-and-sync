@@ -716,20 +716,30 @@ const Profile = () => {
                           if (isResendingEmail || resendCooldown > 0) return;
                           setIsResendingEmail(true);
                           try {
-                            // Use email_change for phone-verified users who added email later
-                            // Use signup for users who signed up with email
-                            const resendType = user?.phone_confirmed_at && !user?.email_confirmed_at 
-                              ? 'email_change' 
-                              : 'signup';
+                            // For phone-verified users who added email later, we need to use updateUser
+                            // to re-trigger the email_change flow (this fires the Auth Hook)
+                            // The resend API with type 'email_change' doesn't trigger the Auth Hook
+                            const isPhoneUserWithPendingEmail = user?.phone_confirmed_at && !user?.email_confirmed_at;
                             
-                            const { error } = await supabase.auth.resend({
-                              type: resendType,
-                              email: profile.email!,
-                              options: {
-                                emailRedirectTo: `${window.location.origin}/email-confirmation`
+                            if (isPhoneUserWithPendingEmail) {
+                              // Re-call updateUser to trigger email_change auth hook
+                              const emailToVerify = (user as any)?.new_email || profile.email;
+                              if (!emailToVerify) {
+                                throw new Error('No pending email to verify');
                               }
-                            });
-                            if (error) throw error;
+                              const { error } = await supabase.auth.updateUser({ email: emailToVerify });
+                              if (error) throw error;
+                            } else {
+                              // For email signup users, use the resend API
+                              const { error } = await supabase.auth.resend({
+                                type: 'signup',
+                                email: profile.email!,
+                                options: {
+                                  emailRedirectTo: `${window.location.origin}/email-confirmation`
+                                }
+                              });
+                              if (error) throw error;
+                            }
                             toast.success('Verification email sent! Check your inbox.');
                             setResendCooldown(60);
                           } catch (error: any) {
