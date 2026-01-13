@@ -266,7 +266,7 @@ export const WeeklyScheduleGrid = ({
   };
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col h-full">
       {/* Instructions & Legend - Compact */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 shrink-0 mb-1">
         <p className="text-[10px] sm:text-xs text-muted-foreground">
@@ -284,15 +284,15 @@ export const WeeklyScheduleGrid = ({
         </div>
       </div>
 
-      {/* Grid Container - Natural height (prevents blank space inside) */}
-      <Card className="overflow-hidden">
+      {/* Grid Container - Fills available space, scrolls internally */}
+      <Card className="overflow-hidden flex-1 min-h-0 flex flex-col">
         <div
           ref={gridRef}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onTouchEnd={handleTouchEnd}
           onTouchMove={handleTouchMove}
-          className="touch-none"
+          className="touch-none flex-1 overflow-y-auto"
         >
           {/* Header Row */}
           <div className="flex border-b bg-muted/30">
@@ -357,8 +357,8 @@ export const WeeklyScheduleGrid = ({
         </div>
       </Card>
 
-      {/* Quick Actions - Compact */}
-      <div className="flex gap-2 shrink-0 mt-1">
+      {/* Quick Actions - Compact, no extra margin */}
+      <div className="flex gap-2 shrink-0 pt-2">
         <Button
           type="button"
           variant="outline"
