@@ -47,6 +47,7 @@ import SupportReservations from "./pages/SupportReservations";
 import SupportAccount from "./pages/SupportAccount";
 import SupportUserDetail from "./pages/SupportUserDetail";
 import GuestBookingDetail from "./pages/GuestBookingDetail";
+import SavedSpots from "./pages/SavedSpots";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ModeProvider } from "./contexts/ModeContext";
 import { MessagesProvider } from "./contexts/MessagesContext";
@@ -123,6 +124,7 @@ const App = () => {
                     <Route path="/manage-availability" element={<RequireHostMode><ManageAvailability /></RequireHostMode>} />
                     <Route path="/messages" element={<Messages />} />
                     <Route path="/profile" element={<Profile />} />
+                    <Route path="/saved-spots" element={<SavedSpots />} />
                     <Route path="/reviews" element={<Reviews />} />
                     <Route path="/manage-account" element={<ManageAccount />} />
                     <Route path="/book/:spotId" element={<Booking />} />

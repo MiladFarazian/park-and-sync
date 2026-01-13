@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, Building2, ArrowRight, ExternalLink, X, Mail, CheckCircle2, Clock, Phone, MessageCircle, Quote } from 'lucide-react';
+import { Edit, Star, User, Car, CreditCard, Bell, Shield, ChevronRight, LogOut, AlertCircle, Upload, Building2, ArrowRight, ExternalLink, X, Mail, CheckCircle2, Clock, Phone, MessageCircle, Quote, Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -575,6 +575,11 @@ const Profile = () => {
     label: 'Manage Account',
     subtitle: 'Update your profile details',
     onClick: () => navigate('/manage-account')
+  }, {
+    icon: Heart,
+    label: 'Saved Spots',
+    subtitle: 'Your favorite parking spots',
+    onClick: () => navigate('/saved-spots')
   }, {
     icon: Building2,
     label: 'List Your Spot',
