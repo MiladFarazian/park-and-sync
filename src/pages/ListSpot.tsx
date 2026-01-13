@@ -1013,27 +1013,26 @@ const ListSpot = () => {
           {currentStep === 4 && (
             <Card className="flex flex-col h-[calc(100vh-2rem)] overflow-hidden">
               <CardContent className="p-3 sm:p-4 flex flex-col flex-1 min-h-0">
-                {/* Compact header with back button */}
+                {/* Compact header - back arrow + title + step on same line */}
                 <div className="flex items-center justify-between shrink-0 mb-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2"
-                    onClick={() => setCurrentStep(3)}
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-1" />
-                    Back
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => setCurrentStep(3)}
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <h2 className="text-lg font-semibold">Weekly Schedule</h2>
+                  </div>
                   <span className="text-xs text-muted-foreground">Step 4 of 6</span>
                 </div>
 
-                <div className="shrink-0 mb-2">
-                  <h2 className="text-lg font-semibold">Weekly Schedule</h2>
-                  <p className="text-xs text-muted-foreground">
-                    Set your recurring availability. <span className="font-medium text-primary">Leave blank</span> to manage on a per-date basis after listing.
-                  </p>
-                </div>
+                <p className="text-xs text-muted-foreground shrink-0 mb-2">
+                  Set your recurring availability. <span className="font-medium text-primary">Leave blank</span> to manage on a per-date basis after listing.
+                </p>
 
                 <div className="flex-1 min-h-0 overflow-hidden">
                   <WeeklyScheduleGrid
