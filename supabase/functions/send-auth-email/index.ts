@@ -214,14 +214,24 @@ const handler = async (req: Request): Promise<Response> => {
     const { user, email_data } = data;
     const { token, token_hash, redirect_to, email_action_type } = email_data;
 
-    // For email_change events, the new email is in user.email_new (user.email may be empty for phone-only users)
-    const recipientEmail = email_action_type === 'email_change' && user.email_new
-      ? user.email_new
-      : user.email;
+    // Debug: Log the full payload structure to understand where email_new is
+    console.log('[send-auth-email] Full user object:', JSON.stringify(user));
+    console.log('[send-auth-email] Full email_data object:', JSON.stringify(email_data));
+
+    // For email_change events, check multiple possible locations for the new email
+    // Supabase may send it as user.new_email, user.email_new, or email_data.new_email
+    const recipientEmail = (() => {
+      if (email_action_type === 'email_change') {
+        // Try various possible field names
+        const newEmail = user.email_new || user.new_email || (email_data as any).new_email || (email_data as any).email;
+        if (newEmail) return newEmail;
+      }
+      return user.email;
+    })();
 
     // Validate we have an email before proceeding
     if (!recipientEmail) {
-      console.error('[send-auth-email] No recipient email found - user.email:', user.email, 'user.email_new:', user.email_new);
+      console.error('[send-auth-email] No recipient email found - user:', JSON.stringify(user), 'email_data:', JSON.stringify(email_data));
       return new Response(
         JSON.stringify({
           error: {
