@@ -66,10 +66,9 @@ const HostHome = () => {
 
       if (bookingsError) throw bookingsError;
 
-      // Calculate total earnings using host_earnings field if available, otherwise use total_amount
+      // Calculate total earnings using host_earnings field (net earnings after platform fee)
       const totalEarnings = completedBookings?.reduce((sum, b) => {
-        const earnings = b.host_earnings ? Number(b.host_earnings) : Number(b.total_amount);
-        return sum + earnings;
+        return sum + Number(b.host_earnings || 0);
       }, 0) || 0;
 
       setStats({

@@ -94,11 +94,11 @@ const Dashboard = () => {
         (spotsData || []).map(async (spot) => {
           const { data: bookings } = await supabase
             .from('bookings')
-            .select('total_amount, status')
+            .select('host_earnings, status')
             .eq('spot_id', spot.id)
             .eq('status', 'completed');
 
-          const earnings = bookings?.reduce((sum, b) => sum + Number(b.total_amount), 0) || 0;
+          const earnings = bookings?.reduce((sum, b) => sum + Number(b.host_earnings || 0), 0) || 0;
           const primaryPhoto = spot.spot_photos?.find((p: any) => p.is_primary) || spot.spot_photos?.[0];
 
           return {
