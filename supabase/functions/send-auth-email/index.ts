@@ -52,10 +52,10 @@ const getEmailTemplate = (
       buttonText: "Verify My Email"
     },
     email_change: {
-      subject: "Confirm your new email for Parkzy",
-      heading: "Confirm Email Change",
-      description: "You requested to change your email address. Click the button below to confirm your new email.",
-      buttonText: "Confirm Email Change"
+      subject: "Verify your email for Parkzy",
+      heading: "Verify Your Email",
+      description: "You're almost done! Please verify your email address to complete your Parkzy account setup and unlock all features.",
+      buttonText: "Verify My Email"
     },
     recovery: {
       subject: "Reset your Parkzy password",
@@ -70,6 +70,9 @@ const getEmailTemplate = (
       buttonText: "Sign In to Parkzy"
     }
   };
+
+  // Use the white logo from the public folder for email headers
+  const logoUrl = `${appUrl}/parkzy-logo-white.png`;
 
   const template = templates[type] || templates.signup;
   const displayName = firstName || 'there';
@@ -90,7 +93,7 @@ const getEmailTemplate = (
             <!-- Header with Logo -->
             <tr>
               <td style="background: linear-gradient(135deg, ${parkzyPurple} 0%, ${parkzyPurpleDark} 100%); padding: 40px 30px; text-align: center;">
-                <img src="https://mqbupmusmciijsjmzbcu.supabase.co/storage/v1/object/public/assets/parkzy-logo-white.png" alt="Parkzy" style="height: 48px; width: auto;" />
+                <img src="${logoUrl}" alt="Parkzy" style="height: 48px; width: auto;" />
               </td>
             </tr>
             
