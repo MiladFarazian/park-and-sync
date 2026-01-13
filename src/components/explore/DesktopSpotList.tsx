@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Star, MapPin, Footprints, Umbrella, Zap, Shield, Car, X, BoltIcon, Clock, Accessibility, Check, ChevronDown, Camera, Lightbulb, Truck } from 'lucide-react';
+import { Star, MapPin, Footprints, Umbrella, Zap, Shield, Car, X, BoltIcon, Clock, Accessibility, Check, ChevronDown, Camera, Lightbulb, Truck, Heart } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -7,6 +7,7 @@ import { EVChargerBadge } from '@/components/ev/EVChargerBadge';
 import { evChargerTypes } from '@/lib/evChargerTypes';
 import { vehicleSizes, getVehicleSizeShortLabel } from '@/lib/vehicleSizes';
 import { cn } from '@/lib/utils';
+import { useFavoriteSpots } from '@/hooks/useFavoriteSpots';
 import {
   Select,
   SelectContent,
@@ -145,6 +146,7 @@ const DesktopSpotList = ({
   const navigate = useNavigate();
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const listContainerRef = useRef<HTMLDivElement>(null);
+  const { isFavorite, toggleFavorite, isLoading: isFavoriteLoading } = useFavoriteSpots();
 
   // Auto-scroll to selected card when selection changes
   useEffect(() => {
@@ -554,8 +556,8 @@ const DesktopSpotList = ({
                   onClick={() => handleViewDetails(spot.id)}
                 >
                   <div className="flex gap-4">
-                    {/* Image */}
-                    <div className="w-24 h-24 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
+                    {/* Image with Heart Button */}
+                    <div className="w-24 h-24 rounded-lg bg-muted flex-shrink-0 overflow-hidden relative">
                       {spot.imageUrl ? (
                         <img
                           src={spot.imageUrl}
@@ -567,6 +569,25 @@ const DesktopSpotList = ({
                           <MapPin className="h-8 w-8" />
                         </div>
                       )}
+                      {/* Favorite Heart Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(spot.id);
+                        }}
+                        disabled={isFavoriteLoading}
+                        className="absolute top-1 right-1 p-1.5 rounded-full bg-background/80 backdrop-blur-sm hover:bg-background transition-colors shadow-sm"
+                        aria-label={isFavorite(spot.id) ? "Remove from favorites" : "Add to favorites"}
+                      >
+                        <Heart
+                          className={cn(
+                            "h-4 w-4 transition-colors",
+                            isFavorite(spot.id)
+                              ? "fill-red-500 text-red-500"
+                              : "text-muted-foreground hover:text-red-500"
+                          )}
+                        />
+                      </button>
                     </div>
 
                     {/* Details */}

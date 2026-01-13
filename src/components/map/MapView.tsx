@@ -3,7 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Star, MapPin, Navigation, Footprints, Pencil, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
+import { Star, MapPin, Navigation, Footprints, Pencil, ChevronLeft, ChevronRight, Zap, Heart } from 'lucide-react';
 import { EVChargerBadge } from '@/components/ev/EVChargerBadge';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useMode } from '@/contexts/ModeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import useEmblaCarousel from 'embla-carousel-react';
+import { useFavoriteSpots } from '@/hooks/useFavoriteSpots';
+import { cn } from '@/lib/utils';
 
 interface UserBooking {
   id: string;
@@ -80,6 +82,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
   const navigate = useNavigate();
   const { mode, setMode } = useMode();
   const { user } = useAuth();
+  const { isFavorite, toggleFavorite, isLoading: isFavoriteLoading } = useFavoriteSpots();
   
   const buildSpotUrl = (spotId: string) => {
     const params = new URLSearchParams({ from: 'explore' });
@@ -1322,12 +1325,31 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                     isAnimating ? 'animate-selection-pulse' : ''
                   }`}>
                     <div className="flex gap-3 cursor-pointer" onClick={() => navigate(buildSpotUrl(spot.id))}>
-                      <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0">
+                      <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0 relative">
                         <img 
                           src={spot.imageUrl || "/placeholder.svg"}
                           alt="Parking spot"
                           className="w-full h-full object-cover rounded-lg"
                         />
+                        {/* Favorite Heart Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(spot.id);
+                          }}
+                          disabled={isFavoriteLoading}
+                          className="absolute top-1 right-1 p-1 rounded-full bg-background/80 backdrop-blur-sm hover:bg-background transition-colors shadow-sm"
+                          aria-label={isFavorite(spot.id) ? "Remove from favorites" : "Add to favorites"}
+                        >
+                          <Heart
+                            className={cn(
+                              "h-3.5 w-3.5 transition-colors",
+                              isFavorite(spot.id)
+                                ? "fill-red-500 text-red-500"
+                                : "text-muted-foreground hover:text-red-500"
+                            )}
+                          />
+                        </button>
                       </div>
                       
                       <div className="flex-1 space-y-2 min-w-0">
