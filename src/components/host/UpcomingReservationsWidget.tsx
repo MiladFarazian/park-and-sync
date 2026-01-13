@@ -19,6 +19,8 @@ interface ReservationPreview {
   status: string;
   total_amount: number;
   host_earnings: number | null;
+  hourly_rate?: number;
+  extension_charges?: number | null;
   renter_id: string;
   is_guest: boolean;
   renter: {
@@ -72,6 +74,8 @@ const UpcomingReservationsWidget = () => {
           status,
           total_amount,
           host_earnings,
+          hourly_rate,
+          extension_charges,
           renter_id,
           is_guest,
           renter:profiles!bookings_renter_id_fkey (
@@ -98,6 +102,8 @@ const UpcomingReservationsWidget = () => {
         status: b.status,
         total_amount: b.total_amount,
         host_earnings: b.host_earnings,
+        hourly_rate: b.hourly_rate,
+        extension_charges: b.extension_charges,
         renter_id: b.renter_id,
         is_guest: b.is_guest || false,
         renter: b.renter as { first_name: string | null; last_name: string | null },
