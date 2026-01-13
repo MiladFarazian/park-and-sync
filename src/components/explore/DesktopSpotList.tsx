@@ -621,6 +621,7 @@ const DesktopSpotList = ({
                         </div>
                         <div className="text-right flex-shrink-0">
                           {filters.evCharging && spot.hasEvCharging && (spot.evChargingPremium ?? 0) > 0 ? (
+                            // EV charging search: show combined price
                             <>
                               <p className="font-bold text-lg">${(spot.hourlyRate + (spot.evChargingPremium ?? 0)).toFixed(2)}</p>
                               <p className="text-xs text-muted-foreground flex items-center justify-end gap-0.5">
@@ -628,7 +629,17 @@ const DesktopSpotList = ({
                                 incl. charging
                               </p>
                             </>
+                          ) : spot.hasEvCharging && (spot.evChargingPremium ?? 0) > 0 ? (
+                            // Non-EV search but spot has charging: show base + optional charging price
+                            <>
+                              <p className="font-bold text-lg">${spot.hourlyRate.toFixed(2)}</p>
+                              <p className="text-xs text-green-600 flex items-center justify-end gap-0.5">
+                                <Zap className="h-3 w-3" />
+                                +${(spot.evChargingPremium ?? 0).toFixed(2)} charging
+                              </p>
+                            </>
                           ) : (
+                            // No charging available or no premium
                             <>
                               <p className="font-bold text-lg">${spot.hourlyRate.toFixed(2)}</p>
                               <p className="text-xs text-muted-foreground">per hour</p>
