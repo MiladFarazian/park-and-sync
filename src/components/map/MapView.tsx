@@ -1368,15 +1368,16 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                           </div>
                           <div className="text-right flex-shrink-0">
                             {spot.hasEvCharging && (spot.evChargingPremium ?? 0) > 0 ? (
+                              // Spot has EV charging: show base rate + charging add-on option
                               <>
-                                <p className="font-bold text-primary text-lg">${(spot.hourlyRate + (spot.evChargingPremium ?? 0)).toFixed(2)}/hr</p>
-                                <p className="text-xs text-muted-foreground flex items-center justify-end gap-0.5">
-                                  <Zap className="h-3 w-3 text-green-600" />
-                                  w/ charging
+                                <p className="font-bold text-primary text-lg">${spot.hourlyRate.toFixed(2)}/hr</p>
+                                <p className="text-xs text-green-600 flex items-center justify-end gap-0.5">
+                                  <Zap className="h-3 w-3" />
+                                  +${(spot.evChargingPremium ?? 0).toFixed(2)} charging
                                 </p>
                               </>
                             ) : (
-                              <p className="font-bold text-primary text-lg">${spot.hourlyRate}/hr</p>
+                              <p className="font-bold text-primary text-lg">${spot.hourlyRate.toFixed(2)}/hr</p>
                             )}
                           </div>
                         </div>
