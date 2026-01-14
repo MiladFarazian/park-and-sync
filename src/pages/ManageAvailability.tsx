@@ -184,7 +184,9 @@ const ManageAvailability = () => {
       const override = data.overrides[0];
       if (!override.is_available) return 'Blocked';
       if (override.start_time && override.end_time) {
-        return `${formatTimeDisplay(override.start_time)} - ${formatTimeDisplay(override.end_time)}`;
+        // Treat 00:00-23:59 as "Available all day"
+        const isFullDay = override.start_time === '00:00' && override.end_time === '23:59';
+        return isFullDay ? 'Available all day' : `${formatTimeDisplay(override.start_time)} - ${formatTimeDisplay(override.end_time)}`;
       }
       return 'Available all day';
     }

@@ -367,7 +367,9 @@ const HostCalendar = () => {
         if (!override.is_available) {
           availableHours = 'Blocked';
         } else if (override.start_time && override.end_time) {
-          availableHours = `${formatTimeDisplay(override.start_time)} - ${formatTimeDisplay(override.end_time)}`;
+          // Treat 00:00-23:59 as "Available all day"
+          const isFullDay = override.start_time === '00:00' && override.end_time === '23:59';
+          availableHours = isFullDay ? 'Available all day' : `${formatTimeDisplay(override.start_time)} - ${formatTimeDisplay(override.end_time)}`;
         } else {
           availableHours = 'Available all day';
         }
