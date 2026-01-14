@@ -356,7 +356,7 @@ function SupportChatPane({
         )}
       </div>
       
-      <div className="p-4 border-t flex-shrink-0 pb-20 md:pb-4">
+      <div className="p-4 border-t flex-shrink-0">
         {mediaPreview && (
           <div className="mb-2 relative inline-block">
             <div className="relative">
