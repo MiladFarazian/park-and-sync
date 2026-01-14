@@ -120,7 +120,7 @@ const HostCalendar = () => {
   }, [user]);
 
   useEffect(() => {
-    if (user && selectedSpotId) {
+    if (user && selectedSpotId && selectedSpotId !== 'none') {
       fetchData();
       fetchAllReservations();
     }
@@ -138,12 +138,17 @@ const HostCalendar = () => {
       if (spotsError) throw spotsError;
       setSpots(spotsData || []);
       
-      // Auto-select first spot if available
+      // Auto-select first spot if available, or 'none' if no spots exist
       if (spotsData && spotsData.length > 0 && !selectedSpotId) {
         setSelectedSpotId(spotsData[0].id);
+      } else if ((!spotsData || spotsData.length === 0) && !selectedSpotId) {
+        // Set a placeholder value so the calendar can render
+        setSelectedSpotId('none');
       }
+      setLoading(false);
     } catch (error) {
       console.error('Error fetching spots:', error);
+      setLoading(false);
     }
   };
 
