@@ -271,7 +271,7 @@ const GuestChatPaneHost = ({ bookingId, guestName, onBack, markAsRead }: GuestCh
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t flex-shrink-0 pb-[calc(1rem+env(safe-area-inset-bottom))] md:pb-4">
+      <div className="p-4 border-t flex-shrink-0">
         <div className="flex gap-2">
           <Input
             placeholder="Type a message..."
