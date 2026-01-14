@@ -585,17 +585,32 @@ const ManageAvailability = () => {
             )}
           </h2>
           
-          <Card className="p-2 sm:p-4 overflow-hidden">
-            <div className="w-full overflow-x-auto">
-              <Calendar
-                mode="multiple"
-                selected={selectedDates}
-                onSelect={handleDateSelect}
-                className="rounded-md border-0 mx-auto pointer-events-auto [&_.rdp-months]:flex-wrap [&_.rdp-month]:min-w-[280px] [&_.rdp-cell]:w-10 [&_.rdp-head_cell]:w-10"
-                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground text-center mt-2">
+          <Card className="p-4">
+            <Calendar
+              mode="multiple"
+              selected={selectedDates}
+              onSelect={handleDateSelect}
+              className="w-full"
+              disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+              classNames={{
+                months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0 justify-center",
+                month: "space-y-4",
+                caption: "flex justify-center pt-1 relative items-center",
+                caption_label: "text-sm font-medium",
+                nav: "space-x-1 flex items-center",
+                table: "w-full border-collapse",
+                head_row: "flex justify-between",
+                head_cell: "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem] flex-1 text-center",
+                row: "flex w-full mt-2 justify-between",
+                cell: "flex-1 text-center text-sm p-0 relative flex items-center justify-center",
+                day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-accent rounded-md",
+                day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+                day_today: "bg-accent text-accent-foreground",
+                day_outside: "text-muted-foreground opacity-50",
+                day_disabled: "text-muted-foreground opacity-50",
+              }}
+            />
+            <p className="text-xs text-muted-foreground text-center mt-3">
               Tap dates to select or deselect them
             </p>
           </Card>
