@@ -58,12 +58,12 @@ const HostHome = () => {
         return;
       }
 
-      // Fetch completed bookings for earnings
+      // Fetch bookings for earnings (completed, active, paid - matching earnings history page)
       const { data: completedBookings, error: bookingsError } = await supabase
         .from('bookings')
-        .select('host_earnings, hourly_rate, start_at, end_at, status')
+        .select('host_earnings, hourly_rate, start_at, end_at, status, extension_charges')
         .in('spot_id', spotIds)
-        .eq('status', 'completed');
+        .in('status', ['completed', 'active', 'paid']);
 
       if (bookingsError) throw bookingsError;
 
