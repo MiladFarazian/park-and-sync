@@ -650,9 +650,9 @@ const HostCalendar = () => {
       )}
 
       {spots.length === 0 && !loading && (
-        <Card className="p-6 text-center">
-          <p className="text-muted-foreground mb-4">You don't have any spots yet.</p>
-          <Button onClick={() => navigate('/list-spot')}>List a Spot</Button>
+        <Card className="p-3 flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">You don't have any spots yet.</p>
+          <Button size="sm" onClick={() => navigate('/list-spot')}>List a Spot</Button>
         </Card>
       )}
 
