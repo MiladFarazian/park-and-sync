@@ -324,8 +324,8 @@ export const QuickAvailabilityActions = () => {
             spot_id: spotId,
             override_date: today,
             is_available: true,
-            start_time: '00:00',
-            end_time: '23:59',
+            start_time: null,
+            end_time: null,
           });
 
         if (error) throw error;
