@@ -855,8 +855,8 @@ const ListSpot = () => {
 
           {/* Step 3: Amenities & Vehicle Size */}
           {currentStep === 3 && (
-            <Card>
-              <CardContent className="p-4 sm:p-6 space-y-6">
+            <Card className="flex flex-col max-h-[calc(100vh-2rem)] overflow-hidden">
+              <CardContent className="p-4 sm:p-6 space-y-6 overflow-y-auto flex-1 pb-32">
                 <div>
                   <h2 className="text-xl font-semibold mb-2">Amenities</h2>
                   <p className="text-sm text-muted-foreground">
