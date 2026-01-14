@@ -272,6 +272,21 @@ const ManageAvailability = () => {
     return errors.length === 0;
   };
 
+  // Helper to detect full-day time ranges
+  const isFullDayTimeRange = (startTime: string | null, endTime: string | null): boolean => {
+    if (!startTime || !endTime) return true; // null times = full day
+    
+    // Normalize times (strip seconds if present)
+    const start = startTime.substring(0, 5); // "00:00:00" → "00:00"
+    const end = endTime.substring(0, 5);     // "24:00:00" → "24:00"
+    
+    // Check common full-day patterns
+    return (
+      (start === '00:00' && end === '24:00') ||
+      (start === '00:00' && end === '23:59')
+    );
+  };
+
   // Get current availability display for a spot
   const getSpotAvailabilityDisplay = (spotId: string): string => {
     const data = spotAvailability[spotId];
@@ -280,16 +295,18 @@ const ManageAvailability = () => {
     if (data.overrides.length > 0) {
       const override = data.overrides[0];
       if (!override.is_available) return 'Blocked';
-      if (override.start_time && override.end_time) {
-        const isFullDay = override.start_time === '00:00' && override.end_time === '23:59';
-        return isFullDay ? 'Available all day' : `${formatTimeDisplay(override.start_time)} - ${formatTimeDisplay(override.end_time)}`;
+      if (isFullDayTimeRange(override.start_time, override.end_time)) {
+        return 'Available all day';
       }
-      return 'Available all day';
+      return `${formatTimeDisplay(override.start_time!)} - ${formatTimeDisplay(override.end_time!)}`;
     }
     
     if (data.rules.length > 0) {
       const rule = data.rules[0];
       if (!rule.is_available) return 'Blocked (recurring)';
+      if (isFullDayTimeRange(rule.start_time, rule.end_time)) {
+        return 'Available all day (recurring)';
+      }
       return `${formatTimeDisplay(rule.start_time)} - ${formatTimeDisplay(rule.end_time)} (recurring)`;
     }
     
