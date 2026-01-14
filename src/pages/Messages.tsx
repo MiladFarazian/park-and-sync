@@ -448,7 +448,7 @@ function ChatPane({
           )
         )}
       </div>
-      <div className="p-4 border-t flex-shrink-0 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-4">
+      <div className="p-4 border-t flex-shrink-0 pb-[calc(1rem+env(safe-area-inset-bottom))] md:pb-4">
         {mediaPreview && (
           <div className="mb-2 relative inline-block">
             <div className="relative">
