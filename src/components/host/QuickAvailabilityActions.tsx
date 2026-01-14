@@ -344,13 +344,10 @@ export const QuickAvailabilityActions = () => {
 
   const handleManageAvailability = () => {
     if (selectedSpots.length === 0) return;
-
-    if (selectedSpots.length === 1) {
-      navigate(`/edit-spot/${selectedSpots[0]}/availability`);
-    } else {
-      const spotIdsParam = selectedSpots.join(',');
-      navigate(`/manage-availability/bulk?spots=${spotIdsParam}`);
-    }
+    
+    // Always navigate to manage-availability with spots param
+    const spotIdsParam = selectedSpots.join(',');
+    navigate(`/manage-availability?spots=${spotIdsParam}`);
     setDialogOpen(false);
   };
 
