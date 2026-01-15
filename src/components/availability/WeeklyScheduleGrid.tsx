@@ -266,9 +266,9 @@ export const WeeklyScheduleGrid = ({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {/* Instructions & Legend - Compact */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 shrink-0 mb-1">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-1">
         <p className="text-[10px] sm:text-xs text-muted-foreground">
           Click and drag to select hours
         </p>
@@ -284,15 +284,15 @@ export const WeeklyScheduleGrid = ({
         </div>
       </div>
 
-      {/* Grid Container - Fills available space, scrolls internally */}
-      <Card className="overflow-hidden flex-1 min-h-0 flex flex-col">
+      {/* Grid Container */}
+      <Card className="overflow-hidden">
         <div
           ref={gridRef}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onTouchEnd={handleTouchEnd}
           onTouchMove={handleTouchMove}
-          className="touch-none flex-1 overflow-y-auto"
+          className="touch-none"
         >
           {/* Header Row */}
           <div className="flex border-b bg-muted/30">

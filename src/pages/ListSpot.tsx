@@ -1019,12 +1019,12 @@ const ListSpot = () => {
             </Card>
           )}
 
-          {/* Step 4: Availability - Fullscreen layout */}
+          {/* Step 4: Availability */}
           {currentStep === 4 && (
-            <Card className="flex flex-col h-[calc(100vh-2rem)] overflow-hidden">
-              <CardContent className="p-3 sm:p-4 flex flex-col flex-1 min-h-0">
+            <Card>
+              <CardContent className="p-3 sm:p-4 space-y-2">
                 {/* Compact header - back arrow + title + step on same line */}
-                <div className="flex items-center justify-between shrink-0 mb-2">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Button
                       type="button"
@@ -1040,11 +1040,11 @@ const ListSpot = () => {
                   <span className="text-xs text-muted-foreground">Step 4 of 6</span>
                 </div>
 
-                <p className="text-xs text-muted-foreground shrink-0 mb-2">
+                <p className="text-xs text-muted-foreground">
                   Set your recurring availability. <span className="font-medium text-primary">Leave blank</span> to manage on a per-date basis after listing.
                 </p>
 
-                <div className="flex-1 min-h-0 overflow-hidden">
+                <div>
                   <WeeklyScheduleGrid
                     initialRules={availabilityRules}
                     onChange={setAvailabilityRules}
@@ -1052,7 +1052,7 @@ const ListSpot = () => {
                   />
                 </div>
 
-                <div className="flex gap-3 pt-3 shrink-0">
+                <div className="flex gap-3 pt-3">
                   <Button
                     type="button"
                     className="flex-1"
