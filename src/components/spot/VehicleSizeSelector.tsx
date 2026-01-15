@@ -10,10 +10,10 @@ interface VehicleSizeSelectorProps {
 }
 
 const sizeIcons: Record<string, string> = {
-  compact: '/icons/vehicles/vehicle-compact.svg',
-  midsize: '/icons/vehicles/vehicle-sedan.svg',
-  suv: '/icons/vehicles/vehicle-suv.svg',
-  truck: '/icons/vehicles/vehicle-truck.svg',
+  compact: '/icons/vehicles/vehicle-compact.png',
+  midsize: '/icons/vehicles/vehicle-sedan.png',
+  suv: '/icons/vehicles/vehicle-suv.png',
+  truck: '/icons/vehicles/vehicle-truck.png',
 };
 
 const VehicleSizeSelector = ({
