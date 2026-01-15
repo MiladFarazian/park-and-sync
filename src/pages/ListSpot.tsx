@@ -78,6 +78,11 @@ const ListSpot = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
+
+  // Scroll to top when step changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [currentStep]);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [instantBook, setInstantBook] = useState(true); // Default to instant book
   const [photos, setPhotos] = useState<File[]>([]);
