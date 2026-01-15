@@ -50,12 +50,13 @@ const Activity = () => {
       } = await supabase.auth.getUser();
       if (!user) return;
       
-      // Fetch user's existing reviews
+      // Fetch user's existing reviews (including pending ones for UI state)
       const { data: reviewsData } = await supabase
         .from('reviews')
-        .select('booking_id')
+        .select('booking_id, revealed_at')
         .eq('reviewer_id', user.id);
       
+      // Store booking IDs where user has already submitted a review
       setUserReviews(new Set(reviewsData?.map(r => r.booking_id) || []));
       
       let bookingsData: any[] = [];
@@ -286,9 +287,10 @@ const Activity = () => {
     };
     
     // Review-related logic
+    const hasReviewed = userReviews.has(booking.id);
     const canReview = (booking.status === 'completed' || (isPast && booking.status === 'paid')) && 
                       booking.status !== 'canceled' && 
-                      !userReviews.has(booking.id);
+                      !hasReviewed;
     const revieweeId = isHost ? booking.renter_id : booking.spots?.host_id;
     const getRevieweeName = () => {
       if (isHost) {
@@ -479,7 +481,7 @@ const Activity = () => {
                   </TooltipTrigger>
                   <TooltipContent>Message</TooltipContent>
                 </Tooltip>
-                {canReview && (
+                {canReview ? (
                   isHost ? (
                     <Button 
                       variant="outline" 
@@ -505,6 +507,20 @@ const Activity = () => {
                       <TooltipContent>Review</TooltipContent>
                     </Tooltip>
                   )
+                ) : hasReviewed && isPast && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        className="flex-1 bg-yellow-50 text-yellow-600 border-yellow-300 cursor-default"
+                        disabled
+                      >
+                        <Star className="h-4 w-4 fill-yellow-400" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Review submitted - awaiting reveal</TooltipContent>
+                  </Tooltip>
                 )}
                 {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && (
                   <Tooltip>
@@ -659,7 +675,7 @@ const Activity = () => {
                   <TooltipContent>Message</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              {canReview && (
+              {canReview ? (
                 isHost ? (
                   <Button 
                     variant="outline" 
@@ -687,6 +703,22 @@ const Activity = () => {
                     </Tooltip>
                   </TooltipProvider>
                 )
+              ) : hasReviewed && isPast && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        className="shrink-0 bg-yellow-50 text-yellow-600 border-yellow-300 cursor-default"
+                        disabled
+                      >
+                        <Star className="h-4 w-4 fill-yellow-400" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Review submitted - awaiting reveal</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
               {!isPast && booking.status !== 'canceled' && booking.userRole === 'renter' && (
                 <TooltipProvider>
