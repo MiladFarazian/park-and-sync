@@ -15,6 +15,7 @@ interface Review {
   created_at: string;
   reviewer_name: string;
   spot_category?: string;
+  revealed_at: string | null;
 }
 
 const REVIEWS_PER_PAGE = 10;
@@ -67,20 +68,22 @@ const Reviews = () => {
         const bookingIds = bookings.map(b => b.id);
         const bookingMap = new Map(bookings.map(b => [b.id, b]));
 
-        // Get total count
+        // Get total count of revealed reviews only
         const { count } = await supabase
           .from('reviews')
           .select('id', { count: 'exact', head: true })
           .in('booking_id', bookingIds)
-          .eq('reviewee_id', user.id);
+          .eq('reviewee_id', user.id)
+          .not('revealed_at', 'is', null);
         
         setTotalCount(count || 0);
 
         const { data: reviewsData, error: reviewsError } = await supabase
           .from('reviews')
-          .select('id, rating, comment, created_at, reviewer_id, booking_id')
+          .select('id, rating, comment, created_at, reviewer_id, booking_id, revealed_at')
           .in('booking_id', bookingIds)
           .eq('reviewee_id', user.id)
+          .not('revealed_at', 'is', null)
           .order('created_at', { ascending: false })
           .range(offset, offset + REVIEWS_PER_PAGE - 1);
         
@@ -115,7 +118,8 @@ const Reviews = () => {
             reviewer_name: reviewer?.first_name && reviewer?.last_name 
               ? `${reviewer.first_name} ${reviewer.last_name.charAt(0)}.`
               : 'Host',
-            spot_category: (booking?.spots as any)?.category || undefined
+            spot_category: (booking?.spots as any)?.category || undefined,
+            revealed_at: r.revealed_at
           };
         });
 
@@ -156,20 +160,22 @@ const Reviews = () => {
         const bookingIds = bookings.map(b => b.id);
         const bookingSpotMap = new Map(bookings.map(b => [b.id, b.spot_id]));
 
-        // Get total count
+        // Get total count of revealed reviews only
         const { count } = await supabase
           .from('reviews')
           .select('id', { count: 'exact', head: true })
           .in('booking_id', bookingIds)
-          .eq('reviewee_id', user.id);
+          .eq('reviewee_id', user.id)
+          .not('revealed_at', 'is', null);
         
         setTotalCount(count || 0);
 
         const { data: reviewsData, error: reviewsError } = await supabase
           .from('reviews')
-          .select('id, rating, comment, created_at, reviewer_id, booking_id')
+          .select('id, rating, comment, created_at, reviewer_id, booking_id, revealed_at')
           .in('booking_id', bookingIds)
           .eq('reviewee_id', user.id)
+          .not('revealed_at', 'is', null)
           .order('created_at', { ascending: false })
           .range(offset, offset + REVIEWS_PER_PAGE - 1);
         
@@ -205,7 +211,8 @@ const Reviews = () => {
             reviewer_name: reviewer?.first_name && reviewer?.last_name 
               ? `${reviewer.first_name} ${reviewer.last_name.charAt(0)}.`
               : 'Driver',
-            spot_category: spot?.category || undefined
+            spot_category: spot?.category || undefined,
+            revealed_at: r.revealed_at
           };
         });
 

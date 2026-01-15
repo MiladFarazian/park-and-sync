@@ -71,7 +71,7 @@ const RecentReviews = () => {
       const bookingIds = bookings.map(b => b.id);
       const bookingSpotMap = new Map(bookings.map(b => [b.id, b.spot_id]));
 
-      // Get reviews for these bookings where host is reviewee
+      // Get reviews for these bookings where host is reviewee (only revealed reviews)
       const { data: reviewsData, error: reviewsError } = await supabase
         .from('reviews')
         .select(`
@@ -80,10 +80,12 @@ const RecentReviews = () => {
           comment,
           created_at,
           booking_id,
-          reviewer_id
+          reviewer_id,
+          revealed_at
         `)
         .in('booking_id', bookingIds)
         .eq('reviewee_id', user.id)
+        .not('revealed_at', 'is', null)
         .order('created_at', { ascending: false })
         .limit(5);
       

@@ -133,6 +133,7 @@ export type Database = {
           platform_fee: number
           refund_amount: number | null
           renter_id: string
+          review_window_ends_at: string | null
           spot_id: string
           start_at: string
           status: Database["public"]["Enums"]["booking_status"]
@@ -175,6 +176,7 @@ export type Database = {
           platform_fee: number
           refund_amount?: number | null
           renter_id: string
+          review_window_ends_at?: string | null
           spot_id: string
           start_at: string
           status?: Database["public"]["Enums"]["booking_status"]
@@ -217,6 +219,7 @@ export type Database = {
           platform_fee?: number
           refund_amount?: number | null
           renter_id?: string
+          review_window_ends_at?: string | null
           spot_id?: string
           start_at?: string
           status?: Database["public"]["Enums"]["booking_status"]
@@ -654,6 +657,7 @@ export type Database = {
           id: string
           is_public: boolean | null
           rating: number
+          revealed_at: string | null
           reviewee_id: string
           reviewer_id: string
         }
@@ -664,6 +668,7 @@ export type Database = {
           id?: string
           is_public?: boolean | null
           rating: number
+          revealed_at?: string | null
           reviewee_id: string
           reviewer_id: string
         }
@@ -674,6 +679,7 @@ export type Database = {
           id?: string
           is_public?: boolean | null
           rating?: number
+          revealed_at?: string | null
           reviewee_id?: string
           reviewer_id?: string
         }
@@ -1154,6 +1160,10 @@ export type Database = {
             }
             Returns: string
           }
+      check_and_reveal_reviews: {
+        Args: { p_booking_id: string }
+        Returns: undefined
+      }
       check_rate_limit: {
         Args: {
           p_key: string

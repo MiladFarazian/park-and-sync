@@ -94,7 +94,10 @@ export const ReviewModal = ({
           .eq('user_id', revieweeId);
       }
 
-      toast.success('Review submitted successfully!');
+      toast.success(
+        'Review submitted! It will be visible once both parties have reviewed or after 14 days.',
+        { duration: 5000 }
+      );
       setRating(0);
       setComment('');
       onOpenChange(false);
@@ -117,7 +120,7 @@ export const ReviewModal = ({
             Rate your {reviewerRole === 'driver' ? 'parking experience' : 'guest'}
           </DialogTitle>
           <DialogDescription>
-            How was your experience with {revieweeName}?
+            How was your experience with {revieweeName}? Your review will be visible once both parties have reviewed, or after 14 days.
           </DialogDescription>
         </DialogHeader>
 
