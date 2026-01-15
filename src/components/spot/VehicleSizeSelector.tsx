@@ -77,28 +77,19 @@ const VehicleSizeSelector = ({
                   : 'border-border bg-background hover:border-muted-foreground/30'
               )}
             >
-              <div
+              <img
+                src={sizeIcons[size.value]}
+                alt={size.label}
                 className={cn(
-                  'flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center transition-colors',
-                  isSelected
-                    ? 'bg-primary/10'
-                    : 'bg-muted'
+                  'flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 transition-all',
+                  isSelected ? 'opacity-100' : 'opacity-40'
                 )}
-              >
-                <img
-                  src={sizeIcons[size.value]}
-                  alt={size.label}
-                  className={cn(
-                    'h-6 w-6 sm:h-8 sm:w-8 transition-all',
-                    isSelected ? 'opacity-100' : 'opacity-60'
-                  )}
-                  style={{
-                    filter: isSelected
-                      ? 'invert(36%) sepia(91%) saturate(1000%) hue-rotate(180deg) brightness(95%)'
-                      : 'none',
-                  }}
-                />
-              </div>
+                style={{
+                  filter: isSelected
+                    ? 'invert(36%) sepia(91%) saturate(1000%) hue-rotate(180deg) brightness(95%)'
+                    : 'none',
+                }}
+              />
 
               <div className="flex-1 min-w-0 pr-6">
                 <p
