@@ -1,5 +1,5 @@
 import React from 'react';
-import { Car, Truck, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { vehicleSizes, VehicleSizeInfo } from '@/lib/vehicleSizes';
 
@@ -9,11 +9,11 @@ interface VehicleSizeSelectorProps {
   error?: string;
 }
 
-const sizeIcons: Record<string, React.ReactNode> = {
-  compact: <Car className="h-6 w-6" />,
-  midsize: <Car className="h-7 w-7" />,
-  suv: <Truck className="h-7 w-7" />,
-  truck: <Truck className="h-8 w-8" />,
+const sizeIcons: Record<string, string> = {
+  compact: '/icons/vehicles/vehicle-compact.svg',
+  midsize: '/icons/vehicles/vehicle-sedan.svg',
+  suv: '/icons/vehicles/vehicle-suv.svg',
+  truck: '/icons/vehicles/vehicle-truck.svg',
 };
 
 const VehicleSizeSelector = ({
@@ -81,11 +81,23 @@ const VehicleSizeSelector = ({
                 className={cn(
                   'flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center transition-colors',
                   isSelected
-                    ? 'bg-primary/10 text-primary'
-                    : 'bg-muted text-muted-foreground'
+                    ? 'bg-primary/10'
+                    : 'bg-muted'
                 )}
               >
-                {sizeIcons[size.value]}
+                <img
+                  src={sizeIcons[size.value]}
+                  alt={size.label}
+                  className={cn(
+                    'h-6 w-6 sm:h-8 sm:w-8 transition-all',
+                    isSelected ? 'opacity-100' : 'opacity-60'
+                  )}
+                  style={{
+                    filter: isSelected
+                      ? 'invert(36%) sepia(91%) saturate(1000%) hue-rotate(180deg) brightness(95%)'
+                      : 'none',
+                  }}
+                />
               </div>
 
               <div className="flex-1 min-w-0 pr-6">
