@@ -915,7 +915,12 @@ const ListSpot = () => {
                             placeholder="2.00"
                             value={evChargingPremium}
                             onChange={(e) => setEvChargingPremium(e.target.value)}
-                            className={`pl-10 ${(!evChargingPremium || parseFloat(evChargingPremium) <= 0) ? 'border-destructive' : ''}`}
+                            onFocus={(e) => {
+                              setTimeout(() => {
+                                e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                              }, 250);
+                            }}
+                            className={`pl-10 scroll-mb-40 ${(!evChargingPremium || parseFloat(evChargingPremium) <= 0) ? 'border-destructive' : ''}`}
                           />
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
@@ -931,7 +936,12 @@ const ListSpot = () => {
                           rows={3}
                           value={evChargingInstructions}
                           onChange={(e) => setEvChargingInstructions(e.target.value)}
-                          className="mt-1.5 resize-none"
+                          onFocus={(e) => {
+                            setTimeout(() => {
+                              e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                            }, 250);
+                          }}
+                          className="mt-1.5 resize-none scroll-mb-40"
                         />
                         <p className="text-xs text-muted-foreground mt-1">
                           These instructions will be shown to drivers who opt-in to EV charging
