@@ -12,6 +12,7 @@ import { useStripeReturnFlow } from '@/hooks/useStripeReturnFlow';
 import { useMode } from '@/contexts/ModeContext';
 import { useSupportRole } from '@/hooks/useSupportRole';
 import { Shield } from 'lucide-react';
+import { useVisualViewportVars } from '@/hooks/useVisualViewportVars';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -33,6 +34,9 @@ const AppLayout = ({ children }: AppLayoutProps) => {
     location.pathname === '/host-calendar';
   // Initialize notifications hook to set up realtime listeners
   useNotifications();
+  
+  // Track visual viewport for iOS PWA keyboard handling
+  useVisualViewportVars();
   
   // Handle return from Stripe setup in PWA/standalone mode
   useStripeReturnFlow();
@@ -66,9 +70,12 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       </div>
 
       {/* Mobile Layout with Bottom Navigation */}
-      <div className="md:hidden flex flex-col h-screen">
+      <div 
+        className="md:hidden flex flex-col"
+        style={{ height: 'var(--app-vvh, 100dvh)' }}
+      >
         <NotificationPermissionBanner />
-        <header className="flex-shrink-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4">
+        <header className="flex-shrink-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4 sticky top-0">
           <div className="flex items-center gap-3">
             <img 
               src={parkzyLogo} 
@@ -90,7 +97,16 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           </div>
         </header>
         <main className="flex-1 overflow-hidden bg-background">
-          <div className={`h-full overflow-y-auto ${isFullScreenPage && location.pathname !== '/messages' && location.pathname !== '/support-messages' ? '' : 'pb-20 pb-[calc(5rem+env(safe-area-inset-bottom))]'}`}>
+          <div 
+            className={`h-full overflow-y-auto ${isFullScreenPage && location.pathname !== '/messages' && location.pathname !== '/support-messages' ? '' : 'pb-20'}`}
+            style={{ 
+              paddingBottom: isFullScreenPage && location.pathname !== '/messages' && location.pathname !== '/support-messages' 
+                ? undefined 
+                : 'calc(5rem + env(safe-area-inset-bottom) + var(--keyboard-inset, 0px))',
+              overscrollBehaviorY: 'contain',
+              WebkitOverflowScrolling: 'touch'
+            }}
+          >
             {children}
           </div>
         </main>
