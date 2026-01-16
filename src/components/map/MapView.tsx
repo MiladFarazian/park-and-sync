@@ -1286,7 +1286,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
 
       {/* Swipeable Spot Cards Carousel - Hidden on desktop split view */}
       {sortedSpots.length > 0 && !hideCarousel && (
-        <div className="absolute bottom-[calc(4rem+env(safe-area-inset-bottom)+8px)] md:bottom-4 left-0 right-0 z-10">
+        <div className="absolute bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-4 left-0 right-0 z-10">
           {/* Navigation arrows and counter - only show if more than 1 spot */}
           {sortedSpots.length > 1 && (
             <div className="flex items-center justify-between px-4 mb-2">
