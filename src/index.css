@@ -226,5 +226,13 @@ All colors MUST be HSL.
   .bg-card,
   .bg-background {
     transition: none !important;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+  
+  /* Force GPU layer for virtualized lists */
+  [data-virtuoso-scroller] {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
   }
 }
