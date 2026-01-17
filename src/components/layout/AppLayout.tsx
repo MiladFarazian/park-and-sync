@@ -96,15 +96,16 @@ const AppLayout = ({ children }: AppLayoutProps) => {
             <NotificationBell />
           </div>
         </header>
-        <main className="flex-1 overflow-hidden bg-background">
+        <main className="flex-1 overflow-hidden bg-background" style={{ minHeight: 0, transform: 'translateZ(0)' }}>
           <div 
-            className={`h-full overflow-y-auto ${isFullScreenPage && location.pathname !== '/messages' && location.pathname !== '/support-messages' ? '' : 'pb-20'}`}
+            className={`h-full ${isFullScreenPage && location.pathname !== '/messages' && location.pathname !== '/support-messages' ? '' : 'overflow-y-auto pb-20'}`}
             style={{ 
               paddingBottom: isFullScreenPage && location.pathname !== '/messages' && location.pathname !== '/support-messages' 
                 ? undefined 
                 : 'calc(5rem + env(safe-area-inset-bottom) + var(--keyboard-inset, 0px))',
               overscrollBehaviorY: 'contain',
-              WebkitOverflowScrolling: 'touch'
+              WebkitOverflowScrolling: 'touch',
+              minHeight: 0
             }}
           >
             {children}
