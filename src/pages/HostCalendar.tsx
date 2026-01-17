@@ -796,7 +796,7 @@ const HostCalendar = () => {
             </div>
           ) : (
             // Week View - Vertical scrollable layout for mobile
-            <div className="space-y-2 max-h-[calc(100vh-22rem)] overflow-y-auto px-1 pb-4" {...weekSwipeHandlers}>
+            <div className="space-y-2 overflow-y-auto px-1 pb-4" style={{ maxHeight: 'calc(var(--app-vvh, 100dvh) - 18rem)' }} {...weekSwipeHandlers}>
               {weekDays.map((date, index) => {
                 const { bookings: dayBookings, isUnavailable, rate, isPast, hasBookings, availableHours } = getDateData(date);
                 const isTodayDate = isToday(date);

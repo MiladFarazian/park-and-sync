@@ -356,7 +356,7 @@ function ChatPane({
   };
 
   return (
-    <div className="flex flex-col h-full bg-card">
+    <div className="flex flex-col h-full bg-card" style={{ minHeight: 0, transform: 'translateZ(0)' }}>
       <div className="p-4 border-b flex-shrink-0">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={onBack}>
@@ -410,7 +410,7 @@ function ChatPane({
         />
       )}
       
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="flex-1 overflow-y-auto min-h-0" style={{ transform: 'translateZ(0)' }}>
         {(loadingMessages && !(messagesCacheRef.current.get(conversationId)?.length)) ? (
           <div className="flex items-center justify-center h-full text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin" />
@@ -465,7 +465,7 @@ function ChatPane({
           )
         )}
       </div>
-      <div className="p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-4 border-t flex-shrink-0 bg-card">
+      <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-4 border-t flex-shrink-0 bg-card">
         {mediaPreview && (
           <div className="mb-2 relative inline-block">
             <div className="relative">
@@ -756,7 +756,7 @@ const MessagesContent = () => {
   );
 
   return (
-    <div className="flex h-full min-h-0 bg-background">
+    <div className="flex min-h-0 bg-background" style={{ height: 'calc(var(--app-vvh, 100dvh) - 3.5rem)', transform: 'translateZ(0)' }}>
       {/* Conversations List */}
       <div className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col overflow-hidden border-r bg-card`}>
         <div className="p-4 border-b flex-shrink-0">
@@ -876,7 +876,7 @@ const MessagesContent = () => {
       </div>
 
       {/* Messages Area */}
-      <div className={`${selectedConversation && isMobile ? 'flex' : 'hidden'} md:flex flex-1 flex-col overflow-hidden bg-card`} style={{ minHeight: 0 }}>
+      <div className={`${selectedConversation && isMobile ? 'flex' : 'hidden'} md:flex flex-1 flex-col overflow-hidden bg-card`} style={{ minHeight: 0, transform: 'translateZ(0)' }}>
         {selectedConversation ? (
           // Check if this is a guest conversation
           selectedConversation.startsWith('guest:') ? (
