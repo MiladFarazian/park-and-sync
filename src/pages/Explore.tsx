@@ -1213,7 +1213,16 @@ const Explore = () => {
           <AlertDialogFooter className="mt-5 sm:justify-center">
             <AlertDialogAction 
               className="rounded-full px-6"
-              onClick={() => setShowEvFallbackDialog(false)}
+              onClick={() => {
+                setShowEvFallbackDialog(false);
+                // Clear EV filter and refetch all spots
+                setEvChargerType(null);
+                setFilters(prev => ({
+                  ...prev,
+                  evCharging: false,
+                  evChargerTypes: [],
+                }));
+              }}
             >
               Got it
             </AlertDialogAction>
