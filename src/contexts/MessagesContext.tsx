@@ -11,6 +11,7 @@ export interface BookingContext {
   start_at: string;
   end_at: string;
   status: string;
+  instant_book?: boolean;
 }
 
 export interface Conversation {
@@ -113,7 +114,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             start_at,
             end_at,
             status,
-            spots!inner(host_id, title, address)
+            spots!inner(host_id, title, address, instant_book)
           `)
           .eq('renter_id', user.id)
           .in('status', ['paid', 'active', 'completed', 'pending'])
@@ -132,6 +133,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 start_at: b.start_at,
                 end_at: b.end_at,
                 status: b.status,
+                instant_book: b.spots.instant_book,
               });
             }
           }
@@ -140,7 +142,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         // Host mode: get renters who have booked user's spots
         const { data: hostSpots } = await supabase
           .from('spots')
-          .select('id, title, address')
+          .select('id, title, address, instant_book')
           .eq('host_id', user.id);
 
         if (hostSpots && hostSpots.length > 0) {
@@ -168,6 +170,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     start_at: b.start_at,
                     end_at: b.end_at,
                     status: b.status,
+                    instant_book: spot.instant_book,
                   });
                 }
               }

@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { calculateBookingTotal, calculateDriverPrice } from '@/lib/pricing';
 import { getHostNetEarnings, getParkzyFee } from '@/lib/hostEarnings';
 import RequireAuth from '@/components/auth/RequireAuth';
+import { getBookingStatus, getBookingStatusColor, getBookingStatusLabelWithOverstay } from '@/lib/bookingStatus';
 
 interface BookingDetails {
   id: string;
@@ -55,6 +56,7 @@ interface BookingDetails {
     access_notes: string | null;
     has_ev_charging: boolean | null;
     ev_charging_instructions: string | null;
+    instant_book: boolean;
     spot_photos: Array<{
       url: string;
       is_primary: boolean | null;
@@ -174,7 +176,7 @@ const BookingDetailContent = () => {
           guest_car_model,
           guest_license_plate,
           guest_email,
-          spots!inner(id, title, address, host_id, description, access_notes, has_ev_charging, ev_charging_instructions, spot_photos(url, is_primary, sort_order)),
+          spots!inner(id, title, address, host_id, description, access_notes, has_ev_charging, ev_charging_instructions, instant_book, spot_photos(url, is_primary, sort_order)),
           profiles!bookings_renter_id_fkey(first_name, last_name, avatar_url)
         `)
         .eq('id', bookingId)
@@ -541,6 +543,18 @@ const BookingDetailContent = () => {
   const isHost = user?.id === booking.spots.host_id;
   const isRenter = booking?.renter_id === user?.id;
   
+  // Get status using new terminology system
+  const bookingStatusResult = getBookingStatus({
+    status: booking.status,
+    instantBook: booking.spots.instant_book !== false,
+    startAt: booking.start_at,
+    endAt: booking.end_at,
+    isHost
+  });
+  const hasOverstay = booking.overstay_charge_amount && booking.overstay_charge_amount > 0;
+  const statusLabel = getBookingStatusLabelWithOverstay(bookingStatusResult.label, hasOverstay);
+  const statusColor = getBookingStatusColor(bookingStatusResult.label);
+  
   // Can extend only after booking has started (before start: use modify instead) - DRIVER ONLY
   const canExtend = isRenter && !isHost && (booking.status === 'pending' || booking.status === 'active' || booking.status === 'paid') && bookingHasStarted && new Date() < new Date(booking.end_at);
   
@@ -590,9 +604,12 @@ const BookingDetailContent = () => {
             </Button>
             <div className="flex items-center gap-3">
               <h1 className="text-lg font-semibold">Booking Details</h1>
-              {isActive && <Badge className="text-xs">Active</Badge>}
-              {isCancelled && <Badge variant="destructive" className="text-xs">Cancelled</Badge>}
-              {isCompleted && <Badge variant="secondary" className="text-xs">Completed</Badge>}
+              <Badge 
+                variant={bookingStatusResult.variant}
+                className={`text-xs border ${statusColor}`}
+              >
+                {statusLabel}
+              </Badge>
             </div>
           </div>
         </div>

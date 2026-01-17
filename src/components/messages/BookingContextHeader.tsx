@@ -1,10 +1,11 @@
 import { MapPin, Calendar, Clock, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { format, isPast, isFuture, isWithinInterval } from 'date-fns';
+import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { BookingContext } from '@/contexts/MessagesContext';
 import { getStreetAddress } from '@/lib/addressUtils';
+import { getBookingStatus, getBookingStatusColor } from '@/lib/bookingStatus';
 
 interface BookingContextHeaderProps {
   booking: BookingContext;
@@ -12,38 +13,23 @@ interface BookingContextHeaderProps {
   partnerRole?: 'host' | 'driver';
 }
 
-const getBookingStatus = (booking: BookingContext): { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' } => {
-  const now = new Date();
-  const start = new Date(booking.start_at);
-  const end = new Date(booking.end_at);
-  
-  if (booking.status === 'canceled' || booking.status === 'refunded') {
-    return { label: 'Cancelled', variant: 'destructive' };
-  }
-  
-  if (booking.status === 'completed' || isPast(end)) {
-    return { label: 'Completed', variant: 'secondary' };
-  }
-  
-  if (isWithinInterval(now, { start, end })) {
-    return { label: 'Active', variant: 'default' };
-  }
-  
-  if (isFuture(start)) {
-    return { label: 'Upcoming', variant: 'outline' };
-  }
-  
-  // Pending booking
-  if (booking.status === 'pending') {
-    return { label: 'Pending', variant: 'outline' };
-  }
-  
-  return { label: booking.status, variant: 'secondary' };
-};
-
 const BookingContextHeader = ({ booking, partnerName, partnerRole }: BookingContextHeaderProps) => {
   const navigate = useNavigate();
-  const status = getBookingStatus(booking);
+  
+  // Use the new status terminology system
+  // Note: We default isHost to false since this is typically shown in driver context
+  // The partnerRole tells us who we're messaging, not who we are
+  const isHost = partnerRole === 'driver'; // If messaging a driver, we are the host
+  
+  const statusResult = getBookingStatus({
+    status: booking.status,
+    instantBook: booking.instant_book !== false,
+    startAt: booking.start_at,
+    endAt: booking.end_at,
+    isHost
+  });
+  
+  const statusColor = getBookingStatusColor(statusResult.label);
   
   const formatDateTime = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -82,8 +68,11 @@ const BookingContextHeader = ({ booking, partnerName, partnerRole }: BookingCont
         
         {/* Status Badge & View Button */}
         <div className="flex flex-col items-end gap-2 shrink-0">
-          <Badge variant={status.variant} className="text-xs">
-            {status.label}
+          <Badge 
+            variant={statusResult.variant} 
+            className={`text-xs border ${statusColor}`}
+          >
+            {statusResult.label}
           </Badge>
           <Button 
             variant="ghost" 

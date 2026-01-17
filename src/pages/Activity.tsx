@@ -17,6 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, isToday } from 'date-fns';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
+import { getBookingStatus, getBookingStatusColorWithOverstay, getBookingStatusLabelWithOverstay } from '@/lib/bookingStatus';
 
 const Activity = () => {
   const navigate = useNavigate();
@@ -71,6 +72,7 @@ const Activity = () => {
               title,
               address,
               host_id,
+              instant_book,
               profiles:host_id (
                 first_name,
                 last_name
@@ -96,6 +98,7 @@ const Activity = () => {
               title,
               address,
               host_id,
+              instant_book,
               spot_photos(url, is_primary, sort_order)
             ),
             renter:renter_id (
@@ -331,28 +334,22 @@ const Activity = () => {
       setExtendDialogOpen(true);
     };
 
+    const bookingStatusResult = getBookingStatus({
+      status: booking.status,
+      instantBook: booking.spots?.instant_book !== false,
+      startAt: booking.start_at,
+      endAt: booking.end_at,
+      isHost
+    });
+
+    const hasOverstay = booking.overstay_charge_amount && booking.overstay_charge_amount > 0;
+
     const getStatusColor = () => {
-      if (booking.status === 'canceled') return 'bg-destructive/10 text-destructive border-destructive/20';
-      if (booking.status === 'completed') {
-        if (booking.overstay_charge_amount && booking.overstay_charge_amount > 0) {
-          return 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-500 border-yellow-200 dark:border-yellow-800';
-        }
-        return 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-500 border-green-200 dark:border-green-800';
-      }
-      if (isPast) return 'bg-muted text-muted-foreground border-border';
-      return 'bg-primary/10 text-primary border-primary/20';
+      return getBookingStatusColorWithOverstay(bookingStatusResult.label, hasOverstay);
     };
 
     const getStatusText = () => {
-      if (booking.status === 'canceled') return 'Cancelled';
-      if (booking.status === 'completed') {
-        if (booking.overstay_charge_amount && booking.overstay_charge_amount > 0) {
-          return 'Completed - Late';
-        }
-        return 'Completed';
-      }
-      if (booking.status === 'paid') return isPast ? 'Completed' : 'Confirmed';
-      return booking.status.charAt(0).toUpperCase() + booking.status.slice(1);
+      return getBookingStatusLabelWithOverstay(bookingStatusResult.label, hasOverstay);
     };
 
     return <Card 
