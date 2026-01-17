@@ -791,10 +791,10 @@ const HostCalendar = () => {
               })}
             </div>
           ) : (
-            // Week View - Vertical layout for mobile
-            <div className="space-y-2" {...weekSwipeHandlers}>
+            // Week View - Vertical scrollable layout for mobile
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1" {...weekSwipeHandlers}>
               {weekDays.map((date, index) => {
-                const { bookings: dayBookings, isUnavailable, rate, isPast, hasBookings } = getDateData(date);
+                const { bookings: dayBookings, isUnavailable, rate, isPast, hasBookings, availableHours } = getDateData(date);
                 const isTodayDate = isToday(date);
                 
                 return (
@@ -869,10 +869,20 @@ const HostCalendar = () => {
                               +{dayBookings.length - 3} more
                             </div>
                           )}
+                          {/* Show availability hours below bookings */}
+                          {availableHours && !isAllSpotsView && (
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1 border-t border-dashed mt-1.5">
+                              <Clock className="h-3 w-3 flex-shrink-0" />
+                              <span className="truncate">{availableHours}</span>
+                            </div>
+                          )}
                         </div>
                       ) : (
-                        <div className="text-sm text-muted-foreground py-1">
-                          {isPast ? 'No bookings' : 'Available'}
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground py-1">
+                          <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                          <span className="truncate">
+                            {isPast ? 'No bookings' : (availableHours || 'Available')}
+                          </span>
                         </div>
                       )}
                     </div>
