@@ -9,6 +9,7 @@
  */
 
 const STRIPE_FLOW_KEY = 'stripeSetupFlow';
+const LIST_SPOT_DRAFT_KEY = 'listSpotDraft';
 const FLOW_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
 
 export interface StripeFlowState {
@@ -17,6 +18,65 @@ export interface StripeFlowState {
   action: 'stripe_setup';
   context?: 'list_spot' | 'profile';
 }
+
+export interface ListSpotDraft {
+  formData: {
+    category: string;
+    address: string;
+    hourlyRate: string;
+    description: string;
+    parkingInstructions: string;
+  };
+  selectedAmenities: string[];
+  instantBook: boolean;
+  availabilityRules: any[];
+  evChargingInstructions: string;
+  evChargingPremium: string;
+  evChargerType: string | null;
+  selectedVehicleSizes: string[];
+  addressCoordinates: { lat: number; lng: number } | null;
+  timestamp: number;
+}
+
+/**
+ * Save list spot draft before navigating to Stripe
+ */
+export const saveListSpotDraft = (draft: Omit<ListSpotDraft, 'timestamp'>): void => {
+  const draftData: ListSpotDraft = {
+    ...draft,
+    timestamp: Date.now(),
+  };
+  localStorage.setItem(LIST_SPOT_DRAFT_KEY, JSON.stringify(draftData));
+};
+
+/**
+ * Get saved list spot draft if it exists and is still valid
+ */
+export const getListSpotDraft = (): ListSpotDraft | null => {
+  try {
+    const saved = localStorage.getItem(LIST_SPOT_DRAFT_KEY);
+    if (!saved) return null;
+    
+    const draft: ListSpotDraft = JSON.parse(saved);
+    
+    // Check if draft is expired
+    if (Date.now() - draft.timestamp > FLOW_EXPIRY_MS) {
+      clearListSpotDraft();
+      return null;
+    }
+    
+    return draft;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Clear saved list spot draft
+ */
+export const clearListSpotDraft = (): void => {
+  localStorage.removeItem(LIST_SPOT_DRAFT_KEY);
+};
 
 /**
  * Detect if running as standalone PWA (iOS/Android homescreen app)

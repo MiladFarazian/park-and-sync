@@ -22,6 +22,7 @@ import { evChargerTypes } from '@/lib/evChargerTypes';
 import { useAuth } from '@/contexts/AuthContext';
 import VehicleSizeSelector from '@/components/spot/VehicleSizeSelector';
 import { vehicleSizes as vehicleSizeOptions } from '@/lib/vehicleSizes';
+import { getListSpotDraft, clearListSpotDraft, saveListSpotDraft, getStripeFlowState, clearStripeFlowState, isStandaloneMode } from '@/lib/stripeSetupFlow';
 
 const spotCategories = [
   'Residential Driveway',
@@ -113,29 +114,9 @@ const ListSpot = () => {
   const [stripeConnected, setStripeConnected] = useState(false);
   const [isConnectingStripe, setIsConnectingStripe] = useState(false);
 
-  // Check Stripe Connect status on mount
-  useEffect(() => {
-    const checkStripeStatus = async () => {
-      if (!user) {
-        setIsCheckingStripe(false);
-        return;
-      }
-      
-      try {
-        const { data, error } = await supabase.functions.invoke('check-stripe-connect-status');
-        if (error) throw error;
-        
-        setStripeConnected(data?.connected && data?.charges_enabled);
-      } catch (error) {
-        console.error('Error checking Stripe status:', error);
-        setStripeConnected(false);
-      } finally {
-        setIsCheckingStripe(false);
-      }
-    };
-    
-    checkStripeStatus();
-  }, [user]);
+  // Track if we're returning from Stripe setup
+  const hasCheckedStripeReturn = useRef(false);
+  const shouldAutoSubmitRef = useRef(false);
 
   useEffect(() => {
     const fetchMapboxToken = async () => {
@@ -172,6 +153,88 @@ const ListSpot = () => {
 
   const formData = watch();
   const addressValue = watch('address');
+
+  // Check Stripe Connect status on mount and handle return from Stripe
+  useEffect(() => {
+    const checkStripeStatus = async () => {
+      if (!user) {
+        setIsCheckingStripe(false);
+        return;
+      }
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('check-stripe-connect-status');
+        if (error) throw error;
+        
+        const isConnected = data?.connected && data?.charges_enabled;
+        setStripeConnected(isConnected);
+        
+        // Check if we're returning from Stripe setup in PWA mode
+        if (!hasCheckedStripeReturn.current) {
+          hasCheckedStripeReturn.current = true;
+          
+          const flowState = getStripeFlowState();
+          const draft = getListSpotDraft();
+          
+          if (flowState?.context === 'list_spot' && draft) {
+            // Clear flow state immediately
+            clearStripeFlowState();
+            
+            // Restore form state from draft
+            setValue('category', draft.formData.category as any);
+            setValue('address', draft.formData.address);
+            setValue('hourlyRate', draft.formData.hourlyRate);
+            setValue('description', draft.formData.description);
+            setValue('parkingInstructions', draft.formData.parkingInstructions);
+            setSelectedAmenities(draft.selectedAmenities);
+            setInstantBook(draft.instantBook);
+            setAvailabilityRules(draft.availabilityRules);
+            setEvChargingInstructions(draft.evChargingInstructions);
+            setEvChargingPremium(draft.evChargingPremium);
+            setEvChargerType(draft.evChargerType);
+            setSelectedVehicleSizes(draft.selectedVehicleSizes);
+            setAddressCoordinates(draft.addressCoordinates);
+            setAddressConfirmedFromSuggestion(!!draft.addressCoordinates);
+            
+            // Go to step 6 (review)
+            setCurrentStep(6);
+            
+            if (isConnected) {
+              toast.success('Stripe connected! Submitting your listing...');
+              // Mark for auto-submit after state is set
+              shouldAutoSubmitRef.current = true;
+            } else if (data?.details_submitted) {
+              toast.info('Stripe setup in progress', {
+                description: 'Your account is being verified. You can submit once verified.',
+              });
+            } else {
+              toast.info('Stripe setup not completed', {
+                description: 'Please complete Stripe setup to submit your listing.',
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking Stripe status:', error);
+        setStripeConnected(false);
+      } finally {
+        setIsCheckingStripe(false);
+      }
+    };
+    
+    checkStripeStatus();
+  }, [user, setValue]);
+
+  // Auto-submit after restoring state and Stripe is connected
+  useEffect(() => {
+    if (shouldAutoSubmitRef.current && stripeConnected && currentStep === 6 && !isCheckingStripe && !isSubmitting) {
+      shouldAutoSubmitRef.current = false;
+      // Clear the draft since we're about to submit
+      clearListSpotDraft();
+      // Trigger form submission
+      handleSubmit(onSubmit)();
+    }
+  }, [stripeConnected, currentStep, isCheckingStripe, isSubmitting, handleSubmit]);
 
   const toggleAmenity = (amenityId: string) => {
     setSelectedAmenities((prev) =>
@@ -583,6 +646,25 @@ const ListSpot = () => {
       if (!url) {
         throw new Error('No Stripe onboarding URL returned');
       }
+
+      // Save form state before navigating to Stripe
+      saveListSpotDraft({
+        formData: {
+          category: formData.category || '',
+          address: formData.address || '',
+          hourlyRate: formData.hourlyRate || '',
+          description: formData.description || '',
+          parkingInstructions: formData.parkingInstructions || '',
+        },
+        selectedAmenities,
+        instantBook,
+        availabilityRules,
+        evChargingInstructions,
+        evChargingPremium,
+        evChargerType,
+        selectedVehicleSizes,
+        addressCoordinates,
+      });
 
       // Import dynamically to avoid circular dependencies
       const { navigateToStripe, isStandaloneMode } = await import('@/lib/stripeSetupFlow');

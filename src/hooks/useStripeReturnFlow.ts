@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { getStripeFlowState, clearStripeFlowState, isStandaloneMode } from '@/lib/stripeSetupFlow';
@@ -7,9 +7,13 @@ import { getStripeFlowState, clearStripeFlowState, isStandaloneMode } from '@/li
 /**
  * Hook to detect and handle return from Stripe setup in PWA mode
  * Should be used in a component that renders on app startup (e.g., AppLayout or Profile)
+ * 
+ * Note: For list_spot context, the ListSpot component handles the return flow itself,
+ * so this hook skips processing for that context.
  */
 export const useStripeReturnFlow = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const hasChecked = useRef(false);
 
   useEffect(() => {
@@ -21,7 +25,18 @@ export const useStripeReturnFlow = () => {
       const flowState = getStripeFlowState();
       if (!flowState) return;
 
-      // Clear state immediately to prevent re-processing
+      // Skip for list_spot context - the ListSpot component handles this itself
+      if (flowState.context === 'list_spot') {
+        // If we're already on /list-spot, let that component handle it
+        if (location.pathname === '/list-spot') {
+          return;
+        }
+        // Otherwise, navigate to list-spot and let it handle the flow
+        navigate('/list-spot');
+        return;
+      }
+
+      // Clear state immediately to prevent re-processing (for non-list_spot contexts)
       clearStripeFlowState();
 
       // Show loading toast
@@ -67,5 +82,5 @@ export const useStripeReturnFlow = () => {
     // Small delay to ensure app is fully loaded
     const timer = setTimeout(checkStripeReturn, 500);
     return () => clearTimeout(timer);
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 };
