@@ -733,6 +733,26 @@ const Explore = () => {
     setShowEvFallbackDialog(true);
     setPendingEvFallbackDialog(false);
   }, [pendingEvFallbackDialog, spotsLoading]);
+
+  const dismissEvFallbackAndClearFilters = useCallback(() => {
+    setShowEvFallbackDialog(false);
+
+    // Clear EV filter state
+    setEvChargerType(null);
+    setFilters((prev) => ({
+      ...prev,
+      evCharging: false,
+      evChargerTypes: [],
+    }));
+
+    // Also remove EV filters from the URL (otherwise the page still "looks filtered")
+    const params = new URLSearchParams(window.location.search);
+    params.delete('ev');
+    params.delete('chargerType');
+
+    const qs = params.toString();
+    navigate(`/explore${qs ? `?${qs}` : ''}`, { replace: true });
+  }, [navigate]);
   
   const handleMapMove = (center: {
     lat: number;
@@ -1192,7 +1212,16 @@ const Explore = () => {
       )}
 
       {/* EV Charger Fallback Dialog */}
-      <AlertDialog open={showEvFallbackDialog} onOpenChange={setShowEvFallbackDialog}>
+      <AlertDialog
+        open={showEvFallbackDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            dismissEvFallbackAndClearFilters();
+            return;
+          }
+          setShowEvFallbackDialog(true);
+        }}
+      >
         <AlertDialogContent className="max-w-[320px] rounded-2xl p-6 gap-0">
           <AlertDialogHeader className="space-y-4">
             <div className="flex items-center justify-center">
@@ -1211,21 +1240,7 @@ const Explore = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-5 sm:justify-center">
-            <AlertDialogAction 
-              className="rounded-full px-6"
-              onClick={() => {
-                setShowEvFallbackDialog(false);
-                // Clear EV filter and refetch all spots
-                setEvChargerType(null);
-                setFilters(prev => ({
-                  ...prev,
-                  evCharging: false,
-                  evChargerTypes: [],
-                }));
-              }}
-            >
-              Got it
-            </AlertDialogAction>
+            <AlertDialogAction className="rounded-full px-6">Got it</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
