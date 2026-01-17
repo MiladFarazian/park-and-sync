@@ -220,3 +220,11 @@ All colors MUST be HSL.
     overflow-x: hidden;
   }
 }
+
+/* Prevent white flash on iOS keyboard open */
+@supports (-webkit-touch-callout: none) {
+  .bg-card,
+  .bg-background {
+    transition: none !important;
+  }
+}
