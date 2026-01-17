@@ -725,16 +725,23 @@ const Explore = () => {
     }
   }, [filters.evCharging, filters.evChargerTypes, searchLocation, fetchNearbySpots]);
 
+  const evFallbackDismissedRef = useRef(false);
+
   // Open EV fallback dialog only after the map/list has rendered (prevents a "black" backdrop flash)
   useEffect(() => {
     if (!pendingEvFallbackDialog) return;
     if (spotsLoading) return;
 
+    evFallbackDismissedRef.current = false;
     setShowEvFallbackDialog(true);
     setPendingEvFallbackDialog(false);
   }, [pendingEvFallbackDialog, spotsLoading]);
 
   const dismissEvFallbackAndClearFilters = useCallback(() => {
+    // Prevent double-processing (AlertDialogAction closes + onOpenChange fires)
+    if (evFallbackDismissedRef.current) return;
+    evFallbackDismissedRef.current = true;
+
     setShowEvFallbackDialog(false);
 
     // Clear EV filter state
@@ -753,7 +760,7 @@ const Explore = () => {
     const qs = params.toString();
     navigate(`/explore${qs ? `?${qs}` : ''}`, { replace: true });
   }, [navigate]);
-  
+
   const handleMapMove = (center: {
     lat: number;
     lng: number;
@@ -1219,6 +1226,7 @@ const Explore = () => {
             dismissEvFallbackAndClearFilters();
             return;
           }
+          evFallbackDismissedRef.current = false;
           setShowEvFallbackDialog(true);
         }}
       >
@@ -1240,7 +1248,12 @@ const Explore = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-5 sm:justify-center">
-            <AlertDialogAction className="rounded-full px-6">Got it</AlertDialogAction>
+            <AlertDialogAction
+              className="rounded-full px-6"
+              onClick={dismissEvFallbackAndClearFilters}
+            >
+              Got it
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
