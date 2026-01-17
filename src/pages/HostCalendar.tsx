@@ -18,6 +18,7 @@ import { ReviewModal } from '@/components/booking/ReviewModal';
 import { useToast } from '@/hooks/use-toast';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { getHostNetEarnings } from '@/lib/hostEarnings';
+import { getBookingStatus, getBookingStatusColor } from '@/lib/bookingStatus';
 
 interface SpotWithRate {
   id: string;
@@ -453,12 +454,15 @@ const HostCalendar = () => {
     return 'bg-primary/10 text-primary border-primary/20';
   };
 
-  const getStatusText = (status: string, isPast: boolean) => {
-    if (status === 'canceled') return 'Cancelled';
-    if (status === 'completed') return 'Completed';
-    if (status === 'paid') return isPast ? 'Completed' : 'Confirmed';
-    if (status === 'active') return 'Active';
-    return status.charAt(0).toUpperCase() + status.slice(1);
+  const getStatusText = (booking: any, isPast: boolean) => {
+    const statusResult = getBookingStatus({
+      status: booking.status,
+      instantBook: booking.spots?.instant_book !== false,
+      startAt: booking.start_at,
+      endAt: booking.end_at,
+      isHost: true
+    });
+    return statusResult.label;
   };
 
   const ReservationCard = ({ booking, isPast = false }: { booking: any; isPast?: boolean }) => {
