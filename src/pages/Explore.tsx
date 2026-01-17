@@ -1030,15 +1030,7 @@ const Explore = () => {
   // Mobile Layout: Full-screen map with overlay controls
   return (
     <div className="h-full overflow-hidden relative">
-      {/* Non-blocking loading indicator for mobile */}
-      {spotsLoading && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20">
-          <div className="bg-background/95 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2">
-            <Loader2 className="h-3 w-3 animate-spin text-primary" />
-            <span className="text-xs text-muted-foreground">Loading spots…</span>
-          </div>
-        </div>
-      )}
+      {/* Loading state is shown via map markers loading - removed redundant overlay indicator */}
       
       <div className="absolute top-4 left-4 right-4 z-10 space-y-2">
         <div className="relative max-w-md mx-auto">
