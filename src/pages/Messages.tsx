@@ -178,6 +178,16 @@ function ChatPane({
     if (cached && cached.length > 0) {
       setMessages(cached);
       setLoadingMessages(false);
+      // Scroll to bottom when using cached messages
+      setTimeout(() => {
+        if (virtuosoRef.current) {
+          virtuosoRef.current.scrollToIndex({
+            index: 'LAST',
+            align: 'end',
+            behavior: 'auto',
+          });
+        }
+      }, 50);
     } else {
       setLoadingMessages(true);
     }
@@ -206,18 +216,25 @@ function ChatPane({
         if (alive) markAsRead(convId);
       }, 1000);
 
-      // Scroll to bottom on initial load only
+      // Scroll to bottom on initial load only - use multiple attempts for reliability
+      const scrollToEnd = () => {
+        if (!alive || !virtuosoRef.current) return;
+        virtuosoRef.current.scrollToIndex({
+          index: 'LAST',
+          align: 'end',
+          behavior: 'auto',
+        });
+      };
+
+      // First attempt after short delay
+      setTimeout(scrollToEnd, 50);
+      // Second attempt to catch race conditions with Virtuoso rendering
+      setTimeout(scrollToEnd, 150);
+      // Final attempt for slower devices
       setTimeout(() => {
-        if (!alive) return;
-        if (virtuosoRef.current && (data?.length || 0) > 0) {
-          virtuosoRef.current.scrollToIndex({
-            index: 'LAST',
-            align: 'end',
-            behavior: 'auto',
-          });
-        }
+        scrollToEnd();
         initialLoadRef.current = false;
-      }, 50);
+      }, 300);
     })();
 
     return () => {
@@ -339,7 +356,7 @@ function ChatPane({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-card">
       <div className="p-4 border-b flex-shrink-0">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={onBack}>
@@ -448,7 +465,7 @@ function ChatPane({
           )
         )}
       </div>
-      <div className="p-4 border-t flex-shrink-0">
+      <div className="p-4 pb-[calc(1rem+5rem+env(safe-area-inset-bottom))] md:pb-4 border-t flex-shrink-0">
         {mediaPreview && (
           <div className="mb-2 relative inline-block">
             <div className="relative">
@@ -739,7 +756,7 @@ const MessagesContent = () => {
   );
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full bg-background">
       {/* Conversations List */}
       <div className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col overflow-hidden border-r bg-card`}>
         <div className="p-4 border-b flex-shrink-0">
@@ -859,7 +876,7 @@ const MessagesContent = () => {
       </div>
 
       {/* Messages Area */}
-      <div className={`${selectedConversation && isMobile ? 'flex' : 'hidden'} md:flex flex-1 flex-col overflow-hidden bg-card`}>
+      <div className={`${selectedConversation && isMobile ? 'flex' : 'hidden'} md:flex flex-1 flex-col overflow-hidden bg-card`} style={{ minHeight: 0 }}>
         {selectedConversation ? (
           // Check if this is a guest conversation
           selectedConversation.startsWith('guest:') ? (
