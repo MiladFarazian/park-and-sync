@@ -880,8 +880,10 @@ const Activity = () => {
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => setSelectedDate(isSelected ? null : day)}
                         className={`
-                          touch-scroll-safe aspect-square rounded-lg p-1 text-sm relative transition-colors
-                          ${isSelected ? 'bg-primary text-primary-foreground' : ''}
+                          aspect-square rounded-lg p-1 text-sm relative transition-colors
+                          ${isSelected 
+                            ? 'bg-primary text-primary-foreground font-medium' 
+                            : 'text-foreground hover:bg-muted'}
                           ${dayIsToday && !isSelected ? 'border-2 border-primary' : ''}
                         `}
                       >
