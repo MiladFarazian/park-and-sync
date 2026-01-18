@@ -455,7 +455,7 @@ function ChatPane({
                 )}
               />
               {showNewMessageButton && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+                <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-10">
                   <Button size="sm" onClick={scrollToBottom} className="shadow-lg">
                     New messages ↓
                   </Button>
@@ -465,22 +465,22 @@ function ChatPane({
           )
         )}
       </div>
-      <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-4 border-t flex-shrink-0 bg-card">
+      <div className="px-3 py-2 border-t flex-shrink-0 bg-card">
         {mediaPreview && (
           <div className="mb-2 relative inline-block">
             <div className="relative">
               {selectedMedia?.type.startsWith('image/') ? (
-                <img src={mediaPreview} alt="Preview" className="h-20 w-20 object-cover rounded-md" />
+                <img src={mediaPreview} alt="Preview" className="h-16 w-16 object-cover rounded-md" />
               ) : (
-                <video src={mediaPreview} className="h-20 w-20 object-cover rounded-md" />
+                <video src={mediaPreview} className="h-16 w-16 object-cover rounded-md" />
               )}
-              <Button variant="destructive" size="icon" className="absolute -top-2 -right-2 h-6 w-6" onClick={handleRemoveMedia}>
-                <X className="h-4 w-4" />
+              <Button variant="destructive" size="icon" className="absolute -top-2 -right-2 h-5 w-5" onClick={handleRemoveMedia}>
+                <X className="h-3 w-3" />
               </Button>
             </div>
           </div>
         )}
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <input
             ref={fileInputRef}
             type="file"
@@ -488,11 +488,12 @@ function ChatPane({
             onChange={handleMediaSelect}
             className="hidden"
           />
-          <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} disabled={uploadingMedia}>
+          <Button variant="outline" size="icon" className="h-10 w-10 flex-shrink-0" onClick={() => fileInputRef.current?.click()} disabled={uploadingMedia}>
             <Paperclip className="h-4 w-4" />
           </Button>
           <Input
             placeholder="Type a message..."
+            className="flex-1 h-10"
             value={messageInput}
             onChange={(e) => {
               setMessageInput(e.target.value);
@@ -515,7 +516,7 @@ function ChatPane({
               }
             }}
           />
-          <Button onClick={handleSendMessage} size="icon" disabled={uploadingMedia || (!messageInput.trim() && !selectedMedia)}>
+          <Button onClick={handleSendMessage} size="icon" className="h-10 w-10 flex-shrink-0" disabled={uploadingMedia || (!messageInput.trim() && !selectedMedia)}>
             {uploadingMedia ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
@@ -756,7 +757,7 @@ const MessagesContent = () => {
   );
 
   return (
-    <div className="flex min-h-0 bg-background" style={{ height: 'calc(var(--app-vvh, 100dvh) - 3.5rem)', transform: 'translateZ(0)' }}>
+    <div className="flex min-h-0 bg-background" style={{ height: 'calc(var(--app-vvh, 100dvh) - 3.5rem - 5rem - env(safe-area-inset-bottom))', transform: 'translateZ(0)' }}>
       {/* Conversations List */}
       <div className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col overflow-hidden border-r bg-card`}>
         <div className="p-4 border-b flex-shrink-0">
