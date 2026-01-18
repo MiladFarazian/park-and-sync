@@ -410,7 +410,7 @@ function ChatPane({
         />
       )}
       
-      <div className="flex-1 overflow-y-auto min-h-0 pb-2" style={{ transform: 'translateZ(0)' }}>
+      <div className="flex-1 overflow-y-auto min-h-0" style={{ transform: 'translateZ(0)' }}>
         {(loadingMessages && !(messagesCacheRef.current.get(conversationId)?.length)) ? (
           <div className="flex items-center justify-center h-full text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin" />
@@ -465,7 +465,7 @@ function ChatPane({
           )
         )}
       </div>
-      <div className="px-3 py-2 border-t flex-shrink-0 bg-card">
+      <div className="px-3 py-1.5 border-t flex-shrink-0 bg-card">
         {mediaPreview && (
           <div className="mb-2 relative inline-block">
             <div className="relative">
@@ -757,7 +757,7 @@ const MessagesContent = () => {
   );
 
   return (
-    <div className="flex min-h-0 bg-background" style={{ height: 'calc(var(--app-vvh, 100dvh) - 3.5rem - 5rem - env(safe-area-inset-bottom))', transform: 'translateZ(0)' }}>
+    <div className="flex min-h-0 bg-background" style={{ height: 'calc(var(--app-vvh, 100dvh) - 3.5rem - 5rem)', transform: 'translateZ(0)' }}>
       {/* Conversations List */}
       <div className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col overflow-hidden border-r bg-card`}>
         <div className="p-4 border-b flex-shrink-0">
