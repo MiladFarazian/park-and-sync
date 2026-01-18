@@ -410,7 +410,7 @@ function ChatPane({
         />
       )}
       
-      <div className="flex-1 overflow-y-auto min-h-0" style={{ transform: 'translateZ(0)' }}>
+      <div className="flex-1 overflow-y-auto min-h-0 pb-2" style={{ transform: 'translateZ(0)' }}>
         {(loadingMessages && !(messagesCacheRef.current.get(conversationId)?.length)) ? (
           <div className="flex items-center justify-center h-full text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin" />
@@ -429,7 +429,7 @@ function ChatPane({
                 data={sortedMessages}
                 computeItemKey={(index, item) => item.id}
                 initialTopMostItemIndex={sortedMessages.length > 0 ? sortedMessages.length - 1 : 0}
-                increaseViewportBy={{ top: 400, bottom: 600 }}
+                increaseViewportBy={{ top: 200, bottom: 100 }}
                 followOutput={() => atBottomRef.current ? 'auto' : false}
                 atBottomStateChange={(isAtBottom) => {
                   atBottomRef.current = isAtBottom;
@@ -446,7 +446,7 @@ function ChatPane({
                     }
                   }
                 }}
-                atBottomThreshold={100}
+                atBottomThreshold={50}
                 startReached={loadOlderMessages}
                 itemContent={(index, message) => (
                   <div className="px-4 py-2">
