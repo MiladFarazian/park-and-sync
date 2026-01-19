@@ -493,7 +493,7 @@ function ChatPane({
           </Button>
           <Input
             placeholder="Type a message..."
-            className="flex-1 h-10"
+            className="flex-1 h-10 text-base md:text-sm"
             value={messageInput}
             onChange={(e) => {
               setMessageInput(e.target.value);
@@ -757,7 +757,7 @@ const MessagesContent = () => {
   );
 
   return (
-    <div className="flex min-h-0 bg-background" style={{ height: 'calc(var(--app-vvh, 100dvh) - 3.5rem - 5rem - env(safe-area-inset-bottom))', transform: 'translateZ(0)', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' } as React.CSSProperties}>
+    <div className="flex min-h-0 bg-background h-full" style={{ transform: 'translateZ(0)' }}>
       {/* Conversations List */}
       <div className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col overflow-hidden border-r bg-card`}>
         <div className="p-4 border-b flex-shrink-0">
