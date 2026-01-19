@@ -377,7 +377,7 @@ function ChatPane({
       </div>
       
       {/* Booking Context Header */}
-      {bookingContext}
+      {bookingContext && <BookingContextHeader booking={bookingContext} partnerName={displayName} partnerRole={partnerRole} />}
       
       <div className="flex-1 overflow-y-auto min-h-0" style={{
       transform: 'translateZ(0)',
