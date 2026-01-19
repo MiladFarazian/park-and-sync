@@ -202,6 +202,11 @@ const Explore = () => {
   const consecutiveMoveCountRef = useRef(0);
   const lastMoveTimeRef = useRef(0);
 
+  // "Search Here" button state - shows when map has been panned away from search location
+  const [showSearchHereButton, setShowSearchHereButton] = useState(false);
+  const [pendingMapCenter, setPendingMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [isSearchingHere, setIsSearchingHere] = useState(false);
+
   // Ensure end time is always after start time
   const validateAndSetTimes = (newStartTime: Date, newEndTime: Date | null) => {
     let validatedEndTime = newEndTime;
@@ -424,6 +429,10 @@ const Explore = () => {
   const handleSelectLocation = async (location: any) => {
     if (!mapboxToken || !location.mapbox_id) return;
     
+    // Hide "Search Here" button when a new search is performed
+    setShowSearchHereButton(false);
+    setPendingMapCenter(null);
+    
     try {
       const retrieveUrl = `https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(location.mapbox_id)}?access_token=${mapboxToken}&session_token=${sessionTokenRef.current}`;
       
@@ -490,6 +499,10 @@ const Explore = () => {
   };
 
   const handleGoToCurrentLocation = async () => {
+    // Hide "Search Here" button when navigating to current location
+    setShowSearchHereButton(false);
+    setPendingMapCenter(null);
+    
     // If we already have a cached current location, use it immediately
     if (currentLocation) {
       setSearchLocation(currentLocation);
@@ -771,6 +784,24 @@ const Explore = () => {
       return;
     }
     
+    // Check if map has moved significantly from the original search location to show "Search Here" button
+    if (searchLocation) {
+      const latDiffFromSearch = Math.abs(center.lat - searchLocation.lat) * 111000;
+      const lngDiffFromSearch = Math.abs(center.lng - searchLocation.lng) * 111000 * Math.cos(center.lat * Math.PI / 180);
+      const distanceFromSearch = Math.sqrt(latDiffFromSearch ** 2 + lngDiffFromSearch ** 2);
+      
+      // Show "Search Here" if moved more than 20% of the current radius or 2km, whichever is larger
+      const threshold = Math.max(radiusMeters * 0.2, 2000);
+      
+      if (distanceFromSearch > threshold) {
+        setPendingMapCenter(center);
+        setShowSearchHereButton(true);
+      } else {
+        setShowSearchHereButton(false);
+        setPendingMapCenter(null);
+      }
+    }
+    
     // Check if we've moved enough to warrant a new fetch (at least 10% of radius)
     const minMoveThreshold = radiusMeters * 0.1; // 10% of visible radius
     if (lastFetchedCenterRef.current) {
@@ -808,6 +839,38 @@ const Explore = () => {
       fetchNearbySpots(center, radiusMeters, false);
     }, debounceDelay);
   };
+
+  // Handle "Search Here" button click - searches for spots at the new map center
+  const handleSearchHere = useCallback(async () => {
+    if (!pendingMapCenter || !mapboxToken) return;
+    
+    setIsSearchingHere(true);
+    
+    // Update the search location to the new map center
+    setSearchLocation(pendingMapCenter);
+    setShowSearchHereButton(false);
+    setPendingMapCenter(null);
+    
+    // Get address for the new location (for URL and display)
+    const address = await reverseGeocode(pendingMapCenter.lat, pendingMapCenter.lng);
+    if (address) {
+      setSearchQuery(address);
+    }
+    
+    // Update URL with new coordinates
+    const params = new URLSearchParams();
+    params.set('lat', pendingMapCenter.lat.toString());
+    params.set('lng', pendingMapCenter.lng.toString());
+    if (startTime) params.set('start', startTime.toISOString());
+    if (endTime) params.set('end', endTime.toISOString());
+    if (address) params.set('q', address);
+    navigate(`/explore?${params.toString()}`, { replace: true });
+    
+    // Fetch spots for the new location
+    await fetchNearbySpots(pendingMapCenter, 15000, true);
+    
+    setIsSearchingHere(false);
+  }, [pendingMapCenter, mapboxToken, reverseGeocode, navigate, startTime, endTime, fetchNearbySpots]);
   const handleDateTimeUpdate = (newStartTime?: Date, newEndTime?: Date) => {
     if (!searchLocation) return;
 
@@ -886,8 +949,27 @@ const Explore = () => {
 
         {/* Right Panel - Map */}
         <div className="flex-1 relative">
+          {/* Search Here Button - Desktop */}
+          {showSearchHereButton && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
+              <Button
+                variant="secondary"
+                onClick={handleSearchHere}
+                disabled={isSearchingHere}
+                className="bg-background/95 backdrop-blur-sm shadow-lg hover:bg-accent animate-in fade-in slide-in-from-top-2 duration-200"
+              >
+                {isSearchingHere ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4 mr-2" />
+                )}
+                Search this area
+              </Button>
+            </div>
+          )}
+          
           {/* Non-blocking loading indicator */}
-          {spotsLoading && (
+          {spotsLoading && !showSearchHereButton && (
             <div className="absolute top-4 right-4 z-20">
               <div className="bg-background/95 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2">
                 <Loader2 className="h-3 w-3 animate-spin text-primary" />
@@ -1150,8 +1232,24 @@ const Explore = () => {
           </div>
         )}
         
-        {/* Filter Button - Below time selector */}
-        <div className="flex justify-end px-4">
+        {/* Filter Button and Search Here - Below time selector */}
+        <div className="flex justify-end gap-2 px-4">
+          {showSearchHereButton && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleSearchHere}
+              disabled={isSearchingHere}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200"
+            >
+              {isSearchingHere ? (
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4 mr-1.5" />
+              )}
+              Search Here
+            </Button>
+          )}
           <MobileFilterSheet
             filters={filters}
             onFiltersChange={setFilters}
