@@ -138,16 +138,16 @@ function ChatPane({
     if (cached && cached.length > 0) {
       setMessages(cached);
       setLoadingMessages(false);
-      // Scroll to bottom when using cached messages
-      setTimeout(() => {
-        if (virtuosoRef.current) {
+      // Immediate scroll to bottom for cached messages using requestAnimationFrame
+      requestAnimationFrame(() => {
+        if (virtuosoRef.current && alive) {
           virtuosoRef.current.scrollToIndex({
             index: 'LAST',
             align: 'end',
             behavior: 'auto'
           });
         }
-      }, 50);
+      });
     } else {
       setLoadingMessages(true);
     }
@@ -174,7 +174,7 @@ function ChatPane({
         if (alive) markAsRead(convId);
       }, 1000);
 
-      // Scroll to bottom on initial load only - use multiple attempts for reliability
+      // Enhanced scroll to bottom - use requestAnimationFrame for better timing
       const scrollToEnd = () => {
         if (!alive || !virtuosoRef.current) return;
         virtuosoRef.current.scrollToIndex({
@@ -184,15 +184,19 @@ function ChatPane({
         });
       };
 
-      // First attempt after short delay
-      setTimeout(scrollToEnd, 50);
-      // Second attempt to catch race conditions with Virtuoso rendering
-      setTimeout(scrollToEnd, 150);
-      // Final attempt for slower devices
-      setTimeout(() => {
+      // Use requestAnimationFrame for better timing with React render cycle
+      requestAnimationFrame(() => {
         scrollToEnd();
-        initialLoadRef.current = false;
-      }, 300);
+        // Second attempt after a frame
+        requestAnimationFrame(() => {
+          scrollToEnd();
+          // Final attempt after render settles
+          setTimeout(() => {
+            scrollToEnd();
+            initialLoadRef.current = false;
+          }, 150);
+        });
+      });
     })();
     return () => {
       alive = false;
@@ -332,7 +336,8 @@ function ChatPane({
     minHeight: 0,
     transform: 'translateZ(0)',
     backfaceVisibility: 'hidden',
-    WebkitBackfaceVisibility: 'hidden'
+    WebkitBackfaceVisibility: 'hidden',
+    WebkitOverflowScrolling: 'touch'
   } as React.CSSProperties}>
       <div className="p-4 border-b flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -379,46 +384,57 @@ function ChatPane({
       {/* Booking Context Header */}
       {bookingContext && <BookingContextHeader booking={bookingContext} partnerName={displayName} partnerRole={partnerRole} />}
       
-      <div className="flex-1 overflow-y-auto min-h-0" style={{
+      <div className="flex-1 overflow-y-auto min-h-0 relative" style={{
       transform: 'translateZ(0)',
       backfaceVisibility: 'hidden',
-      WebkitBackfaceVisibility: 'hidden'
+      WebkitBackfaceVisibility: 'hidden',
+      WebkitOverflowScrolling: 'touch'
     } as React.CSSProperties}>
         {loadingMessages && !messagesCacheRef.current.get(conversationId)?.length ? <div className="flex items-center justify-center h-full text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin" />
           </div> : sortedMessages.length === 0 ? <div className="flex items-center justify-center h-full text-center text-muted-foreground">
               <p className="text-sm">No messages yet. Start the conversation!</p>
             </div> : <>
-              <Virtuoso style={{
-          height: '100%'
-        }} key={conversationId} ref={virtuosoRef} data={sortedMessages} computeItemKey={(index, item) => item.id} initialTopMostItemIndex={sortedMessages.length > 0 ? sortedMessages.length - 1 : 0} increaseViewportBy={{
-          top: 200,
-          bottom: 100
-        }} followOutput={() => atBottomRef.current ? 'auto' : false} atBottomStateChange={isAtBottom => {
-          atBottomRef.current = isAtBottom;
-          if (isAtBottom) {
-            setShowNewMessageButton(false);
-            // Don't auto-mark as read here - let the initial load handle it
-            // This prevents instant marking before unread indicators can show
-          } else {
-            if (!initialLoadRef.current && sortedMessages.length > 0) {
-              const latestMsg = sortedMessages[sortedMessages.length - 1];
-              if (latestMsg.sender_id === conversationId) {
-                setShowNewMessageButton(true);
-              }
-            }
-          }
-        }} atBottomThreshold={50} startReached={loadOlderMessages} itemContent={(index, message) => <div className="px-4 py-2">
+              <Virtuoso 
+                style={{ height: '100%' }} 
+                key={conversationId} 
+                ref={virtuosoRef} 
+                data={sortedMessages} 
+                computeItemKey={(index, item) => item.id} 
+                initialTopMostItemIndex={sortedMessages.length > 0 ? sortedMessages.length - 1 : 0} 
+                increaseViewportBy={{ top: 200, bottom: 50 }}
+                followOutput={() => atBottomRef.current ? 'auto' : false} 
+                atBottomStateChange={isAtBottom => {
+                  atBottomRef.current = isAtBottom;
+                  if (isAtBottom) {
+                    setShowNewMessageButton(false);
+                  } else {
+                    if (!initialLoadRef.current && sortedMessages.length > 0) {
+                      const latestMsg = sortedMessages[sortedMessages.length - 1];
+                      if (latestMsg.sender_id === conversationId) {
+                        setShowNewMessageButton(true);
+                      }
+                    }
+                  }
+                }} 
+                atBottomThreshold={50} 
+                startReached={loadOlderMessages} 
+                itemContent={(index, message) => <div className="px-4 py-1.5">
                     <MessageItem key={message.id} message={message} isMe={message.sender_id === userId} />
-                  </div>} />
-              {showNewMessageButton && <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-10">
+                  </div>} 
+              />
+              {showNewMessageButton && <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
                   <Button size="sm" onClick={scrollToBottom} className="shadow-lg">
                     New messages ↓
                   </Button>
                 </div>}
             </>}
       </div>
-      <div className="px-3 py-2 border-t flex-shrink-0 bg-card">
+      
+      {/* Input Area - sticky with safe area handling */}
+      <div className="px-3 py-2 border-t flex-shrink-0 bg-card" style={{
+        paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))'
+      }}>
         {mediaPreview && <div className="mb-2 relative inline-block">
             <div className="relative">
               {selectedMedia?.type.startsWith('image/') ? <img src={mediaPreview} alt="Preview" className="h-16 w-16 object-cover rounded-md" /> : <video src={mediaPreview} className="h-16 w-16 object-cover rounded-md" />}
@@ -427,7 +443,7 @@ function ChatPane({
               </Button>
             </div>
           </div>}
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-end">
           <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,video/webm" onChange={handleMediaSelect} className="hidden" />
           <Button variant="outline" size="icon" className="h-10 w-10 flex-shrink-0" onClick={() => fileInputRef.current?.click()} disabled={uploadingMedia}>
             <Paperclip className="h-4 w-4" />
@@ -446,7 +462,8 @@ function ChatPane({
             broadcastStoppedTyping();
           }
         }} onKeyDown={e => {
-          if (e.key === 'Enter') {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
             broadcastStoppedTyping();
             handleSendMessage();
           }
