@@ -388,7 +388,8 @@ function ChatPane({
       transform: 'translateZ(0)',
       backfaceVisibility: 'hidden',
       WebkitBackfaceVisibility: 'hidden',
-      WebkitOverflowScrolling: 'touch'
+      WebkitOverflowScrolling: 'touch',
+      paddingBottom: '8px'
     } as React.CSSProperties}>
         {loadingMessages && !messagesCacheRef.current.get(conversationId)?.length ? <div className="flex items-center justify-center h-full text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin" />
@@ -423,7 +424,7 @@ function ChatPane({
                     <MessageItem key={message.id} message={message} isMe={message.sender_id === userId} />
                   </div>} 
               />
-              {showNewMessageButton && <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+              {showNewMessageButton && <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-10">
                   <Button size="sm" onClick={scrollToBottom} className="shadow-lg">
                     New messages ↓
                   </Button>
@@ -433,7 +434,10 @@ function ChatPane({
       
       {/* Input Area - sticky with safe area handling */}
       <div className="px-3 py-2 border-t flex-shrink-0 bg-card" style={{
-        paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))'
+        paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
+        position: 'sticky',
+        bottom: 0,
+        zIndex: 20
       }}>
         {mediaPreview && <div className="mb-2 relative inline-block">
             <div className="relative">
