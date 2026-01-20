@@ -28,6 +28,7 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
+    --bottom-nav-height: 80px; /* h-16 (64px) + pb-4 (16px) */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 
