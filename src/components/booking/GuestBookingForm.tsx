@@ -215,13 +215,22 @@ const GuestBookingFormContent = ({
                 }
               }
               
-              // Try to link the guest booking to the new user
-              try {
-                await supabase.functions.invoke('link-guest-bookings', {
-                  body: { email: email.trim() },
-                });
-              } catch (linkErr) {
-                console.warn('Could not auto-link booking:', linkErr);
+              // Try to link the guest booking to the new user ONLY if we have a valid session.
+              // If email verification is required, signUpData.session will be null and linking will
+              // happen later on SIGNED_IN (see AuthContext).
+              if (signUpData.session && signUpData.user) {
+                try {
+                  await supabase.functions.invoke('link-guest-bookings', {
+                    body: {
+                      user_id: signUpData.user.id,
+                      email: email.trim(),
+                      phone: phone.trim(),
+                      first_name: firstName,
+                    },
+                  });
+                } catch (linkErr) {
+                  console.warn('Could not auto-link booking:', linkErr);
+                }
               }
             }
           } catch (accountErr) {

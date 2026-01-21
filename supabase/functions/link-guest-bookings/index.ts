@@ -162,7 +162,15 @@ serve(async (req) => {
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
+    const token = authHeader.replace('Bearer ', '').trim();
+
+    if (!token) {
+      console.warn('[link-guest-bookings] Empty bearer token');
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired session' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     // Create service-role client for database operations first
     const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
