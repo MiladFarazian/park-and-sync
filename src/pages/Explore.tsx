@@ -205,6 +205,7 @@ const Explore = () => {
   // "Search Here" button state - shows when map has been panned away from search location
   const [showSearchHereButton, setShowSearchHereButton] = useState(false);
   const [pendingMapCenter, setPendingMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [pendingMapRadius, setPendingMapRadius] = useState<number>(15000);
   const [isSearchingHere, setIsSearchingHere] = useState(false);
 
   // Ensure end time is always after start time
@@ -795,6 +796,7 @@ const Explore = () => {
       
       if (distanceFromSearch > threshold) {
         setPendingMapCenter(center);
+        setPendingMapRadius(radiusMeters);
         setShowSearchHereButton(true);
       } else {
         setShowSearchHereButton(false);
@@ -840,7 +842,7 @@ const Explore = () => {
     }, debounceDelay);
   };
 
-  // Handle "Search Here" button click - searches for spots at the new map center
+  // Handle "Search Here" button click - searches for spots in the entire visible map area
   const handleSearchHere = useCallback(async () => {
     if (!pendingMapCenter || !mapboxToken) return;
     
@@ -849,28 +851,35 @@ const Explore = () => {
     // Update the search location to the new map center
     setSearchLocation(pendingMapCenter);
     setShowSearchHereButton(false);
+    
+    const savedCenter = pendingMapCenter;
+    const savedRadius = pendingMapRadius;
+    
     setPendingMapCenter(null);
     
     // Get address for the new location (for URL and display)
-    const address = await reverseGeocode(pendingMapCenter.lat, pendingMapCenter.lng);
+    const address = await reverseGeocode(savedCenter.lat, savedCenter.lng);
     if (address) {
       setSearchQuery(address);
     }
     
     // Update URL with new coordinates
     const params = new URLSearchParams();
-    params.set('lat', pendingMapCenter.lat.toString());
-    params.set('lng', pendingMapCenter.lng.toString());
+    params.set('lat', savedCenter.lat.toString());
+    params.set('lng', savedCenter.lng.toString());
     if (startTime) params.set('start', startTime.toISOString());
     if (endTime) params.set('end', endTime.toISOString());
     if (address) params.set('q', address);
     navigate(`/explore?${params.toString()}`, { replace: true });
     
-    // Fetch spots for the new location
-    await fetchNearbySpots(pendingMapCenter, 15000, true);
+    // Update lastFetchedCenterRef to prevent handleMapMove from triggering another fetch
+    lastFetchedCenterRef.current = { lat: savedCenter.lat, lng: savedCenter.lng, radius: savedRadius };
+    
+    // Fetch spots for the entire visible map area using the current map radius (no zoom)
+    await fetchNearbySpots(savedCenter, savedRadius, false);
     
     setIsSearchingHere(false);
-  }, [pendingMapCenter, mapboxToken, reverseGeocode, navigate, startTime, endTime, fetchNearbySpots]);
+  }, [pendingMapCenter, pendingMapRadius, mapboxToken, reverseGeocode, navigate, startTime, endTime, fetchNearbySpots]);
   const handleDateTimeUpdate = (newStartTime?: Date, newEndTime?: Date) => {
     if (!searchLocation) return;
 
@@ -956,7 +965,7 @@ const Explore = () => {
                 variant="secondary"
                 onClick={handleSearchHere}
                 disabled={isSearchingHere}
-                className="bg-background/95 backdrop-blur-sm shadow-lg hover:bg-accent animate-in fade-in slide-in-from-top-2 duration-200"
+                className="rounded-full bg-background/95 backdrop-blur-sm shadow-lg hover:bg-accent animate-in fade-in slide-in-from-top-2 duration-200"
               >
                 {isSearchingHere ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1240,7 +1249,7 @@ const Explore = () => {
               size="sm"
               onClick={handleSearchHere}
               disabled={isSearchingHere}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200"
+              className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200"
             >
               {isSearchingHere ? (
                 <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
