@@ -524,6 +524,9 @@ export type Database = {
           notification_host_messages: boolean | null
           phone: string | null
           phone_verified: boolean | null
+          privacy_show_full_name: boolean | null
+          privacy_show_in_reviews: boolean | null
+          privacy_show_profile_photo: boolean | null
           rating: number | null
           review_count: number | null
           role: Database["public"]["Enums"]["user_role"]
@@ -549,6 +552,9 @@ export type Database = {
           notification_host_messages?: boolean | null
           phone?: string | null
           phone_verified?: boolean | null
+          privacy_show_full_name?: boolean | null
+          privacy_show_in_reviews?: boolean | null
+          privacy_show_profile_photo?: boolean | null
           rating?: number | null
           review_count?: number | null
           role?: Database["public"]["Enums"]["user_role"]
@@ -574,6 +580,9 @@ export type Database = {
           notification_host_messages?: boolean | null
           phone?: string | null
           phone_verified?: boolean | null
+          privacy_show_full_name?: boolean | null
+          privacy_show_in_reviews?: boolean | null
+          privacy_show_profile_photo?: boolean | null
           rating?: number | null
           review_count?: number | null
           role?: Database["public"]["Enums"]["user_role"]

@@ -43,17 +43,18 @@ export const PrivacySettingsDialog = ({ open, onOpenChange }: PrivacySettingsDia
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("privacy_show_profile_photo, privacy_show_full_name, privacy_show_in_reviews")
+        .select("*")
         .eq("user_id", user.id)
         .single();
 
       if (error) throw error;
 
       if (data) {
+        const profileData = data as any;
         setSettings({
-          privacy_show_profile_photo: data.privacy_show_profile_photo ?? true,
-          privacy_show_full_name: data.privacy_show_full_name ?? true,
-          privacy_show_in_reviews: data.privacy_show_in_reviews ?? true,
+          privacy_show_profile_photo: profileData.privacy_show_profile_photo ?? true,
+          privacy_show_full_name: profileData.privacy_show_full_name ?? true,
+          privacy_show_in_reviews: profileData.privacy_show_in_reviews ?? true,
         });
       }
     } catch (error: any) {
@@ -74,7 +75,7 @@ export const PrivacySettingsDialog = ({ open, onOpenChange }: PrivacySettingsDia
           privacy_show_profile_photo: settings.privacy_show_profile_photo,
           privacy_show_full_name: settings.privacy_show_full_name,
           privacy_show_in_reviews: settings.privacy_show_in_reviews,
-        })
+        } as any)
         .eq("user_id", user.id);
 
       if (error) throw error;
