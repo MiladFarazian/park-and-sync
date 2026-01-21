@@ -104,6 +104,8 @@ function ChatPane({
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [showNewMessageButton, setShowNewMessageButton] = useState(false);
+  // Track first item index for Virtuoso to maintain scroll position when prepending
+  const [firstItemIndex, setFirstItemIndex] = useState(10000);
 
   // Typing indicator
   const {
@@ -149,6 +151,7 @@ function ChatPane({
 
     // Reset state flags but keep cache if present
     setShowNewMessageButton(false);
+    setFirstItemIndex(10000); // Reset for new conversation
     initialLoadRef.current = true;
     loadingOlderRef.current = false;
     atBottomRef.current = true;
@@ -243,10 +246,22 @@ function ChatPane({
         ascending: false
       }).limit(20);
       if (!error && data && data.length > 0) {
-        setMessages(prev => [...data.reverse(), ...prev]);
+        const newMessages = data.reverse() as Message[];
+        // Adjust firstItemIndex BEFORE updating messages to maintain scroll position
+        setFirstItemIndex(prev => prev - newMessages.length);
+        // Use functional update to avoid race conditions
+        setMessages(prev => {
+          // Dedupe by id in case of race conditions
+          const existingIds = new Set(prev.map(m => m.id));
+          const uniqueNew = newMessages.filter(m => !existingIds.has(m.id));
+          return [...uniqueNew, ...prev];
+        });
       }
     } finally {
-      loadingOlderRef.current = false;
+      // Small delay before allowing next load to prevent rapid-fire requests
+      setTimeout(() => {
+        loadingOlderRef.current = false;
+      }, 300);
     }
   };
   const scrollToBottom = () => {
@@ -414,15 +429,16 @@ function ChatPane({
           </div> : sortedMessages.length === 0 ? <div className="flex items-center justify-center h-full text-center text-muted-foreground">
               <p className="text-sm">No messages yet. Start the conversation!</p>
             </div> : <>
-              <Virtuoso 
-                style={{ height: '100%' }} 
-                key={conversationId} 
-                ref={virtuosoRef} 
-                data={sortedMessages} 
-                computeItemKey={(index, item) => item.id} 
-                initialTopMostItemIndex={sortedMessages.length > 0 ? sortedMessages.length - 1 : 0} 
-                increaseViewportBy={{ top: 200, bottom: 50 }}
-                followOutput={() => atBottomRef.current ? 'auto' : false} 
+              <Virtuoso
+                style={{ height: '100%' }}
+                key={conversationId}
+                ref={virtuosoRef}
+                data={sortedMessages}
+                firstItemIndex={firstItemIndex}
+                computeItemKey={(index, item) => item.id}
+                initialTopMostItemIndex={sortedMessages.length > 0 ? sortedMessages.length - 1 : 0}
+                increaseViewportBy={{ top: 400, bottom: 100 }}
+                followOutput={() => atBottomRef.current ? 'auto' : false}
                 atBottomStateChange={isAtBottom => {
                   atBottomRef.current = isAtBottom;
                   if (isAtBottom) {
@@ -435,12 +451,12 @@ function ChatPane({
                       }
                     }
                   }
-                }} 
-                atBottomThreshold={50} 
-                startReached={loadOlderMessages} 
+                }}
+                atBottomThreshold={50}
+                startReached={loadOlderMessages}
                 itemContent={(index, message) => <div className="px-4 py-1.5">
                     <MessageItem key={message.id} message={message} isMe={message.sender_id === userId} />
-                  </div>} 
+                  </div>}
               />
               {showNewMessageButton && <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-10">
                   <Button size="sm" onClick={scrollToBottom} className="shadow-lg">
