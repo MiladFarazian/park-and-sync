@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import BottomNavigation from './BottomNavigation';
 import DesktopHeader from './DesktopHeader';
+import ScrollToTop from './ScrollToTop';
 import parkzyLogo from '@/assets/parkzy-logo.png';
 import ModeSwitcher from './ModeSwitcher';
 import ModeLoadingOverlay from './ModeLoadingOverlay';
@@ -56,13 +57,14 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   
   return (
     <>
+      <ScrollToTop />
       <ModeLoadingOverlay />
       
       {/* Desktop Layout with Top Header */}
       <div className="hidden md:flex h-screen flex-col">
         <NotificationPermissionBanner />
         <DesktopHeader />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto" data-scroll-container>
           <div className={isFullScreenPage || isHomePage ? "h-full" : "container mx-auto p-6 h-full"}>
             {children}
           </div>
@@ -102,6 +104,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         </header>
         <main className="flex-1 overflow-hidden bg-background" style={{ minHeight: 0, transform: 'translateZ(0)' }}>
           <div
+            data-scroll-container
             className={`h-full ${isFullScreenPage ? '' : 'overflow-y-auto pb-20'}`}
             style={{
               paddingBottom: isFullScreenPage
