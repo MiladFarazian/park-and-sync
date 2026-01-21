@@ -827,7 +827,7 @@ const MessagesContent = () => {
                             {conversation.name}
                           </p>
                           {conversation.is_guest_conversation && <Badge variant="outline" className="text-xs shrink-0">Guest</Badge>}
-                          {conversation.partner_role && !conversation.is_guest_conversation && <Badge variant="secondary" className="text-xs shrink-0">
+                          {conversation.partner_role && !conversation.is_guest_conversation && conversation.user_id !== '00000000-0000-0000-0000-000000000001' && <Badge variant="secondary" className="text-xs shrink-0">
                               {conversation.partner_role === 'host' ? 'Host' : 'Driver'}
                             </Badge>}
                         </div>
