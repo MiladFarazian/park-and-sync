@@ -64,6 +64,7 @@ export default {
       },
       boxShadow: {
         'elegant': 'var(--shadow-elegant)',
+        'card': 'var(--shadow-card)',
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -125,15 +126,15 @@ export default {
         "selection-pulse": {
           "0%": {
             transform: "scale(1)",
-            boxShadow: "0 0 0 0 hsl(250 100% 65% / 0.3)",
+            boxShadow: "0 0 0 0 hsl(252 85% 58% / 0.3)",
           },
           "50%": {
             transform: "scale(1.01)",
-            boxShadow: "0 0 0 4px hsl(250 100% 65% / 0.1)",
+            boxShadow: "0 0 0 4px hsl(252 85% 58% / 0.1)",
           },
           "100%": {
             transform: "scale(1)",
-            boxShadow: "0 0 0 0 hsl(250 100% 65% / 0)",
+            boxShadow: "0 0 0 0 hsl(252 85% 58% / 0)",
           },
         },
       },
