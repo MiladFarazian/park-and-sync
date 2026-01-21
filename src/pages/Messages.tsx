@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { sendMessage as sendMessageLib } from '@/lib/sendMessage';
 import { compressImage } from '@/lib/compressImage';
 import { getStreetAddress } from '@/lib/addressUtils';
@@ -110,12 +111,29 @@ function ChatPane({
     broadcastTyping,
     broadcastStoppedTyping
   } = useTypingIndicator(conversationId, userId);
+
+  // Keyboard handling for iOS
+  const { isKeyboardOpen } = useKeyboardHeight();
+
   const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const virtuosoRef = useRef<any>(null);
   const atBottomRef = useRef(true);
   const initialLoadRef = useRef(true);
   const loadingOlderRef = useRef(false);
+
+  // Scroll to bottom when keyboard opens
+  useEffect(() => {
+    if (isKeyboardOpen && virtuosoRef.current) {
+      requestAnimationFrame(() => {
+        virtuosoRef.current?.scrollToIndex({
+          index: 'LAST',
+          align: 'end',
+          behavior: 'auto'
+        });
+      });
+    }
+  }, [isKeyboardOpen]);
 
   // Sorted view (stable)
   const sortedMessages = [...messages].sort((a, b) => {
@@ -499,6 +517,7 @@ const MessagesContent = () => {
   const [newUserProfile, setNewUserProfile] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const isMobile = useIsMobile();
+  const { isKeyboardOpen } = useKeyboardHeight();
   const messagesCacheRef = useRef<Map<string, Message[]>>(new Map());
   const [tick, setTick] = useState(0);
   const [composeOpen, setComposeOpen] = useState(false);
@@ -686,7 +705,8 @@ const MessagesContent = () => {
     </div>;
   return <div className="flex min-h-0 bg-background h-full" style={{
     transform: 'translateZ(0)',
-    paddingBottom: isMobile ? 'var(--bottom-nav-height)' : undefined
+    // Remove bottom nav padding when keyboard is open (nav is hidden behind keyboard)
+    paddingBottom: isMobile && !isKeyboardOpen ? 'var(--bottom-nav-height)' : undefined
   }}>
       {/* Conversations List */}
       <div className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col overflow-hidden border-r bg-card`}>

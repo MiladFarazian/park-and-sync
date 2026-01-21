@@ -249,5 +249,11 @@ All colors MUST be HSL.
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
   }
+
+  /* Prevent iOS keyboard causing layout jumps */
+  input, textarea {
+    /* Prevent zoom on focus */
+    font-size: 16px !important;
+  }
 }
 
