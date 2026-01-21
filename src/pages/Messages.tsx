@@ -517,7 +517,6 @@ const MessagesContent = () => {
   const [newUserProfile, setNewUserProfile] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const isMobile = useIsMobile();
-  const { isKeyboardOpen } = useKeyboardHeight();
   const messagesCacheRef = useRef<Map<string, Message[]>>(new Map());
   const [tick, setTick] = useState(0);
   const [composeOpen, setComposeOpen] = useState(false);
@@ -705,8 +704,7 @@ const MessagesContent = () => {
     </div>;
   return <div className="flex min-h-0 bg-background h-full" style={{
     transform: 'translateZ(0)',
-    // Remove bottom nav padding when keyboard is open (nav is hidden behind keyboard)
-    paddingBottom: isMobile && !isKeyboardOpen ? 'var(--bottom-nav-height)' : undefined
+    paddingBottom: isMobile ? 'var(--bottom-nav-height)' : undefined
   }}>
       {/* Conversations List */}
       <div className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col overflow-hidden border-r bg-card`}>

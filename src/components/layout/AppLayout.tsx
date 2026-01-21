@@ -70,9 +70,13 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       </div>
 
       {/* Mobile Layout with Bottom Navigation */}
-      <div 
+      <div
         className="md:hidden flex flex-col"
-        style={{ height: 'var(--app-vvh, 100dvh)' }}
+        style={{
+          // Use 100dvh for pages with keyboard input to prevent resize on keyboard open
+          // Other pages use --app-vvh for proper keyboard handling
+          height: isFullScreenPage ? '100dvh' : 'var(--app-vvh, 100dvh)'
+        }}
       >
         <NotificationPermissionBanner />
         <header className="flex-shrink-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4 sticky top-0">
