@@ -1,31 +1,38 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Shield, Lock, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
+import { ChangePasswordDialog } from "@/components/settings/ChangePasswordDialog";
+import { TwoFactorAuthDialog } from "@/components/settings/TwoFactorAuthDialog";
+import { PrivacySettingsDialog } from "@/components/settings/PrivacySettingsDialog";
 
 const PrivacySecurity = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [twoFactorOpen, setTwoFactorOpen] = useState(false);
+  const [privacySettingsOpen, setPrivacySettingsOpen] = useState(false);
 
   const securityOptions = [
     {
       icon: Lock,
       title: "Change Password",
       description: "Update your account password",
-      action: () => {},
+      action: () => setChangePasswordOpen(true),
     },
     {
       icon: Shield,
       title: "Two-Factor Authentication",
       description: "Add an extra layer of security",
-      action: () => {},
+      action: () => setTwoFactorOpen(true),
     },
     {
       icon: Eye,
       title: "Privacy Settings",
       description: "Control who can see your information",
-      action: () => {},
+      action: () => setPrivacySettingsOpen(true),
     },
   ];
 
@@ -83,6 +90,19 @@ const PrivacySecurity = () => {
             </div>
           </div>
         </Card>
+
+        <ChangePasswordDialog 
+          open={changePasswordOpen} 
+          onOpenChange={setChangePasswordOpen} 
+        />
+        <TwoFactorAuthDialog 
+          open={twoFactorOpen} 
+          onOpenChange={setTwoFactorOpen} 
+        />
+        <PrivacySettingsDialog 
+          open={privacySettingsOpen} 
+          onOpenChange={setPrivacySettingsOpen} 
+        />
       </div>
     </div>
   );
