@@ -114,7 +114,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setLoading(false);
 
             // Link guest bookings on SIGNED_IN event (handles post-email-verification)
-            if (event === 'SIGNED_IN') {
+            if (event === 'SIGNED_IN' && session.access_token) {
               try {
                 const { data: linkData, error: linkError } = await supabase.functions.invoke('link-guest-bookings', {
                   body: { 
@@ -126,12 +126,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 });
                 
                 if (linkError) {
-                  console.error('[Auth] Error linking guest bookings on sign in:', linkError);
+                  // Only log if it's not a 401 (which can happen during initial sign-in race)
+                  if (!linkError.message?.includes('401')) {
+                    console.error('[Auth] Error linking guest bookings on sign in:', linkError);
+                  }
                 } else if (linkData?.linked_count > 0) {
                   console.log(`[Auth] Linked ${linkData.linked_count} guest bookings on sign in`);
                 }
               } catch (err) {
-                console.error('[Auth] Failed to link guest bookings on sign in:', err);
+                // Silently handle errors during sign-in race conditions
+                console.warn('[Auth] Could not link guest bookings on sign in:', err);
               }
             }
           }, 0);
