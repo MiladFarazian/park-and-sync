@@ -1,18 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, TrendingUp, Calendar, MapPin, Car, ChevronRight } from 'lucide-react';
+import { Plus, TrendingUp, Calendar, MapPin, Car, ChevronRight, Wallet, Clock, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMode } from '@/contexts/ModeContext';
 import { toast } from 'sonner';
-import EarningsAnalytics from '@/components/host/EarningsAnalytics';
 import RecentReviews from '@/components/host/RecentReviews';
 import UpcomingReservationsWidget from '@/components/host/UpcomingReservationsWidget';
 import QuickAvailabilityActions from '@/components/host/QuickAvailabilityActions';
+import EarningsBySpot from '@/components/host/EarningsBySpot';
 import { getHostNetEarnings } from '@/lib/hostEarnings';
+import { format } from 'date-fns';
+
+interface StripeBalanceData {
+  connected: boolean;
+  available_balance: number;
+  pending_balance: number;
+  next_payout_date: string | null;
+  next_payout_amount: number | null;
+  last_payout_status: string | null;
+  last_payout_amount: number | null;
+  last_payout_date: string | null;
+}
 
 const HostHome = () => {
   const navigate = useNavigate();
@@ -21,15 +34,18 @@ const HostHome = () => {
   const [stats, setStats] = useState({
     totalEarnings: 0,
     totalBookings: 0,
-    activeListings: 0,
   });
+  const [stripeBalance, setStripeBalance] = useState<StripeBalanceData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [stripeLoading, setStripeLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
       fetchHostStats();
+      fetchStripeBalance();
     } else if (!authLoading) {
       setLoading(false);
+      setStripeLoading(false);
     }
   }, [user, authLoading]);
 
@@ -52,7 +68,6 @@ const HostHome = () => {
         setStats({
           totalEarnings: 0,
           totalBookings: 0,
-          activeListings: 0,
         });
         setLoading(false);
         return;
@@ -73,13 +88,63 @@ const HostHome = () => {
       setStats({
         totalEarnings,
         totalBookings: completedBookings?.length || 0,
-        activeListings: spotsData?.length || 0,
       });
     } catch (error) {
       console.error('Error fetching host stats:', error);
       toast.error('Failed to load dashboard');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchStripeBalance = async () => {
+    try {
+      setStripeLoading(true);
+      const { data, error } = await supabase.functions.invoke('get-stripe-connect-balance');
+
+      if (error) {
+        console.error('Error fetching Stripe balance:', error);
+        setStripeBalance(null);
+      } else {
+        setStripeBalance(data);
+      }
+    } catch (error) {
+      console.error('Error fetching Stripe balance:', error);
+      setStripeBalance(null);
+    } finally {
+      setStripeLoading(false);
+    }
+  };
+
+  const getPayoutStatusIcon = (status: string | null) => {
+    switch (status) {
+      case 'paid':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'failed':
+      case 'canceled':
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'pending':
+      case 'in_transit':
+        return <Clock className="h-4 w-4 text-yellow-500" />;
+      default:
+        return <AlertCircle className="h-4 w-4 text-muted-foreground" />;
+    }
+  };
+
+  const getPayoutStatusBadge = (status: string | null) => {
+    switch (status) {
+      case 'paid':
+        return <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50">Paid</Badge>;
+      case 'failed':
+        return <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50">Failed</Badge>;
+      case 'canceled':
+        return <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50">Canceled</Badge>;
+      case 'pending':
+        return <Badge variant="outline" className="text-yellow-600 border-yellow-300 bg-yellow-50">Pending</Badge>;
+      case 'in_transit':
+        return <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50">In Transit</Badge>;
+      default:
+        return null;
     }
   };
 
@@ -123,59 +188,32 @@ const HostHome = () => {
         </div>
 
         {/* Stats Cards Skeleton */}
-        <div className="grid grid-cols-1 gap-4">
+        <div className="space-y-4">
           <Card className="p-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-5 w-5 rounded" />
-                <Skeleton className="h-4 w-24" />
-              </div>
-              <Skeleton className="h-9 w-32 mt-2" />
-              <Skeleton className="h-4 w-28" />
-            </div>
-          </Card>
-          
-          <Card className="p-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-5 w-5 rounded" />
-                <Skeleton className="h-4 w-32" />
-              </div>
-              <Skeleton className="h-9 w-16 mt-2" />
-              <Skeleton className="h-4 w-24" />
-            </div>
+            <Skeleton className="h-9 w-32 mb-2" />
+            <Skeleton className="h-4 w-28" />
           </Card>
 
-          <Card className="p-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-5 w-5 rounded" />
-                <Skeleton className="h-4 w-28" />
-              </div>
-              <Skeleton className="h-9 w-12 mt-2" />
-              <Skeleton className="h-4 w-28" />
-            </div>
-          </Card>
-        </div>
-
-        {/* Earnings Analytics Skeleton */}
-        <Card className="p-6">
-          <Skeleton className="h-6 w-40 mb-4" />
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            <Skeleton className="h-16 rounded" />
-            <Skeleton className="h-16 rounded" />
-            <Skeleton className="h-16 rounded" />
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="p-4">
+              <Skeleton className="h-4 w-24 mb-2" />
+              <Skeleton className="h-7 w-20" />
+            </Card>
+            <Card className="p-4">
+              <Skeleton className="h-4 w-24 mb-2" />
+              <Skeleton className="h-7 w-20" />
+            </Card>
           </div>
-          <Skeleton className="h-48 w-full rounded" />
-        </Card>
-
-        {/* Quick Actions Skeleton */}
-        <div className="space-y-3">
-          <Skeleton className="h-6 w-28" />
-          <Skeleton className="h-10 w-full rounded" />
-          <Skeleton className="h-10 w-full rounded" />
-          <Skeleton className="h-10 w-full rounded" />
         </div>
+
+        {/* Payout Info Skeleton */}
+        <Card className="p-4">
+          <Skeleton className="h-5 w-32 mb-3" />
+          <div className="space-y-2">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        </Card>
       </div>
     );
   }
@@ -196,56 +234,120 @@ const HostHome = () => {
         <QuickAvailabilityActions />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 animate-fade-in">
-        <Card 
-          className="p-6 bg-primary text-primary-foreground cursor-pointer hover:opacity-90 transition-opacity"
-          onClick={() => navigate('/host-earnings-history')}
-        >
-          <div className="flex items-center justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                <span className="text-sm opacity-90">Total Earnings</span>
-              </div>
-              <div>
-                <p className="text-3xl font-bold">${stats.totalEarnings.toFixed(2)}</p>
-                <p className="text-sm opacity-75">Lifetime earnings</p>
-              </div>
-            </div>
-            <ChevronRight className="h-5 w-5 opacity-75" />
-          </div>
-        </Card>
-        
-        <Card className="p-6">
+      {/* Total Earnings Card - Primary CTA */}
+      <Card
+        className="p-6 bg-primary text-primary-foreground cursor-pointer hover:opacity-90 transition-opacity animate-fade-in"
+        onClick={() => navigate('/host-earnings-history')}
+      >
+        <div className="flex items-center justify-between">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              <span className="text-sm text-muted-foreground">Completed Bookings</span>
+              <TrendingUp className="h-5 w-5" />
+              <span className="text-sm opacity-90">All-Time Earnings</span>
             </div>
             <div>
-              <p className="text-3xl font-bold">{stats.totalBookings}</p>
-              <p className="text-sm text-muted-foreground">Total bookings</p>
+              <p className="text-3xl font-bold">${stats.totalEarnings.toFixed(2)}</p>
+              <p className="text-sm opacity-75">{stats.totalBookings} total booking{stats.totalBookings !== 1 ? 's' : ''}</p>
             </div>
           </div>
-        </Card>
+          <ChevronRight className="h-5 w-5 opacity-75" />
+        </div>
+      </Card>
 
-        <Card className="p-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-primary" />
-              <span className="text-sm text-muted-foreground">Active Listings</span>
+      {/* Stripe Balance Section */}
+      <div className="space-y-3 animate-fade-in" style={{ animationDelay: '50ms', animationFillMode: 'both' }}>
+        <h2 className="text-lg font-semibold flex items-center gap-2">
+          <Wallet className="h-5 w-5 text-primary" />
+          Payout Information
+        </h2>
+
+        {stripeLoading ? (
+          <Card className="p-4">
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-            <div>
-              <p className="text-3xl font-bold">{stats.activeListings}</p>
-              <p className="text-sm text-muted-foreground">Published spots</p>
+          </Card>
+        ) : stripeBalance?.connected ? (
+          <>
+            {/* Available & Pending Balance */}
+            <div className="grid grid-cols-2 gap-3">
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground mb-1">Available Balance</p>
+                <p className="text-2xl font-bold text-green-600">${stripeBalance.available_balance.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground">Ready for payout</p>
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs text-muted-foreground mb-1">Pending Balance</p>
+                <p className="text-2xl font-bold text-yellow-600">${stripeBalance.pending_balance.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground">Processing</p>
+              </Card>
             </div>
-          </div>
-        </Card>
+
+            {/* Next Payout */}
+            {stripeBalance.next_payout_date && (
+              <Card className="p-4 bg-primary/5 border-primary/20">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Next Payout</p>
+                    <p className="font-semibold">
+                      {format(new Date(stripeBalance.next_payout_date), 'EEEE, MMM d')}
+                    </p>
+                  </div>
+                  {stripeBalance.next_payout_amount && (
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground mb-1">Amount</p>
+                      <p className="text-xl font-bold text-primary">
+                        ${stripeBalance.next_payout_amount.toFixed(2)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            )}
+
+            {/* Last Payout Status */}
+            {stripeBalance.last_payout_status && (
+              <Card className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {getPayoutStatusIcon(stripeBalance.last_payout_status)}
+                    <div>
+                      <p className="text-xs text-muted-foreground">Last Payout</p>
+                      <p className="text-sm font-medium">
+                        {stripeBalance.last_payout_date
+                          ? format(new Date(stripeBalance.last_payout_date), 'MMM d, yyyy')
+                          : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {stripeBalance.last_payout_amount && (
+                      <span className="font-semibold">${stripeBalance.last_payout_amount.toFixed(2)}</span>
+                    )}
+                    {getPayoutStatusBadge(stripeBalance.last_payout_status)}
+                  </div>
+                </div>
+              </Card>
+            )}
+          </>
+        ) : (
+          <Card className="p-4 border-yellow-300 bg-yellow-50 dark:bg-yellow-900/10">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 shrink-0" />
+              <div className="flex-1">
+                <p className="font-medium text-yellow-800 dark:text-yellow-300">Stripe Not Connected</p>
+                <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                  Connect your Stripe account to receive payouts.
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
       </div>
 
-      {/* Earnings Analytics */}
+      {/* Earnings by Spot */}
       <div className="animate-fade-in" style={{ animationDelay: '100ms', animationFillMode: 'both' }}>
-        <EarningsAnalytics />
+        <EarningsBySpot />
       </div>
 
       {/* Recent Reviews */}
@@ -256,7 +358,7 @@ const HostHome = () => {
       {/* Quick Actions */}
       <div className="space-y-3 animate-fade-in" style={{ animationDelay: '200ms', animationFillMode: 'both' }}>
         <h2 className="text-lg font-semibold">Quick Actions</h2>
-        <Button 
+        <Button
           className="w-full"
           onClick={() => navigate('/list-spot')}
         >
@@ -271,7 +373,7 @@ const HostHome = () => {
           <MapPin className="h-4 w-4 mr-2" />
           View All Listings
         </Button>
-        <Button 
+        <Button
           variant="outline"
           className="w-full"
           onClick={() => {
