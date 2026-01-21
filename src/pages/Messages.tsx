@@ -375,7 +375,7 @@ function ChatPane({
                   </svg>
                   Support
                 </span>}
-              {partnerRole && <Badge variant="outline" className="text-xs">
+              {partnerRole && conversationId !== '00000000-0000-0000-0000-000000000001' && <Badge variant="outline" className="text-xs">
                   {partnerRole === 'host' ? 'Host' : 'Driver'}
                 </Badge>}
             </p>
