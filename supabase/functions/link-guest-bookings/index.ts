@@ -171,27 +171,32 @@ serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    
-    // Create service-role client for database operations first
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { persistSession: false }
-    });
-    
-    // Validate JWT using service role client's getUser with the token
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
 
-    if (userError || !userData?.user?.id) {
-      console.warn('[link-guest-bookings] Failed to validate user:', userError?.message);
+    // Validate JWT using anon client + getClaims (signing-keys compatible)
+    const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false },
+    });
+
+    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
+
+    if (claimsError || !claimsData?.claims?.sub) {
+      console.warn('[link-guest-bookings] Failed to get claims:', claimsError?.message);
       return new Response(
         JSON.stringify({ error: 'Invalid or expired session' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const authUserId = userData.user.id;
+    const authUserId = claimsData.claims.sub as string;
     console.log('[link-guest-bookings] Authenticated user:', authUserId);
+
+    // Create service-role client for database operations
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
     
-    // supabaseClient is already our service-role client
+    // supabaseClient is our service-role client
 
     // Parse request body
     const { user_id, email, phone, first_name }: LinkRequest = await req.json();
