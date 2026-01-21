@@ -193,7 +193,7 @@ serve(async (req) => {
     // If time range is provided, filter out spots with conflicting bookings or unavailable overrides
     if (start_time && end_time) {
       const spotIds = spotsWithDistance.map(s => s.id);
-      
+
       if (spotIds.length > 0) {
         // Get dates covered by the search range for calendar override checks
         const startDate = new Date(start_time);
@@ -203,48 +203,146 @@ serve(async (req) => {
         currentDate.setHours(0, 0, 0, 0);
         const endDateMidnight = new Date(endDate);
         endDateMidnight.setHours(0, 0, 0, 0);
-        
+
         while (currentDate <= endDateMidnight) {
           searchDates.push(currentDate.toISOString().split('T')[0]);
           currentDate.setDate(currentDate.getDate() + 1);
         }
 
-        // Get calendar overrides that mark spots as unavailable for the search dates
-        const { data: unavailableOverrides } = await supabase
+        // Get days of week covered by the search range (0=Sunday, 1=Monday, etc.)
+        const searchDaysOfWeek = new Set<number>();
+        const tempDate = new Date(startDate);
+        tempDate.setHours(0, 0, 0, 0);
+        while (tempDate <= endDateMidnight) {
+          searchDaysOfWeek.add(tempDate.getDay());
+          tempDate.setDate(tempDate.getDate() + 1);
+        }
+
+        // Get calendar overrides for the search dates (both available and unavailable)
+        const { data: calendarOverrides } = await supabase
           .from('calendar_overrides')
           .select('spot_id, override_date, start_time, end_time, is_available')
           .in('spot_id', spotIds)
-          .in('override_date', searchDates)
-          .eq('is_available', false);
+          .in('override_date', searchDates);
 
-        // Determine which spots are fully unavailable during the search time
-        const unavailableSpotIds = new Set<string>();
-        
-        for (const override of unavailableOverrides || []) {
-          // If override has no time range (full day block), spot is unavailable
-          if (!override.start_time && !override.end_time) {
-            unavailableSpotIds.add(override.spot_id);
-            continue;
+        // Get availability rules (recurring weekly schedules) for all spots
+        const { data: availabilityRules } = await supabase
+          .from('availability_rules')
+          .select('spot_id, day_of_week, start_time, end_time, is_available')
+          .in('spot_id', spotIds)
+          .in('day_of_week', Array.from(searchDaysOfWeek));
+
+        // Build a map of spots with their overrides and rules
+        const spotOverrides = new Map<string, any[]>();
+        for (const override of calendarOverrides || []) {
+          if (!spotOverrides.has(override.spot_id)) {
+            spotOverrides.set(override.spot_id, []);
           }
-          
-          // Check if override time range overlaps with search time on that date
-          const overrideDate = override.override_date;
-          const overrideStart = override.start_time 
-            ? new Date(`${overrideDate}T${override.start_time}`) 
-            : new Date(`${overrideDate}T00:00:00`);
-          const overrideEnd = override.end_time 
-            ? new Date(`${overrideDate}T${override.end_time}`) 
-            : new Date(`${overrideDate}T23:59:59`);
-          
-          // Check overlap: override blocks if search range overlaps with blocked range
-          if (new Date(start_time) < overrideEnd && new Date(end_time) > overrideStart) {
-            unavailableSpotIds.add(override.spot_id);
+          spotOverrides.get(override.spot_id)!.push(override);
+        }
+
+        const spotRules = new Map<string, any[]>();
+        for (const rule of availabilityRules || []) {
+          if (!spotRules.has(rule.spot_id)) {
+            spotRules.set(rule.spot_id, []);
+          }
+          spotRules.get(rule.spot_id)!.push(rule);
+        }
+
+        // Helper function to check if a time falls within a time range
+        const isTimeInRange = (time: Date, rangeStart: string, rangeEnd: string, dateStr: string): boolean => {
+          const timeStr = time.toTimeString().substring(0, 8); // HH:MM:SS format
+          const rangeStartNorm = rangeStart.length === 5 ? rangeStart + ':00' : rangeStart;
+          const rangeEndNorm = rangeEnd.length === 5 ? rangeEnd + ':00' : rangeEnd;
+          return timeStr >= rangeStartNorm && timeStr <= rangeEndNorm;
+        };
+
+        // Determine which spots are unavailable during the search time
+        const unavailableSpotIds = new Set<string>();
+
+        for (const spotId of spotIds) {
+          const overrides = spotOverrides.get(spotId) || [];
+          const rules = spotRules.get(spotId) || [];
+
+          // Check each date in the search range
+          let isAvailableForAllDates = true;
+
+          for (const dateStr of searchDates) {
+            const dateObj = new Date(dateStr + 'T00:00:00');
+            const dayOfWeek = dateObj.getDay();
+
+            // Find override for this specific date (takes precedence over rules)
+            const dateOverride = overrides.find(o => o.override_date === dateStr);
+
+            if (dateOverride) {
+              // Override exists for this date
+              if (!dateOverride.is_available) {
+                // Date is blocked
+                if (!dateOverride.start_time && !dateOverride.end_time) {
+                  // Full day block
+                  isAvailableForAllDates = false;
+                  break;
+                }
+                // Partial block - check if search time overlaps with blocked time
+                const overrideStart = new Date(`${dateStr}T${dateOverride.start_time || '00:00:00'}`);
+                const overrideEnd = new Date(`${dateStr}T${dateOverride.end_time || '23:59:59'}`);
+                if (new Date(start_time) < overrideEnd && new Date(end_time) > overrideStart) {
+                  isAvailableForAllDates = false;
+                  break;
+                }
+              } else {
+                // Override marks as available - check if search time is within available hours
+                if (dateOverride.start_time && dateOverride.end_time) {
+                  const availStart = new Date(`${dateStr}T${dateOverride.start_time}`);
+                  const availEnd = new Date(`${dateStr}T${dateOverride.end_time}`);
+                  // Search must be entirely within available window
+                  const searchStartOnDate = new Date(Math.max(new Date(start_time).getTime(), dateObj.getTime()));
+                  const searchEndOnDate = new Date(Math.min(new Date(end_time).getTime(), new Date(dateStr + 'T23:59:59').getTime()));
+                  if (searchStartOnDate < availStart || searchEndOnDate > availEnd) {
+                    isAvailableForAllDates = false;
+                    break;
+                  }
+                }
+                // If no time range specified in override, treat as available all day
+              }
+            } else {
+              // No override - check recurring rules for this day of week
+              const dayRule = rules.find(r => r.day_of_week === dayOfWeek);
+
+              if (dayRule) {
+                if (dayRule.is_available === false) {
+                  // Day is blocked by recurring rule
+                  isAvailableForAllDates = false;
+                  break;
+                }
+                // Day has availability hours - check if search time falls within
+                if (dayRule.start_time && dayRule.end_time) {
+                  const ruleStart = new Date(`${dateStr}T${dayRule.start_time}`);
+                  const ruleEnd = new Date(`${dateStr}T${dayRule.end_time}`);
+                  // Search time on this date must be within the available window
+                  const searchStartOnDate = new Date(Math.max(new Date(start_time).getTime(), dateObj.getTime()));
+                  const nextDay = new Date(dateObj);
+                  nextDay.setDate(nextDay.getDate() + 1);
+                  const searchEndOnDate = new Date(Math.min(new Date(end_time).getTime(), nextDay.getTime() - 1));
+
+                  if (searchStartOnDate < ruleStart || searchEndOnDate > ruleEnd) {
+                    isAvailableForAllDates = false;
+                    break;
+                  }
+                }
+              }
+              // If no rule exists for this day, spot is considered available (no restrictions)
+            }
+          }
+
+          if (!isAvailableForAllDates) {
+            unavailableSpotIds.add(spotId);
           }
         }
 
         if (unavailableSpotIds.size > 0) {
           spotsWithDistance = spotsWithDistance.filter(spot => !unavailableSpotIds.has(spot.id));
-          console.log(`[search-spots-lite] Filtered out ${unavailableSpotIds.size} unavailable spots (calendar overrides)`);
+          console.log(`[search-spots-lite] Filtered out ${unavailableSpotIds.size} unavailable spots (availability rules/overrides)`);
         }
 
         // Get all bookings that overlap with the requested time range
