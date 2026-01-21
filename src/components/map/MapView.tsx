@@ -58,6 +58,7 @@ interface MapViewProps {
   onSpotHover?: (spotId: string | null) => void;
   onSpotSelect?: (spotId: string) => void; // Callback when a marker is clicked
   hideCarousel?: boolean;
+  skipFlyToSearchCenter?: boolean; // When true, don't animate/zoom to searchCenter on change
 }
 
 // Calculate distance between two coordinates using Haversine formula (returns miles)
@@ -78,7 +79,7 @@ const calculateWalkTime = (distanceMiles: number): number => {
   return Math.round((distanceMiles / 3) * 60);
 };
 
-const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, onMapMove, searchQuery, exploreParams, highlightedSpotId, selectedSpotId: propSelectedSpotId, onSpotHover, onSpotSelect, hideCarousel }: MapViewProps) => {
+const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, onMapMove, searchQuery, exploreParams, highlightedSpotId, selectedSpotId: propSelectedSpotId, onSpotHover, onSpotSelect, hideCarousel, skipFlyToSearchCenter }: MapViewProps) => {
   const navigate = useNavigate();
   const { mode, setMode } = useMode();
   const { user } = useAuth();
@@ -568,6 +569,9 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
   useEffect(() => {
     if (!map.current || !mapReady || !searchCenter) return;
 
+    // Skip fly animation when explicitly requested (e.g., "Search Here" button)
+    if (skipFlyToSearchCenter) return;
+
     const { lat, lng } = searchCenter;
     if (
       typeof lat !== 'number' || typeof lng !== 'number' ||
@@ -586,7 +590,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       essential: true,
       duration: 1500
     });
-  }, [searchCenter, mapReady]);
+  }, [searchCenter, mapReady, skipFlyToSearchCenter]);
 
   // Update current location GeoJSON source when currentLocation changes
   useEffect(() => {

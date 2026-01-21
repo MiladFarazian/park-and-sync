@@ -207,6 +207,7 @@ const Explore = () => {
   const [pendingMapCenter, setPendingMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [pendingMapRadius, setPendingMapRadius] = useState<number>(15000);
   const [isSearchingHere, setIsSearchingHere] = useState(false);
+  const [skipFlyToSearchCenter, setSkipFlyToSearchCenter] = useState(false);
 
   // Ensure end time is always after start time
   const validateAndSetTimes = (newStartTime: Date, newEndTime: Date | null) => {
@@ -252,6 +253,27 @@ const Explore = () => {
       }
     } catch (error) {
       console.error('Error reverse geocoding:', error);
+    }
+    return null;
+  };
+
+  // Function to reverse geocode to area-level label (neighborhood/city, not street address)
+  const reverseGeocodeArea = async (lat: number, lng: number) => {
+    if (!mapboxToken) return null;
+    
+    try {
+      // Request only neighborhood, locality, and place types for area-level label
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxToken}&types=neighborhood,locality,place`
+      );
+      const data = await response.json();
+      
+      if (data.features && data.features.length > 0) {
+        // Return the most specific area name (neighborhood first, then locality, then place)
+        return data.features[0].place_name;
+      }
+    } catch (error) {
+      console.error('Error reverse geocoding area:', error);
     }
     return null;
   };
@@ -848,28 +870,30 @@ const Explore = () => {
     
     setIsSearchingHere(true);
     
-    // Update the search location to the new map center
-    setSearchLocation(pendingMapCenter);
-    setShowSearchHereButton(false);
-    
     const savedCenter = pendingMapCenter;
     const savedRadius = pendingMapRadius;
     
+    // Set skip flag BEFORE updating searchLocation to prevent MapView from flying/zooming
+    setSkipFlyToSearchCenter(true);
+    
+    // Update the search location to the new map center (won't trigger flyTo due to skip flag)
+    setSearchLocation(savedCenter);
+    setShowSearchHereButton(false);
     setPendingMapCenter(null);
     
-    // Get address for the new location (for URL and display)
-    const address = await reverseGeocode(savedCenter.lat, savedCenter.lng);
-    if (address) {
-      setSearchQuery(address);
+    // Get area-level label for the new location (neighborhood/city, not street address)
+    const areaLabel = await reverseGeocodeArea(savedCenter.lat, savedCenter.lng);
+    if (areaLabel) {
+      setSearchQuery(areaLabel);
     }
     
-    // Update URL with new coordinates
+    // Update URL with new coordinates and area label
     const params = new URLSearchParams();
     params.set('lat', savedCenter.lat.toString());
     params.set('lng', savedCenter.lng.toString());
     if (startTime) params.set('start', startTime.toISOString());
     if (endTime) params.set('end', endTime.toISOString());
-    if (address) params.set('q', address);
+    if (areaLabel) params.set('q', areaLabel);
     navigate(`/explore?${params.toString()}`, { replace: true });
     
     // Update lastFetchedCenterRef to prevent handleMapMove from triggering another fetch
@@ -879,7 +903,10 @@ const Explore = () => {
     await fetchNearbySpots(savedCenter, savedRadius, false);
     
     setIsSearchingHere(false);
-  }, [pendingMapCenter, pendingMapRadius, mapboxToken, reverseGeocode, navigate, startTime, endTime, fetchNearbySpots]);
+    
+    // Reset skip flag after a short delay to allow normal behavior for future searches
+    setTimeout(() => setSkipFlyToSearchCenter(false), 100);
+  }, [pendingMapCenter, pendingMapRadius, mapboxToken, reverseGeocodeArea, navigate, startTime, endTime, fetchNearbySpots]);
   const handleDateTimeUpdate = (newStartTime?: Date, newEndTime?: Date) => {
     if (!searchLocation) return;
 
@@ -1110,6 +1137,7 @@ const Explore = () => {
               onSpotHover={setHoveredSpotId}
               onSpotSelect={setSelectedSpotId}
               hideCarousel={true}
+              skipFlyToSearchCenter={skipFlyToSearchCenter}
             />
           )}
         </div>
@@ -1294,6 +1322,7 @@ const Explore = () => {
           searchQuery={searchQuery}
           exploreParams={exploreParams}
           selectedSpotId={selectedSpotId}
+          skipFlyToSearchCenter={skipFlyToSearchCenter}
         />
       )}
 
