@@ -22,7 +22,7 @@ import { evChargerTypes } from '@/lib/evChargerTypes';
 import { useAuth } from '@/contexts/AuthContext';
 import VehicleSizeSelector from '@/components/spot/VehicleSizeSelector';
 import { vehicleSizes as vehicleSizeOptions } from '@/lib/vehicleSizes';
-import { getListSpotDraft, clearListSpotDraft, saveListSpotDraft, getStripeFlowState, clearStripeFlowState, isStandaloneMode } from '@/lib/stripeSetupFlow';
+import { getListSpotDraft, clearListSpotDraft, saveListSpotDraft, getStripeFlowState, clearStripeFlowState, isStandaloneMode, fileToDataUrl, dataUrlToFile, PhotoDraft } from '@/lib/stripeSetupFlow';
 
 const spotCategories = [
   'Residential Driveway',
@@ -172,14 +172,14 @@ const ListSpot = () => {
         // Check if we're returning from Stripe setup in PWA mode
         if (!hasCheckedStripeReturn.current) {
           hasCheckedStripeReturn.current = true;
-          
+
           const flowState = getStripeFlowState();
           const draft = getListSpotDraft();
-          
+
           if (flowState?.context === 'list_spot' && draft) {
             // Clear flow state immediately
             clearStripeFlowState();
-            
+
             // Restore form state from draft
             setValue('category', draft.formData.category as any);
             setValue('address', draft.formData.address);
@@ -195,10 +195,19 @@ const ListSpot = () => {
             setSelectedVehicleSizes(draft.selectedVehicleSizes);
             setAddressCoordinates(draft.addressCoordinates);
             setAddressConfirmedFromSuggestion(!!draft.addressCoordinates);
-            
+
+            // Restore photos from data URLs
+            if (draft.photos && draft.photos.length > 0) {
+              const restoredPhotos = draft.photos.map(p =>
+                dataUrlToFile(p.dataUrl, p.name, p.type)
+              );
+              setPhotos(restoredPhotos);
+              setPrimaryIndex(draft.primaryPhotoIndex || 0);
+            }
+
             // Go to step 6 (review)
             setCurrentStep(6);
-            
+
             if (isConnected) {
               toast.success('Stripe connected! Submitting your listing...');
               // Mark for auto-submit after state is set
@@ -647,6 +656,19 @@ const ListSpot = () => {
         throw new Error('No Stripe onboarding URL returned');
       }
 
+      // Convert photos to data URLs for localStorage storage
+      let photoDrafts: PhotoDraft[] = [];
+      if (photos.length > 0) {
+        toast.info('Saving your progress...');
+        photoDrafts = await Promise.all(
+          photos.map(async (file) => ({
+            dataUrl: await fileToDataUrl(file),
+            name: file.name,
+            type: file.type,
+          }))
+        );
+      }
+
       // Save form state before navigating to Stripe
       saveListSpotDraft({
         formData: {
@@ -664,11 +686,13 @@ const ListSpot = () => {
         evChargerType,
         selectedVehicleSizes,
         addressCoordinates,
+        photos: photoDrafts,
+        primaryPhotoIndex: primaryIndex,
       });
 
       // Import dynamically to avoid circular dependencies
       const { navigateToStripe, isStandaloneMode } = await import('@/lib/stripeSetupFlow');
-      
+
       // Navigate to Stripe with proper PWA handling
       navigateToStripe(url, {
         returnRoute: '/list-spot',

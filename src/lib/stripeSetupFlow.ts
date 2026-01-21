@@ -19,6 +19,12 @@ export interface StripeFlowState {
   context?: 'list_spot' | 'profile';
 }
 
+export interface PhotoDraft {
+  dataUrl: string;
+  name: string;
+  type: string;
+}
+
 export interface ListSpotDraft {
   formData: {
     category: string;
@@ -35,8 +41,36 @@ export interface ListSpotDraft {
   evChargerType: string | null;
   selectedVehicleSizes: string[];
   addressCoordinates: { lat: number; lng: number } | null;
+  photos?: PhotoDraft[];
+  primaryPhotoIndex?: number;
   timestamp: number;
 }
+
+/**
+ * Convert File to data URL for localStorage storage
+ */
+export const fileToDataUrl = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
+/**
+ * Convert data URL back to File object
+ */
+export const dataUrlToFile = (dataUrl: string, filename: string, mimeType: string): File => {
+  const arr = dataUrl.split(',');
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mimeType });
+};
 
 /**
  * Save list spot draft before navigating to Stripe
