@@ -28,7 +28,7 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --bottom-nav-height: 80px; /* h-16 (64px) + pb-4 (16px) */
+    --bottom-nav-height: calc(4rem + env(safe-area-inset-bottom, 0px)); /* h-16 (64px) + safe area */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 
@@ -143,10 +143,23 @@ All colors MUST be HSL.
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
   }
-  
+
   /* Touch manipulation for better scroll behavior */
   .touch-action-manipulation {
     touch-action: manipulation;
+  }
+
+  /* Safe area utilities for PWA/notched devices */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 
@@ -230,10 +243,18 @@ All colors MUST be HSL.
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
   }
-  
+
   /* Force GPU layer for virtualized lists */
   [data-virtuoso-scroller] {
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
+  }
+}
+
+/* PWA standalone mode specific styles */
+@media all and (display-mode: standalone) {
+  :root {
+    /* Ensure safe area is accounted for in standalone mode */
+    --bottom-nav-height: calc(4rem + env(safe-area-inset-bottom, 34px));
   }
 }
