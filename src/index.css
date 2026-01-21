@@ -251,10 +251,3 @@ All colors MUST be HSL.
   }
 }
 
-/* PWA standalone mode specific styles */
-@media all and (display-mode: standalone) {
-  :root {
-    /* Ensure safe area is accounted for in standalone mode */
-    --bottom-nav-height: calc(4rem + env(safe-area-inset-bottom, 34px));
-  }
-}

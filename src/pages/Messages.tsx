@@ -432,13 +432,8 @@ function ChatPane({
             </>}
       </div>
       
-      {/* Input Area - sticky with safe area handling */}
-      <div className="px-3 py-2 border-t flex-shrink-0 bg-card" style={{
-        paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
-        position: 'sticky',
-        bottom: 0,
-        zIndex: 20
-      }}>
+      {/* Input Area */}
+      <div className="px-3 py-2 pb-3 border-t flex-shrink-0 bg-card">
         {mediaPreview && <div className="mb-2 relative inline-block">
             <div className="relative">
               {selectedMedia?.type.startsWith('image/') ? <img src={mediaPreview} alt="Preview" className="h-16 w-16 object-cover rounded-md" /> : <video src={mediaPreview} className="h-16 w-16 object-cover rounded-md" />}
