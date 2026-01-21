@@ -73,9 +73,9 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       <div
         className="md:hidden flex flex-col"
         style={{
-          // Use 100dvh for pages with keyboard input to prevent resize on keyboard open
-          // Other pages use --app-vvh for proper keyboard handling
-          height: isFullScreenPage ? '100dvh' : 'var(--app-vvh, 100dvh)'
+          // Use 100dvh to prevent layout resize when iOS keyboard opens
+          // The keyboard overlays the viewport rather than shrinking it
+          height: '100dvh'
         }}
       >
         <NotificationPermissionBanner />
@@ -101,12 +101,12 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           </div>
         </header>
         <main className="flex-1 overflow-hidden bg-background" style={{ minHeight: 0, transform: 'translateZ(0)' }}>
-          <div 
+          <div
             className={`h-full ${isFullScreenPage ? '' : 'overflow-y-auto pb-20'}`}
-            style={{ 
+            style={{
               paddingBottom: isFullScreenPage
                 ? undefined
-                : 'calc(5rem + env(safe-area-inset-bottom) + var(--keyboard-inset, 0px))',
+                : 'calc(5rem + env(safe-area-inset-bottom))',
               overscrollBehaviorY: 'contain',
               WebkitOverflowScrolling: 'touch',
               minHeight: 0
