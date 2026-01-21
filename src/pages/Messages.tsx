@@ -43,22 +43,69 @@ const MessageItem = memo(({
   message: Message;
   isMe: boolean;
 }) => {
+  const [mediaLoaded, setMediaLoaded] = useState(false);
   const isVideo = message.media_type?.startsWith('video/');
   const isImage = message.media_type?.startsWith('image/');
+  const hasMedia = Boolean(message.media_url);
+
   return <div className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-[70%] rounded-lg p-3 ${isMe ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-        {message.media_url && <div className="mb-2">
-            {isImage && <img src={message.media_url} alt="Shared media" className="rounded-md max-w-full h-auto max-h-64 object-cover" onError={e => {
-          console.error('Failed to load image:', message.media_url);
-          e.currentTarget.style.display = 'none';
-        }} />}
-            {isVideo && <video src={message.media_url} controls className="rounded-md max-w-full h-auto max-h-64" onError={e => {
-          console.error('Failed to load video:', message.media_url);
-        }} />}
+        {hasMedia && <div className="mb-2">
+            {/* Reserve fixed space for media to prevent layout shift */}
+            <div
+              className="relative rounded-md overflow-hidden bg-muted/50"
+              style={{
+                // Use fixed dimensions to prevent jumping - media will scale within
+                width: '200px',
+                height: mediaLoaded ? 'auto' : '150px',
+                minHeight: mediaLoaded ? undefined : '150px',
+                maxHeight: '256px'
+              }}
+            >
+              {isImage && (
+                <img
+                  src={message.media_url}
+                  alt="Shared media"
+                  className="rounded-md w-full h-auto object-cover"
+                  style={{
+                    opacity: mediaLoaded ? 1 : 0,
+                    transition: 'opacity 0.2s ease-in'
+                  }}
+                  onLoad={() => setMediaLoaded(true)}
+                  onError={e => {
+                    console.error('Failed to load image:', message.media_url);
+                    e.currentTarget.style.display = 'none';
+                    setMediaLoaded(true);
+                  }}
+                />
+              )}
+              {isVideo && (
+                <video
+                  src={message.media_url}
+                  controls
+                  className="rounded-md w-full h-auto"
+                  style={{
+                    opacity: mediaLoaded ? 1 : 0,
+                    transition: 'opacity 0.2s ease-in'
+                  }}
+                  onLoadedMetadata={() => setMediaLoaded(true)}
+                  onError={e => {
+                    console.error('Failed to load video:', message.media_url);
+                    setMediaLoaded(true);
+                  }}
+                />
+              )}
+              {/* Loading placeholder */}
+              {!mediaLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              )}
+            </div>
           </div>}
-        
+
         {message.message && <p className="text-sm">{message.message}</p>}
-        
+
         <div className={`flex items-center gap-1 mt-1 ${isMe ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
           <span className="text-xs">
             {new Date(message.created_at).toLocaleTimeString('en-US', {
