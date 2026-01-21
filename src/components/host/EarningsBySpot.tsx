@@ -124,7 +124,7 @@ const EarningsBySpot = () => {
           <div
             key={spot.id}
             className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted cursor-pointer transition-colors"
-            onClick={() => navigate(`/edit-spot/${spot.id}`)}
+            onClick={() => navigate(`/spot-earnings/${spot.id}`)}
           >
             {/* Thumbnail */}
             {spot.photoUrl ? (

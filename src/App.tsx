@@ -16,6 +16,7 @@ import Dashboard from "./pages/Dashboard";
 import HostHome from "./pages/HostHome";
 import HostCalendar from "./pages/HostCalendar";
 import HostEarningsHistory from "./pages/HostEarningsHistory";
+import SpotEarningsHistory from "./pages/SpotEarningsHistory";
 import Messages from "./pages/Messages";
 import SearchResults from "./pages/SearchResults";
 import SpotDetail from "./pages/SpotDetail";
@@ -125,6 +126,7 @@ const App = () => {
                     <Route path="/host-home" element={<RequireHostMode><HostHome /></RequireHostMode>} />
                     <Route path="/host-calendar" element={<RequireHostMode><HostCalendar /></RequireHostMode>} />
                     <Route path="/host-earnings-history" element={<RequireHostMode><HostEarningsHistory /></RequireHostMode>} />
+                    <Route path="/spot-earnings/:spotId" element={<RequireHostMode><SpotEarningsHistory /></RequireHostMode>} />
                     <Route path="/manage-availability" element={<RequireHostMode><ManageAvailability /></RequireHostMode>} />
                     <Route path="/messages" element={<Messages />} />
                     <Route path="/profile" element={<Profile />} />
