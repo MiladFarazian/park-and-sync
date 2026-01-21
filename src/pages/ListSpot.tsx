@@ -718,12 +718,12 @@ const ListSpot = () => {
   });
 
   return (
-    <div 
-      className="bg-background min-h-screen"
+    <div
+      className="bg-background min-h-full"
       onTouchStart={swipeHandlers.onTouchStart}
       onTouchEnd={swipeHandlers.onTouchEnd}
     >
-      <div className="p-4 space-y-6 max-w-2xl mx-auto">
+      <div className="p-4 space-y-6 max-w-2xl mx-auto pb-4">
         {/* Header - Hidden on Step 4 for fullscreen calendar */}
         {currentStep !== 4 && (
           <div className="flex items-center gap-3">
