@@ -331,9 +331,18 @@ const HostCalendar = () => {
   const formatTimeDisplay = (time: string): string => {
     const [hours, minutes] = time.split(':');
     const h = parseInt(hours);
+    // Handle 24:00 as 11:59 PM (end of day)
+    if (h === 24) {
+      return '11:59 PM';
+    }
     const ampm = h >= 12 ? 'PM' : 'AM';
     const hour12 = h % 12 || 12;
     return `${hour12}:${minutes} ${ampm}`;
+  };
+
+  // Helper to check if a time range represents a full day
+  const isFullDayRange = (startTime: string, endTime: string): boolean => {
+    return startTime === '00:00' && (endTime === '23:59' || endTime === '24:00');
   };
   
   const getDateData = (date: Date) => {
@@ -373,9 +382,10 @@ const HostCalendar = () => {
         if (!override.is_available) {
           availableHours = 'Blocked';
         } else if (override.start_time && override.end_time) {
-          // Treat 00:00-23:59 as "Available all day"
-          const isFullDay = override.start_time === '00:00' && override.end_time === '23:59';
-          availableHours = isFullDay ? 'Available all day' : `${formatTimeDisplay(override.start_time)} - ${formatTimeDisplay(override.end_time)}`;
+          // Treat 00:00-23:59 or 00:00-24:00 as "Available all day"
+          availableHours = isFullDayRange(override.start_time, override.end_time)
+            ? 'Available all day'
+            : `${formatTimeDisplay(override.start_time)} - ${formatTimeDisplay(override.end_time)}`;
         } else {
           availableHours = 'Available all day';
         }
@@ -384,7 +394,10 @@ const HostCalendar = () => {
         if (dayRule.is_available === false) {
           availableHours = 'Blocked (recurring)';
         } else {
-          availableHours = `${formatTimeDisplay(dayRule.start_time)} - ${formatTimeDisplay(dayRule.end_time)} (recurring)`;
+          // Check if recurring rule is full day
+          availableHours = isFullDayRange(dayRule.start_time, dayRule.end_time)
+            ? 'Available all day (recurring)'
+            : `${formatTimeDisplay(dayRule.start_time)} - ${formatTimeDisplay(dayRule.end_time)} (recurring)`;
         }
       } else {
         availableHours = 'No schedule set';
