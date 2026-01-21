@@ -411,7 +411,7 @@ export const QuickAvailabilityActions = () => {
           variant="ghost"
           size="sm"
           className="w-full justify-center text-xs text-muted-foreground h-8"
-          onClick={() => openDialog('manage')}
+          onClick={() => navigate('/manage-availability')}
         >
           <Clock className="h-3 w-3 mr-1.5" />
           Manage Availability
