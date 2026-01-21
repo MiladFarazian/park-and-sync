@@ -690,7 +690,8 @@ const MessagesContent = () => {
           </button>)}
     </div>;
   return <div className="flex min-h-0 bg-background h-full" style={{
-    transform: 'translateZ(0)'
+    transform: 'translateZ(0)',
+    paddingBottom: isMobile ? 'calc(4rem + env(safe-area-inset-bottom, 0px))' : undefined
   }}>
       {/* Conversations List */}
       <div className={`${selectedConversation && isMobile ? 'hidden' : 'flex'} w-full md:w-80 flex-col overflow-hidden border-r bg-card`}>
