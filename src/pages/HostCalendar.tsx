@@ -569,7 +569,7 @@ const HostCalendar = () => {
   }
 
   return (
-    <div className="min-h-full flex flex-col gap-4 p-4 pb-24 pb-[calc(6rem+env(safe-area-inset-bottom))]">
+    <div className="h-full overflow-y-auto flex flex-col gap-4 p-4 pb-24" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
