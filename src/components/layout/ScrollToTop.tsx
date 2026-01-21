@@ -25,10 +25,22 @@ const ScrollToTop = () => {
         // Use instant scroll to avoid jarring animations
         window.scrollTo({ top: 0, behavior: 'instant' });
 
-        // Also scroll the main content container if it exists (for mobile layout)
-        const mainContent = document.querySelector('[data-scroll-container]');
-        if (mainContent) {
-          mainContent.scrollTop = 0;
+        // Also scroll all potential scroll containers (mobile and desktop layouts)
+        const scrollContainers = document.querySelectorAll('[data-scroll-container]');
+        scrollContainers.forEach(container => {
+          container.scrollTop = 0;
+        });
+
+        // Also reset any overflow-y-auto elements that might be scrollable
+        // This catches cases where the main scrollable element doesn't have the data attribute
+        const mainElement = document.querySelector('main');
+        if (mainElement) {
+          mainElement.scrollTop = 0;
+          // Check for scrollable children within main
+          const scrollableChild = mainElement.querySelector('.overflow-y-auto');
+          if (scrollableChild) {
+            scrollableChild.scrollTop = 0;
+          }
         }
       }
 
