@@ -117,6 +117,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (event === 'SIGNED_IN' && session.access_token) {
               try {
                 const { data: linkData, error: linkError } = await supabase.functions.invoke('link-guest-bookings', {
+                  headers: {
+                    Authorization: `Bearer ${session.access_token}`,
+                  },
                   body: { 
                     user_id: session.user.id, 
                     email: session.user.email,
@@ -222,6 +225,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (data.user && data.session) {
         try {
           const { data: linkData, error: linkError } = await supabase.functions.invoke('link-guest-bookings', {
+            headers: {
+              Authorization: `Bearer ${data.session.access_token}`,
+            },
             body: { 
               user_id: data.user.id, 
               email,
