@@ -221,6 +221,9 @@ const GuestBookingFormContent = ({
               if (signUpData.session && signUpData.user) {
                 try {
                   await supabase.functions.invoke('link-guest-bookings', {
+                    headers: {
+                      Authorization: `Bearer ${signUpData.session.access_token}`,
+                    },
                     body: {
                       user_id: signUpData.user.id,
                       email: email.trim(),

@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { Resend } from "npm:resend@2.0.0";
 
 
@@ -172,31 +172,38 @@ serve(async (req) => {
       );
     }
 
-    // Validate JWT using anon client + getClaims (signing-keys compatible)
-    const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
+    console.log('[link-guest-bookings] Token present, length:', token.length);
+
+    // Create service-role client for database operations
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { persistSession: false },
     });
 
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
+    // Validate JWT using getUser with explicit token - most reliable method
+    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
 
-    if (claimsError || !claimsData?.claims?.sub) {
-      console.warn('[link-guest-bookings] Failed to get claims:', claimsError?.message);
+    if (userError) {
+      console.warn('[link-guest-bookings] getUser failed:', {
+        message: userError.message,
+        status: userError.status,
+        name: userError.name,
+      });
       return new Response(
         JSON.stringify({ error: 'Invalid or expired session' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const authUserId = claimsData.claims.sub as string;
-    console.log('[link-guest-bookings] Authenticated user:', authUserId);
+    if (!userData?.user?.id) {
+      console.warn('[link-guest-bookings] No user returned from getUser');
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired session' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Create service-role client for database operations
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { persistSession: false },
-    });
-    
-    // supabaseClient is our service-role client
+    const authUserId = userData.user.id;
+    console.log('[link-guest-bookings] Authenticated user:', authUserId);
 
     // Parse request body
     const { user_id, email, phone, first_name }: LinkRequest = await req.json();
