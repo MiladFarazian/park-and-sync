@@ -445,30 +445,23 @@ const HostCalendar = () => {
     return `${startTime} - ${endTime}`;
   };
 
-  const getStatusColor = (status: string, isPast: boolean) => {
-    if (status === 'canceled') return 'bg-destructive/10 text-destructive border-destructive/20';
-    if (status === 'completed') {
-      return 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-500 border-green-200 dark:border-green-800';
-    }
-    if (isPast) return 'bg-muted text-muted-foreground border-border';
-    return 'bg-primary/10 text-primary border-primary/20';
-  };
-
-  const getStatusText = (booking: any, isPast: boolean) => {
-    const statusResult = getBookingStatus({
+  const getReservationStatusResult = (booking: any) => {
+    return getBookingStatus({
       status: booking.status,
       instantBook: booking.spots?.instant_book !== false,
       startAt: booking.start_at,
       endAt: booking.end_at,
       isHost: true
     });
-    return statusResult.label;
   };
 
   const ReservationCard = ({ booking, isPast = false }: { booking: any; isPast?: boolean }) => {
-    const canReview = (booking.status === 'completed' || (isPast && booking.status === 'paid')) && 
-                      booking.status !== 'canceled' && 
+    const canReview = (booking.status === 'completed' || (isPast && booking.status === 'paid')) &&
+                      booking.status !== 'canceled' &&
                       !userReviews.has(booking.id);
+
+    const statusResult = getReservationStatusResult(booking);
+    const statusColorClasses = getBookingStatusColor(statusResult.label);
 
     const handleReview = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -477,7 +470,7 @@ const HostCalendar = () => {
       setReviewBooking({
         ...booking,
         revieweeId: booking.renter_id,
-        revieweeName: isGuestBooking 
+        revieweeName: isGuestBooking
           ? (booking.guest_full_name || 'Guest')
           : (renter?.first_name ? `${renter.first_name} ${renter.last_name || ''}`.trim() : 'Guest'),
         reviewerRole: 'host'
@@ -486,7 +479,7 @@ const HostCalendar = () => {
     };
 
     return (
-      <Card 
+      <Card
         className="group cursor-pointer hover:shadow-elegant hover:border-primary/30 transition-all duration-300 overflow-hidden"
         onClick={() => navigate(`/booking/${booking.id}`)}
       >
@@ -499,18 +492,18 @@ const HostCalendar = () => {
               <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
                 <User className="h-3.5 w-3.5 shrink-0" />
                 <span>
-                  {booking.is_guest 
+                  {booking.is_guest
                     ? (booking.guest_full_name || 'Guest')
                     : `${booking.renter?.first_name || 'Guest'} ${booking.renter?.last_name?.[0] || ''}.`
                   }
                 </span>
               </div>
             </div>
-            <Badge 
-              className={`text-xs border ${getStatusColor(booking.status, isPast)}`}
+            <Badge
+              className={`text-xs border ${statusColorClasses}`}
               variant="outline"
             >
-              {getStatusText(booking.status, isPast)}
+              {statusResult.label}
             </Badge>
           </div>
 
@@ -1087,13 +1080,17 @@ const HostCalendar = () => {
                             </div>
                           </div>
                           <div className="text-right">
-                            <Badge variant={
-                              booking.status === 'completed' ? 'secondary' :
-                              booking.status === 'active' ? 'default' :
-                              booking.status === 'pending' ? 'outline' : 'default'
-                            }>
-                              {booking.status}
-                            </Badge>
+                            {(() => {
+                              const sheetStatusResult = getReservationStatusResult(booking);
+                              return (
+                                <Badge
+                                  className={`text-xs border ${getBookingStatusColor(sheetStatusResult.label)}`}
+                                  variant="outline"
+                                >
+                                  {sheetStatusResult.label}
+                                </Badge>
+                              );
+                            })()}
                             <div className="text-sm font-semibold mt-1 text-green-600 dark:text-green-400">
                               ${getHostNetEarnings(booking).toFixed(2)}
                             </div>

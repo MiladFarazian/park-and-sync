@@ -88,29 +88,31 @@ export function getBookingStatus(input: BookingStatusInput): BookingStatusResult
 
   // For instant book spots
   if (instantBook) {
-    // Before stay starts: "Booked"
+    // Before stay starts: "Booked" (includes held during payment processing)
     if (!hasStarted && (status === 'active' || status === 'paid' || status === 'held')) {
+      return { label: 'Booked', variant: 'default' };
+    }
+    // Pending for instant-book is unusual but treat as Booked
+    if (!hasStarted && status === 'pending') {
       return { label: 'Booked', variant: 'default' };
     }
   } else {
     // For spots requiring host confirmation
-    
-    // Pending/held status = waiting for host confirmation = "Requested"
-    if (status === 'pending' || status === 'held') {
-      if (!hasStarted) {
-        return { label: 'Requested', variant: 'outline' };
-      }
+
+    // Pending status = waiting for host confirmation = "Requested"
+    if (status === 'pending') {
+      return { label: 'Requested', variant: 'outline' };
+    }
+
+    // Held status during payment processing after host approval = "Booked"
+    if (!hasStarted && status === 'held') {
+      return { label: 'Booked', variant: 'default' };
     }
 
     // After host confirms (active/paid) but before stay starts: "Booked"
     if (!hasStarted && (status === 'active' || status === 'paid')) {
       return { label: 'Booked', variant: 'default' };
     }
-  }
-
-  // Fallback for pending instant-book (shouldn't happen often)
-  if (status === 'pending') {
-    return { label: 'Requested', variant: 'outline' };
   }
 
   // Default fallback

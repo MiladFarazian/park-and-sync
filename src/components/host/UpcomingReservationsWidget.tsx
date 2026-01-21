@@ -7,10 +7,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronRight, Calendar, Clock, MessageCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, isToday, isTomorrow, isPast } from 'date-fns';
+import { format, isToday, isTomorrow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { getStreetAddress } from '@/lib/addressUtils';
 import { getHostNetEarnings } from '@/lib/hostEarnings';
+import { getBookingStatus, getBookingStatusColor } from '@/lib/bookingStatus';
 
 interface ReservationPreview {
   id: string;
@@ -30,6 +31,7 @@ interface ReservationPreview {
   spot: {
     title: string;
     address: string;
+    instant_book: boolean;
   };
 }
 
@@ -84,7 +86,8 @@ const UpcomingReservationsWidget = () => {
           ),
           spot:spots!bookings_spot_id_fkey (
             title,
-            address
+            address,
+            instant_book
           )
         `)
         .in('spot_id', spotIds)
@@ -107,7 +110,7 @@ const UpcomingReservationsWidget = () => {
         renter_id: b.renter_id,
         is_guest: b.is_guest || false,
         renter: b.renter as { first_name: string | null; last_name: string | null },
-        spot: b.spot as { title: string; address: string }
+        spot: b.spot as { title: string; address: string; instant_book: boolean }
       }));
 
       setReservations(formattedBookings);
@@ -125,20 +128,22 @@ const UpcomingReservationsWidget = () => {
     return format(date, 'MMM d');
   };
 
-  const getStatusBadge = (status: string, startAt: string) => {
-    const startDate = new Date(startAt);
-    const isStarted = isPast(startDate);
+  const getStatusBadge = (reservation: ReservationPreview) => {
+    const statusResult = getBookingStatus({
+      status: reservation.status,
+      instantBook: reservation.spot?.instant_book !== false,
+      startAt: reservation.start_at,
+      endAt: reservation.end_at,
+      isHost: true
+    });
 
-    if (status === 'active') {
-      return <Badge className="bg-green-500 text-white text-[10px]">Active</Badge>;
-    }
-    if (status === 'pending') {
-      return <Badge variant="secondary" className="text-[10px]">Pending</Badge>;
-    }
-    if (isStarted) {
-      return <Badge className="bg-blue-500 text-white text-[10px]">In Progress</Badge>;
-    }
-    return <Badge variant="outline" className="text-[10px]">Confirmed</Badge>;
+    const colorClasses = getBookingStatusColor(statusResult.label);
+
+    return (
+      <Badge className={`text-[10px] border ${colorClasses}`} variant="outline">
+        {statusResult.label}
+      </Badge>
+    );
   };
 
   const handleMessage = (e: React.MouseEvent, reservation: ReservationPreview) => {
@@ -219,7 +224,7 @@ const UpcomingReservationsWidget = () => {
                     <span className="text-sm font-medium truncate">
                       {reservation.renter?.first_name || 'Guest'} {reservation.renter?.last_name?.[0] || ''}.
                     </span>
-                    {getStatusBadge(reservation.status, reservation.start_at)}
+                    {getStatusBadge(reservation)}
                   </div>
                   
                   {/* Time Range */}
