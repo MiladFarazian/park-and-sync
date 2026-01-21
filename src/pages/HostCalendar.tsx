@@ -569,7 +569,7 @@ const HostCalendar = () => {
   }
 
   return (
-    <div className="h-full overflow-hidden flex flex-col gap-4 p-4 pb-20 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+    <div className="min-h-full flex flex-col gap-4 p-4 pb-24 pb-[calc(6rem+env(safe-area-inset-bottom))]">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -788,8 +788,8 @@ const HostCalendar = () => {
               })}
             </div>
           ) : (
-            // Week View - Vertical scrollable layout for mobile
-            <div className="space-y-2 overflow-y-auto px-1 pb-4" style={{ maxHeight: 'calc(var(--app-vvh, 100dvh) - 18rem)' }} {...weekSwipeHandlers}>
+            // Week View - Vertical layout for mobile (no scroll constraint, container handles it)
+            <div className="space-y-2 px-1" {...weekSwipeHandlers}>
               {weekDays.map((date, index) => {
                 const { bookings: dayBookings, isUnavailable, rate, isPast, hasBookings, availableHours } = getDateData(date);
                 const isTodayDate = isToday(date);
