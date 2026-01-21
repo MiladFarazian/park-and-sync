@@ -10,7 +10,7 @@ import { PrivacySettingsDialog } from "@/components/settings/PrivacySettingsDial
 
 const PrivacySecurity = () => {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [twoFactorOpen, setTwoFactorOpen] = useState(false);
   const [privacySettingsOpen, setPrivacySettingsOpen] = useState(false);
@@ -78,14 +78,14 @@ const PrivacySecurity = () => {
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm">Email Verification</span>
-              <span className={`text-sm ${profile?.email_verified ? 'text-green-600' : 'text-muted-foreground'}`}>
-                {profile?.email_verified ? 'Verified' : 'Not Verified'}
+              <span className={`text-sm ${user?.email_confirmed_at ? 'text-green-600' : 'text-muted-foreground'}`}>
+                {user?.email_confirmed_at ? 'Verified' : 'Not Verified'}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm">Phone Verification</span>
-              <span className={`text-sm ${profile?.phone_verified ? 'text-green-600' : 'text-muted-foreground'}`}>
-                {profile?.phone_verified ? 'Verified' : 'Not Verified'}
+              <span className={`text-sm ${user?.phone_confirmed_at ? 'text-green-600' : 'text-muted-foreground'}`}>
+                {user?.phone_confirmed_at ? 'Verified' : 'Not Verified'}
               </span>
             </div>
           </div>
