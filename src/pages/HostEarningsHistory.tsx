@@ -66,7 +66,7 @@ const HostEarningsHistory = () => {
         return;
       }
 
-      // Fetch all bookings for these spots (completed, active, paid)
+      // Fetch all bookings for these spots (including cancelled for display, but excluded from total)
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select(`
@@ -76,7 +76,7 @@ const HostEarningsHistory = () => {
           spot:spots!bookings_spot_id_fkey (title, address, instant_book)
         `)
         .in('spot_id', spotIds)
-        .in('status', ['completed', 'active', 'paid'])
+        .in('status', ['completed', 'active', 'paid', 'canceled', 'refunded'])
         .order('start_at', { ascending: false });
 
       if (bookingsError) throw bookingsError;
@@ -84,8 +84,11 @@ const HostEarningsHistory = () => {
       const typedBookings = (bookingsData || []) as unknown as BookingWithDetails[];
       setBookings(typedBookings);
 
-      // Calculate total earnings from all displayed bookings (completed, active, paid)
-      const total = typedBookings.reduce((sum, b) => sum + getHostNetEarnings(b), 0);
+      // Calculate total earnings excluding cancelled/declined bookings
+      const earningStatuses = ['completed', 'active', 'paid'];
+      const total = typedBookings
+        .filter(b => earningStatuses.includes(b.status))
+        .reduce((sum, b) => sum + getHostNetEarnings(b), 0);
       setTotalEarnings(total);
     } catch (error) {
       console.error('Error fetching bookings:', error);
@@ -213,11 +216,17 @@ const HostEarningsHistory = () => {
                     </div>
                   </div>
 
-                  {/* Earnings */}
+                  {/* Earnings - show $0 for cancelled/declined */}
                   <div className="text-right shrink-0">
-                    <span className="text-lg font-semibold text-green-600 dark:text-green-400">
-                      ${earnings.toFixed(2)}
-                    </span>
+                    {statusResult.label === 'Cancelled' || statusResult.label === 'Declined' ? (
+                      <span className="text-lg font-semibold text-muted-foreground">
+                        $0.00
+                      </span>
+                    ) : (
+                      <span className="text-lg font-semibold text-green-600 dark:text-green-400">
+                        ${earnings.toFixed(2)}
+                      </span>
+                    )}
                   </div>
                 </div>
               </Card>
