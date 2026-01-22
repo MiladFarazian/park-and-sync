@@ -124,7 +124,7 @@ serve(async (req) => {
     // Get spot details for pricing
     const { data: spot, error: spotError } = await supabase
       .from('spots')
-      .select('*, host_id, instant_book, has_ev_charging, ev_charging_premium_per_hour, ev_charger_type, parking_instructions')
+      .select('*, host_id, instant_book, has_ev_charging, ev_charging_premium_per_hour, ev_charger_type, access_notes, ev_charging_instructions')
       .eq('id', spot_id)
       .single();
 
