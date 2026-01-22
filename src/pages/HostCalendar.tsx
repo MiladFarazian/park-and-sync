@@ -169,12 +169,14 @@ const HostCalendar = () => {
     }
   }, [user]);
 
+  // Fetch data when spots are loaded and we have a valid selection
+  // This ensures data loads on initial mount when spot is restored from URL
   useEffect(() => {
-    if (user && selectedSpotId && selectedSpotId !== 'none') {
+    if (user && selectedSpotId && selectedSpotId !== 'none' && spots.length > 0) {
       fetchData();
       fetchAllReservations();
     }
-  }, [user, currentMonth, currentWeek, viewMode, selectedSpotId]);
+  }, [user, currentMonth, currentWeek, viewMode, selectedSpotId, spots]);
 
   const fetchSpots = async () => {
     if (!user) return;
