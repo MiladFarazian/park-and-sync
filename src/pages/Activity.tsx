@@ -227,44 +227,31 @@ const Activity = () => {
     onSwipeRight: useCallback(() => setCalendarMonth(prev => subMonths(prev, 1)), []),
   });
 
-  // Get calendar dot color based on booking status and timing
+  // Get calendar dot color based on booking status using the centralized status logic
   const getCalendarDotColor = (booking: any) => {
-    const now = new Date();
-    const start = new Date(booking.start_at);
-    const end = new Date(booking.end_at);
-    const status = booking.status;
+    const statusResult = getBookingStatus({
+      status: booking.status,
+      instantBook: booking.spots?.instant_book !== false,
+      startAt: booking.start_at,
+      endAt: booking.end_at,
+      isHost: mode === 'host',
+    });
 
-    // Cancelled or refunded
-    if (status === 'canceled' || status === 'refunded') {
-      return 'bg-red-500';
+    switch (statusResult.label) {
+      case 'Cancelled':
+      case 'Declined':
+        return 'bg-red-500';
+      case 'Requested':
+        return 'bg-yellow-500';
+      case 'Active':
+        return 'bg-primary';
+      case 'Completed':
+        return 'bg-green-500';
+      case 'Booked':
+        return 'bg-blue-500';
+      default:
+        return 'bg-gray-500';
     }
-
-    // Declined/rejected
-    if (status === 'declined' || status === 'rejected') {
-      return 'bg-red-500';
-    }
-
-    // Pending (awaiting host confirmation)
-    if (status === 'pending') {
-      return 'bg-yellow-500';
-    }
-
-    // Completed (past end time or explicitly completed)
-    if (status === 'completed' || now > end) {
-      return 'bg-green-500'; // Green for completed
-    }
-
-    // Active (currently during the booking period)
-    if (now >= start && now <= end && (status === 'active' || status === 'paid' || status === 'held')) {
-      return 'bg-primary'; // Primary color for active
-    }
-
-    // Booked (future confirmed booking)
-    if (now < start && (status === 'active' || status === 'paid' || status === 'held')) {
-      return 'bg-blue-500';
-    }
-
-    return 'bg-gray-500';
   };
   const BookingCard = ({
     booking,
@@ -962,7 +949,12 @@ const Activity = () => {
             )}
 
             {/* Legend */}
+            {/* Legend - order follows booking lifecycle */}
             <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                Requested
+              </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-blue-500" />
                 Booked
@@ -974,10 +966,6 @@ const Activity = () => {
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-green-500" />
                 Completed
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-yellow-500" />
-                Requested
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-red-500" />
