@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { getHostNetEarnings } from '@/lib/hostEarnings';
+import { getBookingStatus, getBookingStatusColor } from '@/lib/bookingStatus';
 
 interface BookingWithDetails {
   id: string;
@@ -27,14 +28,9 @@ interface BookingWithDetails {
   spot: {
     title: string;
     address: string;
+    instant_book?: boolean;
   } | null;
 }
-
-const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  completed: { label: 'Completed', variant: 'secondary' },
-  active: { label: 'Active', variant: 'default' },
-  paid: { label: 'Paid', variant: 'outline' },
-};
 
 const HostEarningsHistory = () => {
   const navigate = useNavigate();
@@ -77,7 +73,7 @@ const HostEarningsHistory = () => {
           id, status, start_at, end_at, total_amount,
           host_earnings, hourly_rate, extension_charges,
           renter:profiles!bookings_renter_id_fkey (first_name, last_name),
-          spot:spots!bookings_spot_id_fkey (title, address)
+          spot:spots!bookings_spot_id_fkey (title, address, instant_book)
         `)
         .in('spot_id', spotIds)
         .in('status', ['completed', 'active', 'paid'])
@@ -170,7 +166,13 @@ const HostEarningsHistory = () => {
       ) : (
         <div className="space-y-3">
           {bookings.map(booking => {
-            const config = statusConfig[booking.status] || { label: booking.status, variant: 'secondary' as const };
+            const statusResult = getBookingStatus({
+              status: booking.status,
+              instantBook: booking.spot?.instant_book ?? true,
+              startAt: booking.start_at,
+              endAt: booking.end_at,
+              isHost: true,
+            });
             const earnings = getHostNetEarnings(booking);
 
             return (
@@ -186,8 +188,8 @@ const HostEarningsHistory = () => {
                       <span className="font-medium truncate">
                         {getRenterName(booking.renter)}
                       </span>
-                      <Badge variant={config.variant} className="shrink-0 text-xs">
-                        {config.label}
+                      <Badge className={`shrink-0 text-xs border ${getBookingStatusColor(statusResult.label)}`}>
+                        {statusResult.label}
                       </Badge>
                     </div>
 

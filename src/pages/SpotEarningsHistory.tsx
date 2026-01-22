@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { getHostNetEarnings } from '@/lib/hostEarnings';
 import { getStreetAddress } from '@/lib/addressUtils';
+import { getBookingStatus, getBookingStatusColor } from '@/lib/bookingStatus';
 
 interface BookingWithDetails {
   id: string;
@@ -27,6 +28,7 @@ interface BookingWithDetails {
     first_name: string | null;
     last_name: string | null;
   } | null;
+  instant_book?: boolean;
 }
 
 interface SpotInfo {
@@ -34,13 +36,8 @@ interface SpotInfo {
   title: string;
   address: string;
   photoUrl: string | null;
+  instantBook: boolean;
 }
-
-const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  completed: { label: 'Completed', variant: 'secondary' },
-  active: { label: 'Active', variant: 'default' },
-  paid: { label: 'Paid', variant: 'outline' },
-};
 
 const SpotEarningsHistory = () => {
   const navigate = useNavigate();
@@ -69,6 +66,7 @@ const SpotEarningsHistory = () => {
           title,
           address,
           host_id,
+          instant_book,
           spot_photos(url, is_primary, sort_order)
         `)
         .eq('id', spotId)
@@ -96,6 +94,7 @@ const SpotEarningsHistory = () => {
         title: spotData.title || 'Untitled Spot',
         address: spotData.address || '',
         photoUrl,
+        instantBook: spotData.instant_book ?? true,
       });
 
       // Fetch all bookings for this spot
@@ -257,7 +256,13 @@ const SpotEarningsHistory = () => {
             Booking History
           </h3>
           {bookings.map(booking => {
-            const config = statusConfig[booking.status] || { label: booking.status, variant: 'secondary' as const };
+            const statusResult = getBookingStatus({
+              status: booking.status,
+              instantBook: spot?.instantBook ?? true,
+              startAt: booking.start_at,
+              endAt: booking.end_at,
+              isHost: true,
+            });
             const earnings = getHostNetEarnings(booking);
 
             return (
@@ -274,8 +279,8 @@ const SpotEarningsHistory = () => {
                       <span className="font-medium truncate">
                         {getRenterName(booking)}
                       </span>
-                      <Badge variant={config.variant} className="shrink-0 text-xs">
-                        {config.label}
+                      <Badge className={`shrink-0 text-xs border ${getBookingStatusColor(statusResult.label)}`}>
+                        {statusResult.label}
                       </Badge>
                     </div>
 
