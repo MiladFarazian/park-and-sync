@@ -23,6 +23,7 @@ import SpotDetail from "./pages/SpotDetail";
 import Booking from "./pages/Booking";
 import BookingConfirmation from "./pages/BookingConfirmation";
 import HostBookingConfirmation from "./pages/HostBookingConfirmation";
+import BookingDeclined from "./pages/BookingDeclined";
 import BookingDetail from "./pages/BookingDetail";
 import CheckoutSuccess from "./pages/CheckoutSuccess";
 import Profile from "./pages/Profile";
@@ -140,6 +141,7 @@ const App = () => {
                     <Route path="/book/:spotId" element={<Booking />} />
                     <Route path="/booking/:bookingId" element={<BookingDetail />} />
                     <Route path="/booking-confirmation/:bookingId" element={<BookingConfirmation />} />
+                    <Route path="/booking-declined/:bookingId" element={<BookingDeclined />} />
                     <Route path="/host-booking-confirmation/:bookingId" element={<RequireHostMode><HostBookingConfirmation /></RequireHostMode>} />
                     <Route path="/admin" element={<AdminDashboard />} />
                     <Route path="/support-home" element={<SupportHome />} />

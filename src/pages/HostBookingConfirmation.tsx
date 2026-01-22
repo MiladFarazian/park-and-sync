@@ -204,7 +204,7 @@ const HostBookingConfirmation = () => {
   const timeUntilExpiry = isPendingApproval ? formatDistanceToNow(new Date(new Date(booking.created_at).getTime() + 60 * 60 * 1000), { addSuffix: true }) : null;
 
   return (
-    <div className="bg-background">
+    <div className="bg-background min-h-screen">
       {/* Header */}
       <div className="border-b bg-card sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
@@ -212,53 +212,55 @@ const HostBookingConfirmation = () => {
             <Button variant="ghost" size="icon" onClick={() => navigate('/host-home')}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-xl font-bold">
-              {isPendingApproval ? 'Booking Request' : 'Booking Confirmed'}
-            </h1>
+            <div className="flex-1">
+              <h1 className="text-lg font-bold">
+                {isPendingApproval ? 'Booking Request' : 'Booking Confirmed'}
+              </h1>
+              <p className="text-xs text-muted-foreground">{bookingNumber}</p>
+            </div>
             {isPendingApproval && (
-              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
-                Pending Approval
+              <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                Pending
               </Badge>
             )}
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
+      <div className="container mx-auto px-4 py-6 max-w-lg space-y-5">
         {/* Status Message */}
         {isPendingApproval ? (
           <>
             {/* Pending Approval UI */}
-            <div className="text-center space-y-4">
+            <div className="text-center space-y-3">
               <div className="flex justify-center">
-                <div className="rounded-full bg-yellow-100 dark:bg-yellow-900/20 p-6">
-                  <Clock className="h-16 w-16 text-yellow-600 dark:text-yellow-500" />
+                <div className="rounded-full bg-amber-100 dark:bg-amber-900/20 p-5">
+                  <Clock className="h-12 w-12 text-amber-600 dark:text-amber-500" />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold text-yellow-700 dark:text-yellow-500">
-                New Booking Request
-              </h2>
-              <p className="text-muted-foreground">
-                A driver wants to book your spot. Approve or decline within 1 hour.
-              </p>
+              <h2 className="text-xl font-bold">New Booking Request</h2>
               <p className="text-sm text-muted-foreground">
-                Request expires {timeUntilExpiry}
+                A driver wants to book your spot. Review and respond within 1 hour.
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                Expires {timeUntilExpiry}
               </p>
             </div>
 
             {/* Approval Actions */}
-            <Card className="p-6 border-yellow-200 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-900/10">
+            <Card className="p-5 border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10">
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400 mb-2">
-                  <AlertTriangle className="h-5 w-5" />
-                  <h3 className="font-bold">Action Required</h3>
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-amber-700 dark:text-amber-400">Action Required</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      The driver's card is authorized for <span className="font-semibold">${booking.total_amount.toFixed(2)}</span>. 
+                      If approved, their card will be charged. If declined, <span className="font-medium text-green-600 dark:text-green-400">no charge will be made</span>.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  The driver's card has been authorized for ${booking.total_amount.toFixed(2)}. 
-                  If you approve, the charge will be processed. If you decline or don't respond within 1 hour, 
-                  the authorization will be released and they won't be charged.
-                </p>
-                <div className="flex gap-3 pt-2">
+                <div className="flex gap-3">
                   <Button 
                     className="flex-1" 
                     onClick={handleApproveBooking}
@@ -267,14 +269,14 @@ const HostBookingConfirmation = () => {
                     {approving ? (
                       <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Approving...</>
                     ) : (
-                      <><CheckCircle2 className="h-4 w-4 mr-2" /> Approve Booking</>
+                      <><CheckCircle2 className="h-4 w-4 mr-2" /> Approve</>
                     )}
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button 
                         variant="outline" 
-                        className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                        className="flex-1 border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground"
                         disabled={approving || rejecting}
                       >
                         {rejecting ? (
@@ -286,10 +288,10 @@ const HostBookingConfirmation = () => {
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Decline Booking Request?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          The driver will be notified and their card will not be charged. 
-                          This action cannot be undone.
+                        <AlertDialogTitle>Decline this booking?</AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-2">
+                          <span className="block">The driver will be notified that their request was declined.</span>
+                          <span className="block font-medium text-green-600">Their card will not be charged.</span>
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -310,17 +312,17 @@ const HostBookingConfirmation = () => {
         ) : (
           <>
             {/* Confirmed Booking UI */}
-            <div className="text-center space-y-4">
+            <div className="text-center space-y-3">
               <div className="flex justify-center">
-                <div className="rounded-full bg-green-100 dark:bg-green-900/20 p-6">
-                  <CheckCircle2 className="h-16 w-16 text-green-600 dark:text-green-500" />
+                <div className="rounded-full bg-green-100 dark:bg-green-900/20 p-5">
+                  <CheckCircle2 className="h-12 w-12 text-green-600 dark:text-green-500" />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold text-green-700 dark:text-green-500">
-                New Booking Received! 🎉
+              <h2 className="text-xl font-bold text-green-700 dark:text-green-500">
+                Booking Confirmed! 🎉
               </h2>
               <p className="text-muted-foreground">
-                You've earned ${hostEarnings.toFixed(2)} from this booking
+                You've earned <span className="font-bold text-foreground">${hostEarnings.toFixed(2)}</span> from this booking
               </p>
             </div>
           </>
@@ -328,27 +330,27 @@ const HostBookingConfirmation = () => {
 
         {/* Earnings Breakdown Card - Only show for confirmed bookings */}
         {!isPendingApproval && (
-          <Card className="p-6 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+          <Card className="p-5 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-primary mb-2">
+              <div className="flex items-center gap-2 text-primary">
                 <DollarSign className="h-5 w-5" />
-                <h3 className="font-bold text-lg">Your Earnings</h3>
+                <h3 className="font-semibold">Earnings Breakdown</h3>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Booking Total</span>
-                <span className="font-semibold">${booking.subtotal.toFixed(2)}</span>
+                <span className="text-muted-foreground">Booking Subtotal</span>
+                <span className="font-medium">${booking.subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground">Platform Fee (15%)</span>
-                <span className="font-semibold text-red-500">-${booking.platform_fee.toFixed(2)}</span>
+                <span className="font-medium text-destructive">-${booking.platform_fee.toFixed(2)}</span>
               </div>
               <Separator />
               <div className="flex justify-between items-center">
-                <span className="font-bold text-base">You Receive</span>
-                <span className="font-bold text-2xl text-primary">${hostEarnings.toFixed(2)}</span>
+                <span className="font-semibold">Your Earnings</span>
+                <span className="font-bold text-xl text-primary">${hostEarnings.toFixed(2)}</span>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Earnings will be available after the booking is completed
+              <p className="text-xs text-muted-foreground">
+                Funds available after booking completion
               </p>
             </div>
           </Card>
@@ -356,57 +358,42 @@ const HostBookingConfirmation = () => {
 
         {/* Potential Earnings Card - Show for pending bookings */}
         {isPendingApproval && (
-          <Card className="p-6">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-muted-foreground mb-2">
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-muted-foreground">
                 <DollarSign className="h-5 w-5" />
-                <h3 className="font-bold text-lg">Potential Earnings</h3>
+                <span className="font-medium">Potential Earnings</span>
               </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">If approved, you'll earn</span>
-                <span className="font-bold text-xl">${hostEarnings.toFixed(2)}</span>
-              </div>
+              <span className="font-bold text-lg">${hostEarnings.toFixed(2)}</span>
             </div>
           </Card>
         )}
 
-        {/* Booking Summary */}
-        <Card className="p-6">
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Booking ID</span>
-              <span className="font-bold">{bookingNumber}</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Duration</span>
-              <span className="font-bold">{duration} hours</span>
-            </div>
-          </div>
-        </Card>
-
         {/* Spot Details Card */}
         <Card className="p-4">
-          <h3 className="font-bold mb-4">Your Spot</h3>
+          <h3 className="font-semibold mb-3 text-sm text-muted-foreground uppercase tracking-wide">Spot</h3>
           <div className="flex gap-4">
             {primaryPhoto && (
               <img 
                 src={primaryPhoto} 
                 alt={spot.title} 
-                className="w-20 h-20 rounded-lg object-cover" 
+                className="w-16 h-16 rounded-lg object-cover shrink-0" 
               />
             )}
-            <div className="flex-1">
-              <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
-                <MapPin className="h-3 w-3" />
-                <span>{spot.address}</span>
+            <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex items-start gap-1.5 text-sm">
+                <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                <span className="truncate">{spot.address}</span>
               </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
+              <div className="flex items-center gap-1.5 text-sm">
+                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
                 <span>
-                  {format(new Date(booking.start_at), 'MMM d, h:mm a')} - {format(new Date(booking.end_at), 'h:mm a')}
+                  {format(new Date(booking.start_at), 'EEE, MMM d • h:mm a')} – {format(new Date(booking.end_at), 'h:mm a')}
                 </span>
               </div>
+              <p className="text-sm text-muted-foreground">
+                {duration} hour{duration !== 1 ? 's' : ''}
+              </p>
             </div>
           </div>
         </Card>
