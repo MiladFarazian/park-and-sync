@@ -43,10 +43,11 @@ const NotificationPermissionBanner = () => {
   }
 
   return (
-    <div 
-      className={`fixed bottom-20 left-4 right-4 z-50 md:left-auto md:right-6 md:bottom-6 md:max-w-sm transition-all duration-500 ease-out ${
+    <div
+      className={`fixed left-4 right-4 z-[60] md:left-auto md:right-6 md:bottom-6 md:max-w-sm transition-all duration-500 ease-out ${
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8 pointer-events-none'
       }`}
+      style={{ bottom: 'calc(var(--bottom-nav-height) + 1rem)' }}
     >
       <div className="bg-card border border-border rounded-xl shadow-lg p-4">
         <div className="flex items-start gap-3">
