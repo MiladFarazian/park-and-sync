@@ -9,7 +9,8 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { ExtendParkingDialog } from '@/components/booking/ExtendParkingDialog';
-import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, AlertTriangle, CheckCircle2, Copy, AlarmClockPlus, Flag, Zap, ChevronLeft, ChevronRight, Car, CalendarPlus } from 'lucide-react';
+import { ReviewModal } from '@/components/booking/ReviewModal';
+import { ArrowLeft, MapPin, Clock, Calendar, DollarSign, AlertCircle, Navigation, MessageCircle, XCircle, Loader2, AlertTriangle, CheckCircle2, Copy, AlarmClockPlus, Flag, Zap, ChevronLeft, ChevronRight, Car, CalendarPlus, Star } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -97,6 +98,8 @@ const BookingDetailContent = () => {
   const [touchEnd, setTouchEnd] = useState(0);
   const [showNotificationBanner, setShowNotificationBanner] = useState<string | null>(null);
   const [showTowConfirmDialog, setShowTowConfirmDialog] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [hasReviewed, setHasReviewed] = useState(false);
 
   useEffect(() => {
     if (!bookingId || !user) return;
@@ -190,6 +193,16 @@ const BookingDetailContent = () => {
       }
 
       setBooking(data as unknown as BookingDetails);
+      
+      // Check if user has already reviewed this booking
+      const { data: existingReview } = await supabase
+        .from('reviews')
+        .select('id')
+        .eq('booking_id', bookingId)
+        .eq('reviewer_id', user?.id)
+        .single();
+      
+      setHasReviewed(!!existingReview);
     } catch (error) {
       console.error('Error loading booking:', error);
       toast.error('Failed to load booking details');
@@ -1135,6 +1148,49 @@ const BookingDetailContent = () => {
           </Card>
         )}
 
+        {/* Leave Review Option (Both Drivers and Hosts) */}
+        {(() => {
+          const bookingEndTime = new Date(booking.end_at);
+          const isBookingEnded = new Date() > bookingEndTime;
+          const canReview = (isBookingEnded || booking.status === 'completed') && 
+                            !['canceled', 'refunded', 'declined', 'rejected', 'pending'].includes(booking.status) && 
+                            !hasReviewed;
+          const revieweeId = isHost ? booking.renter_id : booking.spots.host_id;
+          const revieweeName = isHost 
+            ? (booking.is_guest ? booking.guest_full_name || 'Guest' : `${booking.profiles.first_name} ${booking.profiles.last_name.charAt(0)}.`)
+            : `${booking.profiles.first_name} ${booking.profiles.last_name.charAt(0)}.`;
+          
+          if (!canReview) return null;
+          
+          return (
+            <Card className="p-4 bg-yellow-50/50 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-800">
+              <div className="flex items-start gap-3">
+                <Star className="h-5 w-5 text-yellow-500 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium mb-1">
+                    How was your experience?
+                  </p>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    {isHost 
+                      ? 'Leave a review for this driver to help other hosts'
+                      : 'Leave a review for this parking spot and host'
+                    }
+                  </p>
+                  <Button 
+                    size="sm"
+                    variant="outline"
+                    className="border-yellow-400 text-yellow-700 hover:bg-yellow-100 dark:border-yellow-600 dark:text-yellow-400 dark:hover:bg-yellow-900/30"
+                    onClick={() => setShowReviewModal(true)}
+                  >
+                    <Star className="h-4 w-4 mr-2" />
+                    Leave Review
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          );
+        })()}
+
         {/* Book Again Option (Renter Only) */}
         {isRenter && !isHost && (
           <Card className="p-4 bg-primary/5 border-primary/20">
@@ -1357,6 +1413,26 @@ const BookingDetailContent = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Review Modal */}
+      {booking && (
+        <ReviewModal
+          open={showReviewModal}
+          onOpenChange={setShowReviewModal}
+          bookingId={booking.id}
+          revieweeId={isHost ? booking.renter_id : booking.spots.host_id}
+          revieweeName={
+            isHost 
+              ? (booking.is_guest ? booking.guest_full_name || 'Guest' : `${booking.profiles.first_name} ${booking.profiles.last_name.charAt(0)}.`)
+              : `${booking.profiles.first_name} ${booking.profiles.last_name.charAt(0)}.`
+          }
+          reviewerRole={isHost ? 'host' : 'driver'}
+          onReviewSubmitted={() => {
+            setHasReviewed(true);
+            loadBookingDetails();
+          }}
+        />
+      )}
     </div>
   );
 };
