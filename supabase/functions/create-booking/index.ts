@@ -122,14 +122,21 @@ serve(async (req) => {
     console.log('Valid hold found:', hold.id);
 
     // Get spot details for pricing
-    const { data: spot, error: spotError } = await supabase
+    // NOTE: Use service-role client to avoid RLS blocking spot reads during booking creation.
+    const { data: spot, error: spotError } = await supabaseAdmin
       .from('spots')
-      .select('*, host_id, instant_book, has_ev_charging, ev_charging_premium_per_hour, ev_charger_type, access_notes, ev_charging_instructions')
+      .select(
+        'id, title, address, hourly_rate, host_id, instant_book, has_ev_charging, ev_charging_premium_per_hour, ev_charger_type, access_notes, ev_charging_instructions'
+      )
       .eq('id', spot_id)
       .single();
 
     if (spotError || !spot) {
-      throw new Error('Spot not found');
+      console.error('Spot lookup failed:', { spot_id, spotError });
+      return new Response(JSON.stringify({ error: 'Spot not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Validate EV charging request
