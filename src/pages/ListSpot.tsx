@@ -563,6 +563,14 @@ const ListSpot = () => {
       
       // Send listing confirmation email (non-blocking)
       if (spotData && profile?.email) {
+        // Check if spot is available 24/7 (all days have 00:00-24:00 or 00:00-23:59)
+        const isAvailable247 = availabilityRules.length === 7 &&
+          availabilityRules.every(rule =>
+            rule.is_available &&
+            rule.start_time === '00:00' &&
+            (rule.end_time === '24:00' || rule.end_time === '23:59')
+          );
+
         supabase.functions.invoke('send-listing-confirmation', {
           body: {
             hostEmail: profile.email,
@@ -571,6 +579,11 @@ const ListSpot = () => {
             spotAddress: data.address,
             hourlyRate: parseFloat(data.hourlyRate),
             spotId: spotData.id,
+            // Additional details
+            isAvailable247,
+            hasEvCharging,
+            evChargerType: hasEvCharging ? evChargerType : null,
+            evChargingPremium: hasEvCharging ? parseFloat(evChargingPremium) || 0 : 0,
           }
         }).catch((err) => console.error('Failed to send listing confirmation email:', err));
       }

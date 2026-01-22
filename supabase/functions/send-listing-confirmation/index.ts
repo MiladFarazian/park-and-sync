@@ -16,6 +16,11 @@ interface ListingConfirmationRequest {
   spotAddress: string;
   hourlyRate: number;
   spotId: string;
+  // Additional details
+  isAvailable247?: boolean;
+  hasEvCharging?: boolean;
+  evChargerType?: string | null;
+  evChargingPremium?: number;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -25,7 +30,18 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { hostEmail, hostName, spotCategory, spotAddress, hourlyRate, spotId }: ListingConfirmationRequest = await req.json();
+    const {
+      hostEmail,
+      hostName,
+      spotCategory,
+      spotAddress,
+      hourlyRate,
+      spotId,
+      isAvailable247,
+      hasEvCharging,
+      evChargerType,
+      evChargingPremium
+    }: ListingConfirmationRequest = await req.json();
 
     console.log("Sending listing confirmation email to:", hostEmail);
 
@@ -80,7 +96,24 @@ const handler = async (req: Request): Promise<Response> => {
                             <p style="color: #71717a; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Listing Details</p>
                             <p style="color: #18181b; margin: 0 0 12px 0; font-size: 18px; font-weight: 600;">${spotCategory}</p>
                             <p style="color: #52525b; margin: 0 0 12px 0; font-size: 14px;">${spotAddress}</p>
-                            <p style="color: #6B4EFF; margin: 0; font-size: 20px; font-weight: 700;">$${hourlyRate.toFixed(2)}/hour</p>
+                            <p style="color: #6B4EFF; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">$${hourlyRate.toFixed(2)}/hour</p>
+
+                            <!-- Features -->
+                            <div style="border-top: 1px solid #e4e4e7; padding-top: 16px; margin-top: 8px;">
+                              ${isAvailable247 ? `
+                              <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                <span style="display: inline-block; width: 20px; height: 20px; background-color: #22c55e; border-radius: 50%; margin-right: 10px; text-align: center; line-height: 20px; color: white; font-size: 12px;">✓</span>
+                                <span style="color: #18181b; font-size: 14px; font-weight: 500;">Available 24/7</span>
+                              </div>
+                              ` : ''}
+                              ${hasEvCharging ? `
+                              <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                <span style="display: inline-block; width: 20px; height: 20px; background-color: #3b82f6; border-radius: 50%; margin-right: 10px; text-align: center; line-height: 20px; color: white; font-size: 12px;">⚡</span>
+                                <span style="color: #18181b; font-size: 14px; font-weight: 500;">EV Charging${evChargerType ? ` (${evChargerType})` : ''}</span>
+                                ${evChargingPremium && evChargingPremium > 0 ? `<span style="color: #6B4EFF; font-size: 14px; margin-left: 8px;">+$${evChargingPremium.toFixed(2)}/hr</span>` : ''}
+                              </div>
+                              ` : ''}
+                            </div>
                           </td>
                         </tr>
                       </table>
