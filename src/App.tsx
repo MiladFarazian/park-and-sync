@@ -38,6 +38,8 @@ import EditVehicle from "./pages/EditVehicle";
 import PaymentMethods from "./pages/PaymentMethods";
 import Notifications from "./pages/Notifications";
 import PrivacySecurity from "./pages/PrivacySecurity";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 import EditSpotAvailability from "./pages/EditSpotAvailability";
 import EditSpot from "./pages/EditSpot";
 import Reviews from "./pages/Reviews";
@@ -112,6 +114,8 @@ const App = () => {
             <Route path="/payment-methods" element={<PaymentMethods />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/privacy-security" element={<PrivacySecurity />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
             <Route path="/*" element={
               <SupportRedirect>
                 <AppLayout>
