@@ -497,23 +497,28 @@ const HostCalendar = () => {
         onClick={() => navigate(`/booking/${booking.id}`)}
       >
         <CardContent className="p-4">
-          <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex items-start gap-3 mb-3">
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-base truncate group-hover:text-primary transition-colors">
-                {getStreetAddress(booking.spots?.address) || 'Parking Spot'}
-              </h3>
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
-                <User className="h-3.5 w-3.5 shrink-0" />
-                <span>
+              <div className="flex items-center gap-2">
+                <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="font-medium truncate">
                   {booking.is_guest
                     ? (booking.guest_full_name || 'Guest')
                     : `${booking.renter?.first_name || 'Guest'} ${booking.renter?.last_name?.[0] || ''}.`
                   }
                 </span>
               </div>
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{formatTime(booking.start_at, booking.end_at)}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-0.5">
+                <MapPin className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{getStreetAddress(booking.spots?.address) || 'Parking Spot'}</span>
+              </div>
             </div>
             <Badge
-              className={`text-xs border ${statusColorClasses}`}
+              className={`text-xs border shrink-0 whitespace-nowrap ${statusColorClasses}`}
               variant="outline"
             >
               {statusResult.label}
@@ -1097,7 +1102,7 @@ const HostCalendar = () => {
                               const sheetStatusResult = getReservationStatusResult(booking);
                               return (
                                 <Badge
-                                  className={`text-xs border ${getBookingStatusColor(sheetStatusResult.label)}`}
+                                  className={`text-xs border shrink-0 whitespace-nowrap ${getBookingStatusColor(sheetStatusResult.label)}`}
                                   variant="outline"
                                 >
                                   {sheetStatusResult.label}
