@@ -22,7 +22,7 @@ interface SavedSpot {
 export default function SavedSpots() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { favorites, toggleFavorite, isLoading: isFavoriteLoading } = useFavoriteSpots();
+  const { favorites, toggleFavorite, isLoading: isFavoriteLoading, isInitialized } = useFavoriteSpots();
   const [spots, setSpots] = useState<SavedSpot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -135,7 +135,7 @@ export default function SavedSpots() {
 
       {/* Content */}
       <div className="p-4">
-        {isLoading ? (
+        {(isLoading || !isInitialized) ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
               <Card key={i}>

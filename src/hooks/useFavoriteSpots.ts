@@ -7,11 +7,13 @@ export function useFavoriteSpots() {
   const { user } = useAuth();
   const [favorites, setFavorites] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Fetch user's favorite spots
   const fetchFavorites = useCallback(async () => {
     if (!user) {
       setFavorites([]);
+      setIsInitialized(true);
       return;
     }
 
@@ -25,10 +27,13 @@ export function useFavoriteSpots() {
       setFavorites(data?.map(f => f.spot_id) || []);
     } catch (error) {
       console.error('Error fetching favorites:', error);
+    } finally {
+      setIsInitialized(true);
     }
   }, [user]);
 
   useEffect(() => {
+    setIsInitialized(false);
     fetchFavorites();
   }, [fetchFavorites]);
 
@@ -109,6 +114,7 @@ export function useFavoriteSpots() {
     isFavorite,
     toggleFavorite,
     isLoading,
+    isInitialized,
     refetch: fetchFavorites
   };
 }
