@@ -213,41 +213,59 @@ All colors MUST be HSL.
   touch-action: pan-y;
 }
 
-/* Page turn animation for multi-step forms */
-@keyframes page-turn-back {
+/* Page peel animation for multi-step forms (book/kindle style) */
+@keyframes page-peel-exit {
   0% {
-    transform: perspective(1200px) rotateY(0deg);
+    transform: perspective(2000px) rotateY(0deg) translateX(0);
     transform-origin: left center;
     opacity: 1;
+    filter: brightness(1);
+  }
+  30% {
+    transform: perspective(2000px) rotateY(-15deg) translateX(5%);
+    transform-origin: left center;
+    opacity: 1;
+    filter: brightness(0.95);
   }
   100% {
-    transform: perspective(1200px) rotateY(90deg);
+    transform: perspective(2000px) rotateY(-90deg) translateX(50%);
     transform-origin: left center;
     opacity: 0;
+    filter: brightness(0.7);
   }
 }
 
-@keyframes page-turn-enter {
+@keyframes page-peel-enter {
   0% {
-    transform: perspective(1200px) rotateY(-90deg);
+    transform: perspective(2000px) rotateY(90deg) translateX(-50%);
     transform-origin: right center;
     opacity: 0;
+    filter: brightness(0.7);
   }
-  100% {
-    transform: perspective(1200px) rotateY(0deg);
+  70% {
+    transform: perspective(2000px) rotateY(15deg) translateX(-5%);
     transform-origin: right center;
     opacity: 1;
+    filter: brightness(0.95);
+  }
+  100% {
+    transform: perspective(2000px) rotateY(0deg) translateX(0);
+    transform-origin: right center;
+    opacity: 1;
+    filter: brightness(1);
   }
 }
 
 .animate-page-turn-back {
-  animation: page-turn-back 0.35s ease-in-out forwards;
+  animation: page-peel-exit 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   backface-visibility: hidden;
+  transform-style: preserve-3d;
 }
 
 .animate-page-turn-enter {
-  animation: page-turn-enter 0.35s ease-in-out forwards;
+  animation: page-peel-enter 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   backface-visibility: hidden;
+  transform-style: preserve-3d;
 }
 
 /* Portrait orientation lock for mobile phones only (not tablets) */

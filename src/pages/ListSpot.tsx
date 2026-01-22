@@ -751,8 +751,8 @@ const ListSpot = () => {
       setTimeout(() => {
         setIsAnimating(false);
         setAnimationDirection(null);
-      }, 350);
-    }, 350);
+      }, 400);
+    }, 400);
   };
 
   // Swipe navigation for multi-step form
