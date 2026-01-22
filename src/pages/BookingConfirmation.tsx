@@ -12,6 +12,7 @@ import { differenceInHours, format, formatDistanceToNow } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import RequireAuth from '@/components/auth/RequireAuth';
+import { calculateDriverPrice } from '@/lib/pricing';
 
 const BookingConfirmationContent = () => {
   const {
@@ -407,7 +408,7 @@ const BookingConfirmationContent = () => {
               <span className="font-medium">{duration} hours</span>
             </div>
             <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Parking ({duration} hrs × ${(booking.hourly_rate || 0).toFixed(2)}/hr)</span>
+              <span className="text-muted-foreground">Parking ({duration} hrs × ${calculateDriverPrice(booking.hourly_rate || 0).toFixed(2)}/hr)</span>
               <span className="font-medium">${booking.subtotal?.toFixed(2) || '0.00'}</span>
             </div>
             <div className="flex justify-between items-center text-sm">
