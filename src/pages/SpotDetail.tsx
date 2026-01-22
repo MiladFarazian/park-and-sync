@@ -22,6 +22,7 @@ import { calculateDriverPrice } from '@/lib/pricing';
 import { vehicleSizes } from '@/lib/vehicleSizes';
 import { useFavoriteSpots } from '@/hooks/useFavoriteSpots';
 import { cn } from '@/lib/utils';
+import { getPrivacyAwareName, getPrivacyAwareAvatar, getReviewerDisplayInfo } from '@/lib/privacyUtils';
 
 // Import the generated images
 import uscGarage from '@/assets/usc-garage.jpg';
@@ -436,7 +437,9 @@ const SpotDetail = () => {
             last_name,
             rating,
             review_count,
-            avatar_url
+            avatar_url,
+            privacy_show_profile_photo,
+            privacy_show_full_name
           ),
           spot_photos (
             url,
@@ -517,8 +520,8 @@ const SpotDetail = () => {
         ],
         rules: spotData.host_rules ? spotData.host_rules.split('.').filter((r: string) => r.trim()) : ['Follow parking guidelines'],
         host: {
-          name: spotData.profiles ? `${spotData.profiles.first_name || 'Host'} ${(spotData.profiles.last_name || '').charAt(0)}.` : 'Host',
-          avatar: spotData.profiles?.avatar_url || '/placeholder.svg',
+          name: getPrivacyAwareName(spotData.profiles, 'Host'),
+          avatar: getPrivacyAwareAvatar(spotData.profiles) || '/placeholder.svg',
           responseTime: 'Usually responds within a few hours'
         },
         reviewsList: []
@@ -597,7 +600,10 @@ const SpotDetail = () => {
           reviewer:reviewer_id (
             first_name,
             last_name,
-            avatar_url
+            avatar_url,
+            privacy_show_full_name,
+            privacy_show_profile_photo,
+            privacy_show_in_reviews
           ),
           booking:booking_id (
             spot_id
@@ -1104,21 +1110,21 @@ const SpotDetail = () => {
                 ) : (
                   reviews
                     .filter((review) => ratingFilter === null || review.rating === ratingFilter)
-                    .map((review) => (
+                    .map((review) => {
+                      const reviewerDisplay = getReviewerDisplayInfo(review.reviewer, 'Anonymous');
+                      return (
                       <Card key={review.id} className="p-4">
                         <div className="flex items-start gap-3">
                           <Avatar className="h-10 w-10">
-                            <AvatarImage src={review.reviewer?.avatar_url} />
+                            <AvatarImage src={reviewerDisplay.avatar} />
                             <AvatarFallback>
-                              {review.reviewer?.first_name?.[0] || 'U'}
+                              {reviewerDisplay.name?.[0] || 'U'}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2 mb-1">
                               <p className="font-medium truncate">
-                                {review.reviewer?.first_name 
-                                  ? `${review.reviewer.first_name} ${review.reviewer.last_name?.[0] || ''}.`
-                                  : 'Anonymous'}
+                                {reviewerDisplay.name}
                               </p>
                               <span className="text-xs text-muted-foreground shrink-0">
                                 {new Date(review.created_at).toLocaleDateString('en-US', {
@@ -1147,7 +1153,8 @@ const SpotDetail = () => {
                           </div>
                         </div>
                       </Card>
-                    ))
+                    );
+                    })
                 )}
               </div>
             </div>

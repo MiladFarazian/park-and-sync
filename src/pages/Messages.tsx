@@ -19,6 +19,7 @@ import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { sendMessage as sendMessageLib } from '@/lib/sendMessage';
 import { compressImage } from '@/lib/compressImage';
 import { getStreetAddress } from '@/lib/addressUtils';
+import { getPrivacyAwareName, getPrivacyAwareAvatar } from '@/lib/privacyUtils';
 import { Virtuoso } from 'react-virtuoso';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
@@ -560,6 +561,7 @@ interface BookingContact {
   first_name: string | null;
   last_name: string | null;
   avatar_url: string | null;
+  displayName?: string;
   spot_title: string;
   booking_date: string;
 }
@@ -638,9 +640,16 @@ const MessagesContent = () => {
       const {
         data,
         error
-      } = await supabase.from('profiles').select('user_id, first_name, last_name, avatar_url').eq('user_id', userId).single();
+      } = await supabase.from('profiles').select('user_id, first_name, last_name, avatar_url, privacy_show_profile_photo, privacy_show_full_name').eq('user_id', userId).single();
       if (error) throw error;
-      setNewUserProfile(data);
+      // Apply privacy settings for display
+      const privacyAwareName = getPrivacyAwareName(data, 'User');
+      const privacyAwareAvatar = getPrivacyAwareAvatar(data);
+      setNewUserProfile({
+        ...data,
+        displayName: privacyAwareName,
+        displayAvatar: privacyAwareAvatar
+      });
     } catch (error) {
       console.error('Error fetching user profile:', error);
       toast.error('Failed to load user profile');
@@ -706,12 +715,13 @@ const MessagesContent = () => {
       // Fetch profiles for all contacts
       const {
         data: profiles
-      } = await supabase.from('profiles').select('user_id, first_name, last_name, avatar_url').in('user_id', Array.from(contactUserIds));
+      } = await supabase.from('profiles').select('user_id, first_name, last_name, avatar_url, privacy_show_profile_photo, privacy_show_full_name').in('user_id', Array.from(contactUserIds));
       const contacts: BookingContact[] = (profiles || []).map(p => ({
         user_id: p.user_id,
         first_name: p.first_name,
         last_name: p.last_name,
-        avatar_url: p.avatar_url,
+        avatar_url: getPrivacyAwareAvatar(p) || null,
+        displayName: getPrivacyAwareName(p, 'User'),
         spot_title: contactsMap.get(p.user_id)?.spot_title || 'Parking Spot',
         booking_date: contactsMap.get(p.user_id)?.booking_date || ''
       }));
@@ -741,9 +751,9 @@ const MessagesContent = () => {
   const filteredConversations = conversations.filter(conv => conv.name.toLowerCase().includes(searchQuery.toLowerCase()));
   const selectedConvData = conversations.find(c => c.user_id === selectedConversation);
 
-  // Use new user profile if starting a new conversation
-  const displayName = selectedConvData?.name || (newUserProfile ? formatDisplayName(newUserProfile.first_name, newUserProfile.last_name) : 'User');
-  const displayAvatar = selectedConvData?.avatar_url || newUserProfile?.avatar_url;
+  // Use new user profile if starting a new conversation (with privacy-aware values)
+  const displayName = selectedConvData?.name || (newUserProfile?.displayName || formatDisplayName(newUserProfile?.first_name, newUserProfile?.last_name));
+  const displayAvatar = selectedConvData?.avatar_url || newUserProfile?.displayAvatar || newUserProfile?.avatar_url;
   const ComposeContent = () => <div className="space-y-2 max-h-[60vh] overflow-y-auto">
       {loadingContacts ? <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -754,12 +764,12 @@ const MessagesContent = () => {
             <Avatar>
               <AvatarImage src={contact.avatar_url || undefined} />
               <AvatarFallback>
-                {`${contact.first_name?.[0] || ''}${contact.last_name?.[0] || ''}`.toUpperCase() || 'U'}
+                {(contact.displayName || 'U')[0].toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sm truncate">
-                {formatDisplayName(contact.first_name, contact.last_name)}
+                {contact.displayName || formatDisplayName(contact.first_name, contact.last_name)}
               </p>
               <p className="text-xs text-muted-foreground truncate">{contact.spot_title}</p>
             </div>
