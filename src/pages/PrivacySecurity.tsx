@@ -1,19 +1,15 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Shield, Lock, Eye } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { ArrowLeft, Lock, FileText, Scale, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { ChangePasswordDialog } from "@/components/settings/ChangePasswordDialog";
-import { TwoFactorAuthDialog } from "@/components/settings/TwoFactorAuthDialog";
-import { PrivacySettingsDialog } from "@/components/settings/PrivacySettingsDialog";
 
 const PrivacySecurity = () => {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
-  const [twoFactorOpen, setTwoFactorOpen] = useState(false);
-  const [privacySettingsOpen, setPrivacySettingsOpen] = useState(false);
 
   const securityOptions = [
     {
@@ -22,17 +18,20 @@ const PrivacySecurity = () => {
       description: "Update your account password",
       action: () => setChangePasswordOpen(true),
     },
+  ];
+
+  const legalLinks = [
     {
-      icon: Shield,
-      title: "Two-Factor Authentication",
-      description: "Add an extra layer of security",
-      action: () => setTwoFactorOpen(true),
+      icon: FileText,
+      title: "Privacy Policy",
+      description: "How we collect and use your data",
+      to: "/privacy",
     },
     {
-      icon: Eye,
-      title: "Privacy Settings",
-      description: "Control who can see your information",
-      action: () => setPrivacySettingsOpen(true),
+      icon: Scale,
+      title: "Terms & Conditions",
+      description: "Our terms of service",
+      to: "/terms",
     },
   ];
 
@@ -91,17 +90,32 @@ const PrivacySecurity = () => {
           </div>
         </Card>
 
+        <div className="space-y-4">
+          <h3 className="font-semibold">Legal</h3>
+          {legalLinks.map((link, index) => {
+            const Icon = link.icon;
+            return (
+              <Link key={index} to={link.to}>
+                <Card className="p-6 cursor-pointer hover:bg-accent/50 active:bg-accent/50 transition-colors touch-scroll-safe">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-full bg-muted">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">{link.title}</p>
+                      <p className="text-sm text-muted-foreground">{link.description}</p>
+                    </div>
+                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+
         <ChangePasswordDialog 
           open={changePasswordOpen} 
           onOpenChange={setChangePasswordOpen} 
-        />
-        <TwoFactorAuthDialog 
-          open={twoFactorOpen} 
-          onOpenChange={setTwoFactorOpen} 
-        />
-        <PrivacySettingsDialog 
-          open={privacySettingsOpen} 
-          onOpenChange={setPrivacySettingsOpen} 
         />
       </div>
     </div>
