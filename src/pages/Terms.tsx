@@ -9,7 +9,7 @@ const Terms = () => {
     <div className="h-screen overflow-y-auto bg-background">
       <div className="container max-w-3xl mx-auto p-4 pb-12 space-y-8">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/privacy-security")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <h1 className="text-2xl font-bold">Terms & Conditions</h1>
