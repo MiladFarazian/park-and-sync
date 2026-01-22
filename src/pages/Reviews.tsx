@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMode } from '@/contexts/ModeContext';
 import { supabase } from '@/integrations/supabase/client';
+import { getReviewerDisplayInfo } from '@/lib/privacyUtils';
 
 interface Review {
   id: string;
@@ -98,11 +99,11 @@ const Reviews = () => {
 
         setHasMore(offset + reviewsData.length < (count || 0));
 
-        // Get reviewer profiles
+        // Get reviewer profiles with privacy settings
         const reviewerIds = [...new Set(reviewsData.map(r => r.reviewer_id))];
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('user_id, first_name, last_name')
+          .select('user_id, first_name, last_name, privacy_show_full_name, privacy_show_in_reviews')
           .in('user_id', reviewerIds);
         
         const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
@@ -110,14 +111,13 @@ const Reviews = () => {
         const formattedReviews = reviewsData.map(r => {
           const reviewer = profileMap.get(r.reviewer_id);
           const booking = bookingMap.get(r.booking_id);
+          const reviewerInfo = getReviewerDisplayInfo(reviewer, 'Host');
           return {
             id: r.id,
             rating: r.rating,
             comment: r.comment,
             created_at: r.created_at,
-            reviewer_name: reviewer?.first_name && reviewer?.last_name 
-              ? `${reviewer.first_name} ${reviewer.last_name.charAt(0)}.`
-              : 'Host',
+            reviewer_name: reviewerInfo.name,
             spot_category: (booking?.spots as any)?.category || undefined,
             revealed_at: r.revealed_at
           };
@@ -190,11 +190,11 @@ const Reviews = () => {
 
         setHasMore(offset + reviewsData.length < (count || 0));
 
-        // Get reviewer profiles
+        // Get reviewer profiles with privacy settings
         const reviewerIds = [...new Set(reviewsData.map(r => r.reviewer_id))];
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('user_id, first_name, last_name')
+          .select('user_id, first_name, last_name, privacy_show_full_name, privacy_show_in_reviews')
           .in('user_id', reviewerIds);
         
         const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
@@ -203,14 +203,13 @@ const Reviews = () => {
           const reviewer = profileMap.get(r.reviewer_id);
           const spotId = bookingSpotMap.get(r.booking_id);
           const spot = spotId ? spotMap.get(spotId) : undefined;
+          const reviewerInfo = getReviewerDisplayInfo(reviewer, 'Driver');
           return {
             id: r.id,
             rating: r.rating,
             comment: r.comment,
             created_at: r.created_at,
-            reviewer_name: reviewer?.first_name && reviewer?.last_name 
-              ? `${reviewer.first_name} ${reviewer.last_name.charAt(0)}.`
-              : 'Driver',
+            reviewer_name: reviewerInfo.name,
             spot_category: spot?.category || undefined,
             revealed_at: r.revealed_at
           };

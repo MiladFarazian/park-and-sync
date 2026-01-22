@@ -26,6 +26,7 @@ import GuestBookingForm from '@/components/booking/GuestBookingForm';
 import CompleteProfileStep from '@/components/auth/CompleteProfileStep';
 import { useAuth } from '@/contexts/AuthContext';
 import { isProfileComplete } from '@/lib/profileUtils';
+import { getPrivacyAwareName, getPrivacyAwareAvatar } from '@/lib/privacyUtils';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 
@@ -143,7 +144,9 @@ const BookingContent = () => {
               first_name,
               last_name,
               avatar_url,
-              rating
+              rating,
+              privacy_show_profile_photo,
+              privacy_show_full_name
             )
           `)
           .eq('id', spotId)
@@ -792,7 +795,8 @@ const BookingContent = () => {
 
   const pricing = calculateTotal();
   const primaryPhoto = spot?.spot_photos?.find((p: any) => p.is_primary)?.url || spot?.spot_photos?.[0]?.url;
-  const hostName = host ? `${host.first_name || ''} ${host.last_name || ''}`.trim() : 'Host';
+  const hostName = host ? getPrivacyAwareName(host, 'Host') : 'Host';
+  const hostAvatar = host ? getPrivacyAwareAvatar(host) : undefined;
   const hostInitial = hostName.charAt(0).toUpperCase();
 
   return (
@@ -842,7 +846,7 @@ const BookingContent = () => {
               <Separator className="my-3" />
               <div className="flex items-center gap-3">
                 <Avatar className="h-10 w-10">
-                  <AvatarImage src={host?.avatar_url} />
+                  <AvatarImage src={hostAvatar} />
                   <AvatarFallback>{hostInitial}</AvatarFallback>
                 </Avatar>
                 <div>

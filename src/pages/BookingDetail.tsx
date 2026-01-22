@@ -20,6 +20,7 @@ import { calculateBookingTotal, calculateDriverPrice } from '@/lib/pricing';
 import { getHostNetEarnings, getParkzyFee } from '@/lib/hostEarnings';
 import RequireAuth from '@/components/auth/RequireAuth';
 import { getBookingStatus, getBookingStatusColor, getBookingStatusLabelWithOverstay } from '@/lib/bookingStatus';
+import { getPrivacyAwareName, getPrivacyAwareAvatar } from '@/lib/privacyUtils';
 
 interface BookingDetails {
   id: string;
@@ -68,6 +69,8 @@ interface BookingDetails {
     first_name: string;
     last_name: string;
     avatar_url: string | null;
+    privacy_show_profile_photo?: boolean | null;
+    privacy_show_full_name?: boolean | null;
   };
 }
 
@@ -180,7 +183,7 @@ const BookingDetailContent = () => {
           guest_license_plate,
           guest_email,
           spots!inner(id, title, address, host_id, description, access_notes, has_ev_charging, ev_charging_instructions, instant_book, spot_photos(url, is_primary, sort_order)),
-          profiles!bookings_renter_id_fkey(first_name, last_name, avatar_url)
+          profiles!bookings_renter_id_fkey(first_name, last_name, avatar_url, privacy_show_profile_photo, privacy_show_full_name)
         `)
         .eq('id', bookingId)
         .single();
@@ -974,11 +977,11 @@ const BookingDetailContent = () => {
                 <span className="text-lg font-semibold text-primary">
                   {(booking.guest_full_name || 'G').charAt(0)}
                 </span>
-              ) : booking.profiles.avatar_url ? (
-                <img src={booking.profiles.avatar_url} alt={isHost ? 'Driver' : 'Host'} className="h-12 w-12 rounded-full object-cover" />
+              ) : getPrivacyAwareAvatar(booking.profiles) ? (
+                <img src={getPrivacyAwareAvatar(booking.profiles)} alt={isHost ? 'Driver' : 'Host'} className="h-12 w-12 rounded-full object-cover" />
               ) : (
                 <span className="text-lg font-semibold text-primary">
-                  {booking.profiles.first_name.charAt(0)}
+                  {getPrivacyAwareName(booking.profiles, isHost ? 'Driver' : 'Host').charAt(0)}
                 </span>
               )}
             </div>
@@ -993,7 +996,7 @@ const BookingDetailContent = () => {
                 </>
               ) : (
                 <>
-                  <p className="font-medium">{booking.profiles.first_name} {booking.profiles.last_name.charAt(0)}.</p>
+                  <p className="font-medium">{getPrivacyAwareName(booking.profiles, isHost ? 'Driver' : 'Host')}</p>
                   <p className="text-sm text-muted-foreground">{isHost ? 'Driver' : 'Spot Host'}</p>
                 </>
               )}
