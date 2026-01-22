@@ -124,7 +124,7 @@ serve(async (req) => {
     // Get spot details for pricing
     const { data: spot, error: spotError } = await supabase
       .from('spots')
-      .select('*, host_id, instant_book, has_ev_charging, ev_charging_premium_per_hour')
+      .select('*, host_id, instant_book, has_ev_charging, ev_charging_premium_per_hour, ev_charger_type, parking_instructions')
       .eq('id', spot_id)
       .single();
 
@@ -392,9 +392,9 @@ serve(async (req) => {
           try {
             const hostEmail = hostUser?.email || hostProfile?.email || '';
             const driverEmail = userData.user.email || renterProfile?.email || '';
-            
+
             console.log('Sending confirmation emails to:', { hostEmail, driverEmail });
-            
+
             await supabase.functions.invoke('send-booking-confirmation', {
               body: {
                 hostEmail,
@@ -407,6 +407,12 @@ serve(async (req) => {
                 endAt: end_at,
                 totalAmount: totalAmount,
                 bookingId: booking.id,
+                // Additional spot details
+                parkingInstructions: spot.parking_instructions,
+                hasEvCharging: spot.has_ev_charging,
+                evChargerType: spot.ev_charger_type,
+                evChargingFee: evChargingFee,
+                willUseEvCharging: useEvCharging,
               },
             });
           } catch (emailError) {

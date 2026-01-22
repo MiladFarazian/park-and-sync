@@ -20,6 +20,12 @@ interface BookingConfirmationRequest {
   endAt: string;
   totalAmount: number;
   bookingId: string;
+  // Additional spot details
+  parkingInstructions?: string | null;
+  hasEvCharging?: boolean;
+  evChargerType?: string | null;
+  evChargingFee?: number;
+  willUseEvCharging?: boolean;
 }
 
 // Generate a magic link for the user using recovery type (more reliable for email links)
@@ -80,6 +86,11 @@ const handler = async (req: Request): Promise<Response> => {
       endAt,
       totalAmount,
       bookingId,
+      parkingInstructions,
+      hasEvCharging,
+      evChargerType,
+      evChargingFee,
+      willUseEvCharging,
     }: BookingConfirmationRequest = await req.json();
 
     const startDate = new Date(startAt).toLocaleString();
@@ -320,6 +331,35 @@ const handler = async (req: Request): Promise<Response> => {
                           </tr>
                         </table>
                         
+                        ${parkingInstructions ? `
+                        <!-- Parking Instructions Box -->
+                        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 16px; margin: 24px 0;">
+                          <tr>
+                            <td>
+                              <p style="margin: 0; color: #1e40af; font-size: 14px; font-weight: 600;">📋 Parking Instructions</p>
+                              <p style="margin: 8px 0 0 0; color: #1e3a8a; font-size: 13px; line-height: 1.5;">
+                                ${parkingInstructions.replace(/\n/g, '<br>')}
+                              </p>
+                            </td>
+                          </tr>
+                        </table>
+                        ` : ''}
+
+                        ${willUseEvCharging && hasEvCharging ? `
+                        <!-- EV Charging Info Box -->
+                        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ecfdf5; border-left: 4px solid #10b981; border-radius: 8px; padding: 16px; margin: 24px 0;">
+                          <tr>
+                            <td>
+                              <p style="margin: 0; color: #065f46; font-size: 14px; font-weight: 600;">⚡ EV Charging Included</p>
+                              <p style="margin: 8px 0 0 0; color: #047857; font-size: 13px; line-height: 1.5;">
+                                ${evChargerType ? `Charger type: <strong>${evChargerType}</strong><br>` : ''}
+                                ${evChargingFee && evChargingFee > 0 ? `Charging fee: <strong>$${evChargingFee.toFixed(2)}</strong> (included in total)` : 'Charging included at no extra cost'}
+                              </p>
+                            </td>
+                          </tr>
+                        </table>
+                        ` : ''}
+
                         <!-- Important Info Box -->
                         <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 16px; margin: 24px 0;">
                           <tr>
@@ -327,7 +367,7 @@ const handler = async (req: Request): Promise<Response> => {
                               <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">⚠️ Important Reminders</p>
                               <p style="margin: 8px 0 0 0; color: #78350f; font-size: 13px; line-height: 1.5;">
                                 • Arrive on time to maximize your parking duration<br>
-                                • Follow any special instructions from your host<br>
+                                ${parkingInstructions ? '' : '• Follow any special instructions from your host<br>'}
                                 • Contact your host through the app if you need assistance
                               </p>
                             </td>
