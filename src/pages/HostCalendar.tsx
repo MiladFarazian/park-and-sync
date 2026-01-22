@@ -76,12 +76,41 @@ const HostCalendar = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  const initialViewMode = searchParams.get('tab') === 'reservations' ? 'reservations' : 'month';
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [currentWeek, setCurrentWeek] = useState(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
+  // Initialize state from URL params for persistence
+  const getInitialViewMode = (): ViewMode => {
+    const tab = searchParams.get('tab');
+    if (tab === 'reservations') return 'reservations';
+    if (tab === 'week') return 'week';
+    return 'month';
+  };
+  
+  const getInitialMonth = (): Date => {
+    const monthParam = searchParams.get('month');
+    if (monthParam) {
+      const parsed = new Date(monthParam + '-01');
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+    return new Date();
+  };
+  
+  const getInitialWeek = (): Date => {
+    const weekParam = searchParams.get('week');
+    if (weekParam) {
+      const parsed = new Date(weekParam);
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+    return new Date();
+  };
+  
+  const getInitialSpotId = (): string | null => {
+    return searchParams.get('spot') || null;
+  };
+
+  const [currentMonth, setCurrentMonth] = useState(getInitialMonth);
+  const [currentWeek, setCurrentWeek] = useState(getInitialWeek);
+  const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewMode);
   const [spots, setSpots] = useState<SpotWithRate[]>([]);
-  const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null); // null means loading, 'all' means all spots
+  const [selectedSpotId, setSelectedSpotId] = useState<string | null>(getInitialSpotId); // null means loading, 'all' means all spots
   const [bookings, setBookings] = useState<BookingForCalendar[]>([]);
   const [allBookings, setAllBookings] = useState<any[]>([]);
   const [overrides, setOverrides] = useState<CalendarOverride[]>([]);
@@ -97,22 +126,42 @@ const HostCalendar = () => {
   const [reviewBooking, setReviewBooking] = useState<any>(null);
   const [userReviews, setUserReviews] = useState<Set<string>>(new Set());
 
+  // Sync state to URL params for persistence
+  const updateUrlParams = useCallback((updates: Record<string, string | null>) => {
+    const newParams = new URLSearchParams(searchParams);
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null) {
+        newParams.delete(key);
+      } else {
+        newParams.set(key, value);
+      }
+    });
+    setSearchParams(newParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const handleViewModeChange = (value: string) => {
     setViewMode(value as ViewMode);
-    if (value === 'reservations') {
-      setSearchParams({ tab: 'reservations' });
-    } else {
-      setSearchParams({});
-    }
+    updateUrlParams({ 
+      tab: value === 'month' ? null : value 
+    });
   };
 
+  // Sync URL when month changes
   useEffect(() => {
-    // Sync view mode from URL on mount/change
-    const tabParam = searchParams.get('tab');
-    if (tabParam === 'reservations') {
-      setViewMode('reservations');
+    updateUrlParams({ month: format(currentMonth, 'yyyy-MM') });
+  }, [currentMonth]);
+
+  // Sync URL when week changes
+  useEffect(() => {
+    updateUrlParams({ week: format(currentWeek, 'yyyy-MM-dd') });
+  }, [currentWeek]);
+
+  // Sync URL when spot changes
+  useEffect(() => {
+    if (selectedSpotId && selectedSpotId !== 'none') {
+      updateUrlParams({ spot: selectedSpotId });
     }
-  }, [searchParams]);
+  }, [selectedSpotId]);
 
   useEffect(() => {
     if (user) {
@@ -139,8 +188,13 @@ const HostCalendar = () => {
       if (spotsError) throw spotsError;
       setSpots(spotsData || []);
       
-      // Auto-select first spot if available, or 'none' if no spots exist
-      if (spotsData && spotsData.length > 0 && !selectedSpotId) {
+      // Use URL param if valid, otherwise auto-select first spot
+      const urlSpotId = searchParams.get('spot');
+      const isValidSpotId = urlSpotId && (urlSpotId === 'all' || spotsData?.some(s => s.id === urlSpotId));
+      
+      if (isValidSpotId && !selectedSpotId) {
+        setSelectedSpotId(urlSpotId);
+      } else if (spotsData && spotsData.length > 0 && !selectedSpotId) {
         setSelectedSpotId(spotsData[0].id);
       } else if ((!spotsData || spotsData.length === 0) && !selectedSpotId) {
         // Set a placeholder value so the calendar can render
