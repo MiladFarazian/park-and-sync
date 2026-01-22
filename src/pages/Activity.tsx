@@ -314,9 +314,12 @@ const Activity = () => {
     };
     
     // Review-related logic
+    // Allow reviews when booking end time has passed OR status is explicitly 'completed'
     const hasReviewed = userReviews.has(booking.id);
-    const canReview = (booking.status === 'completed' || (isPast && booking.status === 'paid')) && 
-                      booking.status !== 'canceled' && 
+    const bookingEndTime = new Date(booking.end_at);
+    const isBookingEnded = new Date() > bookingEndTime;
+    const canReview = (isBookingEnded || booking.status === 'completed') && 
+                      !['canceled', 'refunded', 'declined', 'rejected', 'pending'].includes(booking.status) && 
                       !hasReviewed;
     const revieweeId = isHost ? booking.renter_id : booking.spots?.host_id;
     const getRevieweeName = () => {
