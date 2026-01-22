@@ -121,7 +121,13 @@ export const NotificationBell = () => {
     await markAsRead(notification.id);
 
     // Handle navigation based on notification type
-    if (notification.type === "booking" || notification.type === "booking_pending") {
+    if (notification.type === "booking_declined" || notification.type === "booking_rejected") {
+      // Booking was declined - navigate to declined page
+      if (mode === 'host') {
+        setMode('driver');
+      }
+      navigate(`/booking-declined/${notification.related_id}`);
+    } else if (notification.type === "booking" || notification.type === "booking_pending") {
       // Driver booking confirmation - switch to driver mode if needed
       if (mode === 'host') {
         setMode('driver');
