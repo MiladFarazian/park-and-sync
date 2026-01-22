@@ -87,8 +87,12 @@ const HostCalendar = () => {
   const getInitialMonth = (): Date => {
     const monthParam = searchParams.get('month');
     if (monthParam) {
-      const parsed = new Date(monthParam + '-01');
-      if (!isNaN(parsed.getTime())) return parsed;
+      // Parse as LOCAL date to avoid timezone shifting (e.g. 2026-01-01 UTC -> Dec 31 in PST)
+      const [y, m] = monthParam.split('-').map(Number);
+      if (Number.isFinite(y) && Number.isFinite(m) && m >= 1 && m <= 12) {
+        const parsed = new Date(y, m - 1, 1);
+        if (!isNaN(parsed.getTime())) return parsed;
+      }
     }
     return new Date();
   };
@@ -96,8 +100,20 @@ const HostCalendar = () => {
   const getInitialWeek = (): Date => {
     const weekParam = searchParams.get('week');
     if (weekParam) {
-      const parsed = new Date(weekParam);
-      if (!isNaN(parsed.getTime())) return parsed;
+      // Parse as LOCAL date to avoid timezone shifting
+      const [y, m, d] = weekParam.split('-').map(Number);
+      if (
+        Number.isFinite(y) &&
+        Number.isFinite(m) &&
+        Number.isFinite(d) &&
+        m >= 1 &&
+        m <= 12 &&
+        d >= 1 &&
+        d <= 31
+      ) {
+        const parsed = new Date(y, m - 1, d);
+        if (!isNaN(parsed.getTime())) return parsed;
+      }
     }
     return new Date();
   };
