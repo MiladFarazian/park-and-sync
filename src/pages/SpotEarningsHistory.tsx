@@ -97,7 +97,7 @@ const SpotEarningsHistory = () => {
         instantBook: spotData.instant_book ?? true,
       });
 
-      // Fetch all bookings for this spot
+      // Fetch all bookings for this spot (including cancelled for display, but excluded from total)
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select(`
@@ -107,7 +107,7 @@ const SpotEarningsHistory = () => {
           renter:profiles!bookings_renter_id_fkey (first_name, last_name)
         `)
         .eq('spot_id', spotId)
-        .in('status', ['completed', 'active', 'paid'])
+        .in('status', ['completed', 'active', 'paid', 'canceled', 'refunded'])
         .order('start_at', { ascending: false });
 
       if (bookingsError) throw bookingsError;
@@ -115,8 +115,11 @@ const SpotEarningsHistory = () => {
       const typedBookings = (bookingsData || []) as unknown as BookingWithDetails[];
       setBookings(typedBookings);
 
-      // Calculate total earnings
-      const total = typedBookings.reduce((sum, b) => sum + getHostNetEarnings(b), 0);
+      // Calculate total earnings excluding cancelled/declined bookings
+      const earningStatuses = ['completed', 'active', 'paid'];
+      const total = typedBookings
+        .filter(b => earningStatuses.includes(b.status))
+        .reduce((sum, b) => sum + getHostNetEarnings(b), 0);
       setTotalEarnings(total);
     } catch (error) {
       console.error('Error fetching spot data:', error);
@@ -297,11 +300,17 @@ const SpotEarningsHistory = () => {
                     </div>
                   </div>
 
-                  {/* Earnings */}
+                  {/* Earnings - show $0 for cancelled/declined */}
                   <div className="text-right shrink-0">
-                    <span className="text-lg font-semibold text-green-600 dark:text-green-400">
-                      ${earnings.toFixed(2)}
-                    </span>
+                    {statusResult.label === 'Cancelled' || statusResult.label === 'Declined' ? (
+                      <span className="text-lg font-semibold text-muted-foreground">
+                        $0.00
+                      </span>
+                    ) : (
+                      <span className="text-lg font-semibold text-green-600 dark:text-green-400">
+                        ${earnings.toFixed(2)}
+                      </span>
+                    )}
                   </div>
                 </div>
               </Card>
