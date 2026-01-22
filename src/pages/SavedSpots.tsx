@@ -35,6 +35,7 @@ export default function SavedSpots() {
       }
 
       try {
+        // Single optimized query with joins
         const { data: spotsData, error: spotsError } = await supabase
           .from('spots')
           .select(`
@@ -43,40 +44,40 @@ export default function SavedSpots() {
             address,
             hourly_rate,
             has_ev_charging,
-            host_id
+            host:profiles!spots_host_id_fkey(rating),
+            spot_photos(url, is_primary, sort_order)
           `)
           .in('id', favorites)
           .eq('status', 'active');
 
         if (spotsError) throw spotsError;
 
-        // Get primary photos for each spot
-        const spotIds = spotsData?.map(s => s.id) || [];
-        const { data: photosData } = await supabase
-          .from('spot_photos')
-          .select('spot_id, url')
-          .in('spot_id', spotIds)
-          .eq('is_primary', true);
+        const enrichedSpots: SavedSpot[] = (spotsData || []).map(spot => {
+          // Get the primary image: first try is_primary=true, then sort_order, then first available
+          const photos = spot.spot_photos || [];
+          let primaryImage: string | undefined;
+          
+          const primaryPhoto = photos.find((p: any) => p.is_primary);
+          if (primaryPhoto) {
+            primaryImage = primaryPhoto.url;
+          } else if (photos.length > 0) {
+            // Sort by sort_order and take first, or just take first if no sort_order
+            const sorted = [...photos].sort((a: any, b: any) => 
+              (a.sort_order ?? 999) - (b.sort_order ?? 999)
+            );
+            primaryImage = sorted[0]?.url;
+          }
 
-        // Get host ratings
-        const hostIds = [...new Set(spotsData?.map(s => s.host_id) || [])];
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('user_id, rating')
-          .in('user_id', hostIds);
-
-        const photoMap = new Map(photosData?.map(p => [p.spot_id, p.url]));
-        const ratingMap = new Map(profilesData?.map(p => [p.user_id, p.rating]));
-
-        const enrichedSpots: SavedSpot[] = (spotsData || []).map(spot => ({
-          id: spot.id,
-          title: spot.title,
-          address: spot.address,
-          hourly_rate: spot.hourly_rate,
-          has_ev_charging: spot.has_ev_charging || false,
-          primary_image: photoMap.get(spot.id),
-          host_rating: ratingMap.get(spot.host_id) || undefined
-        }));
+          return {
+            id: spot.id,
+            title: spot.title,
+            address: spot.address,
+            hourly_rate: spot.hourly_rate,
+            has_ev_charging: spot.has_ev_charging || false,
+            primary_image: primaryImage,
+            host_rating: (spot.host as any)?.rating || undefined
+          };
+        });
 
         setSpots(enrichedSpots);
       } catch (error) {
