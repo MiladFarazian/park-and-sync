@@ -90,27 +90,29 @@ const PrivacySecurity = () => {
           </div>
         </Card>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           <h3 className="font-semibold">Legal</h3>
-          {legalLinks.map((link, index) => {
-            const Icon = link.icon;
-            return (
-              <Link key={index} to={link.to}>
-                <Card className="p-6 cursor-pointer hover:bg-accent/50 active:bg-accent/50 transition-colors touch-scroll-safe">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-full bg-muted">
-                      <Icon className="h-5 w-5" />
+          <div className="space-y-3">
+            {legalLinks.map((link, index) => {
+              const Icon = link.icon;
+              return (
+                <Link key={index} to={link.to}>
+                  <Card className="p-6 cursor-pointer hover:bg-accent/50 active:bg-accent/50 transition-colors touch-scroll-safe mb-3">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 rounded-full bg-muted">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium">{link.title}</p>
+                        <p className="text-sm text-muted-foreground">{link.description}</p>
+                      </div>
+                      <ExternalLink className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <div className="flex-1">
-                      <p className="font-medium">{link.title}</p>
-                      <p className="text-sm text-muted-foreground">{link.description}</p>
-                    </div>
-                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </Card>
-              </Link>
-            );
-          })}
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
         </div>
 
         <ChangePasswordDialog 
