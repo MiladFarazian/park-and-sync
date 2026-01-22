@@ -146,22 +146,34 @@ const HostCalendar = () => {
     });
   };
 
-  // Sync URL when month changes
+  // Track if initial mount is done to avoid overwriting URL on mount
+  const [isInitialized, setIsInitialized] = useState(false);
+  
+  // Mark as initialized after first render
   useEffect(() => {
-    updateUrlParams({ month: format(currentMonth, 'yyyy-MM') });
-  }, [currentMonth]);
+    setIsInitialized(true);
+  }, []);
 
-  // Sync URL when week changes
+  // Sync URL when month changes (only after initialization)
   useEffect(() => {
-    updateUrlParams({ week: format(currentWeek, 'yyyy-MM-dd') });
-  }, [currentWeek]);
+    if (isInitialized) {
+      updateUrlParams({ month: format(currentMonth, 'yyyy-MM') });
+    }
+  }, [currentMonth, isInitialized]);
 
-  // Sync URL when spot changes
+  // Sync URL when week changes (only after initialization)
   useEffect(() => {
-    if (selectedSpotId && selectedSpotId !== 'none') {
+    if (isInitialized) {
+      updateUrlParams({ week: format(currentWeek, 'yyyy-MM-dd') });
+    }
+  }, [currentWeek, isInitialized]);
+
+  // Sync URL when spot changes (only after initialization)
+  useEffect(() => {
+    if (isInitialized && selectedSpotId && selectedSpotId !== 'none') {
       updateUrlParams({ spot: selectedSpotId });
     }
-  }, [selectedSpotId]);
+  }, [selectedSpotId, isInitialized]);
 
   useEffect(() => {
     if (user) {
