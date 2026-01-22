@@ -407,11 +407,10 @@ serve(async (req) => {
                 endAt: end_at,
                 totalAmount: totalAmount,
                 bookingId: booking.id,
-                // Additional spot details
-                parkingInstructions: spot.parking_instructions,
-                hasEvCharging: spot.has_ev_charging,
-                evChargerType: spot.ev_charger_type,
-                evChargingFee: evChargingFee,
+                // Access and EV charging instructions for driver email
+                accessNotes: spot.access_notes || '',
+                evChargingInstructions: spot.ev_charging_instructions || '',
+                hasEvCharging: spot.has_ev_charging || false,
                 willUseEvCharging: useEvCharging,
               },
             });
