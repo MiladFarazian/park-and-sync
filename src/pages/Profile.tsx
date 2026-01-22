@@ -55,7 +55,7 @@ const Profile = () => {
   const [profileAlertDismissed, setProfileAlertDismissed] = useState(false);
   const [profileAlertVisible, setProfileAlertVisible] = useState(false);
   const [isLoadingStripe, setIsLoadingStripe] = useState(false);
-  const [hasListedSpots, setHasListedSpots] = useState(false);
+  const [hasListedSpots, setHasListedSpots] = useState<boolean | null>(null);
   const [isResendingEmail, setIsResendingEmail] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [isPhoneVerifyDialogOpen, setIsPhoneVerifyDialogOpen] = useState(false);
@@ -797,8 +797,9 @@ const Profile = () => {
       </Card>
 
       <div className="px-4 pb-4 space-y-6">
-        {/* Become a Host Widget */}
-        {mode === 'driver' && !hasListedSpots && <Card className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+        {/* Become a Host Widget - only show after loading completes and user has no spots */}
+        {mode === 'driver' && hasListedSpots === false && (
+          <Card className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 animate-fade-in">
             <div className="flex items-start gap-4">
               <div className="p-3 bg-primary/10 rounded-lg">
                 <Building2 className="h-6 w-6 text-primary" />
@@ -814,7 +815,8 @@ const Profile = () => {
                 </Button>
               </div>
             </div>
-          </Card>}
+          </Card>
+        )}
 
         {/* Stripe Connect for Hosts */}
         {mode === 'host' && <Card className="p-6 border-primary/20">
