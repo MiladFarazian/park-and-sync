@@ -213,61 +213,6 @@ All colors MUST be HSL.
   touch-action: pan-y;
 }
 
-/* Page peel animation for multi-step forms (book/kindle style) */
-@keyframes page-peel-exit {
-  0% {
-    transform: perspective(2000px) rotateY(0deg) translateX(0);
-    transform-origin: left center;
-    opacity: 1;
-    filter: brightness(1);
-  }
-  30% {
-    transform: perspective(2000px) rotateY(-15deg) translateX(5%);
-    transform-origin: left center;
-    opacity: 1;
-    filter: brightness(0.95);
-  }
-  100% {
-    transform: perspective(2000px) rotateY(-90deg) translateX(50%);
-    transform-origin: left center;
-    opacity: 0;
-    filter: brightness(0.7);
-  }
-}
-
-@keyframes page-peel-enter {
-  0% {
-    transform: perspective(2000px) rotateY(90deg) translateX(-50%);
-    transform-origin: right center;
-    opacity: 0;
-    filter: brightness(0.7);
-  }
-  70% {
-    transform: perspective(2000px) rotateY(15deg) translateX(-5%);
-    transform-origin: right center;
-    opacity: 1;
-    filter: brightness(0.95);
-  }
-  100% {
-    transform: perspective(2000px) rotateY(0deg) translateX(0);
-    transform-origin: right center;
-    opacity: 1;
-    filter: brightness(1);
-  }
-}
-
-.animate-page-turn-back {
-  animation: page-peel-exit 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-  backface-visibility: hidden;
-  transform-style: preserve-3d;
-}
-
-.animate-page-turn-enter {
-  animation: page-peel-enter 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-  backface-visibility: hidden;
-  transform-style: preserve-3d;
-}
-
 /* Portrait orientation lock for mobile phones only (not tablets) */
 /* Uses max-height to ensure tablets (which have larger heights in landscape) are excluded */
 @media screen and (orientation: landscape) and (max-width: 896px) and (max-height: 500px) {

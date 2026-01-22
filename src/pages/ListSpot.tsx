@@ -79,8 +79,6 @@ const ListSpot = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [animationDirection, setAnimationDirection] = useState<'back' | 'forward' | null>(null);
 
   // Scroll to top when step changes
   useEffect(() => {
@@ -730,35 +728,16 @@ const ListSpot = () => {
   // Show Stripe Connect requirement on final step (step 6) if not set up
   const showStripeSetup = currentStep === 6 && !stripeConnected && !isCheckingStripe;
 
-  // Animated step change for page turn effect
-  const goToPreviousStep = () => {
-    if (isAnimating) return;
-
-    if (currentStep === 1) {
-      navigate('/dashboard');
-      return;
-    }
-
-    setIsAnimating(true);
-    setAnimationDirection('back');
-
-    // After exit animation completes, change step and start enter animation
-    setTimeout(() => {
-      setCurrentStep(currentStep - 1);
-      setAnimationDirection('forward');
-
-      // Reset animation state after enter animation
-      setTimeout(() => {
-        setIsAnimating(false);
-        setAnimationDirection(null);
-      }, 400);
-    }, 400);
-  };
-
   // Swipe navigation for multi-step form
   const swipeHandlers = useSwipeNavigation({
     onSwipeLeft: () => {}, // No action on swipe left
-    onSwipeRight: goToPreviousStep,
+    onSwipeRight: () => {
+      if (currentStep === 1) {
+        navigate('/dashboard');
+      } else {
+        setCurrentStep(currentStep - 1);
+      }
+    },
     threshold: 50,
   });
 
@@ -775,8 +754,13 @@ const ListSpot = () => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={goToPreviousStep}
-              disabled={isAnimating}
+              onClick={() => {
+                if (currentStep === 1) {
+                  navigate('/dashboard');
+                } else {
+                  setCurrentStep(currentStep - 1);
+                }
+              }}
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -790,16 +774,6 @@ const ListSpot = () => {
         )}
 
         <form onSubmit={handleSubmit(onSubmit)}>
-          {/* Step content with page turn animation */}
-          <div
-            className={
-              animationDirection === 'back'
-                ? 'animate-page-turn-back'
-                : animationDirection === 'forward'
-                ? 'animate-page-turn-enter'
-                : ''
-            }
-          >
           {/* Step 1: Basic Information */}
           {currentStep === 1 && (
             <Card>
@@ -1610,7 +1584,6 @@ const ListSpot = () => {
               </CardContent>
             </Card>
           )}
-          </div>
         </form>
       </div>
     </div>
