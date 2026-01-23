@@ -25,6 +25,8 @@ import {
 
 // Session cache utilities for instant back/forward navigation and regional caching
 const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+const TWO_MILE_RADIUS_METERS = 3219; // 2 miles in meters
+const EXPANDED_RADIUS_METERS = 15000; // ~9.3 miles for expanded search
 
 // Grid-based cache key - divides the map into ~1km tiles for efficient regional caching
 // At this scale, nearby areas share cache keys, reducing redundant API calls
@@ -187,6 +189,10 @@ const Explore = () => {
   const [showEvFallbackDialog, setShowEvFallbackDialog] = useState(false);
   const [evFallbackChargerName, setEvFallbackChargerName] = useState('');
   
+  // "No spots within 2 miles" fallback state
+  const [showNoSpotsNearbyDialog, setShowNoSpotsNearbyDialog] = useState(false);
+  const noSpotsNearbyShownRef = useRef(false);
+  
   const latestRequestIdRef = useRef(0);
   
   // Guard to prevent duplicate initial fetches
@@ -205,7 +211,7 @@ const Explore = () => {
   // "Search Here" button state - shows when map has been panned away from search location
   const [showSearchHereButton, setShowSearchHereButton] = useState(false);
   const [pendingMapCenter, setPendingMapCenter] = useState<{ lat: number; lng: number } | null>(null);
-  const [pendingMapRadius, setPendingMapRadius] = useState<number>(15000);
+  const [pendingMapRadius, setPendingMapRadius] = useState<number>(EXPANDED_RADIUS_METERS);
   const [isSearchingHere, setIsSearchingHere] = useState(false);
   const [skipFlyToSearchCenter, setSkipFlyToSearchCenter] = useState(false);
 
@@ -336,17 +342,17 @@ const Explore = () => {
 
       // Skip cache when EV filter is applied to get accurate fallback notification
       if (evParam === 'true' && chargerTypeParam) {
-        fetchNearbySpots(desired, 15000, true, { start: start ? startDate : null, end: end ? endDate : null }, chargerTypeParam);
+        fetchNearbySpots(desired, EXPANDED_RADIUS_METERS, true, { start: start ? startDate : null, end: end ? endDate : null }, chargerTypeParam);
       } else {
         // Check cache first for instant render (time-bucketed)
-        const cachedSpots = findCoveringCache(desired.lat, desired.lng, 15000, initialTimeKey);
+        const cachedSpots = findCoveringCache(desired.lat, desired.lng, EXPANDED_RADIUS_METERS, initialTimeKey);
         if (cachedSpots) {
           setParkingSpots(cachedSpots);
           setSpotsLoading(false);
           // Still fetch fresh data in background
-          fetchNearbySpots(desired, 15000, false, { start: start ? startDate : null, end: end ? endDate : null });
+          fetchNearbySpots(desired, EXPANDED_RADIUS_METERS, false, { start: start ? startDate : null, end: end ? endDate : null });
         } else {
-          fetchNearbySpots(desired, 15000, true, { start: start ? startDate : null, end: end ? endDate : null });
+          fetchNearbySpots(desired, EXPANDED_RADIUS_METERS, true, { start: start ? startDate : null, end: end ? endDate : null });
         }
       }
     } else {
@@ -477,7 +483,7 @@ const Explore = () => {
         setSuggestions([]);
         
         // Fetch spots for the new search location
-        fetchNearbySpots(desired, 15000, false);
+        fetchNearbySpots(desired, EXPANDED_RADIUS_METERS, true);
         
         // Regenerate session token for next search session
         sessionTokenRef.current = crypto.randomUUID();
@@ -529,7 +535,7 @@ const Explore = () => {
     // If we already have a cached current location, use it immediately
     if (currentLocation) {
       setSearchLocation(currentLocation);
-      fetchNearbySpots(currentLocation, 15000, false);
+      fetchNearbySpots(currentLocation, EXPANDED_RADIUS_METERS, true);
 
       // Get address in background
       if (mapboxToken) {
@@ -558,7 +564,7 @@ const Explore = () => {
         if (address) setSearchQuery(address);
       }
 
-      fetchNearbySpots(deviceLoc, 15000, false);
+      fetchNearbySpots(deviceLoc, EXPANDED_RADIUS_METERS, true);
       setIsLoadingLocation(false);
     };
 
@@ -601,10 +607,11 @@ const Explore = () => {
   };
   const fetchNearbySpots = useCallback(async (
     center: { lat: number; lng: number },
-    radius = 15000,
+    radius = EXPANDED_RADIUS_METERS,
     isInitialLoad = true,
     timeOverride?: { start: Date | null; end: Date | null },
-    evChargerTypeFilter?: string | null
+    evChargerTypeFilter?: string | null,
+    skipTwoMileCheck = false // When true, skip the 2-mile check (used for expanded searches)
   ) => {
     if (!center) return;
 
@@ -634,13 +641,17 @@ const Explore = () => {
       }
       // Note: We do NOT clear parkingSpots here - "stale-while-revalidate" behavior
 
+      // For initial searches (not map panning), first try 2-mile radius
+      const shouldCheckTwoMileFirst = isInitialLoad && !skipTwoMileCheck && radius >= EXPANDED_RADIUS_METERS;
+      const searchRadius = shouldCheckTwoMileFirst ? TWO_MILE_RADIUS_METERS : Math.ceil(radius);
+
       // Use search-spots-lite for fast map pin loading
       // Pass time range to filter out already-booked spots
       const { data, error } = await supabase.functions.invoke('search-spots-lite', {
         body: {
           latitude: center.lat,
           longitude: center.lng,
-          radius: Math.ceil(radius),
+          radius: searchRadius,
           limit: 500,
           start_time: effectiveStartTime ? effectiveStartTime.toISOString() : undefined,
           end_time: effectiveEndTime ? effectiveEndTime.toISOString() : undefined,
@@ -665,6 +676,25 @@ const Explore = () => {
         return;
       }
 
+      const spots = data.spots || [];
+
+      // If we searched with 2-mile radius and found no spots, show dialog and expand search
+      if (shouldCheckTwoMileFirst && spots.length === 0) {
+        // Prevent showing the dialog multiple times for the same search
+        const noSpotsKey = `no-spots-nearby-v1:${center.lat.toFixed(4)}:${center.lng.toFixed(4)}:${timeKey}`;
+        const alreadyShown = sessionStorage.getItem(noSpotsKey) === '1' || noSpotsNearbyShownRef.current;
+
+        if (!alreadyShown) {
+          sessionStorage.setItem(noSpotsKey, '1');
+          noSpotsNearbyShownRef.current = true;
+          setShowNoSpotsNearbyDialog(true);
+        }
+
+        // Fetch expanded results to show on the map
+        await fetchNearbySpots(center, EXPANDED_RADIUS_METERS, isInitialLoad, timeOverride, evChargerTypeFilter, true);
+        return;
+      }
+
       // Show fallback dialog if EV filter was applied but no matches found
       if (data.ev_filter_applied && data.ev_match_count === 0) {
         // Persist across React 18 StrictMode remounts so it cannot appear twice
@@ -683,7 +713,7 @@ const Explore = () => {
         }
       }
 
-      const transformedSpots = data.spots?.map((spot: any) => ({
+      const transformedSpots = spots.map((spot: any) => ({
         id: spot.id,
         title: spot.title,
         category: spot.category,
@@ -752,12 +782,12 @@ const Explore = () => {
     if (evWasOn && evIsNowOff) {
       // EV filter removed - refetch without EV filter to get all spots
       setEvChargerType(null);
-      fetchNearbySpots(searchLocation, 15000, false);
+      fetchNearbySpots(searchLocation, EXPANDED_RADIUS_METERS, false);
     } else if (chargerTypesChanged && filters.evChargerTypes && filters.evChargerTypes.length > 0) {
       // Charger type changed - refetch with new filter
       const newChargerType = filters.evChargerTypes[0]; // Use first selected type for API
       setEvChargerType(newChargerType);
-      fetchNearbySpots(searchLocation, 15000, false, undefined, newChargerType);
+      fetchNearbySpots(searchLocation, EXPANDED_RADIUS_METERS, false, undefined, newChargerType);
     }
   }, [filters.evCharging, filters.evChargerTypes, searchLocation, fetchNearbySpots]);
 
@@ -923,7 +953,7 @@ const Explore = () => {
     navigate(`/explore?${params.toString()}`, { replace: true });
 
     // Refetch spots with the effective time range
-    fetchNearbySpots(searchLocation, 15000, false, {
+    fetchNearbySpots(searchLocation, EXPANDED_RADIUS_METERS, false, {
       start: effectiveStartTime ?? null,
       end: effectiveEndTime ?? null,
     });
@@ -1354,9 +1384,46 @@ const Explore = () => {
         />
       )}
 
+      {/* No Spots Within 2 Miles Dialog */}
+      <AlertDialog 
+        open={showNoSpotsNearbyDialog} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowNoSpotsNearbyDialog(false);
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-[320px] rounded-2xl p-6 gap-0">
+          <AlertDialogHeader className="space-y-4">
+            <div className="flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center shadow-sm">
+                <MapPin className="h-7 w-7 text-muted-foreground" />
+              </div>
+            </div>
+            <AlertDialogTitle className="text-center text-lg font-semibold">
+              No Spots Within 2 Miles
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-sm leading-relaxed">
+              There are no parking spots available within 2 miles of your search location.
+              <span className="block mt-3 text-xs text-muted-foreground">
+                Showing the nearest spots so you can explore the map.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-5 sm:justify-center">
+            <AlertDialogAction
+              className="rounded-full px-6"
+              onClick={() => setShowNoSpotsNearbyDialog(false)}
+            >
+              Got it
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* EV Charger Fallback Dialog */}
-      <AlertDialog
-        open={showEvFallbackDialog}
+      <AlertDialog 
+        open={showEvFallbackDialog} 
         onOpenChange={(open) => {
           if (!open) {
             dismissEvFallbackAndClearFilters();
