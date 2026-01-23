@@ -845,8 +845,8 @@ const Explore = () => {
       const lngDiffFromSearch = Math.abs(center.lng - searchLocation.lng) * 111000 * Math.cos(center.lat * Math.PI / 180);
       const distanceFromSearch = Math.sqrt(latDiffFromSearch ** 2 + lngDiffFromSearch ** 2);
       
-      // Show "Search Here" if moved more than 20% of the current radius or 2km, whichever is larger
-      const threshold = Math.max(radiusMeters * 0.2, 2000);
+      // Show "Search Here" if moved more than 15% of the current radius or 500m, whichever is larger
+      const threshold = Math.max(radiusMeters * 0.15, 500);
       
       if (distanceFromSearch > threshold) {
         setPendingMapCenter(center);
