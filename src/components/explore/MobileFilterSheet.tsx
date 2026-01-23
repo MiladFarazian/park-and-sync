@@ -107,25 +107,26 @@ const MobileFilterSheet = ({
         </button>
       </SheetTrigger>
       <SheetContent side="bottom" className="rounded-t-2xl h-auto max-h-[85vh] overflow-y-auto">
-        <SheetHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <SheetTitle>Filter Spots</SheetTitle>
-            {activeFilterCount > 0 && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={clearAllFilters}
-                className="text-muted-foreground h-auto py-1 px-2"
-              >
-                <X className="h-3.5 w-3.5 mr-1" />
-                Clear all
-              </Button>
-            )}
-          </div>
+        <SheetHeader className="pb-2">
+          <SheetTitle>Filter Spots</SheetTitle>
           <p className="text-sm text-muted-foreground text-left">
             {filteredCount} of {totalSpots} spot{totalSpots !== 1 ? 's' : ''} match your filters
           </p>
         </SheetHeader>
+
+        {activeFilterCount > 0 && (
+          <div className="pb-4">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={clearAllFilters}
+              className="text-muted-foreground"
+            >
+              <X className="h-3.5 w-3.5 mr-1.5" />
+              Clear all filters
+            </Button>
+          </div>
+        )}
 
         <div className="space-y-6 pb-6">
           {/* Amenity Filters */}
