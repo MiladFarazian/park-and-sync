@@ -240,6 +240,7 @@ const Activity = () => {
     switch (statusResult.label) {
       case 'Cancelled':
       case 'Declined':
+      case 'Expired':
         return 'bg-red-500';
       case 'Requested':
         return 'bg-yellow-500';
@@ -250,6 +251,7 @@ const Activity = () => {
       case 'Booked':
         return 'bg-blue-500';
       default:
+        return 'bg-muted';
         return 'bg-gray-500';
     }
   };
@@ -969,7 +971,7 @@ const Activity = () => {
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-red-500" />
-                Cancelled
+                Cancelled / Expired
               </div>
             </div>
           </div>
