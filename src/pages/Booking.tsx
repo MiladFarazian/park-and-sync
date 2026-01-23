@@ -226,9 +226,12 @@ const BookingContent = () => {
           if (rulesData.length === 0) {
             setAvailabilityDisplay('No schedule set');
           } else if (rulesData.length === 7) {
-            const is247 = rulesData.every(r => r.start_time === '00:00:00' && r.end_time === '23:59:00');
+            const is247 = rulesData.every(r => 
+              (r.start_time === '00:00:00' || r.start_time === '00:00') && 
+              (r.end_time === '23:59:00' || r.end_time === '23:59' || r.end_time === '24:00:00' || r.end_time === '24:00')
+            );
             if (is247) {
-              setAvailabilityDisplay('Available 24/7');
+              setAvailabilityDisplay('12:00 AM – 11:59 PM');
             } else {
               // Show time range in AM/PM format
               const times = [...new Set(rulesData.map(r => 
