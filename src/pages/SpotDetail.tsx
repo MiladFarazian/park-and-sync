@@ -829,9 +829,9 @@ const SpotDetail = () => {
                   return Object.entries(availableDays).map(([day, rules]: [string, any]) => {
                     const dayIndex = parseInt(day);
                     const timeRanges = rules.map((r: any) => {
-                      // Check for full-day availability
+                      // Check for full-day availability - show as 12:00 AM – 11:59 PM
                       if (isFullDayTimeRange(r.start_time, r.end_time)) {
-                        return 'All day';
+                        return '12:00 AM – 11:59 PM';
                       }
                       const formatTime = (time: string) => {
                         const [hours, minutes] = time.split(':');
