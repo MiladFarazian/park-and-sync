@@ -1,75 +1,82 @@
 
 
-## Show Availability for All Spots Regardless of Selection
+## Speed Up Availability Loading
 
-### Problem
-Currently, spot availability is only fetched and displayed for selected spots. Non-selected spots show "Select to view" which hides useful information from hosts.
+### Root Cause
+The availability data loads slowly because:
+
+1. **Sequential fetching**: The code loops through each spot one-by-one, waiting for each spot's queries to complete before moving to the next
+2. **2 queries per spot**: Each spot requires separate queries for `availability_rules` and `calendar_overrides`
+3. **Total queries**: For 5 spots = 10 database round-trips in sequence
+
+Meanwhile, the hourly rate is instant because it's fetched in the same query as the spots (`spots.hourly_rate`).
 
 ### Solution
-Update the page to fetch and display availability for **all spots**, not just selected ones.
+Fetch all availability data in **parallel** using `Promise.all()`, and use batch queries with `.in()` filters instead of individual queries per spot.
 
 ### Technical Changes
 
 **File:** `src/pages/ManageAvailability.tsx`
 
-#### 1. Update `fetchAvailabilityData()` to fetch for all spots
-
-Change the loop to iterate over `spots` instead of `selectedSpots`:
-
+#### Before (sequential, slow):
 ```typescript
-// Before (line 166):
-for (const spotId of selectedSpots) {
-
-// After:
-for (const spotId of spots.map(s => s.id)) {
-```
-
-Also update the condition that triggers the fetch (line 107):
-
-```typescript
-// Before:
-if (selectedSpots.length > 0 && user && selectedDates.length > 0) {
-
-// After:
-if (spots.length > 0 && user && selectedDates.length > 0) {
-```
-
-#### 2. Simplify `getSpotAvailabilityDisplay()` 
-
-Remove the selection check since we now fetch for all spots:
-
-```typescript
-const getSpotAvailabilityDisplay = (spotId: string): { text: string; isLoading: boolean } => {
-  const data = spotAvailability[spotId];
-  if (!data) {
-    return { text: 'Loading...', isLoading: true };
-  }
+for (const spot of spots) {
+  const spotId = spot.id;
+  const { data: rules } = await supabase
+    .from('availability_rules')
+    .select('...')
+    .eq('spot_id', spotId)
+    .eq('day_of_week', dayOfWeek);
   
-  // ... rest of existing logic unchanged
-};
+  const { data: overrides } = await supabase
+    .from('calendar_overrides')
+    .select('...')
+    .eq('spot_id', spotId)
+    .eq('override_date', dateStr);
+  
+  availability[spotId] = { rules, overrides };
+}
 ```
 
-#### 3. Update the spot card rendering
+#### After (parallel, fast):
+```typescript
+// Get all spot IDs
+const spotIds = spots.map(s => s.id);
 
-Simplify the availability display since it no longer depends on selection state:
+// Fetch ALL rules and overrides in just 2 parallel queries
+const [rulesResult, overridesResult] = await Promise.all([
+  supabase
+    .from('availability_rules')
+    .select('spot_id, day_of_week, start_time, end_time, is_available, custom_rate')
+    .in('spot_id', spotIds)
+    .eq('day_of_week', dayOfWeek),
+  supabase
+    .from('calendar_overrides')
+    .select('id, spot_id, override_date, start_time, end_time, is_available, custom_rate')
+    .in('spot_id', spotIds)
+    .eq('override_date', dateStr)
+]);
 
-```tsx
-<div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-  {availabilityInfo.isLoading ? (
-    <Loader2 className="h-3 w-3 animate-spin" />
-  ) : (
-    <Clock className="h-3 w-3" />
-  )}
-  {availabilityInfo.text}
-</div>
+// Group results by spot_id
+const availability: Record<string, { rules: AvailabilityRule[]; overrides: CalendarOverride[] }> = {};
+
+for (const spotId of spotIds) {
+  availability[spotId] = {
+    rules: (rulesResult.data || []).filter(r => r.spot_id === spotId),
+    overrides: (overridesResult.data || []).filter(o => o.spot_id === spotId)
+  };
+}
+
+setSpotAvailability(availability);
 ```
+
+### Performance Improvement
+| Before | After |
+|--------|-------|
+| 2N queries (sequential) | 2 queries (parallel) |
+| 5 spots = 10 round-trips | 5 spots = 2 round-trips |
+| ~1-2 seconds | ~100-200ms |
 
 ### Files to Modify
-- `src/pages/ManageAvailability.tsx`
-
-### Expected Behavior After Fix
-- All spots display their current availability immediately on page load
-- Loading states appear briefly for all spots while data is fetched
-- Selecting/deselecting spots no longer affects what availability info is shown
-- Hosts can see availability at a glance before deciding which spots to edit
+- `src/pages/ManageAvailability.tsx` - Refactor `fetchAvailabilityData()` to use batch queries
 
