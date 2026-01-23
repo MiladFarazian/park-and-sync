@@ -20,7 +20,7 @@ import { ImageCropDialog } from '@/components/profile/ImageCropDialog';
 import { useMode } from '@/contexts/ModeContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isProfileComplete } from '@/lib/profileUtils';
-import { getReviewerDisplayInfo } from '@/lib/privacyUtils';
+import { formatDisplayName } from '@/lib/displayUtils';
 
 const profileSchema = z.object({
   first_name: z.string().trim().min(1, 'First name is required').max(50, 'First name must be less than 50 characters'),
@@ -242,11 +242,11 @@ const Profile = () => {
         if (reviewsError) throw reviewsError;
         if (!reviews || reviews.length === 0) return;
 
-        // Get reviewer profiles with privacy settings
+        // Get reviewer profiles
         const reviewerIds = [...new Set(reviews.map(r => r.reviewer_id))];
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('user_id, first_name, last_name, privacy_show_full_name, privacy_show_in_reviews')
+          .select('user_id, first_name, last_name')
           .in('user_id', reviewerIds);
         
         const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
@@ -254,13 +254,12 @@ const Profile = () => {
         const formattedReviews = reviews.map(r => {
           const reviewer = profileMap.get(r.reviewer_id);
           const booking = bookingMap.get(r.booking_id);
-          const reviewerInfo = getReviewerDisplayInfo(reviewer, 'Host');
           return {
             id: r.id,
             rating: r.rating,
             comment: r.comment,
             created_at: r.created_at,
-            reviewer_name: reviewerInfo.name,
+            reviewer_name: formatDisplayName(reviewer, 'Host'),
             spot_category: (booking?.spots as any)?.category || undefined
           };
         });
@@ -301,11 +300,11 @@ const Profile = () => {
         if (reviewsError) throw reviewsError;
         if (!reviews || reviews.length === 0) return;
 
-        // Get reviewer profiles with privacy settings
+        // Get reviewer profiles
         const reviewerIds = [...new Set(reviews.map(r => r.reviewer_id))];
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('user_id, first_name, last_name, privacy_show_full_name, privacy_show_in_reviews')
+          .select('user_id, first_name, last_name')
           .in('user_id', reviewerIds);
         
         const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
@@ -314,13 +313,12 @@ const Profile = () => {
           const reviewer = profileMap.get(r.reviewer_id);
           const spotId = bookingSpotMap.get(r.booking_id);
           const spot = spotId ? spotMap.get(spotId) : undefined;
-          const reviewerInfo = getReviewerDisplayInfo(reviewer, 'Driver');
           return {
             id: r.id,
             rating: r.rating,
             comment: r.comment,
             created_at: r.created_at,
-            reviewer_name: reviewerInfo.name,
+            reviewer_name: formatDisplayName(reviewer, 'Driver'),
             spot_category: spot?.category || undefined
           };
         });

@@ -22,7 +22,7 @@ import { calculateDriverPrice } from '@/lib/pricing';
 import { vehicleSizes } from '@/lib/vehicleSizes';
 import { useFavoriteSpots } from '@/hooks/useFavoriteSpots';
 import { cn } from '@/lib/utils';
-import { getPrivacyAwareName, getPrivacyAwareAvatar, getReviewerDisplayInfo } from '@/lib/privacyUtils';
+import { formatDisplayName } from '@/lib/displayUtils';
 import { resolveLegacyImagePath, PLACEHOLDER_IMAGE } from '@/assets';
 
 const SpotDetail = () => {
@@ -465,8 +465,8 @@ const SpotDetail = () => {
         ],
         rules: spotData.host_rules ? spotData.host_rules.split('.').filter((r: string) => r.trim()) : ['Follow parking guidelines'],
         host: {
-          name: getPrivacyAwareName(spotData.profiles, 'Host'),
-          avatar: getPrivacyAwareAvatar(spotData.profiles) || PLACEHOLDER_IMAGE,
+          name: formatDisplayName(spotData.profiles, 'Host'),
+          avatar: spotData.profiles?.avatar_url || PLACEHOLDER_IMAGE,
           responseTime: 'Usually responds within a few hours'
         },
         reviewsList: []
@@ -1067,7 +1067,7 @@ const SpotDetail = () => {
                   reviews
                     .filter((review) => ratingFilter === null || review.rating === ratingFilter)
                     .map((review) => {
-                      const reviewerDisplay = getReviewerDisplayInfo(review.reviewer, 'Anonymous');
+                      const reviewerDisplay = { name: formatDisplayName(review.reviewer, 'Anonymous'), avatar: review.reviewer?.avatar_url };
                       return (
                       <Card key={review.id} className="p-4">
                         <div className="flex items-start gap-3">
