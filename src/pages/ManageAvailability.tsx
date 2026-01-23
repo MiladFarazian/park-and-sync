@@ -156,31 +156,32 @@ const ManageAvailability = () => {
     if (!user || spots.length === 0 || selectedDates.length === 0) return;
     
     try {
-      // Use the first selected date for display purposes
       const primaryDate = selectedDates[0];
       const dateStr = format(primaryDate, 'yyyy-MM-dd');
       const dayOfWeek = getDay(primaryDate);
+      const spotIds = spots.map(s => s.id);
       
+      // Fetch ALL rules and overrides in just 2 parallel queries
+      const [rulesResult, overridesResult] = await Promise.all([
+        supabase
+          .from('availability_rules')
+          .select('spot_id, day_of_week, start_time, end_time, is_available, custom_rate')
+          .in('spot_id', spotIds)
+          .eq('day_of_week', dayOfWeek),
+        supabase
+          .from('calendar_overrides')
+          .select('id, spot_id, override_date, start_time, end_time, is_available, custom_rate')
+          .in('spot_id', spotIds)
+          .eq('override_date', dateStr)
+      ]);
+      
+      // Group results by spot_id
       const availability: Record<string, { rules: AvailabilityRule[]; overrides: CalendarOverride[] }> = {};
       
-      // Fetch availability for all spots, not just selected ones
-      for (const spot of spots) {
-        const spotId = spot.id;
-        const { data: rules } = await supabase
-          .from('availability_rules')
-          .select('day_of_week, start_time, end_time, is_available, custom_rate')
-          .eq('spot_id', spotId)
-          .eq('day_of_week', dayOfWeek);
-        
-        const { data: overrides } = await supabase
-          .from('calendar_overrides')
-          .select('id, override_date, start_time, end_time, is_available, custom_rate')
-          .eq('spot_id', spotId)
-          .eq('override_date', dateStr);
-        
+      for (const spotId of spotIds) {
         availability[spotId] = {
-          rules: rules || [],
-          overrides: overrides || []
+          rules: (rulesResult.data || []).filter(r => r.spot_id === spotId),
+          overrides: (overridesResult.data || []).filter(o => o.spot_id === spotId)
         };
       }
       
