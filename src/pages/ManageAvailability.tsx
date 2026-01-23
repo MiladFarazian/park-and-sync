@@ -288,29 +288,38 @@ const ManageAvailability = () => {
   };
 
   // Get current availability display for a spot
-  const getSpotAvailabilityDisplay = (spotId: string): string => {
+  const getSpotAvailabilityDisplay = (spotId: string): { text: string; isLoading: boolean; isSelected: boolean } => {
+    const isSelected = selectedSpots.includes(spotId);
+    
+    // If spot is not selected, don't show availability - just a neutral indicator
+    if (!isSelected) {
+      return { text: 'Select to view', isLoading: false, isSelected: false };
+    }
+    
     const data = spotAvailability[spotId];
-    if (!data) return 'Loading...';
+    if (!data) {
+      return { text: 'Loading...', isLoading: true, isSelected: true };
+    }
     
     if (data.overrides.length > 0) {
       const override = data.overrides[0];
-      if (!override.is_available) return 'Blocked';
+      if (!override.is_available) return { text: 'Blocked', isLoading: false, isSelected: true };
       if (isFullDayTimeRange(override.start_time, override.end_time)) {
-        return 'Available all day';
+        return { text: 'Available all day', isLoading: false, isSelected: true };
       }
-      return `${formatTimeDisplay(override.start_time!)} - ${formatTimeDisplay(override.end_time!)}`;
+      return { text: `${formatTimeDisplay(override.start_time!)} - ${formatTimeDisplay(override.end_time!)}`, isLoading: false, isSelected: true };
     }
     
     if (data.rules.length > 0) {
       const rule = data.rules[0];
-      if (!rule.is_available) return 'Blocked (recurring)';
+      if (!rule.is_available) return { text: 'Blocked (recurring)', isLoading: false, isSelected: true };
       if (isFullDayTimeRange(rule.start_time, rule.end_time)) {
-        return 'Available all day (recurring)';
+        return { text: 'Available all day (recurring)', isLoading: false, isSelected: true };
       }
-      return `${formatTimeDisplay(rule.start_time)} - ${formatTimeDisplay(rule.end_time)} (recurring)`;
+      return { text: `${formatTimeDisplay(rule.start_time)} - ${formatTimeDisplay(rule.end_time)} (recurring)`, isLoading: false, isSelected: true };
     }
     
-    return 'No schedule set';
+    return { text: 'No schedule set', isLoading: false, isSelected: true };
   };
 
   const formatTimeDisplay = (time: string): string => {
@@ -343,7 +352,7 @@ const ManageAvailability = () => {
     
     // Get availability for first selected spot as representative
     const firstSpotId = selectedSpots[0];
-    return getSpotAvailabilityDisplay(firstSpotId);
+    return getSpotAvailabilityDisplay(firstSpotId).text;
   };
 
   const handleSave = async () => {
@@ -536,39 +545,49 @@ const ManageAvailability = () => {
                 </div>
               )}
 
-              {spots.map(spot => (
-                <Card 
-                  key={spot.id}
-                  className={cn(
-                    "p-4 cursor-pointer transition-colors",
-                    selectedSpots.includes(spot.id) 
-                      ? "border-primary bg-primary/5" 
-                      : "active:bg-accent/50"
-                  )}
-                  onClick={() => toggleSpot(spot.id)}
-                >
-                  <div className="flex items-center gap-3">
-                    <Checkbox 
-                      checked={selectedSpots.includes(spot.id)}
-                      onCheckedChange={() => toggleSpot(spot.id)}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium">{spot.title}</div>
-                      <div className="text-sm text-muted-foreground truncate">
-                        ${spot.hourly_rate}/hr
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {getSpotAvailabilityDisplay(spot.id)}
-                      </div>
-                    </div>
-                    {selectedSpots.includes(spot.id) && (
-                      <Check className="h-5 w-5 text-primary" />
+              {spots.map(spot => {
+                const availabilityInfo = getSpotAvailabilityDisplay(spot.id);
+                return (
+                  <Card 
+                    key={spot.id}
+                    className={cn(
+                      "p-4 cursor-pointer transition-colors",
+                      selectedSpots.includes(spot.id) 
+                        ? "border-primary bg-primary/5" 
+                        : "active:bg-accent/50"
                     )}
-                  </div>
-                </Card>
-              ))}
+                    onClick={() => toggleSpot(spot.id)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Checkbox 
+                        checked={selectedSpots.includes(spot.id)}
+                        onCheckedChange={() => toggleSpot(spot.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium">{spot.title}</div>
+                        <div className="text-sm text-muted-foreground truncate">
+                          ${spot.hourly_rate}/hr
+                        </div>
+                        <div className={cn(
+                          "text-xs text-muted-foreground mt-1 flex items-center gap-1",
+                          !availabilityInfo.isSelected && "italic opacity-70"
+                        )}>
+                          {availabilityInfo.isLoading ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Clock className="h-3 w-3" />
+                          )}
+                          {availabilityInfo.text}
+                        </div>
+                      </div>
+                      {selectedSpots.includes(spot.id) && (
+                        <Check className="h-5 w-5 text-primary" />
+                      )}
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </section>
