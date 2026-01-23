@@ -33,7 +33,7 @@ export function SwipeableToast({ children, onDismiss }: SwipeableToastProps) {
   const [translateY, setTranslateY] = useState(0);
   const [translateX, setTranslateX] = useState(0);
   const [isDismissing, setIsDismissing] = useState(false);
-  const [dismissDirection, setDismissDirection] = useState<'up' | 'right' | null>(null);
+  const [dismissDirection, setDismissDirection] = useState<'up' | 'down' | 'left' | 'right' | null>(null);
   const [hasTriggeredThresholdHaptic, setHasTriggeredThresholdHaptic] = useState(false);
   
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
@@ -66,14 +66,8 @@ export function SwipeableToast({ children, onDismiss }: SwipeableToastProps) {
 
     if (!swipeDirectionRef.current) return;
 
-    // Handle vertical swipe (up only)
+    // Handle vertical swipe (up or down)
     if (swipeDirectionRef.current === 'vertical') {
-      // Only allow upward swipes (negative deltaY)
-      if (deltaY > 0) {
-        setTranslateY(0);
-        setTranslateX(0);
-        return;
-      }
       setIsDragging(true);
       setTranslateY(deltaY);
       setTranslateX(0);
@@ -84,20 +78,14 @@ export function SwipeableToast({ children, onDismiss }: SwipeableToastProps) {
         setHasTriggeredThresholdHaptic(true);
       }
     }
-    // Handle horizontal swipe (right only)
+    // Handle horizontal swipe (left or right)
     else if (swipeDirectionRef.current === 'horizontal') {
-      // Only allow rightward swipes (positive deltaX)
-      if (deltaX < 0) {
-        setTranslateX(0);
-        setTranslateY(0);
-        return;
-      }
       setIsDragging(true);
       setTranslateX(deltaX);
       setTranslateY(0);
 
       // Trigger haptic when crossing threshold
-      if (deltaX > DISMISS_THRESHOLD && !hasTriggeredThresholdHaptic) {
+      if (Math.abs(deltaX) > DISMISS_THRESHOLD && !hasTriggeredThresholdHaptic) {
         triggerHaptic('light');
         setHasTriggeredThresholdHaptic(true);
       }
@@ -120,21 +108,21 @@ export function SwipeableToast({ children, onDismiss }: SwipeableToastProps) {
     const velocityY = Math.abs(translateY) / duration;
     const velocityX = Math.abs(translateX) / duration;
 
-    // Check for upward dismissal
+    // Check for vertical dismissal (up or down)
     if (swipeDirectionRef.current === 'vertical' && 
         (Math.abs(translateY) > DISMISS_THRESHOLD || velocityY > VELOCITY_THRESHOLD)) {
       setIsDismissing(true);
-      setDismissDirection('up');
+      setDismissDirection(translateY < 0 ? 'up' : 'down');
       triggerHaptic('medium');
       setTimeout(() => {
         onDismiss();
       }, 150);
     }
-    // Check for rightward dismissal
+    // Check for horizontal dismissal (left or right)
     else if (swipeDirectionRef.current === 'horizontal' && 
-             (translateX > DISMISS_THRESHOLD || velocityX > VELOCITY_THRESHOLD)) {
+             (Math.abs(translateX) > DISMISS_THRESHOLD || velocityX > VELOCITY_THRESHOLD)) {
       setIsDismissing(true);
-      setDismissDirection('right');
+      setDismissDirection(translateX > 0 ? 'right' : 'left');
       triggerHaptic('medium');
       setTimeout(() => {
         onDismiss();
@@ -158,7 +146,13 @@ export function SwipeableToast({ children, onDismiss }: SwipeableToastProps) {
   // Determine final transform for dismissal animation
   const getTransform = () => {
     if (isDismissing) {
-      return dismissDirection === 'up' ? 'translateY(-100%)' : 'translateX(100%)';
+      switch (dismissDirection) {
+        case 'up': return 'translateY(-100%)';
+        case 'down': return 'translateY(100%)';
+        case 'left': return 'translateX(-100%)';
+        case 'right': return 'translateX(100%)';
+        default: return 'translate(0, 0)';
+      }
     }
     return `translate(${translateX}px, ${translateY}px)`;
   };
