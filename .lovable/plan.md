@@ -1,98 +1,75 @@
 
-## Fix Spot Availability Display on Selection
+
+## Show Availability for All Spots Regardless of Selection
 
 ### Problem
-When a host selects a specific spot in the Manage Availability page, non-selected spots incorrectly display "Loading..." for their hourly availability. This happens because:
-
-1. The `fetchAvailabilityData()` function only fetches data for **selected spots**
-2. The `getSpotAvailabilityDisplay()` function returns "Loading..." when no data exists for a spot
-3. All spots render this display regardless of selection state
+Currently, spot availability is only fetched and displayed for selected spots. Non-selected spots show "Select to view" which hides useful information from hosts.
 
 ### Solution
-Update the UI to only show availability information for **selected spots**. Non-selected spots will display a neutral indicator ("Select to view availability") instead of a misleading "Loading..." state.
+Update the page to fetch and display availability for **all spots**, not just selected ones.
 
 ### Technical Changes
 
 **File:** `src/pages/ManageAvailability.tsx`
 
-#### 1. Update `getSpotAvailabilityDisplay()` to accept selection context
+#### 1. Update `fetchAvailabilityData()` to fetch for all spots
 
-Modify the function to handle the "not selected" case explicitly:
+Change the loop to iterate over `spots` instead of `selectedSpots`:
 
 ```typescript
-// Get current availability display for a spot
+// Before (line 166):
+for (const spotId of selectedSpots) {
+
+// After:
+for (const spotId of spots.map(s => s.id)) {
+```
+
+Also update the condition that triggers the fetch (line 107):
+
+```typescript
+// Before:
+if (selectedSpots.length > 0 && user && selectedDates.length > 0) {
+
+// After:
+if (spots.length > 0 && user && selectedDates.length > 0) {
+```
+
+#### 2. Simplify `getSpotAvailabilityDisplay()` 
+
+Remove the selection check since we now fetch for all spots:
+
+```typescript
 const getSpotAvailabilityDisplay = (spotId: string): { text: string; isLoading: boolean } => {
-  // If spot is not selected, don't show availability
-  if (!selectedSpots.includes(spotId)) {
-    return { text: 'Select to view', isLoading: false };
-  }
-  
   const data = spotAvailability[spotId];
   if (!data) {
     return { text: 'Loading...', isLoading: true };
   }
   
-  // ... rest of existing logic, returning { text: displayString, isLoading: false }
+  // ... rest of existing logic unchanged
 };
 ```
 
-#### 2. Update the spot card rendering to use the new return type
+#### 3. Update the spot card rendering
 
-The spot cards (lines 539-571) will be updated to:
-- Only show the loading spinner when `isLoading: true`
-- Display the neutral "Select to view" text for non-selected spots
-- Style non-selected availability text as more muted
+Simplify the availability display since it no longer depends on selection state:
 
 ```tsx
-{spots.map(spot => {
-  const availabilityInfo = getSpotAvailabilityDisplay(spot.id);
-  return (
-    <Card key={spot.id} ...>
-      <div className="flex items-center gap-3">
-        {/* ... existing checkbox and title ... */}
-        <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-          {availabilityInfo.isLoading ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <Clock className="h-3 w-3" />
-          )}
-          <span className={cn(
-            !selectedSpots.includes(spot.id) && "italic opacity-70"
-          )}>
-            {availabilityInfo.text}
-          </span>
-        </div>
-      </div>
-    </Card>
-  );
-})}
-```
-
-#### 3. Alternative: Hide availability line for non-selected spots entirely
-
-For an even cleaner UX, we could hide the availability line completely for non-selected spots:
-
-```tsx
-{selectedSpots.includes(spot.id) && (
-  <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+<div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+  {availabilityInfo.isLoading ? (
+    <Loader2 className="h-3 w-3 animate-spin" />
+  ) : (
     <Clock className="h-3 w-3" />
-    {getSpotAvailabilityDisplay(spot.id)}
-  </div>
-)}
+  )}
+  {availabilityInfo.text}
+</div>
 ```
-
-### Implementation Details
-
-The recommended approach is **Option 2** (show "Select to view" with muted styling) because:
-- It maintains consistent card heights across spots
-- Users understand that availability info is available upon selection
-- Avoids layout shift when toggling spot selection
 
 ### Files to Modify
 - `src/pages/ManageAvailability.tsx`
 
 ### Expected Behavior After Fix
-- Selecting Spot A shows its availability immediately (or brief loading state)
-- Non-selected spots show "Select to view" in muted/italic text
-- No misleading "Loading..." states for unselected spots
-- Switching between spots updates availability cleanly without flicker
+- All spots display their current availability immediately on page load
+- Loading states appear briefly for all spots while data is fetched
+- Selecting/deselecting spots no longer affects what availability info is shown
+- Hosts can see availability at a glance before deciding which spots to edit
+
