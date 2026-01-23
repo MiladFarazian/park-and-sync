@@ -307,10 +307,83 @@ serve(async (req) => {
 
     console.log(`Successfully expired ${expiredCount} bookings`);
 
+    // ============================================
+    // PART 3: Clean up stale pending bookings past their end time
+    // ============================================
+    const { data: stalePendingBookings, error: staleError } = await supabaseAdmin
+      .from('bookings')
+      .select(`
+        id,
+        renter_id,
+        spot_id,
+        stripe_payment_intent_id,
+        spots (address)
+      `)
+      .eq('status', 'pending')
+      .lt('end_at', new Date().toISOString());
+
+    let staleCanceledCount = 0;
+
+    if (staleError) {
+      console.error('Error fetching stale pending bookings:', staleError);
+    } else if (stalePendingBookings && stalePendingBookings.length > 0) {
+      console.log(`Found ${stalePendingBookings.length} stale pending bookings to clean up`);
+
+      for (const booking of stalePendingBookings) {
+        try {
+          // Cancel any held payment intent
+          if (booking.stripe_payment_intent_id) {
+            try {
+              await stripe.paymentIntents.cancel(booking.stripe_payment_intent_id);
+              console.log(`Canceled payment intent for stale booking ${booking.id}`);
+            } catch (stripeError) {
+              // Payment intent may already be canceled or in a non-cancelable state
+              console.log(`Could not cancel payment intent for ${booking.id}:`, stripeError);
+            }
+          }
+
+          // Update booking to canceled
+          await supabaseAdmin
+            .from('bookings')
+            .update({ 
+              status: 'canceled',
+              cancellation_reason: 'Booking expired - payment was never completed'
+            })
+            .eq('id', booking.id);
+
+          // Delete any booking holds
+          await supabaseAdmin
+            .from('booking_holds')
+            .delete()
+            .eq('spot_id', booking.spot_id)
+            .eq('user_id', booking.renter_id);
+
+          // Notify driver
+          await supabaseAdmin
+            .from('notifications')
+            .insert({
+              user_id: booking.renter_id,
+              type: 'booking',
+              title: 'Booking Expired',
+              message: `Your booking at ${booking.spots?.address || 'the parking spot'} expired because payment was never completed.`,
+              related_id: booking.id,
+            });
+
+          staleCanceledCount++;
+          console.log(`Cleaned up stale pending booking ${booking.id}`);
+        } catch (bookingError) {
+          console.error(`Failed to clean up stale booking ${booking.id}:`, bookingError);
+        }
+      }
+    }
+
+    console.log(`Successfully cleaned up ${staleCanceledCount} stale pending bookings`);
+
     return new Response(JSON.stringify({
       success: true,
-      message: `Expired ${expiredCount} bookings`,
-      expired_count: expiredCount
+      message: `Expired ${expiredCount} held bookings, cleaned up ${staleCanceledCount} stale pending bookings`,
+      expired_count: expiredCount,
+      stale_canceled_count: staleCanceledCount
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
