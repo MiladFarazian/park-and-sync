@@ -611,7 +611,8 @@ const Explore = () => {
     isInitialLoad = true,
     timeOverride?: { start: Date | null; end: Date | null },
     evChargerTypeFilter?: string | null,
-    skipTwoMileCheck = false // When true, skip the 2-mile check (used for expanded searches)
+    skipTwoMileCheck = false, // When true, skip the 2-mile check (used for expanded searches)
+    skipCache = false // When true, always make fresh API call (used for map movements)
   ) => {
     if (!center) return;
 
@@ -620,11 +621,12 @@ const Explore = () => {
     const timeKey = getTimeBucketKey(effectiveStartTime, effectiveEndTime);
 
     // Skip cache when EV filter is applied to get accurate fallback notification
-    if (!evChargerTypeFilter) {
-      // Check regional cache first - skip API call if we have fresh data
+    // Also skip cache when explicitly requested (map pan/zoom) to ensure pins update
+    if (!evChargerTypeFilter && !skipCache) {
+      // Check regional cache first - only for initial loads and back/forward navigation
       const cachedData = findCoveringCache(center.lat, center.lng, radius, timeKey);
       if (cachedData && !isInitialLoad) {
-        // For map movements, use cache silently without API call
+        // Only use cache for background refreshes, not map movements
         setParkingSpots(cachedData);
         setSpotsLoading(false);
         return;
@@ -890,7 +892,8 @@ const Explore = () => {
       // Store the center we're about to fetch
       lastFetchedCenterRef.current = { lat: center.lat, lng: center.lng, radius: radiusMeters };
       consecutiveMoveCountRef.current = 0; // Reset after successful fetch
-      fetchNearbySpots(center, radiusMeters, false);
+      // Pass skipCache=true to ensure fresh API call for map movements
+      fetchNearbySpots(center, radiusMeters, false, undefined, undefined, false, true);
     }, debounceDelay);
   };
 
