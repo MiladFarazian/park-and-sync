@@ -242,7 +242,18 @@ const BookingContent = () => {
           } else {
             const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             const availableDays = [...new Set(rulesData.map(r => r.day_of_week))].sort((a, b) => a - b);
-            setAvailabilityDisplay(availableDays.map(d => DAYS[d]).join(', '));
+            const daysList = availableDays.map(d => DAYS[d]).join(', ');
+            
+            // Get unique time ranges and format them
+            const times = [...new Set(rulesData.map(r => 
+              `${formatTimeToAMPM(r.start_time)} - ${formatTimeToAMPM(r.end_time)}`
+            ))];
+            
+            if (times.length === 1) {
+              setAvailabilityDisplay(`${daysList} • ${times[0]}`);
+            } else {
+              setAvailabilityDisplay(`${daysList} • Varied hours`);
+            }
           }
         }
 
