@@ -59,6 +59,40 @@ interface SearchRequest {
   ev_charger_type?: string; // Filter for specific EV charger type
 }
 
+// Helper to convert a UTC date to Pacific timezone and extract date/time components
+const toPacificComponents = (utcDate: Date): { dateStr: string; timeStr: string; dayOfWeek: number } => {
+  // Use Intl.DateTimeFormat to get Pacific time components
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    weekday: 'short'
+  });
+  
+  const parts = formatter.formatToParts(utcDate);
+  const get = (type: string) => parts.find(p => p.type === type)?.value || '';
+  
+  // Build date string as YYYY-MM-DD
+  const dateStr = `${get('year')}-${get('month')}-${get('day')}`;
+  
+  // Build time string as HH:MM:SS
+  let hour = get('hour');
+  // Handle midnight edge case (some formatters return '24' for midnight)
+  if (hour === '24') hour = '00';
+  const timeStr = `${hour}:${get('minute')}:${get('second')}`;
+  
+  // Get day of week (0=Sunday, 1=Monday, etc.)
+  const weekdayMap: Record<string, number> = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+  const dayOfWeek = weekdayMap[get('weekday')] ?? new Date(dateStr).getDay();
+  
+  return { dateStr, timeStr, dayOfWeek };
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -195,27 +229,33 @@ serve(async (req) => {
       const spotIds = spotsWithDistance.map(s => s.id);
 
       if (spotIds.length > 0) {
-        // Get dates covered by the search range for calendar override checks
-        const startDate = new Date(start_time);
-        const endDate = new Date(end_time);
+        // Convert search times to Pacific timezone for availability rule comparisons
+        // Availability rules are stored in Pacific time (e.g., 00:00:00 to 23:59:00 means midnight to 11:59 PM Pacific)
+        const searchStartUtc = new Date(start_time);
+        const searchEndUtc = new Date(end_time);
+        const startPacific = toPacificComponents(searchStartUtc);
+        const endPacific = toPacificComponents(searchEndUtc);
+        
+        console.log(`[search-spots-lite] Search times - UTC: ${start_time} to ${end_time}`);
+        console.log(`[search-spots-lite] Search times - Pacific: ${startPacific.dateStr} ${startPacific.timeStr} to ${endPacific.dateStr} ${endPacific.timeStr}`);
+
+        // Get dates covered by the search range in Pacific timezone
         const searchDates: string[] = [];
-        const currentDate = new Date(startDate);
-        currentDate.setHours(0, 0, 0, 0);
-        const endDateMidnight = new Date(endDate);
-        endDateMidnight.setHours(0, 0, 0, 0);
-
-        while (currentDate <= endDateMidnight) {
-          searchDates.push(currentDate.toISOString().split('T')[0]);
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
-
-        // Get days of week covered by the search range (0=Sunday, 1=Monday, etc.)
         const searchDaysOfWeek = new Set<number>();
-        const tempDate = new Date(startDate);
-        tempDate.setHours(0, 0, 0, 0);
-        while (tempDate <= endDateMidnight) {
-          searchDaysOfWeek.add(tempDate.getDay());
-          tempDate.setDate(tempDate.getDate() + 1);
+        
+        // Start from the Pacific date of the start time
+        let currentDateStr = startPacific.dateStr;
+        const endDateStr = endPacific.dateStr;
+        
+        while (currentDateStr <= endDateStr) {
+          searchDates.push(currentDateStr);
+          // Calculate day of week for this date
+          const [year, month, day] = currentDateStr.split('-').map(Number);
+          const dateForDow = new Date(year, month - 1, day);
+          searchDaysOfWeek.add(dateForDow.getDay());
+          // Move to next day
+          dateForDow.setDate(dateForDow.getDate() + 1);
+          currentDateStr = dateForDow.toISOString().split('T')[0];
         }
 
         // Get calendar overrides for the search dates (both available and unavailable)
@@ -249,12 +289,10 @@ serve(async (req) => {
           spotRules.get(rule.spot_id)!.push(rule);
         }
 
-        // Helper function to check if a time falls within a time range
-        const isTimeInRange = (time: Date, rangeStart: string, rangeEnd: string, dateStr: string): boolean => {
-          const timeStr = time.toTimeString().substring(0, 8); // HH:MM:SS format
-          const rangeStartNorm = rangeStart.length === 5 ? rangeStart + ':00' : rangeStart;
-          const rangeEndNorm = rangeEnd.length === 5 ? rangeEnd + ':00' : rangeEnd;
-          return timeStr >= rangeStartNorm && timeStr <= rangeEndNorm;
+        // Helper to normalize time strings to HH:MM:SS format
+        const normalizeTimeStr = (timeStr: string): string => {
+          if (!timeStr) return '00:00:00';
+          return timeStr.length === 5 ? timeStr + ':00' : timeStr;
         };
 
         // Determine which spots are unavailable during the search time
@@ -264,12 +302,37 @@ serve(async (req) => {
           const overrides = spotOverrides.get(spotId) || [];
           const rules = spotRules.get(spotId) || [];
 
-          // Check each date in the search range
+          // Check each date in the search range (dates are in Pacific timezone)
           let isAvailableForAllDates = true;
 
           for (const dateStr of searchDates) {
-            const dateObj = new Date(dateStr + 'T00:00:00');
-            const dayOfWeek = dateObj.getDay();
+            // Calculate day of week for this Pacific date
+            const [year, month, day] = dateStr.split('-').map(Number);
+            const dateForDow = new Date(year, month - 1, day);
+            const dayOfWeek = dateForDow.getDay();
+
+            // Determine what portion of the search time falls on this Pacific date
+            // If search spans multiple days, we need to check each day's portion
+            let searchStartTimeOnDate: string;
+            let searchEndTimeOnDate: string;
+            
+            if (dateStr === startPacific.dateStr && dateStr === endPacific.dateStr) {
+              // Search is entirely on this day
+              searchStartTimeOnDate = startPacific.timeStr;
+              searchEndTimeOnDate = endPacific.timeStr;
+            } else if (dateStr === startPacific.dateStr) {
+              // First day of multi-day search: from start time to end of day
+              searchStartTimeOnDate = startPacific.timeStr;
+              searchEndTimeOnDate = '23:59:59';
+            } else if (dateStr === endPacific.dateStr) {
+              // Last day of multi-day search: from start of day to end time
+              searchStartTimeOnDate = '00:00:00';
+              searchEndTimeOnDate = endPacific.timeStr;
+            } else {
+              // Middle day: full day needed
+              searchStartTimeOnDate = '00:00:00';
+              searchEndTimeOnDate = '23:59:59';
+            }
 
             // Find override for this specific date (takes precedence over rules)
             const dateOverride = overrides.find(o => o.override_date === dateStr);
@@ -283,22 +346,21 @@ serve(async (req) => {
                   isAvailableForAllDates = false;
                   break;
                 }
-                // Partial block - check if search time overlaps with blocked time
-                const overrideStart = new Date(`${dateStr}T${dateOverride.start_time || '00:00:00'}`);
-                const overrideEnd = new Date(`${dateStr}T${dateOverride.end_time || '23:59:59'}`);
-                if (new Date(start_time) < overrideEnd && new Date(end_time) > overrideStart) {
+                // Partial block - check if search time overlaps with blocked time (using string comparison in Pacific)
+                const blockStart = normalizeTimeStr(dateOverride.start_time || '00:00:00');
+                const blockEnd = normalizeTimeStr(dateOverride.end_time || '23:59:59');
+                // Overlap check: searchStart < blockEnd AND searchEnd > blockStart
+                if (searchStartTimeOnDate < blockEnd && searchEndTimeOnDate > blockStart) {
                   isAvailableForAllDates = false;
                   break;
                 }
               } else {
                 // Override marks as available - check if search time is within available hours
                 if (dateOverride.start_time && dateOverride.end_time) {
-                  const availStart = new Date(`${dateStr}T${dateOverride.start_time}`);
-                  const availEnd = new Date(`${dateStr}T${dateOverride.end_time}`);
-                  // Search must be entirely within available window
-                  const searchStartOnDate = new Date(Math.max(new Date(start_time).getTime(), dateObj.getTime()));
-                  const searchEndOnDate = new Date(Math.min(new Date(end_time).getTime(), new Date(dateStr + 'T23:59:59').getTime()));
-                  if (searchStartOnDate < availStart || searchEndOnDate > availEnd) {
+                  const availStart = normalizeTimeStr(dateOverride.start_time);
+                  const availEnd = normalizeTimeStr(dateOverride.end_time);
+                  // Search must be entirely within available window (Pacific time string comparison)
+                  if (searchStartTimeOnDate < availStart || searchEndTimeOnDate > availEnd) {
                     isAvailableForAllDates = false;
                     break;
                   }
@@ -317,15 +379,11 @@ serve(async (req) => {
                 }
                 // Day has availability hours - check if search time falls within
                 if (dayRule.start_time && dayRule.end_time) {
-                  const ruleStart = new Date(`${dateStr}T${dayRule.start_time}`);
-                  const ruleEnd = new Date(`${dateStr}T${dayRule.end_time}`);
-                  // Search time on this date must be within the available window
-                  const searchStartOnDate = new Date(Math.max(new Date(start_time).getTime(), dateObj.getTime()));
-                  const nextDay = new Date(dateObj);
-                  nextDay.setDate(nextDay.getDate() + 1);
-                  const searchEndOnDate = new Date(Math.min(new Date(end_time).getTime(), nextDay.getTime() - 1));
-
-                  if (searchStartOnDate < ruleStart || searchEndOnDate > ruleEnd) {
+                  const ruleStart = normalizeTimeStr(dayRule.start_time);
+                  const ruleEnd = normalizeTimeStr(dayRule.end_time);
+                  
+                  // Pacific time string comparison - search time must be within rule window
+                  if (searchStartTimeOnDate < ruleStart || searchEndTimeOnDate > ruleEnd) {
                     isAvailableForAllDates = false;
                     break;
                   }
