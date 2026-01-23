@@ -1,82 +1,97 @@
 
 
-## Speed Up Availability Loading
+## Add Parking Details to Guest Confirmation Emails
 
-### Root Cause
-The availability data loads slowly because:
+### Problem
+Guest booking confirmation emails are missing critical parking information:
+- Access instructions (gate codes, parking spot location, etc.)
+- EV charging instructions (for spots with charging)
 
-1. **Sequential fetching**: The code loops through each spot one-by-one, waiting for each spot's queries to complete before moving to the next
-2. **2 queries per spot**: Each spot requires separate queries for `availability_rules` and `calendar_overrides`
-3. **Total queries**: For 5 spots = 10 database round-trips in sequence
+**Root cause:** The `send-guest-booking-confirmation` edge function and its callers don't include these fields.
 
-Meanwhile, the hourly rate is instant because it's fetched in the same query as the spots (`spots.hourly_rate`).
+### Current State
+
+| Email Function | Has Access Notes | Has EV Instructions |
+|----------------|------------------|---------------------|
+| `send-booking-confirmation` (authenticated) | Yes | Yes |
+| `approve-booking` (host approval) | Yes | Yes |
+| `send-guest-booking-confirmation` (guest) | No | No |
 
 ### Solution
-Fetch all availability data in **parallel** using `Promise.all()`, and use batch queries with `.in()` filters instead of individual queries per spot.
 
-### Technical Changes
+Update the guest booking confirmation flow to include parking details:
 
-**File:** `src/pages/ManageAvailability.tsx`
+#### 1. Update `send-guest-booking-confirmation/index.ts`
 
-#### Before (sequential, slow):
+**Add fields to interface:**
 ```typescript
-for (const spot of spots) {
-  const spotId = spot.id;
-  const { data: rules } = await supabase
-    .from('availability_rules')
-    .select('...')
-    .eq('spot_id', spotId)
-    .eq('day_of_week', dayOfWeek);
-  
-  const { data: overrides } = await supabase
-    .from('calendar_overrides')
-    .select('...')
-    .eq('spot_id', spotId)
-    .eq('override_date', dateStr);
-  
-  availability[spotId] = { rules, overrides };
+interface GuestBookingConfirmationRequest {
+  // ... existing fields ...
+  accessNotes?: string;
+  evChargingInstructions?: string;
+  hasEvCharging?: boolean;
+  willUseEvCharging?: boolean;
 }
 ```
 
-#### After (parallel, fast):
+**Add HTML sections for access notes and EV instructions** (same styling as `send-booking-confirmation`):
+- Blue box for access instructions
+- Green box for EV charging instructions (when opted in)
+- Gray box for EV available but not selected
+
+#### 2. Update `stripe-webhooks/index.ts` - `handlePaymentSucceeded()`
+
+When fetching the booking (line 86), add spot details:
 ```typescript
-// Get all spot IDs
-const spotIds = spots.map(s => s.id);
-
-// Fetch ALL rules and overrides in just 2 parallel queries
-const [rulesResult, overridesResult] = await Promise.all([
-  supabase
-    .from('availability_rules')
-    .select('spot_id, day_of_week, start_time, end_time, is_available, custom_rate')
-    .in('spot_id', spotIds)
-    .eq('day_of_week', dayOfWeek),
-  supabase
-    .from('calendar_overrides')
-    .select('id, spot_id, override_date, start_time, end_time, is_available, custom_rate')
-    .in('spot_id', spotIds)
-    .eq('override_date', dateStr)
-]);
-
-// Group results by spot_id
-const availability: Record<string, { rules: AvailabilityRule[]; overrides: CalendarOverride[] }> = {};
-
-for (const spotId of spotIds) {
-  availability[spotId] = {
-    rules: (rulesResult.data || []).filter(r => r.spot_id === spotId),
-    overrides: (overridesResult.data || []).filter(o => o.spot_id === spotId)
-  };
-}
-
-setSpotAvailability(availability);
+.select('..., spots!inner(host_id, title, address, access_notes, ev_charging_instructions, has_ev_charging)')
 ```
 
-### Performance Improvement
-| Before | After |
-|--------|-------|
-| 2N queries (sequential) | 2 queries (parallel) |
-| 5 spots = 10 round-trips | 5 spots = 2 round-trips |
-| ~1-2 seconds | ~100-200ms |
+When calling `send-guest-booking-confirmation`, add the new fields:
+```typescript
+body: JSON.stringify({
+  // ... existing fields ...
+  accessNotes: (booking.spots as any).access_notes || '',
+  evChargingInstructions: (booking.spots as any).ev_charging_instructions || '',
+  hasEvCharging: (booking.spots as any).has_ev_charging || false,
+  willUseEvCharging: booking.will_use_ev_charging || false,
+}),
+```
 
-### Files to Modify
-- `src/pages/ManageAvailability.tsx` - Refactor `fetchAvailabilityData()` to use batch queries
+### Technical Details
+
+#### Files to Modify:
+1. `supabase/functions/send-guest-booking-confirmation/index.ts`
+   - Add 4 new optional fields to interface
+   - Add access notes HTML section (blue box)
+   - Add EV charging HTML section (green/gray box)
+   
+2. `supabase/functions/stripe-webhooks/index.ts`
+   - Expand spot select query to include `access_notes`, `ev_charging_instructions`, `has_ev_charging`
+   - Add `will_use_ev_charging` to booking select
+   - Pass all 4 new fields when calling `send-guest-booking-confirmation`
+
+#### Email Template Additions:
+```html
+<!-- Access Notes Section (Blue) -->
+<table style="background-color: #e0f2fe; border-left: 4px solid #0ea5e9; ...">
+  <tr><td>
+    <p>🔑 Access Instructions</p>
+    <p>${accessNotes}</p>
+  </td></tr>
+</table>
+
+<!-- EV Charging Section (Green - when opted in) -->
+<table style="background-color: #dcfce7; border-left: 4px solid #22c55e; ...">
+  <tr><td>
+    <p>⚡ EV Charging Instructions</p>
+    <p>${evChargingInstructions}</p>
+  </td></tr>
+</table>
+```
+
+### Expected Result
+After this change, guest confirmation emails will match authenticated user emails with:
+- Access instructions displayed prominently in a blue info box
+- EV charging instructions in a green box (if opted in)
+- "EV Charging Available" notice in gray (if available but not selected)
 
