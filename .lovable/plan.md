@@ -1,97 +1,63 @@
 
 
-## Add Parking Details to Guest Confirmation Emails
+## Fix Incorrect Availability Hours Display on Booking Page
 
 ### Problem
-Guest booking confirmation emails are missing critical parking information:
-- Access instructions (gate codes, parking spot location, etc.)
-- EV charging instructions (for spots with charging)
+When a spot has availability set for fewer than 7 days (e.g., Monday-Friday only), the booking page displays just the day names ("Mon, Tue, Wed, Thu, Fri") without showing the actual time ranges. This is confusing because users need to know **when** the spot is available, not just which days.
 
-**Root cause:** The `send-guest-booking-confirmation` edge function and its callers don't include these fields.
+### Root Cause
+In `src/pages/Booking.tsx` (lines 226-246), the availability display logic has three branches:
 
-### Current State
-
-| Email Function | Has Access Notes | Has EV Instructions |
-|----------------|------------------|---------------------|
-| `send-booking-confirmation` (authenticated) | Yes | Yes |
-| `approve-booking` (host approval) | Yes | Yes |
-| `send-guest-booking-confirmation` (guest) | No | No |
-
-### Solution
-
-Update the guest booking confirmation flow to include parking details:
-
-#### 1. Update `send-guest-booking-confirmation/index.ts`
-
-**Add fields to interface:**
 ```typescript
-interface GuestBookingConfirmationRequest {
-  // ... existing fields ...
-  accessNotes?: string;
-  evChargingInstructions?: string;
-  hasEvCharging?: boolean;
-  willUseEvCharging?: boolean;
+if (rulesData.length === 0) {
+  setAvailabilityDisplay('No schedule set');
+} else if (rulesData.length === 7) {
+  // ✅ Shows time range (8:00 AM - 6:00 PM)
+} else {
+  // ❌ BUG: Only shows day names ("Mon, Tue, Wed, Thu, Fri")
+  // Missing the time range entirely!
+  setAvailabilityDisplay(availableDays.map(d => DAYS[d]).join(', '));
 }
 ```
 
-**Add HTML sections for access notes and EV instructions** (same styling as `send-booking-confirmation`):
-- Blue box for access instructions
-- Green box for EV charging instructions (when opted in)
-- Gray box for EV available but not selected
+### Solution
+Update the `else` branch to include both the days AND the time range, matching the format used when all 7 days are available.
 
-#### 2. Update `stripe-webhooks/index.ts` - `handlePaymentSucceeded()`
+### Technical Changes
 
-When fetching the booking (line 86), add spot details:
+**File:** `src/pages/Booking.tsx`
+
+Update lines 242-246 to include time information:
+
 ```typescript
-.select('..., spots!inner(host_id, title, address, access_notes, ev_charging_instructions, has_ev_charging)')
-```
-
-When calling `send-guest-booking-confirmation`, add the new fields:
-```typescript
-body: JSON.stringify({
-  // ... existing fields ...
-  accessNotes: (booking.spots as any).access_notes || '',
-  evChargingInstructions: (booking.spots as any).ev_charging_instructions || '',
-  hasEvCharging: (booking.spots as any).has_ev_charging || false,
-  willUseEvCharging: booking.will_use_ev_charging || false,
-}),
-```
-
-### Technical Details
-
-#### Files to Modify:
-1. `supabase/functions/send-guest-booking-confirmation/index.ts`
-   - Add 4 new optional fields to interface
-   - Add access notes HTML section (blue box)
-   - Add EV charging HTML section (green/gray box)
-   
-2. `supabase/functions/stripe-webhooks/index.ts`
-   - Expand spot select query to include `access_notes`, `ev_charging_instructions`, `has_ev_charging`
-   - Add `will_use_ev_charging` to booking select
-   - Pass all 4 new fields when calling `send-guest-booking-confirmation`
-
-#### Email Template Additions:
-```html
-<!-- Access Notes Section (Blue) -->
-<table style="background-color: #e0f2fe; border-left: 4px solid #0ea5e9; ...">
-  <tr><td>
-    <p>🔑 Access Instructions</p>
-    <p>${accessNotes}</p>
-  </td></tr>
-</table>
-
-<!-- EV Charging Section (Green - when opted in) -->
-<table style="background-color: #dcfce7; border-left: 4px solid #22c55e; ...">
-  <tr><td>
-    <p>⚡ EV Charging Instructions</p>
-    <p>${evChargingInstructions}</p>
-  </td></tr>
-</table>
+} else {
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const availableDays = [...new Set(rulesData.map(r => r.day_of_week))].sort((a, b) => a - b);
+  const daysList = availableDays.map(d => DAYS[d]).join(', ');
+  
+  // Get unique time ranges and format them
+  const times = [...new Set(rulesData.map(r => 
+    `${formatTimeToAMPM(r.start_time)} - ${formatTimeToAMPM(r.end_time)}`
+  ))];
+  
+  if (times.length === 1) {
+    // All days have same hours: "Mon-Fri, 8:00 AM - 6:00 PM"
+    setAvailabilityDisplay(`${daysList} • ${times[0]}`);
+  } else {
+    // Different hours on different days
+    setAvailabilityDisplay(`${daysList} • Varied hours`);
+  }
+}
 ```
 
 ### Expected Result
-After this change, guest confirmation emails will match authenticated user emails with:
-- Access instructions displayed prominently in a blue info box
-- EV charging instructions in a green box (if opted in)
-- "EV Charging Available" notice in gray (if available but not selected)
+
+| Before | After |
+|--------|-------|
+| "Mon, Tue, Wed, Thu, Fri" | "Mon, Tue, Wed, Thu, Fri • 8:00 AM - 6:00 PM" |
+| "Mon, Tue, Wed" | "Mon, Tue, Wed • 9:00 AM - 5:00 PM" |
+| Days with different hours | "Mon, Tue, Wed • Varied hours" |
+
+### Files to Modify
+- `src/pages/Booking.tsx` - Fix the availability display logic in the `else` branch (around lines 242-246)
 
