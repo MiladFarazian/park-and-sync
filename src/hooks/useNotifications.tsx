@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { NOTIFICATION_ICON } from '@/lib/constants';
 
 interface NotificationPayload {
   title: string;
@@ -218,7 +219,7 @@ export const useNotifications = () => {
       // Show browser notification
       const notification = new Notification(payload.title, {
         body: payload.body,
-        icon: payload.icon || '/parkzy-logo.png',
+        icon: payload.icon || NOTIFICATION_ICON,
         badge: '/favicon.png',
         tag: payload.tag || 'default',
         requireInteraction: payload.requireInteraction || false,

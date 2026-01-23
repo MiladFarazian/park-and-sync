@@ -13,6 +13,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import useEmblaCarousel from 'embla-carousel-react';
 import { useFavoriteSpots } from '@/hooks/useFavoriteSpots';
 import { cn } from '@/lib/utils';
+import { mapLogger as log } from '@/lib/logger';
+import { PLACEHOLDER_IMAGE } from '@/lib/constants';
 
 interface UserBooking {
   id: string;
@@ -287,7 +289,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         if (error) throw error;
         setMapboxToken(data.token);
       } catch (error) {
-        console.error('Error fetching Mapbox token:', error);
+        log.error('Failed to fetch Mapbox token', { error: error instanceof Error ? error.message : error });
       } finally {
         setIsLoading(false);
       }
@@ -403,7 +405,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
               map.current?.addImage('pin-destination', destImg, { pixelRatio: 2 });
             }
           } catch (e) {
-            console.warn('Destination pin image error:', e);
+            // Ignore - destination pin image may already exist
           }
         };
         destImg.src = destPinUrl;
@@ -485,7 +487,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
               map.current?.addImage('pin-destination', destImg, { pixelRatio: 2 });
             }
           } catch (e) {
-            console.warn('Destination pin image error (alt):', e);
+            // Ignore - destination pin image may already exist
           }
         };
         destImg.src = destPinUrl;
@@ -579,7 +581,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       lat < -90 || lat > 90 ||
       lng < -180 || lng > 180
     ) {
-      console.warn('Invalid search center coordinates:', lat, lng);
+      log.warn('Invalid search center coordinates', { lat, lng });
       return;
     }
 
@@ -604,7 +606,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       lat < -90 || lat > 90 ||
       lng < -180 || lng > 180
     ) {
-      console.warn('Invalid current location coordinates:', lat, lng);
+      log.warn('Invalid current location coordinates', { lat, lng });
       return;
     }
 
@@ -638,7 +640,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       lat < -90 || lat > 90 ||
       lng < -180 || lng > 180
     ) {
-      console.warn('Invalid search center coordinates:', lat, lng);
+      log.warn('Invalid search center coordinates', { lat, lng });
       return;
     }
 
@@ -695,7 +697,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
             lat = rawLng;
             lng = rawLat;
           } else {
-            console.warn('Skipping invalid coords for spot', spot.title, rawLat, rawLng);
+            log.warn('Skipping invalid coords for spot', { title: spot.title, lat: rawLat, lng: rawLng });
             return null;
           }
         }
@@ -1006,28 +1008,16 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       // Handle unclustered point clicks - show spot details
       const onClick = (e: any) => {
         const f = e.features?.[0];
-        console.log('[MapView] Pin clicked:', { 
-          featureId: f?.properties?.id, 
-          featureTitle: f?.properties?.title,
-          hasFeature: !!f 
-        });
-        
+
         if (!f) {
-          console.warn('[MapView] No feature found on click');
           return;
         }
-        
+
         // Use spotsRef.current to get the most recent spots array
         const spot = spotsRef.current.find((s) => s.id === f.properties.id);
-        console.log('[MapView] Spot lookup result:', { 
-          spotId: f.properties.id, 
-          foundSpot: !!spot,
-          spotTitle: spot?.title,
-          totalSpotsInRef: spotsRef.current.length
-        });
-        
+
         if (spot) {
-          console.log('[MapView] Setting selected spot:', spot.id);
+          log.debug('Pin clicked', { spotId: spot.id.substring(0, 8) });
           setUserSelectedSpot(true); // Mark that user manually selected a spot
           setSelectedSpot(spot);
           // Notify parent of selection
@@ -1054,7 +1044,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
             });
           }
         } else {
-          console.error('[MapView] Spot not found in spots array for ID:', f.properties.id);
+          log.warn('Spot not found in spots array', { featureId: f.properties.id });
         }
       };
       (map.current as any).on('click', circleId, onClick);
@@ -1118,7 +1108,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         onVisibleSpotsChange?.(visibleSpots.length);
       }, 100);
 
-      console.log('Rendered', features.length, 'spot pins via layers');
+      log.debug('Rendered spot pins via layers', { count: features.length });
     };
 
     // Ensure both pin images are available, then add layers
@@ -1153,7 +1143,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           try {
             (map.current as any).addImage(pinImageIdWhite, whiteImg, { pixelRatio: 2 });
           } catch (e) {
-            console.warn('addImage error (white pin may already exist):', e);
+            // Ignore - white pin image may already exist
           }
           checkAndAddLayers();
         };
@@ -1181,7 +1171,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           try {
             (map.current as any).addImage(pinImageIdPurple, purpleImg, { pixelRatio: 2 });
           } catch (e) {
-            console.warn('addImage error (purple pin may already exist):', e);
+            // Ignore - purple pin image may already exist
           }
           checkAndAddLayers();
         };
@@ -1330,8 +1320,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                   }`}>
                     <div className="flex gap-3 cursor-pointer" onClick={() => navigate(buildSpotUrl(spot.id))}>
                       <div className="w-20 h-20 rounded-lg bg-muted flex-shrink-0 relative">
-                        <img 
-                          src={spot.imageUrl || "/placeholder.svg"}
+                        <img
+                          src={spot.imageUrl || PLACEHOLDER_IMAGE}
                           alt="Parking spot"
                           className="w-full h-full object-cover rounded-lg"
                         />

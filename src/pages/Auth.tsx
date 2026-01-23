@@ -9,8 +9,7 @@ import { ArrowLeft, Phone, Mail, Loader2, Car, MapPin, Shield, Eye, EyeOff } fro
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import parkzyLogo from '@/assets/parkzy-logo-white.png';
-import parkzyLogoDark from '@/assets/parkzy-logo.png';
+import { logos } from '@/assets';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
@@ -444,7 +443,7 @@ const Auth = () => {
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           {/* Logo */}
           <div>
-            <img src={parkzyLogo} alt="Parkzy" className="h-12" />
+            <img src={logos.white} alt="Parkzy" className="h-12" />
           </div>
           
           {/* Main content */}
@@ -509,7 +508,7 @@ const Auth = () => {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <img src={parkzyLogoDark} alt="Parkzy" className="h-8 lg:hidden" />
+          <img src={logos.primary} alt="Parkzy" className="h-8 lg:hidden" />
           <div className="w-10" />
         </div>
 

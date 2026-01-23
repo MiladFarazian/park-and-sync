@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMode } from '@/contexts/ModeContext';
+import { SUPPORT_AVATAR } from '@/lib/constants';
 
 // Booking context for conversations
 export interface BookingContext {
@@ -322,7 +323,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         ? 'Parkzy Support' 
         : (profile ? formatDisplayName(profile.first_name, profile.last_name) : 'Unknown User');
       const profileAvatar = isSupportUser
-        ? '/parkzy-support-avatar.png'
+        ? SUPPORT_AVATAR
         : profile?.avatar_url;
       
       const lastMsg = conv.messages.sort((a: Message, b: Message) => 
@@ -468,9 +469,9 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (profileCacheRef.current.has(partnerId)) return;
     
     if (partnerId === '00000000-0000-0000-0000-000000000001') {
-      profileCacheRef.current.set(partnerId, { name: 'Parkzy Support', avatar_url: '/parkzy-support-avatar.png' });
+      profileCacheRef.current.set(partnerId, { name: 'Parkzy Support', avatar_url: SUPPORT_AVATAR });
       if (mountedRef.current) {
-        setConversations(prev => prev.map(c => c.user_id === partnerId ? { ...c, name: 'Parkzy Support', avatar_url: '/parkzy-support-avatar.png' } : c));
+        setConversations(prev => prev.map(c => c.user_id === partnerId ? { ...c, name: 'Parkzy Support', avatar_url: SUPPORT_AVATAR } : c));
       }
       return;
     }

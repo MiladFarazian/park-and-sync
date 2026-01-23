@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import parkzyLogo from '@/assets/parkzy-logo.png';
+import { logos } from '@/assets';
 import ModeSwitcher from './ModeSwitcher';
 import { NotificationBell } from './NotificationBell';
 import { useMode } from '@/contexts/ModeContext';
@@ -69,7 +69,7 @@ const DesktopHeader = () => {
         {/* Left: Logo and Nav */}
         <div className="flex items-center gap-8">
           <img 
-            src={parkzyLogo} 
+            src={logos.primary} 
             alt="Parkzy" 
             className="h-9 cursor-pointer" 
             onClick={handleLogoClick}

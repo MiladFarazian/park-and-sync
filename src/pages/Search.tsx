@@ -13,6 +13,7 @@ import { TimePicker } from '@/components/ui/time-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { calculateDriverPrice } from '@/lib/pricing';
+import { PLACEHOLDER_IMAGE } from '@/lib/constants';
 
 const Search = () => {
   const navigate = useNavigate();
@@ -158,7 +159,7 @@ const Search = () => {
         rating: parseFloat(spot.profiles?.rating || 4.5),
         reviews: spot.profiles?.review_count || 0,
         status: 'Available Now',
-        image: spot.spot_photos?.find((p: any) => p.is_primary)?.url || '/placeholder.svg'
+        image: spot.spot_photos?.find((p: any) => p.is_primary)?.url || PLACEHOLDER_IMAGE
       })) || [];
 
       setRecentlyViewed(transformedSpots);

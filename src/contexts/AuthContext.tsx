@@ -83,7 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
     
     if (error) {
-      console.error('[Auth] Error ensuring profile exists:', error);
+      log.error('Failed to ensure profile exists', { userId: userId.substring(0, 8), error: error.message });
     }
     return { error };
   };
@@ -103,7 +103,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.id);
+        log.debug('Auth state changed', { event, userId: session?.user?.id?.substring(0, 8) });
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -132,14 +132,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 if (linkError) {
                   // Only log if it's not a 401 (which can happen during initial sign-in race)
                   if (!linkError.message?.includes('401')) {
-                    console.error('[Auth] Error linking guest bookings on sign in:', linkError);
+                    log.error('Failed to link guest bookings on sign in', { error: linkError.message });
                   }
                 } else if (linkData?.linked_count > 0) {
-                  console.log(`[Auth] Linked ${linkData.linked_count} guest bookings on sign in`);
+                  log.info('Linked guest bookings on sign in', { count: linkData.linked_count });
                 }
               } catch (err) {
                 // Silently handle errors during sign-in race conditions
-                console.warn('[Auth] Could not link guest bookings on sign in:', err);
+                log.warn('Could not link guest bookings on sign in', { error: err instanceof Error ? err.message : err });
               }
             }
           }, 0);
@@ -157,16 +157,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     if (accessToken && refreshToken) {
       // Magic link tokens detected - set the session
-      console.log('Magic link tokens detected, setting session...');
+      log.debug('Magic link tokens detected, setting session');
       supabase.auth.setSession({
         access_token: accessToken,
         refresh_token: refreshToken
       }).then(({ data, error }) => {
         if (error) {
-          console.error('Error setting session from magic link:', error);
+          log.error('Failed to set session from magic link', { error: error.message });
           setLoading(false);
         } else {
-          console.log('Session set from magic link successfully');
+          log.info('Session set from magic link successfully');
           // Clean up the URL hash
           window.history.replaceState({}, '', window.location.pathname + window.location.search);
         }
@@ -238,7 +238,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           });
           
           if (linkError) {
-            console.error('Error linking guest bookings:', linkError);
+            log.error('Failed to link guest bookings', { error: linkError.message });
           } else if (linkData?.linked_count > 0) {
             toast({
               title: "Bookings Linked",
@@ -246,7 +246,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             });
           }
         } catch (err) {
-          console.error('Failed to link guest bookings:', err);
+          log.error('Failed to link guest bookings', { error: err instanceof Error ? err.message : err });
         }
       }
     }
@@ -313,7 +313,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) return { error: new Error('No user logged in') };
 
-    console.log('[Auth] Updating profile for user:', user.id, updates);
+    log.debug('Updating profile', { userId: user.id.substring(0, 8), fields: Object.keys(updates) });
     
     // Use upsert instead of update to handle cases where profile doesn't exist
     const { error } = await supabase
@@ -327,7 +327,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
     if (error) {
-      console.error('[Auth] Profile update failed:', error);
+      log.error('Profile update failed', { userId: user.id.substring(0, 8), error: error.message });
       toast({
         title: "Profile Update Failed",
         description: error.message,
@@ -348,7 +348,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshProfile = async () => {
     if (!user) return;
-    console.log('[Auth] Refreshing profile for user:', user.id);
+    log.debug('Refreshing profile', { userId: user.id.substring(0, 8) });
     const profileData = await fetchProfile(user.id);
     setProfile(profileData);
   };

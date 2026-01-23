@@ -4,7 +4,7 @@ import { MapPin, Clock, Shield, Calendar, ChevronRight, Zap } from 'lucide-react
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { useNavigate } from 'react-router-dom';
 import { format, addHours } from 'date-fns';
-import heroImage from '@/assets/hero-parking.jpg';
+import { marketing } from '@/assets';
 import LocationSearchInput from '@/components/ui/location-search-input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -157,7 +157,7 @@ const HeroSection = () => {
           <div className="relative hidden lg:block">
             <div className="relative rounded-3xl overflow-hidden shadow-2xl">
               <img
-                src={heroImage}
+                src={marketing.hero}
                 alt="Modern parking spot in urban setting"
                 className="w-full h-[560px] object-cover"
               />

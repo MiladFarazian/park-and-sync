@@ -1,5 +1,6 @@
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { bookingLogger as log } from '@/lib/logger';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle, Loader2, Info, Zap } from 'lucide-react';
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -132,7 +133,7 @@ const BookingContent = () => {
       if (!spotId) return;
       
       try {
-        console.log('[Booking] Fetching spot:', spotId);
+        log.debug('Fetching spot', { spotId: spotId?.substring(0, 8) });
         
         // Fetch spot with host info and first photo
         const { data: spotData, error: spotError } = await supabase
@@ -152,17 +153,15 @@ const BookingContent = () => {
           .eq('id', spotId)
           .single();
 
-        console.log('[Booking] Fetch result:', { 
-          spotId, 
-          hasData: !!spotData, 
+        log.debug('Spot fetch result', {
+          spotId: spotId?.substring(0, 8),
+          hasData: !!spotData,
           hasError: !!spotError,
-          errorCode: spotError?.code,
-          errorMessage: spotError?.message,
-          spotStatus: spotData?.status
+          status: spotData?.status
         });
 
         if (spotError) {
-          console.error('[Booking] RLS/Permission error:', spotError);
+          log.error('Spot fetch failed', { code: spotError?.code, message: spotError?.message });
           if (spotError.code === 'PGRST116' || spotError.message?.includes('not found')) {
             toast({
               title: "Spot not available",
@@ -181,7 +180,7 @@ const BookingContent = () => {
         }
 
         if (!spotData) {
-          console.error('[Booking] No spot data returned');
+          log.error('No spot data returned');
           toast({
             title: "Error",
             description: "Spot not found",
@@ -193,7 +192,7 @@ const BookingContent = () => {
 
         // Check if spot is active
         if (spotData.status !== 'active') {
-          console.warn('[Booking] Spot is not active:', { spotId, status: spotData.status });
+          log.warn('Spot is not active', { spotId: spotId?.substring(0, 8), status: spotData.status });
           toast({
             title: "Spot not active",
             description: "This spot is not currently active and cannot be booked",
@@ -309,7 +308,7 @@ const BookingContent = () => {
           }
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
+        log.error('Error fetching booking data', { error: error instanceof Error ? error.message : error });
         toast({
           title: "Error",
           description: "Failed to load booking information",
@@ -338,7 +337,7 @@ const BookingContent = () => {
       if (!user) return;
 
       setCheckingAvailability(true);
-      console.log('Checking spot availability...', { spotId, start: startDateTime.toISOString(), end: endDateTime.toISOString() });
+      log.debug('Checking spot availability', { spotId: spotId?.substring(0, 8) });
 
       try {
         const { data, error } = await supabase.rpc('check_spot_availability', {
@@ -351,18 +350,18 @@ const BookingContent = () => {
         if (cancelled) return;
 
         if (error) {
-          console.warn('Availability check error:', error);
+          log.warn('Availability check error', { error: error.message });
           setServerAvailable({ ok: false, reason: 'Unable to verify availability right now' });
         } else {
           const isAvailable = !!data;
-          console.log('Availability check result:', isAvailable);
+          log.debug('Availability check result', { isAvailable });
           setServerAvailable({ 
             ok: isAvailable, 
             reason: isAvailable ? undefined : 'Another booking or hold conflicts with your selected time'
           });
         }
       } catch (err) {
-        console.error('Availability check exception:', err);
+        log.error('Availability check exception', { error: err instanceof Error ? err.message : err });
         if (!cancelled) {
           setServerAvailable({ ok: false, reason: 'Error checking availability' });
         }
@@ -389,13 +388,13 @@ const BookingContent = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      console.log('Setting up broadcast channel for spot:', spotId);
+      log.debug('Setting up broadcast channel', { spotId: spotId?.substring(0, 8) });
       const channel = supabase
         .channel(`spot:${spotId}`, { 
           config: { broadcast: { ack: false } } 
         })
         .on('broadcast', { event: 'hold_created' }, (payload) => {
-          console.log('Received hold_created broadcast:', payload);
+          log.debug('Received hold_created broadcast');
           const { userId, start_at, end_at } = payload.payload;
           
           // Ignore our own broadcasts
@@ -407,15 +406,15 @@ const BookingContent = () => {
           const hasOverlap = startDateTime < broadcastEnd && endDateTime > broadcastStart;
 
           if (hasOverlap) {
-            console.log('Detected overlapping hold from another user');
-            setServerAvailable({ 
-              ok: false, 
+            log.info('Detected overlapping hold from another user');
+            setServerAvailable({
+              ok: false,
               reason: 'Another user just reserved this time slot'
             });
           }
         })
         .on('broadcast', { event: 'booking_created' }, (payload) => {
-          console.log('Received booking_created broadcast:', payload);
+          log.debug('Received booking_created broadcast');
           const { userId, start_at, end_at } = payload.payload;
           
           // Ignore our own broadcasts
@@ -427,9 +426,9 @@ const BookingContent = () => {
           const hasOverlap = startDateTime < broadcastEnd && endDateTime > broadcastStart;
 
           if (hasOverlap) {
-            console.log('Detected overlapping booking from another user');
-            setServerAvailable({ 
-              ok: false, 
+            log.info('Detected overlapping booking from another user');
+            setServerAvailable({
+              ok: false,
               reason: 'Another user just booked this time slot'
             });
           }
@@ -442,7 +441,7 @@ const BookingContent = () => {
     setupChannel();
 
     return () => {
-      console.log('Cleaning up broadcast channel');
+      log.debug('Cleaning up broadcast channel');
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
@@ -452,35 +451,31 @@ const BookingContent = () => {
 
   const calculateTotal = () => {
     if (!startDateTime || !endDateTime || !spot) {
-      console.log('Missing dates:', { startDateTime, endDateTime, spot });
       return null;
     }
-    
+
     if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
-      console.log('Invalid date objects');
       return null;
     }
-    
+
     // Calculate exact hours including minutes (e.g., 2.75 hours for 2h 45m)
     const minutes = differenceInMinutes(endDateTime, startDateTime);
     const hours = minutes / 60;
-    console.log('Time calculated:', { minutes, hours });
-    
+
     if (hours <= 0) {
-      console.log('Hours less than or equal to 0');
       return null;
     }
 
     // Use new pricing: driver sees upcharged rate + service fee + optional EV fee
     const evPremium = spot.ev_charging_premium_per_hour || 0;
     const { driverHourlyRate, driverSubtotal, serviceFee, evChargingFee, driverTotal } = calculateBookingTotal(
-      spot.hourly_rate, 
+      spot.hourly_rate,
       hours,
       evPremium,
       useEvCharging
     );
 
-    console.log('Pricing:', { hours, driverHourlyRate, driverSubtotal, serviceFee, evChargingFee, driverTotal });
+    log.debug('Calculated pricing', { hours: hours.toFixed(2), total: driverTotal.toFixed(2) });
 
     return {
       hours: hours.toFixed(2),
@@ -559,22 +554,11 @@ const BookingContent = () => {
 
     // Validate availability - client side (warning only)
     const availabilityCheck = validateAvailability(startDateTime, endDateTime);
-    console.log('[Booking] Client availability check:', { 
-      valid: availabilityCheck.valid, 
-      message: availabilityCheck.message,
-      start: startDateTime.toISOString(),
-      end: endDateTime.toISOString()
-    });
-    
-    // Log server availability state
-    console.log('[Booking] Server availability state:', { 
-      ok: serverAvailable.ok, 
-      reason: serverAvailable.reason 
-    });
-    
+    log.debug('Client availability check', { valid: availabilityCheck.valid });
+
     if (!availabilityCheck.valid) {
       // Don't block booking purely on client estimate; trust server below
-      console.warn('[Booking] Client-side availability warning (not blocking):', availabilityCheck);
+      log.warn('Client-side availability warning (not blocking)', { message: availabilityCheck.message });
     }
     
     // Prioritize server-side availability check
@@ -651,7 +635,7 @@ const BookingContent = () => {
 
       // Broadcast hold creation for instant feedback to other users
       if (holdData?.hold_id && channelRef.current) {
-        console.log('Broadcasting hold_created event');
+        log.debug('Broadcasting hold_created event');
         channelRef.current.send({
           type: 'broadcast',
           event: 'hold_created',
@@ -705,11 +689,11 @@ const BookingContent = () => {
         throw bookingError;
       }
 
-      console.log('[Booking] Booking response:', bookingData);
+      log.debug('Booking response received', { success: bookingData.success, pending_approval: bookingData.pending_approval });
 
       // Broadcast booking creation for instant feedback to other users
       if (channelRef.current) {
-        console.log('Broadcasting booking_created event');
+        log.debug('Broadcasting booking_created event');
         channelRef.current.send({
           type: 'broadcast',
           event: 'booking_created',
@@ -761,7 +745,7 @@ const BookingContent = () => {
         throw new Error('Unexpected booking response');
       }
     } catch (error) {
-      console.error('Booking error:', error);
+      log.error('Booking failed', { error: error instanceof Error ? error.message : error });
       toast({
         title: "Booking failed",
         description: error instanceof Error ? error.message : "Failed to create booking",
@@ -1401,7 +1385,7 @@ const GuestBookingPage = () => {
         const promise = getStripePromise();
         setStripePromise(promise);
       } catch (err) {
-        console.error('Error:', err);
+        log.error('Failed to load guest booking data', { error: err instanceof Error ? err.message : err });
         navigate('/explore');
       } finally {
         setLoading(false);
@@ -1427,7 +1411,7 @@ const GuestBookingPage = () => {
         });
         
         if (error) {
-          console.error('Availability check error:', error);
+          log.warn('Guest availability check error', { error: error.message });
           setServerAvailable({ ok: true }); // Fail open - let server validate
         } else {
           setServerAvailable({
@@ -1436,7 +1420,7 @@ const GuestBookingPage = () => {
           });
         }
       } catch (err) {
-        console.error('Availability check failed:', err);
+        log.warn('Guest availability check failed', { error: err instanceof Error ? err.message : err });
         setServerAvailable({ ok: true }); // Fail open
       } finally {
         setCheckingAvailability(false);

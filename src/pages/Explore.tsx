@@ -262,7 +262,7 @@ const Explore = () => {
         return data.features[0].place_name;
       }
     } catch (error) {
-      console.error('Error reverse geocoding:', error);
+      log.error('Reverse geocode failed', { error: error instanceof Error ? error.message : error });
     }
     return null;
   };
@@ -283,7 +283,7 @@ const Explore = () => {
         return data.features[0].place_name;
       }
     } catch (error) {
-      console.error('Error reverse geocoding area:', error);
+      log.error('Reverse geocode area failed', { error: error instanceof Error ? error.message : error });
     }
     return null;
   };
@@ -378,7 +378,7 @@ const Explore = () => {
         });
       },
       (error) => {
-        console.error('Error watching location:', error);
+        log.warn('Location watch failed', { code: error.code, message: error.message });
       },
       {
         enableHighAccuracy: true, // Use GPS for accurate location
@@ -399,7 +399,7 @@ const Explore = () => {
         setMapboxToken(data.token);
       }
     } catch (error) {
-      console.error('Error fetching Mapbox token:', error);
+      log.error('Failed to fetch Mapbox token', { error: error instanceof Error ? error.message : error });
     }
   };
   const searchByQuery = async (query: string) => {
@@ -409,7 +409,7 @@ const Explore = () => {
       return;
     }
     if (!mapboxToken) {
-      console.log('Mapbox token not ready yet');
+      log.debug('Mapbox token not ready yet');
       return;
     }
     try {
@@ -426,24 +426,22 @@ const Explore = () => {
         `&country=US` +
         `&bbox=-119.5,32.5,-117.0,34.8`;
       
-      console.log('[Search Box API] Calling:', url.replace(mapboxToken, 'TOKEN'));
-      
+      log.debug('Search Box API suggest request', { query });
+
       const response = await fetch(url);
       const data = await response.json();
-      
-      console.log('[Search Box API] Response:', data);
-      
+
+      log.debug('Search Box API response', { suggestionCount: data.suggestions?.length || 0 });
+
       if (data.suggestions && data.suggestions.length > 0) {
-        console.log('[Search Box API] Found', data.suggestions.length, 'suggestions');
         setSuggestions(data.suggestions);
         setShowSuggestions(true);
       } else {
-        console.log('[Search Box API] No suggestions found');
         setSuggestions([]);
         setShowSuggestions(false);
       }
     } catch (error) {
-      console.error('[Search Box API] Error:', error);
+      log.error('Search Box API suggest failed', { error: error instanceof Error ? error.message : error });
       setSuggestions([]);
       setShowSuggestions(false);
     }
@@ -468,13 +466,11 @@ const Explore = () => {
     
     try {
       const retrieveUrl = `https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(location.mapbox_id)}?access_token=${mapboxToken}&session_token=${sessionTokenRef.current}`;
-      
-      console.log('[Search Box API] Retrieving:', retrieveUrl.replace(mapboxToken, 'TOKEN'));
-      
+
+      log.debug('Search Box API retrieve request', { mapbox_id: location.mapbox_id });
+
       const response = await fetch(retrieveUrl);
       const data = await response.json();
-      
-      console.log('[Search Box API] Retrieve response:', data);
       
       if (data?.features?.[0]?.geometry?.coordinates) {
         const [lng, lat] = data.features[0].geometry.coordinates;
@@ -491,10 +487,10 @@ const Explore = () => {
         
         // Regenerate session token for next search session
         sessionTokenRef.current = crypto.randomUUID();
-        console.log('[Search Box API] Session token regenerated');
+        log.debug('Search session token regenerated');
       }
     } catch (error) {
-      console.error('[Search Box API] Retrieve error:', error);
+      log.error('Search Box API retrieve failed', { error: error instanceof Error ? error.message : error });
     }
   };
 
@@ -521,7 +517,7 @@ const Explore = () => {
         handleSelectLocation(data.suggestions[0]);
       }
     } catch (error) {
-      console.error('Error searching location:', error);
+      log.error('Location search failed', { error: error instanceof Error ? error.message : error });
     }
   };
 
@@ -551,7 +547,7 @@ const Explore = () => {
     }
 
     const logGeoError = (label: string, error: GeolocationPositionError) => {
-      console.log(label, { code: error.code, message: error.message });
+      log.warn(label, { code: error.code, message: error.message });
     };
 
     const onSuccess = async (position: GeolocationPosition) => {
@@ -667,12 +663,12 @@ const Explore = () => {
 
       // Check if this request is still the latest one
       if (requestId !== latestRequestIdRef.current) {
-        console.log('[Explore] Discarding stale response', { requestId, latest: latestRequestIdRef.current });
+        log.debug('Discarding stale response', { requestId, latest: latestRequestIdRef.current });
         return;
       }
 
       if (error) {
-        console.error('Search error:', error);
+        log.error('Spot search failed', { error: error.message });
         // Check for rate limit error (429)
         if (error.message?.includes('429') || error.message?.includes('Too many requests')) {
           toast.error('Too many requests. Please wait a moment and try again.', {
@@ -756,7 +752,7 @@ const Explore = () => {
         setCachedSpots(cacheKey, transformedSpots, center, radius);
       }
     } catch (err) {
-      console.error('Unexpected error:', err);
+      log.error('Unexpected error in fetchNearbySpots', { error: err instanceof Error ? err.message : err });
     } finally {
       setSpotsLoading(false);
     }

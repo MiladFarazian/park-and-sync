@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import BottomNavigation from './BottomNavigation';
 import DesktopHeader from './DesktopHeader';
 import ScrollToTop from './ScrollToTop';
-import parkzyLogo from '@/assets/parkzy-logo.png';
+import { logos } from '@/assets';
 import ModeSwitcher from './ModeSwitcher';
 import ModeLoadingOverlay from './ModeLoadingOverlay';
 import NotificationPermissionBanner from './NotificationPermissionBanner';
@@ -83,10 +83,10 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         <NotificationPermissionBanner />
         <header className="flex-shrink-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4 sticky top-0">
           <div className="flex items-center gap-3">
-            <img 
-              src={parkzyLogo} 
-              alt="Parkzy" 
-              className="h-8 cursor-pointer" 
+            <img
+              src={logos.primary}
+              alt="Parkzy"
+              className="h-8 cursor-pointer"
               onClick={handleLogoClick}
             />
             {isSupport ? (

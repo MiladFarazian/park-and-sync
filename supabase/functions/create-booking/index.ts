@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
+import { logger } from "../_shared/logger.ts";
+
+const log = logger.scope('create-booking');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -62,10 +65,10 @@ serve(async (req) => {
 
     const useEvCharging = will_use_ev_charging || false;
 
-    console.log('Creating booking:', { spot_id, start_at, end_at, user_id: userData.user.id, useEvCharging });
+    log.info('Creating booking', { spotId: spot_id, userId: userData.user.id, useEvCharging });
 
     // Re-check availability before proceeding
-    console.log('Re-checking spot availability...');
+    log.debug('Re-checking spot availability');
     const { data: isAvailable, error: availabilityError } = await supabase.rpc('check_spot_availability', {
       p_spot_id: spot_id,
       p_start_at: start_at,
@@ -74,12 +77,12 @@ serve(async (req) => {
     });
 
     if (availabilityError) {
-      console.error('Availability check error:', availabilityError);
+      log.error('Availability check error', { error: availabilityError.message });
       throw availabilityError;
     }
 
     if (!isAvailable) {
-      console.error('Spot is not available:', { spot_id, start_at, end_at });
+      log.warn('Spot is not available', { spotId: spot_id });
       return new Response(JSON.stringify({ 
         error: 'Spot is not available for the requested time' 
       }), {
@@ -90,7 +93,7 @@ serve(async (req) => {
 
     // Require a valid non-expired hold from this user for exact time window
     // Get the most recent one in case there are duplicates
-    console.log('Verifying booking hold...');
+    log.debug('Verifying booking hold');
     const { data: holds, error: holdError } = await supabase
       .from('booking_holds')
       .select('id, start_at, end_at, expires_at')
@@ -105,12 +108,12 @@ serve(async (req) => {
     const hold = holds?.[0] || null;
 
     if (holdError) {
-      console.error('Hold verification error:', holdError);
+      log.error('Hold verification error', { error: holdError.message });
       throw holdError;
     }
 
     if (!hold) {
-      console.error('Missing or expired booking hold:', { spot_id, user_id: userData.user.id, start_at, end_at });
+      log.warn('Missing or expired booking hold', { spotId: spot_id, userId: userData.user.id });
       return new Response(JSON.stringify({ 
         error: 'Missing or expired booking hold for this time window. Please try booking again.' 
       }), {
@@ -119,7 +122,7 @@ serve(async (req) => {
       });
     }
 
-    console.log('Valid hold found:', hold.id);
+    log.debug('Valid hold found', { holdId: hold.id });
 
     // Get spot details for pricing
     // NOTE: Use service-role client to avoid RLS blocking spot reads during booking creation.
@@ -132,7 +135,7 @@ serve(async (req) => {
       .single();
 
     if (spotError || !spot) {
-      console.error('Spot lookup failed:', { spot_id, spotError });
+      log.error('Spot lookup failed', { spotId: spot_id, error: spotError?.message });
       return new Response(JSON.stringify({ error: 'Spot not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -141,7 +144,7 @@ serve(async (req) => {
 
     // Validate EV charging request
     if (useEvCharging && !spot.has_ev_charging) {
-      console.error('EV charging requested but spot does not support it');
+      log.warn('EV charging requested but spot does not support it');
       return new Response(JSON.stringify({ 
         error: 'This spot does not offer EV charging' 
       }), {
@@ -151,11 +154,11 @@ serve(async (req) => {
     }
 
     const isInstantBook = spot.instant_book !== false; // Default to true for backwards compatibility
-    console.log('Spot instant_book setting:', isInstantBook);
+    log.debug('Spot instant_book setting', { isInstantBook });
 
     // Check if user is trying to book their own spot
     if (userData.user.id === spot.host_id) {
-      console.error('Self-booking attempt:', { user_id: userData.user.id, host_id: spot.host_id });
+      log.warn('Self-booking attempt', { userId: userData.user.id });
       throw new Error('You cannot book your own parking spot');
     }
 
@@ -186,7 +189,7 @@ serve(async (req) => {
     const platformFee = serviceFee; // Visible service fee
     const totalAmount = Math.round((driverSubtotal + serviceFee + evChargingFee) * 100) / 100;
     
-    console.log('Pricing calculated:', { totalHours, hostHourlyRate, hostEarnings, driverSubtotal, serviceFee, evChargingFee, totalAmount });
+    log.debug('Pricing calculated', { totalHours, totalAmount });
 
     // Initialize Stripe
     const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');
@@ -210,7 +213,7 @@ serve(async (req) => {
         await stripe.customers.retrieve(customerId);
       } catch (err: any) {
         if (err.code === 'resource_missing') {
-          console.log('Stripe customer not found, will create new one');
+          log.debug('Stripe customer not found, will create new one');
           customerId = null;
         } else {
           throw err;
@@ -235,7 +238,7 @@ serve(async (req) => {
     }
 
     // Check for saved payment methods BEFORE creating booking
-    console.log('Checking for saved payment methods...');
+    log.debug('Checking for saved payment methods');
     const paymentMethods = await stripe.paymentMethods.list({
       customer: customerId,
       type: 'card',
@@ -244,7 +247,7 @@ serve(async (req) => {
 
     // If no saved card, return error prompting user to add one (don't create booking)
     if (paymentMethods.data.length === 0) {
-      console.log('No saved payment methods found - not creating booking');
+      log.info('No saved payment methods found - not creating booking');
       return new Response(JSON.stringify({ 
         error: 'no_payment_method',
         message: 'Please add a payment method before booking'
@@ -268,7 +271,7 @@ serve(async (req) => {
       .eq('status', 'pending');
 
     if (cancelError) {
-      console.warn('Failed to cancel existing pending bookings:', cancelError);
+      log.warn('Failed to cancel existing pending bookings', { error: cancelError.message });
       // Continue anyway - not critical
     }
 
@@ -299,16 +302,16 @@ serve(async (req) => {
       .single();
 
     if (bookingError) {
-      console.error('Booking creation error:', bookingError);
+      log.error('Booking creation error', { error: bookingError.message });
       throw bookingError;
     }
 
-    console.log('Booking created:', booking.id);
+    log.info('Booking created', { bookingId: booking.id });
 
     // Handle payment based on instant_book setting
     if (isInstantBook) {
       // INSTANT BOOK: Charge immediately
-      console.log('Creating PaymentIntent with saved card (instant book)...');
+      log.debug('Creating PaymentIntent with saved card (instant book)');
       try {
         const paymentIntent = await stripe.paymentIntents.create({
           amount: Math.round(totalAmount * 100),
@@ -326,7 +329,7 @@ serve(async (req) => {
           description: `Parking at ${spot.title}`,
         });
 
-        console.log('PaymentIntent created and confirmed:', paymentIntent.id);
+        log.info('PaymentIntent created and confirmed', { paymentIntentId: paymentIntent.id });
 
         // Update booking to active and store payment intent ID
         const { error: updateError } = await supabase
@@ -339,11 +342,11 @@ serve(async (req) => {
           .eq('id', booking.id);
 
         if (updateError) {
-          console.error('Failed to update booking status:', updateError);
+          log.error('Failed to update booking status', { error: updateError.message });
           throw updateError;
         }
 
-        console.log('Booking activated successfully');
+        log.info('Booking activated successfully');
 
         // Release the hold if provided
         if (hold_id) {
@@ -392,7 +395,7 @@ serve(async (req) => {
             .insert([hostNotification, renterNotification]);
 
           if (notificationError) {
-            console.error('Failed to create booking notifications:', notificationError);
+            log.error('Failed to create booking notifications', { error: notificationError.message });
           }
 
           // Send confirmation emails
@@ -400,7 +403,7 @@ serve(async (req) => {
             const hostEmail = hostUser?.email || hostProfile?.email || '';
             const driverEmail = userData.user.email || renterProfile?.email || '';
 
-            console.log('Sending confirmation emails to:', { hostEmail, driverEmail });
+            log.debug('Sending confirmation emails');
 
             await supabase.functions.invoke('send-booking-confirmation', {
               body: {
@@ -422,7 +425,7 @@ serve(async (req) => {
               },
             });
           } catch (emailError) {
-            console.error('Failed to send confirmation emails:', emailError);
+            log.error('Failed to send confirmation emails', { error: emailError instanceof Error ? emailError.message : emailError });
           }
         }
 
@@ -437,15 +440,15 @@ serve(async (req) => {
         });
 
       } catch (paymentError: any) {
-        console.error('Payment failed:', paymentError);
-        
+        log.error('Payment failed', { error: paymentError.message, code: paymentError.code });
+
         // If 3DS is required or card declined, fallback to checkout session
-        const requiresAction = paymentError.type === 'StripeCardError' || 
+        const requiresAction = paymentError.type === 'StripeCardError' ||
                               paymentError.code === 'authentication_required' ||
                               paymentError.code === 'card_declined';
 
         if (requiresAction) {
-          console.log('Payment requires additional action, creating checkout session...');
+          log.info('Payment requires additional action, creating checkout session');
           const origin = req.headers.get('origin') || 'http://localhost:8080';
           
           const checkoutSession = await stripe.checkout.sessions.create({
@@ -494,7 +497,7 @@ serve(async (req) => {
       }
     } else {
       // NON-INSTANT BOOK: Hold card, wait for host approval
-      console.log('Creating PaymentIntent with manual capture (requires host approval)...');
+      log.debug('Creating PaymentIntent with manual capture (requires host approval)');
       try {
         const paymentIntent = await stripe.paymentIntents.create({
           amount: Math.round(totalAmount * 100),
@@ -513,7 +516,7 @@ serve(async (req) => {
           description: `Parking at ${spot.title} (pending host approval)`,
         });
 
-        console.log('PaymentIntent created with hold:', paymentIntent.id);
+        log.info('PaymentIntent created with hold', { paymentIntentId: paymentIntent.id });
 
         // Update booking to 'held' status (awaiting host approval)
         const { error: updateError } = await supabase
@@ -525,11 +528,11 @@ serve(async (req) => {
           .eq('id', booking.id);
 
         if (updateError) {
-          console.error('Failed to update booking status:', updateError);
+          log.error('Failed to update booking status', { error: updateError.message });
           throw updateError;
         }
 
-        console.log('Booking set to held status, awaiting host approval');
+        log.info('Booking set to held status, awaiting host approval');
 
         // Get host and renter profiles for notifications
         const { data: hostProfile } = await supabase
@@ -569,7 +572,7 @@ serve(async (req) => {
             .insert([hostNotification, renterNotification]);
 
           if (notificationError) {
-            console.error('Failed to create booking notifications:', notificationError);
+            log.error('Failed to create booking notifications', { error: notificationError.message });
           }
         }
 
@@ -586,7 +589,7 @@ serve(async (req) => {
         });
 
       } catch (paymentError: any) {
-        console.error('Payment hold failed:', paymentError);
+        log.error('Payment hold failed', { error: paymentError.message, code: paymentError.code });
         
         // Handle card errors
         if (paymentError.type === 'StripeCardError' || paymentError.code === 'card_declined') {
@@ -604,7 +607,7 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('Booking creation error:', error);
+    log.error('Booking creation error', { error: error instanceof Error ? error.message : error });
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,

@@ -27,6 +27,7 @@ import RequireAuth from '@/components/auth/RequireAuth';
 import RequireVerifiedAuth from '@/components/auth/RequireVerifiedAuth';
 import GuestChatPaneHost from '@/components/guest/GuestChatPaneHost';
 import BookingContextHeader from '@/components/messages/BookingContextHeader';
+import { SUPPORT_AVATAR } from '@/lib/constants';
 
 // Helper to format display name (First Name + Last Initial)
 const formatDisplayName = (firstName?: string | null, lastName?: string | null): string => {
@@ -633,7 +634,7 @@ const MessagesContent = () => {
           user_id: userId,
           first_name: 'Parkzy',
           last_name: 'Support',
-          avatar_url: '/parkzy-support-avatar.png'
+          avatar_url: SUPPORT_AVATAR
         });
         return;
       }

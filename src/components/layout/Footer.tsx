@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import parkzyLogo from '@/assets/parkzy-logo.png';
+import { logos } from '@/assets';
 
 const Footer = () => {
   return (
@@ -9,7 +9,7 @@ const Footer = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
-            <img src={parkzyLogo} alt="Parkzy" className="h-8 mb-4" />
+            <img src={logos.primary} alt="Parkzy" className="h-8 mb-4" />
             <p className="text-sm text-muted-foreground max-w-xs">
               The easiest way to find and book parking. Join thousands of drivers saving time and money.
             </p>

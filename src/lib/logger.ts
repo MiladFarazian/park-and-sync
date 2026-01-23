@@ -87,11 +87,11 @@ const SCOPE_STYLE = 'color: #8b5cf6; font-weight: bold'; // purple
 
 class Logger {
   private config: LoggerConfig;
-  private scope?: string;
+  private scopeName?: string;
 
-  constructor(config: Partial<LoggerConfig> = {}, scope?: string) {
+  constructor(config: Partial<LoggerConfig> = {}, scopeName?: string) {
     this.config = { ...defaultConfig, ...config };
-    this.scope = scope;
+    this.scopeName = scopeName;
   }
 
   private shouldLog(level: LogLevel): boolean {
@@ -107,12 +107,12 @@ class Logger {
       const timestamp = this.config.showTimestamp
         ? `[${new Date().toLocaleTimeString()}]`
         : '';
-      const scopePrefix = this.scope && this.config.showScope
-        ? `[${this.scope}]`
+      const scopePrefix = this.scopeName && this.config.showScope
+        ? `[${this.scopeName}]`
         : '';
       const levelPrefix = `[${level.toUpperCase()}]`;
 
-      if (this.scope) {
+      if (this.scopeName) {
         parts.push(
           `%c${timestamp}%c${scopePrefix}%c${levelPrefix}`,
           'color: #6b7280',
@@ -127,7 +127,7 @@ class Logger {
       }
     } else {
       // In production, simple prefix (no styles)
-      const prefix = this.scope ? `[${this.scope}]` : '';
+      const prefix = this.scopeName ? `[${this.scopeName}]` : '';
       if (prefix) parts.push(prefix);
     }
 
@@ -161,8 +161,8 @@ class Logger {
   /**
    * Create a scoped logger for a specific component or feature
    */
-  createScope(scopeName: string): Logger {
-    const newScope = this.scope ? `${this.scope}:${scopeName}` : scopeName;
+  createScope(name: string): Logger {
+    const newScope = this.scopeName ? `${this.scopeName}:${name}` : name;
     return new Logger(this.config, newScope);
   }
 
@@ -196,7 +196,7 @@ class Logger {
     }
 
     if (isDevelopment) {
-      console.groupCollapsed(`%c[${this.scope || 'Logger'}] ${label}`, SCOPE_STYLE);
+      console.groupCollapsed(`%c[${this.scopeName || 'Logger'}] ${label}`, SCOPE_STYLE);
       fn();
       console.groupEnd();
     } else {

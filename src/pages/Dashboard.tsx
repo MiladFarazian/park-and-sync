@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { formatAvailability } from '@/lib/formatAvailability';
 import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
 import { getHostNetEarnings } from '@/lib/hostEarnings';
+import { PLACEHOLDER_IMAGE } from '@/lib/constants';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('listings');
@@ -119,7 +120,7 @@ const Dashboard = () => {
         return {
           ...spot,
           earnings,
-          image: primaryPhoto?.url || '/placeholder.svg',
+          image: primaryPhoto?.url || PLACEHOLDER_IMAGE,
           reviews: 0,
           rating: 0,
         };

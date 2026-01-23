@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { CheckCircle, XCircle, Loader2, Mail, RefreshCw, ArrowRight, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import parkzyLogo from '@/assets/parkzy-logo.png';
+import { logos } from '@/assets';
 
 const sendWelcomeEmail = async (userId: string, email: string, firstName?: string) => {
   try {
@@ -352,7 +352,7 @@ const EmailConfirmation = () => {
       <div className="w-full max-w-md space-y-6">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <img src={parkzyLogo} alt="Parkzy" className="h-12" />
+          <img src={logos.primary} alt="Parkzy" className="h-12" />
         </div>
 
         <Card className="border-border shadow-xl overflow-hidden">

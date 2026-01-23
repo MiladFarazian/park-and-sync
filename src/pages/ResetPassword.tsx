@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Loader2, CheckCircle, Lock, Check, X, Eye, EyeOff } from 'lucide-react';
-import parkzyLogo from '@/assets/parkzy-logo.png';
+import { logos } from '@/assets';
 import { Card } from '@/components/ui/card';
 
 const PasswordRequirement = ({ met, label }: { met: boolean; label: string }) => (
@@ -141,7 +141,7 @@ const ResetPassword = () => {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <img src={parkzyLogo} alt="Parkzy" className="h-8" />
+          <img src={logos.primary} alt="Parkzy" className="h-8" />
           <div className="w-10" />
         </div>
 
