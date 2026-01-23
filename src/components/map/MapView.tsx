@@ -1357,7 +1357,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                       </div>
                       
                       <div className="flex-1 space-y-1.5 min-w-0">
-                        <div className="flex justify-between items-start gap-2">
+                        <div className="flex justify-between items-center gap-2">
                           <div className="flex items-center gap-2 min-w-0">
                             {spot.category && (
                               <span className="text-sm font-semibold text-foreground truncate">
