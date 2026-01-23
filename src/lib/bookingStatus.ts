@@ -13,7 +13,8 @@ export type BookingStatusLabel =
   | 'Active'
   | 'Completed'
   | 'Declined'
-  | 'Cancelled';
+  | 'Cancelled'
+  | 'Expired';
 
 export type BookingStatusVariant = 
   | 'default'      // Primary color (Active, Booked)
@@ -62,13 +63,19 @@ export function getBookingStatus(input: BookingStatusInput): BookingStatusResult
     return { label: 'Cancelled', variant: 'destructive' };
   }
 
+  // Handle stale pending/held bookings that have passed their end time
+  // These are bookings where payment was never completed
+  if ((status === 'pending' || status === 'held') && now > end) {
+    return { label: 'Expired', variant: 'destructive' };
+  }
+
   // Handle completion
   if (status === 'completed') {
     return { label: 'Completed', variant: 'secondary' };
   }
 
   // Check if stay has ended (treat as completed)
-  if (now > end && status !== 'pending' && status !== 'held') {
+  if (now > end) {
     return { label: 'Completed', variant: 'secondary' };
   }
 
@@ -126,6 +133,7 @@ export function getBookingStatusColor(label: BookingStatusLabel): string {
   switch (label) {
     case 'Cancelled':
     case 'Declined':
+    case 'Expired':
       return 'bg-destructive/10 text-destructive border-destructive/20';
     case 'Completed':
       return 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-500 border-green-200 dark:border-green-800';
