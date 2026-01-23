@@ -104,10 +104,10 @@ const ManageAvailability = () => {
   }, [user]);
 
   useEffect(() => {
-    if (selectedSpots.length > 0 && user && selectedDates.length > 0) {
+    if (spots.length > 0 && user && selectedDates.length > 0) {
       fetchAvailabilityData();
     }
-  }, [selectedSpots, selectedDates, user]);
+  }, [spots, selectedDates, user]);
 
   // Validate time blocks whenever they change
   useEffect(() => {
@@ -153,7 +153,7 @@ const ManageAvailability = () => {
   };
 
   const fetchAvailabilityData = async () => {
-    if (!user || selectedSpots.length === 0 || selectedDates.length === 0) return;
+    if (!user || spots.length === 0 || selectedDates.length === 0) return;
     
     try {
       // Use the first selected date for display purposes
@@ -163,7 +163,9 @@ const ManageAvailability = () => {
       
       const availability: Record<string, { rules: AvailabilityRule[]; overrides: CalendarOverride[] }> = {};
       
-      for (const spotId of selectedSpots) {
+      // Fetch availability for all spots, not just selected ones
+      for (const spot of spots) {
+        const spotId = spot.id;
         const { data: rules } = await supabase
           .from('availability_rules')
           .select('day_of_week, start_time, end_time, is_available, custom_rate')
@@ -288,38 +290,31 @@ const ManageAvailability = () => {
   };
 
   // Get current availability display for a spot
-  const getSpotAvailabilityDisplay = (spotId: string): { text: string; isLoading: boolean; isSelected: boolean } => {
-    const isSelected = selectedSpots.includes(spotId);
-    
-    // If spot is not selected, don't show availability - just a neutral indicator
-    if (!isSelected) {
-      return { text: 'Select to view', isLoading: false, isSelected: false };
-    }
-    
+  const getSpotAvailabilityDisplay = (spotId: string): { text: string; isLoading: boolean } => {
     const data = spotAvailability[spotId];
     if (!data) {
-      return { text: 'Loading...', isLoading: true, isSelected: true };
+      return { text: 'Loading...', isLoading: true };
     }
     
     if (data.overrides.length > 0) {
       const override = data.overrides[0];
-      if (!override.is_available) return { text: 'Blocked', isLoading: false, isSelected: true };
+      if (!override.is_available) return { text: 'Blocked', isLoading: false };
       if (isFullDayTimeRange(override.start_time, override.end_time)) {
-        return { text: 'Available all day', isLoading: false, isSelected: true };
+        return { text: 'Available all day', isLoading: false };
       }
-      return { text: `${formatTimeDisplay(override.start_time!)} - ${formatTimeDisplay(override.end_time!)}`, isLoading: false, isSelected: true };
+      return { text: `${formatTimeDisplay(override.start_time!)} - ${formatTimeDisplay(override.end_time!)}`, isLoading: false };
     }
     
     if (data.rules.length > 0) {
       const rule = data.rules[0];
-      if (!rule.is_available) return { text: 'Blocked (recurring)', isLoading: false, isSelected: true };
+      if (!rule.is_available) return { text: 'Blocked (recurring)', isLoading: false };
       if (isFullDayTimeRange(rule.start_time, rule.end_time)) {
-        return { text: 'Available all day (recurring)', isLoading: false, isSelected: true };
+        return { text: 'Available all day (recurring)', isLoading: false };
       }
-      return { text: `${formatTimeDisplay(rule.start_time)} - ${formatTimeDisplay(rule.end_time)} (recurring)`, isLoading: false, isSelected: true };
+      return { text: `${formatTimeDisplay(rule.start_time)} - ${formatTimeDisplay(rule.end_time)} (recurring)`, isLoading: false };
     }
     
-    return { text: 'No schedule set', isLoading: false, isSelected: true };
+    return { text: 'No schedule set', isLoading: false };
   };
 
   const formatTimeDisplay = (time: string): string => {
@@ -569,10 +564,7 @@ const ManageAvailability = () => {
                         <div className="text-sm text-muted-foreground truncate">
                           ${spot.hourly_rate}/hr
                         </div>
-                        <div className={cn(
-                          "text-xs text-muted-foreground mt-1 flex items-center gap-1",
-                          !availabilityInfo.isSelected && "italic opacity-70"
-                        )}>
+                        <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                           {availabilityInfo.isLoading ? (
                             <Loader2 className="h-3 w-3 animate-spin" />
                           ) : (
