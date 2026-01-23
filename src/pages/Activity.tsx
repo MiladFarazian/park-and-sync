@@ -62,7 +62,7 @@ const Activity = () => {
   const [selectedBooking, setSelectedBooking] = useState<ActivityBooking | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
-  const [reviewBooking, setReviewBooking] = useState<ActivityBooking | null>(null);
+  const [reviewBooking, setReviewBooking] = useState<(ActivityBooking & { revieweeId: string; revieweeName: string; reviewerRole: 'host' | 'driver' }) | null>(null);
   const [userReviews, setUserReviews] = useState<Set<string>>(new Set());
 
   // Quick extend state

@@ -142,7 +142,9 @@ export function resolveLegacyImagePath(path: string): string | undefined {
 // Re-exports from constants for backward compatibility
 // =============================================================================
 // Note: Prefer importing from '@/lib/constants' directly
-export { PLACEHOLDER_IMAGE, SUPPORT_AVATAR, NOTIFICATION_ICON } from '@/lib/constants';
+import { PLACEHOLDER_IMAGE as PLACEHOLDER, SUPPORT_AVATAR, NOTIFICATION_ICON } from '@/lib/constants';
+export { SUPPORT_AVATAR, NOTIFICATION_ICON };
+export const PLACEHOLDER_IMAGE = PLACEHOLDER;
 
 // =============================================================================
 // Helper Functions
