@@ -819,9 +819,20 @@ const SpotDetail = () => {
                       return acc;
                     }, {});
                   
+                  // Helper to detect full-day time ranges
+                  const isFullDayTimeRange = (startTime: string, endTime: string): boolean => {
+                    const start = startTime?.replace(/:\d{2}$/, '') || '00:00'; // normalize seconds
+                    const end = endTime?.replace(/:\d{2}$/, '') || '24:00';
+                    return (start === '00:00' && (end === '24:00' || end === '23:59'));
+                  };
+                  
                   return Object.entries(availableDays).map(([day, rules]: [string, any]) => {
                     const dayIndex = parseInt(day);
                     const timeRanges = rules.map((r: any) => {
+                      // Check for full-day availability
+                      if (isFullDayTimeRange(r.start_time, r.end_time)) {
+                        return 'All day';
+                      }
                       const formatTime = (time: string) => {
                         const [hours, minutes] = time.split(':');
                         const hour = parseInt(hours);
