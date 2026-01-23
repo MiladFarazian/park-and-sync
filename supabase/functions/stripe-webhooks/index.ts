@@ -83,7 +83,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     if (bookingIdFromMetadata) {
       const { data, error } = await supabase
         .from('bookings')
-        .select('id, status, host_earnings, renter_id, spot_id, start_at, end_at, total_amount, is_guest, guest_full_name, guest_email, guest_phone, guest_access_token, spots!inner(host_id, title, address)')
+        .select('id, status, host_earnings, renter_id, spot_id, start_at, end_at, total_amount, is_guest, guest_full_name, guest_email, guest_phone, guest_access_token, will_use_ev_charging, spots!inner(host_id, title, address, access_notes, ev_charging_instructions, has_ev_charging)')
         .eq('id', bookingIdFromMetadata)
         .single();
 
@@ -92,7 +92,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     } else {
       const { data, error } = await supabase
         .from('bookings')
-        .select('id, status, host_earnings, renter_id, spot_id, start_at, end_at, total_amount, is_guest, guest_full_name, guest_email, guest_phone, guest_access_token, spots!inner(host_id, title, address)')
+        .select('id, status, host_earnings, renter_id, spot_id, start_at, end_at, total_amount, is_guest, guest_full_name, guest_email, guest_phone, guest_access_token, will_use_ev_charging, spots!inner(host_id, title, address, access_notes, ev_charging_instructions, has_ev_charging)')
         .eq('stripe_payment_intent_id', paymentIntent.id)
         .single();
 
@@ -185,6 +185,10 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
             totalAmount: booking.total_amount,
             bookingId: booking.id,
             guestAccessToken: booking.guest_access_token,
+            accessNotes: (booking.spots as any).access_notes || '',
+            evChargingInstructions: (booking.spots as any).ev_charging_instructions || '',
+            hasEvCharging: (booking.spots as any).has_ev_charging || false,
+            willUseEvCharging: booking.will_use_ev_charging || false,
           }),
         });
         console.log('Guest confirmation (email/SMS) sent');
