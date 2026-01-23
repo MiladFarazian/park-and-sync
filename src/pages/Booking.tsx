@@ -27,7 +27,7 @@ import GuestBookingForm from '@/components/booking/GuestBookingForm';
 import CompleteProfileStep from '@/components/auth/CompleteProfileStep';
 import { useAuth } from '@/contexts/AuthContext';
 import { isProfileComplete } from '@/lib/profileUtils';
-import { getPrivacyAwareName, getPrivacyAwareAvatar } from '@/lib/privacyUtils';
+import { formatDisplayName } from '@/lib/displayUtils';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 
@@ -793,8 +793,8 @@ const BookingContent = () => {
 
   const pricing = calculateTotal();
   const primaryPhoto = spot?.spot_photos?.find((p: any) => p.is_primary)?.url || spot?.spot_photos?.[0]?.url;
-  const hostName = host ? getPrivacyAwareName(host, 'Host') : 'Host';
-  const hostAvatar = host ? getPrivacyAwareAvatar(host) : undefined;
+  const hostName = formatDisplayName(host, 'Host');
+  const hostAvatar = host?.avatar_url || undefined;
   const hostInitial = hostName.charAt(0).toUpperCase();
 
   return (

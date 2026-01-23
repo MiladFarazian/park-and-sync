@@ -19,7 +19,7 @@ import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { sendMessage as sendMessageLib } from '@/lib/sendMessage';
 import { compressImage } from '@/lib/compressImage';
 import { getStreetAddress } from '@/lib/addressUtils';
-import { getPrivacyAwareName, getPrivacyAwareAvatar } from '@/lib/privacyUtils';
+import { formatDisplayName } from '@/lib/displayUtils';
 import { Virtuoso } from 'react-virtuoso';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
@@ -29,8 +29,8 @@ import GuestChatPaneHost from '@/components/guest/GuestChatPaneHost';
 import BookingContextHeader from '@/components/messages/BookingContextHeader';
 import { SUPPORT_AVATAR } from '@/lib/constants';
 
-// Helper to format display name (First Name + Last Initial)
-const formatDisplayName = (firstName?: string | null, lastName?: string | null): string => {
+// Local helper for message display (takes separate args)
+const formatMessageDisplayName = (firstName?: string | null, lastName?: string | null): string => {
   const first = firstName?.trim() || '';
   const lastInitial = lastName?.trim()?.[0] || '';
   if (!first && !lastInitial) return 'User';
@@ -641,15 +641,12 @@ const MessagesContent = () => {
       const {
         data,
         error
-      } = await supabase.from('profiles').select('user_id, first_name, last_name, avatar_url, privacy_show_profile_photo, privacy_show_full_name').eq('user_id', userId).single();
+      } = await supabase.from('profiles').select('user_id, first_name, last_name, avatar_url').eq('user_id', userId).single();
       if (error) throw error;
-      // Apply privacy settings for display
-      const privacyAwareName = getPrivacyAwareName(data, 'User');
-      const privacyAwareAvatar = getPrivacyAwareAvatar(data);
       setNewUserProfile({
         ...data,
-        displayName: privacyAwareName,
-        displayAvatar: privacyAwareAvatar
+        displayName: formatDisplayName(data, 'User'),
+        displayAvatar: data?.avatar_url || undefined
       });
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -721,8 +718,8 @@ const MessagesContent = () => {
         user_id: p.user_id,
         first_name: p.first_name,
         last_name: p.last_name,
-        avatar_url: getPrivacyAwareAvatar(p) || null,
-        displayName: getPrivacyAwareName(p, 'User'),
+        avatar_url: p.avatar_url || null,
+        displayName: formatDisplayName(p, 'User'),
         spot_title: contactsMap.get(p.user_id)?.spot_title || 'Parking Spot',
         booking_date: contactsMap.get(p.user_id)?.booking_date || ''
       }));
@@ -770,7 +767,7 @@ const MessagesContent = () => {
             </Avatar>
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sm truncate">
-                {contact.displayName || formatDisplayName(contact.first_name, contact.last_name)}
+                {contact.displayName || formatMessageDisplayName(contact.first_name, contact.last_name)}
               </p>
               <p className="text-xs text-muted-foreground truncate">{contact.spot_title}</p>
             </div>
