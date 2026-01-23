@@ -37,15 +37,15 @@ interface LogData {
 const isDebugEnabled = Deno.env.get('LOG_LEVEL') === 'debug';
 
 class EdgeLogger {
-  private scope: string;
+  private scopeName: string;
 
-  constructor(scope: string = 'function') {
-    this.scope = scope;
+  constructor(scopeName: string = 'function') {
+    this.scopeName = scopeName;
   }
 
   private formatMessage(level: LogLevel, message: string, data?: LogData): string {
     const timestamp = new Date().toISOString();
-    const prefix = `[${timestamp}] [${level.toUpperCase()}] [${this.scope}]`;
+    const prefix = `[${timestamp}] [${level.toUpperCase()}] [${this.scopeName}]`;
 
     if (data && Object.keys(data).length > 0) {
       // Sanitize sensitive fields
