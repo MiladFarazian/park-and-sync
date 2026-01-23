@@ -863,19 +863,29 @@ const HostCalendar = () => {
                         {/* Bookings */}
                         {dayBookings.length > 0 && (
                           <div className="space-y-0.5">
-                            {dayBookings.slice(0, 2).map((booking) => (
-                              <div
-                                key={booking.id}
-                                className={cn(
-                                  "text-[8px] leading-tight text-center rounded px-0.5 truncate",
-                                  booking.status === 'completed' ? "bg-muted text-muted-foreground" :
-                                  booking.status === 'active' ? "bg-primary/20 text-primary" :
-                                  "bg-blue-500/20 text-blue-700 dark:text-blue-300"
-                                )}
-                              >
-                                {format(new Date(booking.start_at), 'ha')}
-                              </div>
-                            ))}
+                            {dayBookings.slice(0, 2).map((booking) => {
+                              const statusResult = getReservationStatusResult(booking);
+                              const dotColor = statusResult.label === 'Cancelled' || statusResult.label === 'Declined' || statusResult.label === 'Expired'
+                                ? "bg-red-500/20 text-red-700 dark:text-red-300"
+                                : statusResult.label === 'Requested'
+                                ? "bg-yellow-500/20 text-yellow-700 dark:text-yellow-300"
+                                : statusResult.label === 'Active'
+                                ? "bg-primary/20 text-primary"
+                                : statusResult.label === 'Completed'
+                                ? "bg-green-500/20 text-green-700 dark:text-green-300"
+                                : "bg-blue-500/20 text-blue-700 dark:text-blue-300";
+                              return (
+                                <div
+                                  key={booking.id}
+                                  className={cn(
+                                    "text-[8px] leading-tight text-center rounded px-0.5 truncate",
+                                    dotColor
+                                  )}
+                                >
+                                  {format(new Date(booking.start_at), 'ha')}
+                                </div>
+                              );
+                            })}
                             {dayBookings.length > 2 && (
                               <div className="text-[8px] text-muted-foreground text-center">
                                 +{dayBookings.length - 2}
@@ -935,34 +945,44 @@ const HostCalendar = () => {
                         </Badge>
                       ) : dayBookings.length > 0 ? (
                         <div className="space-y-1.5">
-                          {dayBookings.slice(0, 3).map((booking) => (
-                            <div
-                              key={booking.id}
-                              className={cn(
-                                "text-sm px-2 py-1.5 rounded-md flex items-center justify-between gap-2",
-                                booking.status === 'completed' ? "bg-muted" :
-                                booking.status === 'active' ? "bg-primary/20" :
-                                "bg-blue-500/15"
-                              )}
-                            >
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <User className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                                  <span className="font-medium truncate">
-                                    {booking.renter?.first_name || 'Guest'}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground flex-shrink-0">
-                                    {format(new Date(booking.start_at), 'h:mm a')}
-                                  </span>
-                                </div>
-                                {isAllSpotsView && booking.spot?.address && (
-                                  <div className="text-xs text-muted-foreground truncate mt-0.5 pl-5">
-                                    {getStreetAddress(booking.spot.address)}
-                                  </div>
+                          {dayBookings.slice(0, 3).map((booking) => {
+                            const statusResult = getReservationStatusResult(booking);
+                            const cellColor = statusResult.label === 'Cancelled' || statusResult.label === 'Declined' || statusResult.label === 'Expired'
+                              ? "bg-red-500/15"
+                              : statusResult.label === 'Requested'
+                              ? "bg-yellow-500/15"
+                              : statusResult.label === 'Active'
+                              ? "bg-primary/20"
+                              : statusResult.label === 'Completed'
+                              ? "bg-green-500/15"
+                              : "bg-blue-500/15";
+                            return (
+                              <div
+                                key={booking.id}
+                                className={cn(
+                                  "text-sm px-2 py-1.5 rounded-md flex items-center justify-between gap-2",
+                                  cellColor
                                 )}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <User className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                    <span className="font-medium truncate">
+                                      {booking.renter?.first_name || 'Guest'}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground flex-shrink-0">
+                                      {format(new Date(booking.start_at), 'h:mm a')}
+                                    </span>
+                                  </div>
+                                  {isAllSpotsView && booking.spot?.address && (
+                                    <div className="text-xs text-muted-foreground truncate mt-0.5 pl-5">
+                                      {getStreetAddress(booking.spot.address)}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                           {dayBookings.length > 3 && (
                             <div className="text-xs text-muted-foreground pl-2">
                               +{dayBookings.length - 3} more
@@ -991,23 +1011,35 @@ const HostCalendar = () => {
             </div>
           )}
 
-          {/* Legend */}
+          {/* Legend - order follows booking lifecycle */}
           <div className="flex flex-col items-center gap-2 mt-4">
             <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded bg-green-500/20 border" />
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                <span>Requested</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-500" />
                 <span>Booked</span>
               </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-primary" />
+                <span>Active</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                <span>Completed</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                <span>Cancelled / Expired</span>
+              </div>
               {!isAllSpotsView && (
-                <div className="flex items-center gap-1">
-                  <span className="w-3 h-3 rounded bg-destructive/10 border" />
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-destructive" />
                   <span>Blocked</span>
                 </div>
               )}
-              <div className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded bg-muted/50 border" />
-                <span>Past</span>
-              </div>
             </div>
             {isAllSpotsView && (
               <p className="text-xs text-muted-foreground text-center">
