@@ -26,7 +26,11 @@ const profileSchema = z.object({
   first_name: z.string().trim().min(1, 'First name is required').max(50, 'First name must be less than 50 characters'),
   last_name: z.string().trim().min(1, 'Last name is required').max(50, 'Last name must be less than 50 characters'),
   email: z.string().trim().email('Invalid email address').optional().or(z.literal('')),
-  phone: z.string().trim().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number format').optional().or(z.literal(''))
+  // Accept various phone formats: +1234567890, (555) 123-4567, 555-123-4567, 555.123.4567
+  phone: z.string().trim()
+    .transform(val => val.replace(/[\s\-\.\(\)]/g, '')) // Normalize: remove spaces, dashes, dots, parens
+    .refine(val => val === '' || /^\+?[1-9]\d{6,14}$/.test(val), 'Invalid phone number (7-15 digits)')
+    .optional().or(z.literal(''))
 });
 type ProfileFormData = z.infer<typeof profileSchema>;
 const Profile = () => {

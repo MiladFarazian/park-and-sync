@@ -90,37 +90,45 @@ const Dashboard = () => {
 
       if (spotsError) throw spotsError;
 
-      // Fetch bookings for each spot to calculate earnings
-      const spotsWithEarnings = await Promise.all(
-        (spotsData || []).map(async (spot) => {
-          const { data: bookings } = await supabase
+      const spotIds = (spotsData || []).map(s => s.id);
+
+      // Fetch all completed bookings for all spots in a single query (fixes N+1)
+      const { data: allBookings } = spotIds.length > 0
+        ? await supabase
             .from('bookings')
-            .select('host_earnings, hourly_rate, start_at, end_at, status')
-            .eq('spot_id', spot.id)
-            .eq('status', 'completed');
+            .select('id, spot_id, host_earnings, hourly_rate, start_at, end_at, status')
+            .in('spot_id', spotIds)
+            .eq('status', 'completed')
+        : { data: [] };
 
-          const earnings = bookings?.reduce((sum, b) => sum + getHostNetEarnings(b), 0) || 0;
-          const primaryPhoto = spot.spot_photos?.find((p: any) => p.is_primary) || spot.spot_photos?.[0];
+      // Group bookings by spot_id for efficient lookup
+      const bookingsBySpot = (allBookings || []).reduce((acc, booking) => {
+        if (!acc[booking.spot_id]) {
+          acc[booking.spot_id] = [];
+        }
+        acc[booking.spot_id].push(booking);
+        return acc;
+      }, {} as Record<string, typeof allBookings>);
 
-          return {
-            ...spot,
-            earnings,
-            image: primaryPhoto?.url || '/placeholder.svg',
-            reviews: 0,
-            rating: 0,
-          };
-        })
-      );
+      // Map spots with their earnings (no additional queries needed)
+      const spotsWithEarnings = (spotsData || []).map((spot) => {
+        const spotBookings = bookingsBySpot[spot.id] || [];
+        const earnings = spotBookings.reduce((sum, b) => sum + getHostNetEarnings(b), 0);
+        const primaryPhoto = spot.spot_photos?.find((p: any) => p.is_primary) || spot.spot_photos?.[0];
+
+        return {
+          ...spot,
+          earnings,
+          image: primaryPhoto?.url || '/placeholder.svg',
+          reviews: 0,
+          rating: 0,
+        };
+      });
 
       setListings(spotsWithEarnings);
 
-      // Calculate total stats
+      // Calculate total stats from already-fetched data
       const totalEarnings = spotsWithEarnings.reduce((sum, spot) => sum + spot.earnings, 0);
-      const { data: allBookings } = await supabase
-        .from('bookings')
-        .select('id')
-        .in('spot_id', spotsWithEarnings.map(s => s.id))
-        .eq('status', 'completed');
 
       setStats({
         totalEarnings,

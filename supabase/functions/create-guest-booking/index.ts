@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
+import { calculateBookingTotal } from "../_shared/pricing.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -136,6 +137,29 @@ serve(async (req) => {
 
     const useEvCharging = will_use_ev_charging || false;
 
+    // Input sanitization - strip HTML/script tags and limit length
+    const sanitizeInput = (input: string, maxLength: number = 200): string => {
+      return input
+        .replace(/<[^>]*>/g, '') // Remove HTML tags
+        .replace(/[<>]/g, '') // Remove remaining angle brackets
+        .trim()
+        .substring(0, maxLength);
+    };
+
+    const sanitizedName = sanitizeInput(guest_full_name, 100);
+    const sanitizedEmail = guest_email ? sanitizeInput(guest_email, 254) : null;
+    const sanitizedPhone = guest_phone ? sanitizeInput(guest_phone, 20) : null;
+    const sanitizedCarModel = sanitizeInput(guest_car_model, 100);
+    const sanitizedLicensePlate = guest_license_plate ? sanitizeInput(guest_license_plate, 20).toUpperCase() : null;
+
+    // Validate email format if provided
+    if (sanitizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sanitizedEmail)) {
+      return new Response(JSON.stringify({ error: 'Invalid email format' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Check availability using admin client
     console.log('Checking spot availability...');
     const { data: isAvailable, error: availabilityError } = await supabaseAdmin.rpc('check_spot_availability', {
@@ -181,26 +205,19 @@ serve(async (req) => {
       });
     }
 
-    // Calculate pricing (same as authenticated booking)
+    // Calculate pricing using shared module (ensures consistency with frontend)
     const startDate = new Date(start_at);
     const endDate = new Date(end_at);
     const totalHours = Math.round(((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)) * 100) / 100;
     const hostHourlyRate = parseFloat(spot.hourly_rate);
-    const hostEarnings = Math.round(totalHours * hostHourlyRate * 100) / 100;
-    
-    const upcharge = Math.max(hostHourlyRate * 0.20, 1.00);
-    const driverHourlyRate = hostHourlyRate + upcharge;
-    const driverSubtotal = Math.round(driverHourlyRate * totalHours * 100) / 100;
-    
-    const serviceFee = Math.round(Math.max(hostEarnings * 0.20, 1.00) * 100) / 100;
-    
     const evChargingPremium = spot.ev_charging_premium_per_hour || 0;
-    const evChargingFee = useEvCharging ? Math.round(evChargingPremium * totalHours * 100) / 100 : 0;
-    
+
+    const pricing = calculateBookingTotal(hostHourlyRate, totalHours, evChargingPremium, useEvCharging);
+
+    const { hostEarnings, driverSubtotal, serviceFee, evChargingFee, driverTotal: totalAmount } = pricing;
     const subtotal = driverSubtotal;
     const platformFee = serviceFee;
-    const totalAmount = Math.round((driverSubtotal + serviceFee + evChargingFee) * 100) / 100;
-    
+
     console.log('Pricing calculated:', { totalHours, hostHourlyRate, hostEarnings, driverSubtotal, serviceFee, evChargingFee, totalAmount });
 
     // Initialize Stripe
@@ -233,11 +250,11 @@ serve(async (req) => {
         will_use_ev_charging: useEvCharging,
         ev_charging_fee: evChargingFee,
         is_guest: true,
-        guest_full_name: guest_full_name.trim(),
-        guest_email: guest_email?.trim() || null,
-        guest_phone: guest_phone?.trim() || null,
-        guest_car_model: guest_car_model.trim(),
-        guest_license_plate: guest_license_plate?.trim() || null,
+        guest_full_name: sanitizedName,
+        guest_email: sanitizedEmail,
+        guest_phone: sanitizedPhone,
+        guest_car_model: sanitizedCarModel,
+        guest_license_plate: sanitizedLicensePlate,
         guest_access_token: guestAccessToken,
       })
       .select()

@@ -19,6 +19,35 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameM
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { getBookingStatus, getBookingStatusColorWithOverstay, getBookingStatusLabelWithOverstay } from '@/lib/bookingStatus';
 
+// Booking type for Activity page
+interface ActivityBooking {
+  id: string;
+  start_at: string;
+  end_at: string;
+  status: string;
+  total_amount: number;
+  renter_id: string;
+  spot_id: string;
+  spots?: {
+    id: string;
+    title: string;
+    address: string;
+    host_id: string;
+    instant_book?: boolean;
+    spot_photos?: Array<{ url: string; is_primary?: boolean }>;
+    profiles?: {
+      first_name?: string;
+      last_name?: string;
+      avatar_url?: string;
+    };
+  };
+  renter?: {
+    first_name?: string;
+    last_name?: string;
+    avatar_url?: string;
+  };
+}
+
 const Activity = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -27,18 +56,18 @@ const Activity = () => {
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [bookings, setBookings] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<ActivityBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [selectedBooking, setSelectedBooking] = useState<ActivityBooking | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
-  const [reviewBooking, setReviewBooking] = useState<any>(null);
+  const [reviewBooking, setReviewBooking] = useState<ActivityBooking | null>(null);
   const [userReviews, setUserReviews] = useState<Set<string>>(new Set());
-  
+
   // Quick extend state
   const [extendDialogOpen, setExtendDialogOpen] = useState(false);
-  const [extendBooking, setExtendBooking] = useState<any>(null);
+  const [extendBooking, setExtendBooking] = useState<ActivityBooking | null>(null);
   useEffect(() => {
     fetchBookings();
   }, [mode]);
@@ -228,7 +257,7 @@ const Activity = () => {
   });
 
   // Get calendar dot color based on booking status using the centralized status logic
-  const getCalendarDotColor = (booking: any) => {
+  const getCalendarDotColor = (booking: ActivityBooking) => {
     const statusResult = getBookingStatus({
       status: booking.status,
       instantBook: booking.spots?.instant_book !== false,
@@ -252,7 +281,6 @@ const Activity = () => {
         return 'bg-blue-500';
       default:
         return 'bg-muted';
-        return 'bg-gray-500';
     }
   };
   const BookingCard = ({
