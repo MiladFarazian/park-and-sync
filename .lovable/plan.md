@@ -1,63 +1,79 @@
 
 
-## Fix Incorrect Availability Hours Display on Booking Page
+## Remove Privacy Settings System
 
 ### Problem
-When a spot has availability set for fewer than 7 days (e.g., Monday-Friday only), the booking page displays just the day names ("Mon, Tue, Wed, Thu, Fri") without showing the actual time ranges. This is confusing because users need to know **when** the spot is available, not just which days.
-
-### Root Cause
-In `src/pages/Booking.tsx` (lines 226-246), the availability display logic has three branches:
-
-```typescript
-if (rulesData.length === 0) {
-  setAvailabilityDisplay('No schedule set');
-} else if (rulesData.length === 7) {
-  // ✅ Shows time range (8:00 AM - 6:00 PM)
-} else {
-  // ❌ BUG: Only shows day names ("Mon, Tue, Wed, Thu, Fri")
-  // Missing the time range entirely!
-  setAvailabilityDisplay(availableDays.map(d => DAYS[d]).join(', '));
-}
-```
+The privacy settings feature (show profile photo, show full name, appear in reviews) was deprecated but code traces remain throughout the app, causing issues like "Hosted by Host" when a host has `privacy_show_full_name` set to `false`.
 
 ### Solution
-Update the `else` branch to include both the days AND the time range, matching the format used when all 7 days are available.
+Remove all privacy settings code and replace with simple display name formatting: **First Name + Last Initial** (e.g., "Milad F.") for everyone.
 
-### Technical Changes
+---
 
-**File:** `src/pages/Booking.tsx`
+### Files to Modify
 
-Update lines 242-246 to include time information:
+#### 1. Delete `src/lib/privacyUtils.ts`
+Remove this entire file.
 
+#### 2. Delete `src/components/settings/PrivacySettingsDialog.tsx`
+Remove this unused component.
+
+#### 3. Create `src/lib/displayUtils.ts` (replacement helper)
+Simple utility with no privacy checks:
 ```typescript
-} else {
-  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const availableDays = [...new Set(rulesData.map(r => r.day_of_week))].sort((a, b) => a - b);
-  const daysList = availableDays.map(d => DAYS[d]).join(', ');
-  
-  // Get unique time ranges and format them
-  const times = [...new Set(rulesData.map(r => 
-    `${formatTimeToAMPM(r.start_time)} - ${formatTimeToAMPM(r.end_time)}`
-  ))];
-  
-  if (times.length === 1) {
-    // All days have same hours: "Mon-Fri, 8:00 AM - 6:00 PM"
-    setAvailabilityDisplay(`${daysList} • ${times[0]}`);
-  } else {
-    // Different hours on different days
-    setAvailabilityDisplay(`${daysList} • Varied hours`);
-  }
+export function formatDisplayName(
+  profile: { first_name?: string | null; last_name?: string | null } | null | undefined,
+  fallback: string = 'User'
+): string {
+  if (!profile) return fallback;
+  const first = profile.first_name?.trim() || '';
+  const lastInitial = profile.last_name?.trim()?.[0] || '';
+  if (!first && !lastInitial) return fallback;
+  return lastInitial ? `${first} ${lastInitial}.` : first;
 }
 ```
 
-### Expected Result
+#### 4. Update Files Using Privacy Utils
+
+| File | Changes |
+|------|---------|
+| `src/pages/Booking.tsx` | Replace `getPrivacyAwareName`/`getPrivacyAwareAvatar` with `formatDisplayName` and direct avatar access. Remove `privacy_*` from select queries. |
+| `src/pages/BookingDetail.tsx` | Same as above. Remove `privacy_*` fields from interface and queries. |
+| `src/pages/Messages.tsx` | Replace privacy functions, remove `privacy_*` from queries. |
+| `src/pages/SpotDetail.tsx` | Replace privacy functions, remove `privacy_*` from queries. |
+| `src/pages/Profile.tsx` | Replace `getReviewerDisplayInfo` with `formatDisplayName`, remove `privacy_*` from queries. |
+| `src/pages/Reviews.tsx` | Same as Profile.tsx. |
+| `src/components/host/RecentReviews.tsx` | Already uses direct `first_name`/`last_name` - no changes needed. |
+| `src/components/messages/BookingContextHeader.tsx` | Check for privacy imports. |
+
+#### 5. Database Columns (Optional Future Cleanup)
+The `privacy_show_profile_photo`, `privacy_show_full_name`, and `privacy_show_in_reviews` columns in the `profiles` table can be dropped via migration, but this is optional since unused columns don't cause harm.
+
+---
+
+### Summary of Changes
+
+**Deletions:**
+- `src/lib/privacyUtils.ts`
+- `src/components/settings/PrivacySettingsDialog.tsx`
+
+**New File:**
+- `src/lib/displayUtils.ts` - Simple name formatter
+
+**Updates (6 files):**
+- `src/pages/Booking.tsx`
+- `src/pages/BookingDetail.tsx`
+- `src/pages/Messages.tsx`
+- `src/pages/SpotDetail.tsx`
+- `src/pages/Profile.tsx`
+- `src/pages/Reviews.tsx`
+
+### Pattern Replacement
 
 | Before | After |
 |--------|-------|
-| "Mon, Tue, Wed, Thu, Fri" | "Mon, Tue, Wed, Thu, Fri • 8:00 AM - 6:00 PM" |
-| "Mon, Tue, Wed" | "Mon, Tue, Wed • 9:00 AM - 5:00 PM" |
-| Days with different hours | "Mon, Tue, Wed • Varied hours" |
-
-### Files to Modify
-- `src/pages/Booking.tsx` - Fix the availability display logic in the `else` branch (around lines 242-246)
+| `getPrivacyAwareName(profile, 'Host')` | `formatDisplayName(profile, 'Host')` |
+| `getPrivacyAwareAvatar(profile)` | `profile?.avatar_url \|\| undefined` |
+| `getReviewerDisplayInfo(profile, 'Driver')` | `{ name: formatDisplayName(profile, 'Driver'), avatar: profile?.avatar_url }` |
+| `privacy_show_profile_photo, privacy_show_full_name` in queries | Remove these fields |
 
