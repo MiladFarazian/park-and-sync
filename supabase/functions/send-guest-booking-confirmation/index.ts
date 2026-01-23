@@ -21,6 +21,10 @@ interface GuestBookingConfirmationRequest {
   totalAmount: number;
   bookingId: string;
   guestAccessToken: string;
+  accessNotes?: string;
+  evChargingInstructions?: string;
+  hasEvCharging?: boolean;
+  willUseEvCharging?: boolean;
 }
 
 // Helper function to send SMS via Twilio
@@ -105,6 +109,10 @@ const handler = async (req: Request): Promise<Response> => {
       totalAmount,
       bookingId,
       guestAccessToken,
+      accessNotes,
+      evChargingInstructions,
+      hasEvCharging,
+      willUseEvCharging,
     }: GuestBookingConfirmationRequest = await req.json();
 
     const startDate = new Date(startAt).toLocaleString('en-US', { 
@@ -245,7 +253,41 @@ Get directions: ${directionsUrl}`;
                             </tr>
                           </table>
                           
-                          <!-- Important Info Box -->
+                          ${accessNotes ? `
+                          <!-- Access Notes Section (Blue) -->
+                          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #e0f2fe; border-left: 4px solid #0ea5e9; border-radius: 8px; margin: 20px 0;">
+                            <tr>
+                              <td style="padding: 16px;">
+                                <p style="margin: 0; color: #0c4a6e; font-size: 14px; font-weight: 600;">🔑 Access Instructions</p>
+                                <p style="margin: 10px 0 0 0; color: #075985; font-size: 13px; line-height: 1.6; white-space: pre-wrap;">${accessNotes}</p>
+                              </td>
+                            </tr>
+                          </table>
+                          ` : ''}
+                          
+                          ${willUseEvCharging && evChargingInstructions ? `
+                          <!-- EV Charging Section (Green - opted in) -->
+                          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #dcfce7; border-left: 4px solid #22c55e; border-radius: 8px; margin: 20px 0;">
+                            <tr>
+                              <td style="padding: 16px;">
+                                <p style="margin: 0; color: #14532d; font-size: 14px; font-weight: 600;">⚡ EV Charging Instructions</p>
+                                <p style="margin: 10px 0 0 0; color: #166534; font-size: 13px; line-height: 1.6; white-space: pre-wrap;">${evChargingInstructions}</p>
+                              </td>
+                            </tr>
+                          </table>
+                          ` : hasEvCharging && !willUseEvCharging ? `
+                          <!-- EV Charging Available (Gray - not opted in) -->
+                          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; border-left: 4px solid #9ca3af; border-radius: 8px; margin: 20px 0;">
+                            <tr>
+                              <td style="padding: 16px;">
+                                <p style="margin: 0; color: #374151; font-size: 14px; font-weight: 600;">⚡ EV Charging Available</p>
+                                <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 13px; line-height: 1.5;">This spot has EV charging available. Contact the host if you'd like to use it.</p>
+                              </td>
+                            </tr>
+                          </table>
+                          ` : ''}
+                          
+                          <!-- Booking Link Info Box -->
                           <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 14px; margin: 20px 0;">
                             <tr>
                               <td>
