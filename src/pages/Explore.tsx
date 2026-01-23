@@ -13,6 +13,10 @@ import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
 import { evChargerTypes, getChargerDisplayName } from '@/lib/evChargerTypes';
+import { logger } from '@/lib/logger';
+
+// Scoped logger for Explore page
+const log = logger.scope('Explore');
 import {
   AlertDialog,
   AlertDialogAction,
@@ -124,7 +128,7 @@ const findCoveringCache = (lat: number, lng: number, radius: number, timeKey = '
 
     // If we're within 30% of the cached radius from its center, the cache likely covers our area
     if (distance < cached.radius * 0.3 && cached.radius >= radius * 0.7) {
-      console.log('[Cache] Hit! Using cached data from', key);
+      log.debug('Cache hit', { key, age: `${Math.round((Date.now() - cached.timestamp) / 1000)}s` });
       return cached.data;
     }
   }

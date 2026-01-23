@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { authLogger as log } from '@/lib/logger';
 
 interface Profile {
   id: string;
@@ -61,7 +62,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .single();
     
     if (error) {
-      console.error('Error fetching profile:', error);
+      log.error('Failed to fetch profile', { userId, error: error.message });
       return null;
     }
     return data;
@@ -69,7 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Ensure a profile exists for the current user (upsert pattern)
   const ensureProfileExistsForUser = async (userId: string, email?: string | null, phone?: string | null) => {
-    console.log('[Auth] Ensuring profile exists for user:', userId);
+    log.debug('Ensuring profile exists', { userId: userId.substring(0, 8) });
     const { error } = await supabase
       .from('profiles')
       .upsert({

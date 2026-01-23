@@ -2,6 +2,9 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { calculateBookingTotal } from "../_shared/pricing.ts";
+import { logger } from "../_shared/logger.ts";
+
+const log = logger.scope('create-guest-booking');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,18 +38,18 @@ async function checkRateLimit(
     });
 
     if (!minuteOk) {
-      console.warn(`[rate-limit] ${functionName} minute limit exceeded for IP: ${clientIp.substring(0, 8)}...`);
+      log.warn('Minute rate limit exceeded', { ip: clientIp.substring(0, 8) });
       return { allowed: false, retryAfter: 60 };
     }
-    
+
     if (!hourOk) {
-      console.warn(`[rate-limit] ${functionName} hour limit exceeded for IP: ${clientIp.substring(0, 8)}...`);
+      log.warn('Hour rate limit exceeded', { ip: clientIp.substring(0, 8) });
       return { allowed: false, retryAfter: 3600 };
     }
 
     return { allowed: true, retryAfter: 0 };
   } catch (error) {
-    console.error('[rate-limit] Error checking rate limit:', error);
+    log.error('Rate limit check failed', { error: (error as Error).message });
     return { allowed: true, retryAfter: 0 };
   }
 }
@@ -161,7 +164,7 @@ serve(async (req) => {
     }
 
     // Check availability using admin client
-    console.log('Checking spot availability...');
+    log.info('Checking spot availability', { spotId: spot_id });
     const { data: isAvailable, error: availabilityError } = await supabaseAdmin.rpc('check_spot_availability', {
       p_spot_id: spot_id,
       p_start_at: start_at,
@@ -169,14 +172,14 @@ serve(async (req) => {
     });
 
     if (availabilityError) {
-      console.error('Availability check error:', availabilityError);
+      log.error('Availability check failed', { error: availabilityError.message });
       throw availabilityError;
     }
 
     if (!isAvailable) {
-      console.error('Spot is not available:', { spot_id, start_at, end_at });
-      return new Response(JSON.stringify({ 
-        error: 'Spot is not available for the requested time' 
+      log.warn('Spot not available', { spotId: spot_id });
+      return new Response(JSON.stringify({
+        error: 'Spot is not available for the requested time'
       }), {
         status: 409,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -191,14 +194,15 @@ serve(async (req) => {
       .single();
 
     if (spotError || !spot) {
+      log.error('Spot not found', { spotId: spot_id });
       throw new Error('Spot not found');
     }
 
     // Validate EV charging request
     if (useEvCharging && !spot.has_ev_charging) {
-      console.error('EV charging requested but spot does not support it');
-      return new Response(JSON.stringify({ 
-        error: 'This spot does not offer EV charging' 
+      log.warn('EV charging requested but not available', { spotId: spot_id });
+      return new Response(JSON.stringify({
+        error: 'This spot does not offer EV charging'
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -218,7 +222,7 @@ serve(async (req) => {
     const subtotal = driverSubtotal;
     const platformFee = serviceFee;
 
-    console.log('Pricing calculated:', { totalHours, hostHourlyRate, hostEarnings, driverSubtotal, serviceFee, evChargingFee, totalAmount });
+    log.info('Pricing calculated', { totalHours, totalAmount });
 
     // Initialize Stripe
     const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');
@@ -261,11 +265,11 @@ serve(async (req) => {
       .single();
 
     if (bookingError) {
-      console.error('Guest booking creation error:', bookingError);
+      log.error('Booking creation failed', { error: bookingError.message });
       throw bookingError;
     }
 
-    console.log('Guest booking created:', booking.id);
+    log.info('Guest booking created', { bookingId: booking.id });
 
     // Create PaymentIntent for the guest (no customer ID)
     // If save_payment_method is true, set up for future use
