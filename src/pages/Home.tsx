@@ -341,13 +341,13 @@ const Home = () => {
             )}
           </div>
 
-          <div className="flex-1 space-y-2 min-w-0">
+            <div className="flex-1 space-y-1.5 min-w-0">
             <div className="flex justify-between items-start gap-2">
-              <div className="flex-1">
+              <div className="flex items-center gap-2 min-w-0">
                 {spot.category && (
-                  <Badge variant="secondary" className="text-xs px-2 py-0.5 mb-1">
+                  <span className="text-sm font-semibold text-foreground truncate">
                     {spot.category}
-                  </Badge>
+                  </span>
                 )}
               </div>
               <div className="text-right flex-shrink-0">

@@ -1356,16 +1356,16 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                         </button>
                       </div>
                       
-                      <div className="flex-1 space-y-2 min-w-0">
+                      <div className="flex-1 space-y-1.5 min-w-0">
                         <div className="flex justify-between items-start gap-2">
-                          <div className="flex-1 flex flex-wrap gap-1 min-h-[22px]">
+                          <div className="flex items-center gap-2 min-w-0">
                             {spot.category && (
-                              <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                              <span className="text-sm font-semibold text-foreground truncate">
                                 {spot.category}
-                              </Badge>
+                              </span>
                             )}
                             {spot.userBooking && (
-                              <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-xs px-2 py-0.5">
+                              <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-xs px-1.5 py-0">
                                 Your Booking
                               </Badge>
                             )}
