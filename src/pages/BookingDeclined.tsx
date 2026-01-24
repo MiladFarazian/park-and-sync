@@ -73,8 +73,8 @@ const BookingDeclined = () => {
         {/* Status Icon */}
         <div className="text-center space-y-4">
           <div className="flex justify-center">
-            <div className="rounded-full bg-destructive/10 p-6">
-              <XCircle className="h-16 w-16 text-destructive" />
+            <div className="rounded-full bg-destructive/10 p-4">
+              <XCircle className="h-10 w-10 text-destructive" />
             </div>
           </div>
           <h2 className="text-2xl font-bold">Request Declined</h2>
