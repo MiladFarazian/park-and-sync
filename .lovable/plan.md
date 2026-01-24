@@ -1,97 +1,93 @@
 
-## Fix: Booking Extension Notification Routing and Earnings Display
+## Fix: "Explore Spots" Button Shows Blank Map
 
-### Problems Identified
-
-**Problem 1: Wrong Routing**
-When a host taps on a "Booking Extended" notification, they are taken to `/host-booking-confirmation/:id` which shows a full "Booking Confirmed!" page with confetti messaging. This is confusing because they already confirmed the booking earlier—this is just an extension update.
-
-**Problem 2: Incorrect Earnings Calculation**  
-The Host Booking Confirmation page shows:
-- Booking Subtotal: $6
-- Platform Fee (15%): -$1
-- Your Earnings: $6 ← Should be $5
-
-The displayed earnings don't reflect the platform fee subtraction shown above.
-
----
+### Problem
+When clicking "Explore Spots" from the Saved Spots page (empty state), it navigates to `/explore` without any URL parameters. The Explore page only loads spots when `lat` and `lng` parameters are present in the URL, so users see a blank map.
 
 ### Solution
+Update the "Explore Spots" button to get the user's current location, then navigate to `/explore` with:
+- `lat` and `lng` - user's current position
+- `start` - current time (now)
+- `end` - 2 hours from now
 
-#### Part 1: Route Extension Notifications to Booking Detail
-
-Change the `extend-booking` edge function to:
-1. Use notification type `booking_extended` instead of `booking_host`
-2. Update the push notification URL to `/booking/:bookingId` instead of `/host-booking-confirmation/:bookingId`
-
-Then update `NotificationBell.tsx` to route `booking_extended` notifications to `/booking/:id`.
-
-This ensures the host sees the existing booking detail page with updated times, rather than a new "confirmation" experience.
-
-#### Part 2: Fix Earnings Display in HostBookingConfirmation
-
-The page currently shows `hostEarnings` for the "Your Earnings" line, but this value comes from the database's `host_earnings` field (or a fallback calculation). The display should be consistent:
-- Either show the breakdown using the stored values
-- Or use the `getHostNetEarnings` utility for consistency across the app
+If geolocation fails, fall back to LA's default coordinates.
 
 ---
 
-### Technical Details
+### Technical Changes
 
-**File 1: `supabase/functions/extend-booking/index.ts`**
+**File: `src/pages/SavedSpots.tsx`**
 
-Lines 246-254 (first occurrence) and 433-441 (second occurrence):
+**Step 1: Add date-fns import for time formatting**
+```tsx
+import { format, addHours } from 'date-fns';
+```
 
-| Before | After |
-|--------|-------|
-| `type: 'booking_host',` | `type: 'booking_extended',` |
+**Step 2: Add constants import for default location**
+```tsx
+import { DEFAULT_MAP_CENTER } from '@/lib/constants';
+```
 
-Lines 270 and 454 (push notification URL):
+**Step 3: Replace the simple button with a location-aware handler**
 
-| Before | After |
-|--------|-------|
-| `url: '/host-booking-confirmation/${bookingId}',` | `url: '/booking/${bookingId}',` |
+Current code (line 162):
+```tsx
+<Button onClick={() => navigate('/explore')}>Explore Spots</Button>
+```
 
----
+New implementation:
+```tsx
+<Button onClick={handleExploreSpots}>Explore Spots</Button>
+```
 
-**File 2: `src/components/layout/NotificationBell.tsx`**
+**Step 4: Add the handler function inside the component**
 
-Add a new case at line 197 (inside `navigateToNotification`):
+This function will:
+1. Try to get the user's current GPS location
+2. Calculate start time (now) and end time (+2 hours)
+3. Format the times as ISO strings
+4. Navigate to `/explore` with all required parameters
+5. Fall back to default LA coordinates if geolocation fails
 
-```text
-Before lines 197-199:
-  } else if (notification.type === "booking_host" || notification.type === "booking_approval_required") {
-    if (mode === 'driver') setMode('host');
-    navigate(`/host-booking-confirmation/${notification.related_id}`);
+```tsx
+const handleExploreSpots = () => {
+  const now = new Date();
+  const twoHoursLater = addHours(now, 2);
+  const startParam = now.toISOString();
+  const endParam = twoHoursLater.toISOString();
 
-Add after:
-  } else if (notification.type === "booking_extended") {
-    if (mode === 'driver') setMode('host');
-    navigate(`/booking/${notification.related_id}`);
+  // Try to get current location
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        navigate(`/explore?lat=${latitude}&lng=${longitude}&start=${startParam}&end=${endParam}`);
+      },
+      () => {
+        // Fallback to default LA location
+        navigate(`/explore?lat=${DEFAULT_MAP_CENTER.lat}&lng=${DEFAULT_MAP_CENTER.lng}&start=${startParam}&end=${endParam}`);
+      },
+      { timeout: 5000, enableHighAccuracy: false }
+    );
+  } else {
+    // No geolocation support - use default
+    navigate(`/explore?lat=${DEFAULT_MAP_CENTER.lat}&lng=${DEFAULT_MAP_CENTER.lng}&start=${startParam}&end=${endParam}`);
+  }
+};
 ```
 
 ---
 
-**File 3: `src/pages/HostBookingConfirmation.tsx`**
+### Summary
 
-Line 202 - Fix earnings calculation:
+| What Changes | Details |
+|-------------|---------|
+| **Imports** | Add `addHours` from date-fns and `DEFAULT_MAP_CENTER` from constants |
+| **New Function** | `handleExploreSpots()` - gets location and builds proper URL |
+| **Button** | Wire to new handler instead of simple navigation |
 
-| Before | After |
-|--------|-------|
-| `const hostEarnings = booking.host_earnings \|\| (booking.subtotal - booking.platform_fee);` | Import and use `getHostNetEarnings(booking)` from `@/lib/hostEarnings` |
-
-Lines 340-350 - The earnings breakdown display currently shows a formula but uses a potentially different value. Two options:
-
-**Option A (Recommended):** Simply show the final earnings amount without the misleading breakdown, since the breakdown formula (subtotal - 15%) doesn't match actual host earnings calculation.
-
-**Option B:** Calculate the breakdown correctly using the actual pricing logic.
-
----
-
-### Summary of Changes
-
-| File | Change |
-|------|--------|
-| `supabase/functions/extend-booking/index.ts` | Change notification type from `booking_host` to `booking_extended`; update push URL to `/booking/:id` |
-| `src/components/layout/NotificationBell.tsx` | Add routing for `booking_extended` type → `/booking/:id` |
-| `src/pages/HostBookingConfirmation.tsx` | Use `getHostNetEarnings()` for consistent earnings display |
+### User Experience
+- User clicks "Explore Spots"
+- Brief geolocation request (~1-2 seconds)
+- Map loads centered on their location with spots available for the next 2 hours
+- If location denied/unavailable, defaults to Downtown LA
