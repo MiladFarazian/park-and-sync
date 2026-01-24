@@ -148,7 +148,7 @@ const BookingDeclined = () => {
 
         {/* Help Text */}
         <p className="text-center text-sm text-muted-foreground pt-4">
-          Need help? <Link to="/messages" className="text-primary underline">Contact support</Link>
+          Need help? <Link to="/messages?userId=00000000-0000-0000-0000-000000000001" className="text-primary underline">Contact support</Link>
         </p>
       </div>
     </div>
