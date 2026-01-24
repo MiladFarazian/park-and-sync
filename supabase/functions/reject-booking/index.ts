@@ -127,7 +127,7 @@ serve(async (req) => {
       .from('notifications')
       .insert({
         user_id: booking.renter_id,
-        type: 'booking',
+        type: 'booking_declined',
         title: 'Booking Request Declined',
         message: `Your booking request at ${booking.spots.address} was declined by the host. Your card was not charged.`,
         related_id: booking_id,
