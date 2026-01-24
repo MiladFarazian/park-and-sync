@@ -1034,12 +1034,6 @@ const HostCalendar = () => {
                 <span className="w-2 h-2 rounded-full bg-red-500" />
                 <span>Cancelled / Expired</span>
               </div>
-              {!isAllSpotsView && (
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-destructive" />
-                  <span>Blocked</span>
-                </div>
-              )}
             </div>
             {isAllSpotsView && (
               <p className="text-xs text-muted-foreground text-center">
