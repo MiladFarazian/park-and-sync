@@ -6,6 +6,50 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Rate limit configuration (generous for holds since users browse multiple spots)
+const RATE_LIMIT_PER_MINUTE = 10;
+const RATE_LIMIT_PER_HOUR = 60;
+
+// Check rate limit using database
+async function checkRateLimit(
+  supabase: any,
+  userId: string
+): Promise<{ allowed: boolean; retryAfter: number }> {
+  const functionName = 'create-booking-hold';
+  const minuteKey = `user:${userId}:${functionName}:min`;
+  const hourKey = `user:${userId}:${functionName}:hour`;
+
+  try {
+    const { data: minuteOk } = await supabase.rpc('check_rate_limit', {
+      p_key: minuteKey,
+      p_window_seconds: 60,
+      p_max_requests: RATE_LIMIT_PER_MINUTE
+    });
+
+    const { data: hourOk } = await supabase.rpc('check_rate_limit', {
+      p_key: hourKey,
+      p_window_seconds: 3600,
+      p_max_requests: RATE_LIMIT_PER_HOUR
+    });
+
+    if (!minuteOk) {
+      console.warn('Minute rate limit exceeded for user:', userId.substring(0, 8));
+      return { allowed: false, retryAfter: 60 };
+    }
+
+    if (!hourOk) {
+      console.warn('Hour rate limit exceeded for user:', userId.substring(0, 8));
+      return { allowed: false, retryAfter: 3600 };
+    }
+
+    return { allowed: true, retryAfter: 0 };
+  } catch (error) {
+    console.error('Rate limit check failed:', error);
+    // Fail open - allow the request if rate limiting fails
+    return { allowed: true, retryAfter: 0 };
+  }
+}
+
 interface HoldRequest {
   spot_id: string;
   start_at: string;
@@ -31,13 +75,35 @@ serve(async (req) => {
       }
     );
 
+    // Create admin client for rate limiting (needs service role to access rate_limits table)
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
     // Get authenticated user
     const authHeader = req.headers.get('Authorization')!;
     const token = authHeader.replace('Bearer ', '');
     const { data: userData, error: authError } = await supabase.auth.getUser(token);
-    
+
     if (authError || !userData.user) {
       throw new Error('User not authenticated');
+    }
+
+    // Check rate limit
+    const rateLimit = await checkRateLimit(supabaseAdmin, userData.user.id);
+    if (!rateLimit.allowed) {
+      return new Response(JSON.stringify({
+        error: 'Too many hold requests. Please slow down.',
+        retry_after: rateLimit.retryAfter
+      }), {
+        status: 429,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'Retry-After': String(rateLimit.retryAfter)
+        },
+      });
     }
 
     const { spot_id, start_at, end_at, idempotency_key }: HoldRequest = await req.json();

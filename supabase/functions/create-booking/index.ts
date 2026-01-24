@@ -10,6 +10,50 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Rate limit configuration (strict for booking creation)
+const RATE_LIMIT_PER_MINUTE = 5;
+const RATE_LIMIT_PER_HOUR = 20;
+
+// Check rate limit using database - uses user ID for authenticated users
+async function checkRateLimit(
+  supabase: any,
+  userId: string
+): Promise<{ allowed: boolean; retryAfter: number }> {
+  const functionName = 'create-booking';
+  const minuteKey = `user:${userId}:${functionName}:min`;
+  const hourKey = `user:${userId}:${functionName}:hour`;
+
+  try {
+    const { data: minuteOk } = await supabase.rpc('check_rate_limit', {
+      p_key: minuteKey,
+      p_window_seconds: 60,
+      p_max_requests: RATE_LIMIT_PER_MINUTE
+    });
+
+    const { data: hourOk } = await supabase.rpc('check_rate_limit', {
+      p_key: hourKey,
+      p_window_seconds: 3600,
+      p_max_requests: RATE_LIMIT_PER_HOUR
+    });
+
+    if (!minuteOk) {
+      log.warn('Minute rate limit exceeded', { userId: userId.substring(0, 8) });
+      return { allowed: false, retryAfter: 60 };
+    }
+
+    if (!hourOk) {
+      log.warn('Hour rate limit exceeded', { userId: userId.substring(0, 8) });
+      return { allowed: false, retryAfter: 3600 };
+    }
+
+    return { allowed: true, retryAfter: 0 };
+  } catch (error) {
+    log.error('Rate limit check failed', { error: (error as Error).message });
+    // Fail open - allow the request if rate limiting fails
+    return { allowed: true, retryAfter: 0 };
+  }
+}
+
 interface BookingRequest {
   spot_id: string;
   start_at: string;
@@ -48,19 +92,35 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization')!;
     const token = authHeader.replace('Bearer ', '');
     const { data: userData, error: authError } = await supabase.auth.getUser(token);
-    
+
     if (authError || !userData.user) {
       throw new Error('User not authenticated');
     }
 
-    const { 
-      spot_id, 
-      start_at, 
-      end_at, 
-      vehicle_id, 
+    // Check rate limit using user ID (more accurate than IP for authenticated users)
+    const rateLimit = await checkRateLimit(supabaseAdmin, userData.user.id);
+    if (!rateLimit.allowed) {
+      return new Response(JSON.stringify({
+        error: 'Too many booking attempts. Please try again later.',
+        retry_after: rateLimit.retryAfter
+      }), {
+        status: 429,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'Retry-After': String(rateLimit.retryAfter)
+        },
+      });
+    }
+
+    const {
+      spot_id,
+      start_at,
+      end_at,
+      vehicle_id,
       hold_id,
       idempotency_key,
-      will_use_ev_charging 
+      will_use_ev_charging
     }: BookingRequest = await req.json();
 
     const useEvCharging = will_use_ev_charging || false;
