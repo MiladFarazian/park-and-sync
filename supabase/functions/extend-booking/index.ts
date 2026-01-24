@@ -247,7 +247,7 @@ serve(async (req) => {
         .from('notifications')
         .insert({
           user_id: booking.spots.host_id,
-          type: 'booking_host',
+          type: 'booking_extended',
           title: 'Booking Extended',
           message: notificationMessage,
           related_id: bookingId,
@@ -267,7 +267,7 @@ serve(async (req) => {
             title: 'Booking Extended',
             body: notificationMessage,
             tag: `extension-${bookingId}`,
-            url: `/host-booking-confirmation/${bookingId}`,
+            url: `/booking/${bookingId}`,
           }),
         });
         if (!pushResponse.ok) {
@@ -434,7 +434,7 @@ serve(async (req) => {
       .from('notifications')
       .insert({
         user_id: booking.spots.host_id,
-        type: 'booking_host',
+        type: 'booking_extended',
         title: 'Booking Extended',
         message: notificationMessage,
         related_id: bookingId,
@@ -454,7 +454,7 @@ serve(async (req) => {
           title: 'Booking Extended',
           body: notificationMessage,
           tag: `extension-${bookingId}`,
-          url: `/host-booking-confirmation/${bookingId}`,
+          url: `/booking/${bookingId}`,
         }),
       });
       if (!pushResponse.ok) {
