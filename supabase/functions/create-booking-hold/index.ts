@@ -110,34 +110,13 @@ serve(async (req) => {
 
     console.log('Creating booking hold:', { spot_id, start_at, end_at, user_id: userData.user.id });
 
-    // Clean up expired holds first
-    await supabase.rpc('cleanup_expired_holds');
-
-    // Check if spot is available (exclude own holds for retry resilience)
-    const { data: isAvailable, error: availabilityError } = await supabase
-      .rpc('check_spot_availability', {
-        p_spot_id: spot_id,
-        p_start_at: start_at,
-        p_end_at: end_at,
-        p_exclude_user_id: userData.user.id
-      });
-
-    if (availabilityError) throw availabilityError;
-    
-    if (!isAvailable) {
-      return new Response(JSON.stringify({ 
-        error: 'Spot is not available for the requested time' 
-      }), {
-        status: 409,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Create a 10-minute hold via security definer function to bypass RLS safely
+    // Create a 10-minute hold atomically (includes availability check with row locking)
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-    const { data: hold, error: holdError } = await supabase
-      .rpc('create_booking_hold', {
+    console.log('Creating atomic booking hold with row locking');
+
+    const { data: holdResult, error: holdError } = await supabase
+      .rpc('create_booking_hold_atomic', {
         p_spot_id: spot_id,
         p_user_id: userData.user.id,
         p_start_at: start_at,
@@ -151,10 +130,24 @@ serve(async (req) => {
       throw holdError;
     }
 
-    console.log('Booking hold created:', hold.id);
+    // The atomic function returns an array with one row
+    const result = holdResult?.[0] || holdResult;
+
+    if (!result?.success) {
+      const errorMessage = result?.error_message || 'Spot is not available for the requested time';
+      console.log('Hold creation failed:', errorMessage);
+      return new Response(JSON.stringify({
+        error: errorMessage
+      }), {
+        status: 409,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('Booking hold created:', result.hold_id);
 
     return new Response(JSON.stringify({
-      hold_id: hold.id,
+      hold_id: result.hold_id,
       expires_at: expiresAt,
       message: 'Booking hold created for 10 minutes'
     }), {

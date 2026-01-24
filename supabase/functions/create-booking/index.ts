@@ -127,62 +127,9 @@ serve(async (req) => {
 
     log.info('Creating booking', { spotId: spot_id, userId: userData.user.id, useEvCharging });
 
-    // Re-check availability before proceeding
-    log.debug('Re-checking spot availability');
-    const { data: isAvailable, error: availabilityError } = await supabase.rpc('check_spot_availability', {
-      p_spot_id: spot_id,
-      p_start_at: start_at,
-      p_end_at: end_at,
-      p_exclude_user_id: userData.user.id
-    });
-
-    if (availabilityError) {
-      log.error('Availability check error', { error: availabilityError.message });
-      throw availabilityError;
-    }
-
-    if (!isAvailable) {
-      log.warn('Spot is not available', { spotId: spot_id });
-      return new Response(JSON.stringify({ 
-        error: 'Spot is not available for the requested time' 
-      }), {
-        status: 409,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Require a valid non-expired hold from this user for exact time window
-    // Get the most recent one in case there are duplicates
-    log.debug('Verifying booking hold');
-    const { data: holds, error: holdError } = await supabase
-      .from('booking_holds')
-      .select('id, start_at, end_at, expires_at')
-      .eq('spot_id', spot_id)
-      .eq('user_id', userData.user.id)
-      .eq('start_at', start_at)
-      .eq('end_at', end_at)
-      .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false })
-      .limit(1);
-    
-    const hold = holds?.[0] || null;
-
-    if (holdError) {
-      log.error('Hold verification error', { error: holdError.message });
-      throw holdError;
-    }
-
-    if (!hold) {
-      log.warn('Missing or expired booking hold', { spotId: spot_id, userId: userData.user.id });
-      return new Response(JSON.stringify({ 
-        error: 'Missing or expired booking hold for this time window. Please try booking again.' 
-      }), {
-        status: 409,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    log.debug('Valid hold found', { holdId: hold.id });
+    // Note: Availability check and hold verification will be done atomically
+    // during the booking creation to prevent race conditions
+    log.debug('Will use atomic booking creation with row locking');
 
     // Get spot details for pricing
     // NOTE: Use service-role client to avoid RLS blocking spot reads during booking creation.
@@ -317,56 +264,55 @@ serve(async (req) => {
       });
     }
 
-    // Cancel any existing pending bookings for the same spot/time/user to avoid duplicates
-    const { error: cancelError } = await supabase
-      .from('bookings')
-      .update({ 
-        status: 'canceled', 
-        cancellation_reason: 'Superseded by new booking attempt' 
-      })
-      .eq('spot_id', spot_id)
-      .eq('renter_id', userData.user.id)
-      .eq('start_at', start_at)
-      .eq('end_at', end_at)
-      .eq('status', 'pending');
+    // Create booking atomically with row locking (includes hold verification and availability check)
+    log.info('Creating booking atomically with row locking');
 
-    if (cancelError) {
-      log.warn('Failed to cancel existing pending bookings', { error: cancelError.message });
-      // Continue anyway - not critical
-    }
-
-    const bookingId = crypto.randomUUID();
-    
-    // Create booking record
-    const { data: booking, error: bookingError } = await supabase
-      .from('bookings')
-      .insert({
-        id: bookingId,
-        spot_id,
-        renter_id: userData.user.id,
-        vehicle_id,
-        start_at,
-        end_at,
-        status: 'pending',
-        hourly_rate: spot.hourly_rate,
-        total_hours: totalHours,
-        subtotal,
-        platform_fee: platformFee,
-        total_amount: totalAmount,
-        host_earnings: hostEarnings,
-        idempotency_key: idempotency_key || crypto.randomUUID(),
-        will_use_ev_charging: useEvCharging,
-        ev_charging_fee: evChargingFee,
-      })
-      .select()
-      .single();
+    const { data: bookingResult, error: bookingError } = await supabase
+      .rpc('create_booking_atomic', {
+        p_spot_id: spot_id,
+        p_user_id: userData.user.id,
+        p_start_at: start_at,
+        p_end_at: end_at,
+        p_vehicle_id: vehicle_id || null,
+        p_idempotency_key: idempotency_key || crypto.randomUUID(),
+        p_will_use_ev_charging: useEvCharging,
+        p_hourly_rate: spot.hourly_rate,
+        p_total_hours: totalHours,
+        p_subtotal: subtotal,
+        p_platform_fee: platformFee,
+        p_total_amount: totalAmount,
+        p_host_earnings: hostEarnings,
+        p_ev_charging_fee: evChargingFee,
+      });
 
     if (bookingError) {
       log.error('Booking creation error', { error: bookingError.message });
       throw bookingError;
     }
 
-    log.info('Booking created', { bookingId: booking.id });
+    // The atomic function returns an array with one row
+    const result = bookingResult?.[0] || bookingResult;
+
+    if (!result?.success) {
+      const errorMessage = result?.error_message || 'Failed to create booking';
+      log.warn('Atomic booking creation failed', { error: errorMessage });
+      return new Response(JSON.stringify({
+        error: errorMessage
+      }), {
+        status: 409,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const bookingId = result.booking_id;
+    log.info('Booking created atomically', { bookingId });
+
+    // Fetch the created booking for subsequent operations
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('id', bookingId)
+      .single();
 
     // Handle payment based on instant_book setting
     if (isInstantBook) {
@@ -408,13 +354,7 @@ serve(async (req) => {
 
         log.info('Booking activated successfully');
 
-        // Release the hold if provided
-        if (hold_id) {
-          await supabase
-            .from('booking_holds')
-            .delete()
-            .eq('id', hold_id);
-        }
+        // Note: Hold was already deleted by create_booking_atomic function
 
         // Get host and renter profiles for notifications and emails
         const { data: hostProfile } = await supabase
