@@ -11,6 +11,7 @@ import { differenceInHours, format, formatDistanceToNow } from 'date-fns';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
+import { getHostNetEarnings } from '@/lib/hostEarnings';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -199,7 +200,7 @@ const HostBookingConfirmation = () => {
     : (driver ? `${driver.first_name || ''} ${driver.last_name || ''}`.trim() : 'Driver');
   const driverInitial = driverName.charAt(0).toUpperCase();
   const bookingNumber = `#PK-${new Date(booking.created_at).getFullYear()}-${booking.id.slice(0, 3).toUpperCase()}`;
-  const hostEarnings = booking.host_earnings || (booking.subtotal - booking.platform_fee);
+  const hostEarnings = getHostNetEarnings(booking);
   const isPendingApproval = booking.status === 'held';
   const timeUntilExpiry = isPendingApproval ? formatDistanceToNow(new Date(new Date(booking.created_at).getTime() + 60 * 60 * 1000), { addSuffix: true }) : null;
 

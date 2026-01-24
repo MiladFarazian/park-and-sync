@@ -197,6 +197,9 @@ export const NotificationBell = () => {
     } else if (notification.type === "booking_host" || notification.type === "booking_approval_required") {
       if (mode === 'driver') setMode('host');
       navigate(`/host-booking-confirmation/${notification.related_id}`);
+    } else if (notification.type === "booking_extended") {
+      if (mode === 'driver') setMode('host');
+      navigate(`/booking/${notification.related_id}`);
     } else if (notification.type === "message") {
       navigate(`/messages`);
     } else if (
