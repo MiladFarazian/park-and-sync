@@ -195,8 +195,14 @@ export const NotificationBell = () => {
       if (mode === 'host') setMode('driver');
       navigate(`/booking-confirmation/${notification.related_id}`);
     } else if (notification.type === "booking_host" || notification.type === "booking_approval_required") {
-      if (mode === 'driver') setMode('host');
-      navigate(`/host-booking-confirmation/${notification.related_id}`);
+      // Check if this is a legacy "Booking Extended" notification with old type
+      if (notification.title === "Booking Extended") {
+        if (mode === 'driver') setMode('host');
+        navigate(`/booking/${notification.related_id}`);
+      } else {
+        if (mode === 'driver') setMode('host');
+        navigate(`/host-booking-confirmation/${notification.related_id}`);
+      }
     } else if (notification.type === "booking_extended") {
       if (mode === 'driver') setMode('host');
       navigate(`/booking/${notification.related_id}`);
