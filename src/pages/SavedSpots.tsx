@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { addHours } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFavoriteSpots } from '@/hooks/useFavoriteSpots';
@@ -8,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Heart, MapPin, Star, Zap, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { DEFAULT_MAP_CENTER } from '@/lib/constants';
 
 interface SavedSpot {
   id: string;
@@ -95,6 +97,28 @@ export default function SavedSpots() {
     await toggleFavorite(spotId);
   };
 
+  const handleExploreSpots = () => {
+    const now = new Date();
+    const twoHoursLater = addHours(now, 2);
+    const startParam = now.toISOString();
+    const endParam = twoHoursLater.toISOString();
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          navigate(`/explore?lat=${latitude}&lng=${longitude}&start=${startParam}&end=${endParam}`);
+        },
+        () => {
+          navigate(`/explore?lat=${DEFAULT_MAP_CENTER.lat}&lng=${DEFAULT_MAP_CENTER.lng}&start=${startParam}&end=${endParam}`);
+        },
+        { timeout: 5000, enableHighAccuracy: false }
+      );
+    } else {
+      navigate(`/explore?lat=${DEFAULT_MAP_CENTER.lat}&lng=${DEFAULT_MAP_CENTER.lng}&start=${startParam}&end=${endParam}`);
+    }
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-background">
@@ -159,7 +183,7 @@ export default function SavedSpots() {
             <p className="text-muted-foreground mb-6">
               Browse parking spots and tap the heart icon to save them here.
             </p>
-            <Button onClick={() => navigate('/explore')}>Explore Spots</Button>
+            <Button onClick={handleExploreSpots}>Explore Spots</Button>
           </div>
         ) : (
           <div className="space-y-4">
