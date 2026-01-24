@@ -1219,6 +1219,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_booking_hold_atomic: {
+        Args: {
+          p_end_at: string
+          p_expires_at: string
+          p_idempotency_key?: string
+          p_spot_id: string
+          p_start_at: string
+          p_user_id: string
+        }
+        Returns: {
+          error_message: string
+          hold_id: string
+          success: boolean
+        }[]
+      }
       disablelongtransactions: { Args: never; Returns: string }
       dropgeometrycolumn:
         | {
