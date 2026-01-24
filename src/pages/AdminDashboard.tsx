@@ -8,8 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from "@/components/ui/pagination";
 import { toast } from "sonner";
 import { Shield, XCircle, AlertTriangle, Ban, Eye, Loader2, ArrowLeft } from "lucide-react";
+import { usePagination, getPaginationRange } from "@/hooks/usePagination";
 import { format } from "date-fns";
 
 interface SpotReport {
@@ -47,6 +49,10 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "pending">("pending");
+  const [totalReports, setTotalReports] = useState(0);
+
+  const PAGE_SIZE = 10;
+  const pagination = usePagination({ pageSize: PAGE_SIZE });
 
   useEffect(() => {
     checkAdminStatus();
@@ -56,7 +62,7 @@ export default function AdminDashboard() {
     if (isAdmin) {
       fetchReports();
     }
-  }, [isAdmin, filter]);
+  }, [isAdmin, filter, pagination.currentPage]);
 
   const checkAdminStatus = async () => {
     if (!user) {
@@ -83,6 +89,27 @@ export default function AdminDashboard() {
   const fetchReports = async () => {
     setLoading(true);
     try {
+      // First, get the total count for pagination
+      let countQuery = supabase
+        .from("spot_reports")
+        .select("id", { count: "exact", head: true });
+
+      if (filter === "pending") {
+        countQuery = countQuery.eq("status", "pending");
+      }
+
+      const { count, error: countError } = await countQuery;
+
+      if (countError) {
+        console.error("Error getting count:", countError);
+      } else {
+        setTotalReports(count || 0);
+        pagination.setTotalItems(count || 0);
+      }
+
+      // Now fetch the paginated data
+      const { from, to } = getPaginationRange(pagination.currentPage, PAGE_SIZE);
+
       let query = supabase
         .from("spot_reports")
         .select(`
@@ -97,7 +124,8 @@ export default function AdminDashboard() {
             first_name, last_name, email
           )
         `)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
       if (filter === "pending") {
         query = query.eq("status", "pending");
@@ -229,14 +257,14 @@ export default function AdminDashboard() {
         <div className="flex gap-2">
           <Button
             variant={filter === "pending" ? "default" : "outline"}
-            onClick={() => setFilter("pending")}
+            onClick={() => { setFilter("pending"); pagination.setPage(1); }}
             size="sm"
           >
             Pending
           </Button>
           <Button
             variant={filter === "all" ? "default" : "outline"}
-            onClick={() => setFilter("all")}
+            onClick={() => { setFilter("all"); pagination.setPage(1); }}
             size="sm"
           >
             All Reports
@@ -446,6 +474,74 @@ export default function AdminDashboard() {
                   ))}
                 </TableBody>
               </Table>
+
+              {/* Pagination */}
+              {pagination.totalPages > 1 && (
+                <div className="mt-6 flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {pagination.startIndex + 1} to {Math.min(pagination.endIndex + 1, totalReports)} of {totalReports} reports
+                  </p>
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() => pagination.previousPage()}
+                          className={!pagination.hasPreviousPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+
+                      {pagination.getPageRange()[0] > 1 && (
+                        <>
+                          <PaginationItem>
+                            <PaginationLink onClick={() => pagination.setPage(1)} className="cursor-pointer">
+                              1
+                            </PaginationLink>
+                          </PaginationItem>
+                          {pagination.getPageRange()[0] > 2 && (
+                            <PaginationItem>
+                              <PaginationEllipsis />
+                            </PaginationItem>
+                          )}
+                        </>
+                      )}
+
+                      {pagination.getPageRange().map((page) => (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            onClick={() => pagination.setPage(page)}
+                            isActive={page === pagination.currentPage}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+
+                      {pagination.getPageRange()[pagination.getPageRange().length - 1] < pagination.totalPages && (
+                        <>
+                          {pagination.getPageRange()[pagination.getPageRange().length - 1] < pagination.totalPages - 1 && (
+                            <PaginationItem>
+                              <PaginationEllipsis />
+                            </PaginationItem>
+                          )}
+                          <PaginationItem>
+                            <PaginationLink onClick={() => pagination.setPage(pagination.totalPages)} className="cursor-pointer">
+                              {pagination.totalPages}
+                            </PaginationLink>
+                          </PaginationItem>
+                        </>
+                      )}
+
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() => pagination.nextPage()}
+                          className={!pagination.hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

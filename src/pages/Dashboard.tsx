@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from '@/components/ui/pagination';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,6 +16,7 @@ import { formatAvailability } from '@/lib/formatAvailability';
 import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
 import { getHostNetEarnings } from '@/lib/hostEarnings';
 import { PLACEHOLDER_IMAGE } from '@/lib/constants';
+import { usePagination, getPaginationRange } from '@/hooks/usePagination';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('listings');
@@ -26,6 +28,10 @@ const Dashboard = () => {
     totalBookings: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [totalListings, setTotalListings] = useState(0);
+
+  const PAGE_SIZE = 6;
+  const pagination = usePagination({ pageSize: PAGE_SIZE });
 
   useEffect(() => {
     if (user) {
@@ -33,7 +39,7 @@ const Dashboard = () => {
     } else {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, pagination.currentPage]);
 
   const handleToggleStatus = async (spotId: string, currentStatus: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -65,7 +71,22 @@ const Dashboard = () => {
     try {
       setLoading(true);
 
-      // Fetch spots
+      // First, get total count for pagination
+      const { count, error: countError } = await supabase
+        .from('spots')
+        .select('id', { count: 'exact', head: true })
+        .eq('host_id', user?.id);
+
+      if (countError) {
+        console.error('Error getting count:', countError);
+      } else {
+        setTotalListings(count || 0);
+        pagination.setTotalItems(count || 0);
+      }
+
+      // Fetch paginated spots
+      const { from, to } = getPaginationRange(pagination.currentPage, PAGE_SIZE);
+
       const { data: spotsData, error: spotsError } = await supabase
         .from('spots')
         .select(`
@@ -87,7 +108,8 @@ const Dashboard = () => {
           )
         `)
         .eq('host_id', user?.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       if (spotsError) throw spotsError;
 
@@ -347,17 +369,87 @@ const Dashboard = () => {
           </Button>
         </Card>
       ) : (
-        <div className="grid gap-4">
-          {listings.map((listing, index) => (
-            <div 
-              key={listing.id} 
-              className="animate-fade-in" 
-              style={{ animationDelay: `${index * 75}ms`, animationFillMode: 'both' }}
-            >
-              <ListingCard listing={listing} />
+        <>
+          <div className="grid gap-4">
+            {listings.map((listing, index) => (
+              <div
+                key={listing.id}
+                className="animate-fade-in"
+                style={{ animationDelay: `${index * 75}ms`, animationFillMode: 'both' }}
+              >
+                <ListingCard listing={listing} />
+              </div>
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <div className="mt-6 flex flex-col items-center gap-4">
+              <p className="text-sm text-muted-foreground">
+                Showing {pagination.startIndex + 1} to {Math.min(pagination.endIndex + 1, totalListings)} of {totalListings} listings
+              </p>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => pagination.previousPage()}
+                      className={!pagination.hasPreviousPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+
+                  {pagination.getPageRange()[0] > 1 && (
+                    <>
+                      <PaginationItem>
+                        <PaginationLink onClick={() => pagination.setPage(1)} className="cursor-pointer">
+                          1
+                        </PaginationLink>
+                      </PaginationItem>
+                      {pagination.getPageRange()[0] > 2 && (
+                        <PaginationItem>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      )}
+                    </>
+                  )}
+
+                  {pagination.getPageRange().map((page) => (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => pagination.setPage(page)}
+                        isActive={page === pagination.currentPage}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+
+                  {pagination.getPageRange()[pagination.getPageRange().length - 1] < pagination.totalPages && (
+                    <>
+                      {pagination.getPageRange()[pagination.getPageRange().length - 1] < pagination.totalPages - 1 && (
+                        <PaginationItem>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      )}
+                      <PaginationItem>
+                        <PaginationLink onClick={() => pagination.setPage(pagination.totalPages)} className="cursor-pointer">
+                          {pagination.totalPages}
+                        </PaginationLink>
+                      </PaginationItem>
+                    </>
+                  )}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => pagination.nextPage()}
+                      className={!pagination.hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -71,6 +71,7 @@ const Profile = () => {
   const [phoneVerifyCooldown, setPhoneVerifyCooldown] = useState(0);
   const [hostRating, setHostRating] = useState<{ average: number; count: number } | null>(null);
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+  const [totalReviewCount, setTotalReviewCount] = useState(0);
   const [userReviews, setUserReviews] = useState<Array<{
     id: string;
     rating: number;
@@ -217,19 +218,29 @@ const Profile = () => {
     try {
       setIsLoadingReviews(true);
       setUserReviews([]);
-      
+      setTotalReviewCount(0);
+
       if (mode === 'driver') {
         // Get reviews where user was the renter (driver reviews)
         const { data: bookings, error: bookingsError } = await supabase
           .from('bookings')
           .select('id, spot_id, spots(category)')
           .eq('renter_id', user.id);
-        
+
         if (bookingsError) throw bookingsError;
         if (!bookings || bookings.length === 0) return;
 
         const bookingIds = bookings.map(b => b.id);
         const bookingMap = new Map(bookings.map(b => [b.id, b]));
+
+        // Get total count first
+        const { count } = await supabase
+          .from('reviews')
+          .select('id', { count: 'exact', head: true })
+          .in('booking_id', bookingIds)
+          .eq('reviewee_id', user.id);
+
+        setTotalReviewCount(count || 0);
 
         const { data: reviews, error: reviewsError } = await supabase
           .from('reviews')
@@ -238,7 +249,7 @@ const Profile = () => {
           .eq('reviewee_id', user.id)
           .order('created_at', { ascending: false })
           .limit(10);
-        
+
         if (reviewsError) throw reviewsError;
         if (!reviews || reviews.length === 0) return;
 
@@ -289,6 +300,15 @@ const Profile = () => {
         const bookingIds = bookings.map(b => b.id);
         const bookingSpotMap = new Map(bookings.map(b => [b.id, b.spot_id]));
 
+        // Get total count first
+        const { count } = await supabase
+          .from('reviews')
+          .select('id', { count: 'exact', head: true })
+          .in('booking_id', bookingIds)
+          .eq('reviewee_id', user.id);
+
+        setTotalReviewCount(count || 0);
+
         const { data: reviews, error: reviewsError } = await supabase
           .from('reviews')
           .select('id, rating, comment, created_at, reviewer_id, booking_id')
@@ -296,7 +316,7 @@ const Profile = () => {
           .eq('reviewee_id', user.id)
           .order('created_at', { ascending: false })
           .limit(10);
-        
+
         if (reviewsError) throw reviewsError;
         if (!reviews || reviews.length === 0) return;
 
@@ -306,7 +326,7 @@ const Profile = () => {
           .from('profiles')
           .select('user_id, first_name, last_name')
           .in('user_id', reviewerIds);
-        
+
         const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
 
         const formattedReviews = reviews.map(r => {
@@ -890,7 +910,9 @@ const Profile = () => {
               <div>
                 <h3 className="font-semibold text-lg">My Reviews</h3>
                 <p className="text-sm text-muted-foreground">
-                  {mode === 'driver' ? 'Reviews from hosts' : 'Reviews from drivers'}
+                  {totalReviewCount > 0
+                    ? `${totalReviewCount} ${totalReviewCount === 1 ? 'review' : 'reviews'} from ${mode === 'driver' ? 'hosts' : 'drivers'}`
+                    : mode === 'driver' ? 'Reviews from hosts' : 'Reviews from drivers'}
                 </p>
               </div>
             </div>
@@ -935,12 +957,12 @@ const Profile = () => {
                 </div>
               ))}
             </div>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full mt-4"
               onClick={() => navigate('/reviews')}
             >
-              See All Reviews
+              {totalReviewCount > 10 ? `See All ${totalReviewCount} Reviews` : 'See All Reviews'}
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           </Card>
