@@ -70,17 +70,17 @@ const BookingDeclined = () => {
       </div>
 
       <div className="container mx-auto px-4 py-8 max-w-lg space-y-6">
-        {/* Status Icon */}
-        <div className="text-center space-y-4">
-          <div className="flex justify-center">
-            <div className="rounded-full bg-destructive/10 p-4">
-              <XCircle className="h-10 w-10 text-destructive" />
-            </div>
+        {/* Status Header */}
+        <div className="flex items-center gap-4">
+          <div className="rounded-full bg-destructive/10 p-3 shrink-0">
+            <XCircle className="h-8 w-8 text-destructive" />
           </div>
-          <h2 className="text-2xl font-bold">Request Declined</h2>
-          <p className="text-muted-foreground">
-            The host was unable to approve your parking request.
-          </p>
+          <div>
+            <h2 className="text-xl font-bold text-destructive">Request Declined</h2>
+            <p className="text-muted-foreground text-sm">
+              The host was unable to approve your request
+            </p>
+          </div>
         </div>
 
         {/* No Charge Confirmation */}
