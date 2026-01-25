@@ -630,7 +630,7 @@ const Profile = () => {
     subtitle: 'Account security settings',
     onClick: () => navigate('/privacy-security')
   }];
-  return <div className="space-y-6 p-4 md:p-6 lg:p-8 max-w-2xl mx-auto">
+  return <div className="space-y-6">
       {/* Incomplete Profile Overlay Popup */}
       {isProfileIncomplete && !profileAlertDismissed && (
         <div 
@@ -677,10 +677,10 @@ const Profile = () => {
         </div>
       )}
 
-      
-      {/* Profile Info Card */}
-      <Card className="bg-gradient-to-br from-primary via-primary to-primary/90 text-primary-foreground border-0 shadow-lg rounded-2xl">
-        <div className="p-4">
+
+      {/* Profile Info Card - Full Width */}
+      <div className="bg-gradient-to-br from-primary via-primary to-primary/90 text-primary-foreground">
+        <div className="p-4 md:p-6 lg:p-8 max-w-4xl mx-auto">
           <div className="flex items-center gap-4">
             <Avatar className="h-20 w-20 border-3 border-white/30 shadow-lg flex-shrink-0">
               <AvatarImage src={profile?.avatar_url} />
@@ -815,9 +815,9 @@ const Profile = () => {
             </div>
           </div>
         </div>
-      </Card>
+      </div>
 
-      <div className="px-4 pb-4 space-y-6">
+      <div className="px-4 md:px-6 lg:px-8 pb-4 space-y-6 max-w-4xl mx-auto">
         {/* Become a Host Widget - only show after loading completes and user has no spots */}
         {mode === 'driver' && hasListedSpots === false && (
           <Card className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 animate-fade-in">
@@ -969,7 +969,7 @@ const Profile = () => {
         )}
 
         {/* Settings Menu */}
-        <div className="space-y-3">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {settingsItems.map((item, index) => {
           const Icon = item.icon;
           return <Card 
