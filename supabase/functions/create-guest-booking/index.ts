@@ -140,24 +140,71 @@ serve(async (req) => {
 
     const useEvCharging = will_use_ev_charging || false;
 
-    // Input sanitization - strip HTML/script tags and limit length
+    // Enhanced input sanitization - strip XSS vectors and normalize
     const sanitizeInput = (input: string, maxLength: number = 200): string => {
       return input
-        .replace(/<[^>]*>/g, '') // Remove HTML tags
-        .replace(/[<>]/g, '') // Remove remaining angle brackets
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove script tags and content
+        .replace(/<[^>]*>/g, '') // Remove all HTML tags
+        .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '') // Remove event handlers
+        .replace(/javascript:/gi, '') // Remove javascript: protocol
+        .replace(/data:/gi, '') // Remove data: protocol (prevents encoded payloads)
+        .replace(/[<>'"&]/g, '') // Remove characters that could break context
+        .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+        .normalize('NFC') // Normalize Unicode
         .trim()
         .substring(0, maxLength);
     };
 
+    // Validate name - allow letters, spaces, hyphens, apostrophes (common in names)
     const sanitizedName = sanitizeInput(guest_full_name, 100);
-    const sanitizedEmail = guest_email ? sanitizeInput(guest_email, 254) : null;
-    const sanitizedPhone = guest_phone ? sanitizeInput(guest_phone, 20) : null;
-    const sanitizedCarModel = sanitizeInput(guest_car_model, 100);
-    const sanitizedLicensePlate = guest_license_plate ? sanitizeInput(guest_license_plate, 20).toUpperCase() : null;
+    if (!/^[\p{L}\p{M}\s'\-\.]+$/u.test(sanitizedName) || sanitizedName.length < 2) {
+      return new Response(JSON.stringify({ error: 'Invalid name format' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    // Validate email format if provided
-    if (sanitizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sanitizedEmail)) {
-      return new Response(JSON.stringify({ error: 'Invalid email format' }), {
+    // Validate and sanitize email with stricter pattern
+    const sanitizedEmail = guest_email ? sanitizeInput(guest_email, 254).toLowerCase() : null;
+    if (sanitizedEmail) {
+      // RFC 5322 compliant email regex (simplified but secure)
+      const emailRegex = /^[a-z0-9](?:[a-z0-9._%+-]{0,61}[a-z0-9])?@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z]{2,})+$/i;
+      if (!emailRegex.test(sanitizedEmail)) {
+        return new Response(JSON.stringify({ error: 'Invalid email format' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // Validate phone number - E.164 format or common formats
+    const sanitizedPhone = guest_phone ? sanitizeInput(guest_phone, 20).replace(/[\s\-\(\)\.]/g, '') : null;
+    if (sanitizedPhone) {
+      // Allow international format with + prefix, 7-15 digits
+      const phoneRegex = /^\+?[1-9]\d{6,14}$/;
+      if (!phoneRegex.test(sanitizedPhone)) {
+        return new Response(JSON.stringify({ error: 'Invalid phone number format. Use format: +1234567890' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // Validate car model - alphanumeric with spaces, hyphens
+    const sanitizedCarModel = sanitizeInput(guest_car_model, 100);
+    if (!/^[\w\s\-\.]+$/u.test(sanitizedCarModel) || sanitizedCarModel.length < 2) {
+      return new Response(JSON.stringify({ error: 'Invalid vehicle model format' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validate license plate - alphanumeric only
+    const sanitizedLicensePlate = guest_license_plate 
+      ? sanitizeInput(guest_license_plate, 20).toUpperCase().replace(/[^A-Z0-9]/g, '')
+      : null;
+    if (sanitizedLicensePlate && (sanitizedLicensePlate.length < 2 || sanitizedLicensePlate.length > 10)) {
+      return new Response(JSON.stringify({ error: 'Invalid license plate format' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

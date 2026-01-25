@@ -90,10 +90,10 @@ serve(async (req) => {
       });
     }
 
-    // Verify booking and token
+    // Verify booking and token with expiration check
     const { data: booking, error: bookingError } = await supabaseAdmin
       .from('bookings')
-      .select('id, guest_access_token')
+      .select('id, guest_access_token, end_at, status')
       .eq('id', booking_id)
       .eq('is_guest', true)
       .single();
@@ -105,8 +105,32 @@ serve(async (req) => {
       });
     }
 
-    if (booking.guest_access_token !== access_token) {
+    // Timing-safe token comparison to prevent timing attacks
+    const tokenA = new TextEncoder().encode(booking.guest_access_token || '');
+    const tokenB = new TextEncoder().encode(access_token || '');
+    const timingSafeEqual = (a: Uint8Array, b: Uint8Array): boolean => {
+      if (a.length !== b.length) return false;
+      let result = 0;
+      for (let i = 0; i < a.length; i++) {
+        result |= a[i] ^ b[i];
+      }
+      return result === 0;
+    };
+
+    if (!timingSafeEqual(tokenA, tokenB)) {
+      console.warn(`[auth] Invalid token attempt for booking: ${booking_id.substring(0, 8)}...`);
       return new Response(JSON.stringify({ error: 'Invalid access token' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Check token expiration: valid until 30 days after booking ends
+    const bookingEndDate = new Date(booking.end_at);
+    const expirationDate = new Date(bookingEndDate.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days after end
+    if (new Date() > expirationDate && booking.status !== 'active' && booking.status !== 'paid') {
+      console.warn(`[auth] Expired token for booking: ${booking_id.substring(0, 8)}...`);
+      return new Response(JSON.stringify({ error: 'Access token has expired' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
