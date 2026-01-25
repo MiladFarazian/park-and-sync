@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -29,6 +30,8 @@ const ManageAccount = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showOwnSpots, setShowOwnSpots] = useState(false);
+  const [isUpdatingSpotsSetting, setIsUpdatingSpotsSetting] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -41,6 +44,39 @@ const ManageAccount = () => {
       setAvatarPreview(profile.avatar_url || '');
     }
   }, [profile]);
+
+  // Load the show_own_spots_in_search preference
+  useEffect(() => {
+    const loadSpotsSetting = async () => {
+      if (!profile?.user_id) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('show_own_spots_in_search')
+        .eq('user_id', profile.user_id)
+        .single();
+      setShowOwnSpots(data?.show_own_spots_in_search ?? false);
+    };
+    loadSpotsSetting();
+  }, [profile?.user_id]);
+
+  const handleShowOwnSpotsChange = async (checked: boolean) => {
+    if (!profile?.user_id) return;
+    setIsUpdatingSpotsSetting(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ show_own_spots_in_search: checked })
+        .eq('user_id', profile.user_id);
+      
+      if (error) throw error;
+      setShowOwnSpots(checked);
+      toast.success(checked ? "You'll now see your own spots when searching" : "Your spots are now hidden from your searches");
+    } catch (error: any) {
+      toast.error('Failed to update setting: ' + error.message);
+    } finally {
+      setIsUpdatingSpotsSetting(false);
+    }
+  };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -290,6 +326,27 @@ const ManageAccount = () => {
             </Button>
           </Card>
         </form>
+
+        {/* Search Preferences Section */}
+        <Card className="p-6">
+          <h3 className="font-semibold text-lg mb-2">Search Preferences</h3>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="show-own-spots" className="text-sm font-medium">
+                Show my spots in search
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                See your own listings when searching for parking as a driver
+              </p>
+            </div>
+            <Switch
+              id="show-own-spots"
+              checked={showOwnSpots}
+              onCheckedChange={handleShowOwnSpotsChange}
+              disabled={isUpdatingSpotsSetting}
+            />
+          </div>
+        </Card>
 
         {/* Delete Account Section */}
         <Card className="p-6">

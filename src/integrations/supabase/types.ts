@@ -530,6 +530,7 @@ export type Database = {
           rating: number | null
           review_count: number | null
           role: Database["public"]["Enums"]["user_role"]
+          show_own_spots_in_search: boolean | null
           strikes: number | null
           stripe_account_enabled: boolean | null
           stripe_account_id: string | null
@@ -558,6 +559,7 @@ export type Database = {
           rating?: number | null
           review_count?: number | null
           role?: Database["public"]["Enums"]["user_role"]
+          show_own_spots_in_search?: boolean | null
           strikes?: number | null
           stripe_account_enabled?: boolean | null
           stripe_account_id?: string | null
@@ -586,6 +588,7 @@ export type Database = {
           rating?: number | null
           review_count?: number | null
           role?: Database["public"]["Enums"]["user_role"]
+          show_own_spots_in_search?: boolean | null
           strikes?: number | null
           stripe_account_enabled?: boolean | null
           stripe_account_id?: string | null
