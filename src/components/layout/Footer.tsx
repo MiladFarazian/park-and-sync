@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { logos } from '@/assets';
+import { SUPPORT_USER_ID } from '@/hooks/useSupportRole';
 
 const Footer = () => {
   return (
@@ -69,7 +70,7 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/messages" className="hover:text-foreground transition-colors">
+                <Link to={`/messages?userId=${SUPPORT_USER_ID}`} className="hover:text-foreground transition-colors">
                   Contact Us
                 </Link>
               </li>

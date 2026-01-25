@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Car, Home, CreditCard, HelpCircle, Search, Calendar, Shield, Star, Zap, MapPin, Clock, Users } from 'lucide-react';
+import { SUPPORT_USER_ID } from '@/hooks/useSupportRole';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -626,7 +627,7 @@ const Docs = () => {
           <p className="text-sm text-muted-foreground mb-4">
             Our support team is here for you. Send us a message and we'll get back to you as soon as possible.
           </p>
-          <Button onClick={() => navigate('/messages')}>
+          <Button onClick={() => navigate(`/messages?userId=${SUPPORT_USER_ID}`)}>
             Contact Support
           </Button>
         </div>
