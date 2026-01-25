@@ -1,6 +1,6 @@
-import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { User, Menu, MessageSquare, Calendar, Home, List, FileText, Headphones } from 'lucide-react';
+import React, { useState } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { User, Menu, MessageSquare, Calendar, Home, List, FileText, Headphones, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -20,8 +20,10 @@ import { Badge } from '@/components/ui/badge';
 
 const DesktopHeader = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { mode, setMode } = useMode();
   const { user, signOut } = useAuth();
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
   // Safe access to messages context - may not be available on all routes
   const messagesContext = React.useContext(MessagesContext);
   const totalUnreadCount = messagesContext?.totalUnreadCount ?? 0;
@@ -41,6 +43,39 @@ const DesktopHeader = () => {
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
+  };
+
+  const handleFindParkingClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (isGettingLocation) return;
+
+    const now = new Date();
+    const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    const startParam = now.toISOString();
+    const endParam = twoHoursLater.toISOString();
+
+    if (navigator.geolocation) {
+      setIsGettingLocation(true);
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000,
+          });
+        });
+        const { latitude, longitude } = position.coords;
+        navigate(`/explore?lat=${latitude}&lng=${longitude}&q=Current%20Location&start=${encodeURIComponent(startParam)}&end=${encodeURIComponent(endParam)}`);
+      } catch (error) {
+        // Fallback to default LA location
+        navigate(`/explore?lat=34.0224&lng=-118.2851&q=Los%20Angeles%2C%20CA&start=${encodeURIComponent(startParam)}&end=${encodeURIComponent(endParam)}`);
+      } finally {
+        setIsGettingLocation(false);
+      }
+    } else {
+      // Geolocation not supported, use default
+      navigate(`/explore?lat=34.0224&lng=-118.2851&q=Los%20Angeles%2C%20CA&start=${encodeURIComponent(startParam)}&end=${encodeURIComponent(endParam)}`);
+    }
   };
 
   // Support-specific navigation
@@ -76,21 +111,43 @@ const DesktopHeader = () => {
           />
           
           <nav className="hidden lg:flex items-center gap-1">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.title}
-                to={item.url}
-                className={({ isActive }) =>
-                  `px-4 py-2 text-sm font-medium rounded-full transition-colors ${
-                    isActive 
-                      ? 'bg-primary/10 text-primary' 
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`
-                }
-              >
-                {item.title}
-              </NavLink>
-            ))}
+            {navItems.map((item) => {
+              // Special handling for "Find Parking" - use GPS-based instant search
+              if (item.title === 'Find Parking') {
+                const isActive = location.pathname === '/explore';
+                return (
+                  <button
+                    key={item.title}
+                    onClick={handleFindParkingClick}
+                    disabled={isGettingLocation}
+                    className={`px-4 py-2 text-sm font-medium rounded-full transition-colors flex items-center gap-2 ${
+                      isActive 
+                        ? 'bg-primary/10 text-primary' 
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    } ${isGettingLocation ? 'opacity-70 cursor-wait' : ''}`}
+                  >
+                    {isGettingLocation && <Loader2 className="h-3 w-3 animate-spin" />}
+                    {item.title}
+                  </button>
+                );
+              }
+              
+              return (
+                <NavLink
+                  key={item.title}
+                  to={item.url}
+                  className={({ isActive }) =>
+                    `px-4 py-2 text-sm font-medium rounded-full transition-colors ${
+                      isActive 
+                        ? 'bg-primary/10 text-primary' 
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    }`
+                  }
+                >
+                  {item.title}
+                </NavLink>
+              );
+            })}
           </nav>
         </div>
 

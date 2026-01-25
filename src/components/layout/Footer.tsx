@@ -1,9 +1,45 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { logos } from '@/assets';
 import { SUPPORT_USER_ID } from '@/hooks/useSupportRole';
 
 const Footer = () => {
+  const navigate = useNavigate();
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+
+  const handleFindParkingClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (isGettingLocation) return;
+
+    const now = new Date();
+    const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    const startParam = now.toISOString();
+    const endParam = twoHoursLater.toISOString();
+
+    if (navigator.geolocation) {
+      setIsGettingLocation(true);
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000,
+          });
+        });
+        const { latitude, longitude } = position.coords;
+        navigate(`/explore?lat=${latitude}&lng=${longitude}&q=Current%20Location&start=${encodeURIComponent(startParam)}&end=${encodeURIComponent(endParam)}`);
+      } catch (error) {
+        // Fallback to default LA location
+        navigate(`/explore?lat=34.0224&lng=-118.2851&q=Los%20Angeles%2C%20CA&start=${encodeURIComponent(startParam)}&end=${encodeURIComponent(endParam)}`);
+      } finally {
+        setIsGettingLocation(false);
+      }
+    } else {
+      // Geolocation not supported, use default
+      navigate(`/explore?lat=34.0224&lng=-118.2851&q=Los%20Angeles%2C%20CA&start=${encodeURIComponent(startParam)}&end=${encodeURIComponent(endParam)}`);
+    }
+  };
   return (
     <footer className="bg-muted/30 border-t py-12 hidden md:block">
       <div className="container mx-auto px-6">
@@ -21,9 +57,14 @@ const Footer = () => {
             <h4 className="font-semibold mb-4">For Drivers</h4>
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li>
-                <Link to="/explore" className="hover:text-foreground transition-colors">
+                <button
+                  onClick={handleFindParkingClick}
+                  disabled={isGettingLocation}
+                  className={`hover:text-foreground transition-colors flex items-center gap-1 ${isGettingLocation ? 'opacity-70 cursor-wait' : ''}`}
+                >
+                  {isGettingLocation && <Loader2 className="h-3 w-3 animate-spin" />}
                   Find Parking
-                </Link>
+                </button>
               </li>
               <li>
                 <Link to="/activity" className="hover:text-foreground transition-colors">
