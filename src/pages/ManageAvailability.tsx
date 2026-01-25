@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, Check, Clock, Ban, Settings2, Plus, Trash2, DollarSign, RefreshCw, AlertCircle, X, CalendarDays, Repeat } from 'lucide-react';
+import { ArrowLeft, Loader2, Check, Clock, Ban, Settings2, Plus, Trash2, DollarSign, RefreshCw, AlertCircle, X, CalendarDays, Repeat, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -112,6 +112,19 @@ const ManageAvailability = () => {
   const [spotRecurringRules, setSpotRecurringRules] = useState<Record<string, AvailabilityRule[]>>({});
   const [isApplyingRecurring, setIsApplyingRecurring] = useState(false);
   const [showClearScheduleDialog, setShowClearScheduleDialog] = useState(false);
+  
+  // Search filter state
+  const [spotSearchQuery, setSpotSearchQuery] = useState('');
+  
+  // Filtered spots based on search query
+  const filteredSpots = useMemo(() => {
+    if (!spotSearchQuery.trim()) return spots;
+    const query = spotSearchQuery.toLowerCase().trim();
+    return spots.filter(spot => 
+      spot.title.toLowerCase().includes(query) || 
+      spot.address.toLowerCase().includes(query)
+    );
+  }, [spots, spotSearchQuery]);
 
   useEffect(() => {
     if (user) {
@@ -747,6 +760,29 @@ const ManageAvailability = () => {
             </Card>
           ) : (
             <div className="space-y-2">
+              {/* Search input */}
+              {spots.length > 3 && (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by title or address..."
+                    value={spotSearchQuery}
+                    onChange={(e) => setSpotSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                  {spotSearchQuery && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                      onClick={() => setSpotSearchQuery('')}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              )}
+              
               {spots.length > 1 && (
                 <div 
                   className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer active:bg-accent/50 transition-colors"
@@ -762,7 +798,13 @@ const ManageAvailability = () => {
                 </div>
               )}
 
-              {spots.map(spot => {
+              {filteredSpots.length === 0 && spotSearchQuery ? (
+                <Card className="p-4 text-center">
+                  <p className="text-muted-foreground text-sm">No spots match "{spotSearchQuery}"</p>
+                </Card>
+              ) : null}
+
+              {filteredSpots.map(spot => {
                 const availabilityInfo = getSpotAvailabilityDisplay(spot.id);
                 return (
                   <Card 
@@ -1132,6 +1174,29 @@ const ManageAvailability = () => {
                 </Card>
               ) : (
                 <div className="space-y-2">
+                  {/* Search input */}
+                  {spots.length > 3 && (
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search by title or address..."
+                        value={spotSearchQuery}
+                        onChange={(e) => setSpotSearchQuery(e.target.value)}
+                        className="pl-9"
+                      />
+                      {spotSearchQuery && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                          onClick={() => setSpotSearchQuery('')}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                  
                   {spots.length > 1 && (
                     <div 
                       className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer active:bg-accent/50 transition-colors"
@@ -1147,7 +1212,13 @@ const ManageAvailability = () => {
                     </div>
                   )}
 
-                  {spots.map(spot => {
+                  {filteredSpots.length === 0 && spotSearchQuery ? (
+                    <Card className="p-4 text-center">
+                      <p className="text-muted-foreground text-sm">No spots match "{spotSearchQuery}"</p>
+                    </Card>
+                  ) : null}
+
+                  {filteredSpots.map(spot => {
                     const currentSchedule = getRecurringScheduleSummary(spot.id);
                     return (
                       <Card 
