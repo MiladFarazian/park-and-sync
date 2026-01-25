@@ -784,9 +784,11 @@ const ManageAvailability = () => {
                       <div className="flex-1 min-w-0">
                         <div className="font-medium">{spot.title}</div>
                         <div className="text-sm text-muted-foreground truncate">
-                          ${spot.hourly_rate}/hr
+                          {spot.address}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                          <span className="font-medium">${spot.hourly_rate}/hr</span>
+                          <span className="mx-1">•</span>
                           {availabilityInfo.isLoading ? (
                             <Loader2 className="h-3 w-3 animate-spin" />
                           ) : (
@@ -1167,11 +1169,13 @@ const ManageAvailability = () => {
                           <div className="flex-1 min-w-0">
                             <div className="font-medium">{spot.title}</div>
                             <div className="text-sm text-muted-foreground truncate">
-                              ${spot.hourly_rate}/hr
+                              {spot.address}
                             </div>
                             <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                              <span className="font-medium">${spot.hourly_rate}/hr</span>
+                              <span className="mx-1">•</span>
                               <Repeat className="h-3 w-3" />
-                              Current: {currentSchedule}
+                              {currentSchedule}
                             </div>
                           </div>
                           {recurringSelectedSpots.includes(spot.id) && (
