@@ -1,162 +1,189 @@
 
-# Plan: Add Recurring Schedule Tab to Manage Availability Page
 
-## Overview
-Add a new tab to the host Manage Availability page (`/manage-availability`) that allows hosts to manage recurring weekly schedules using a When2Meet-style UI. This tab will enable hosts to:
-1. Create a weekly schedule visually (blank grid to start)
-2. Assign the schedule to one or multiple spots simultaneously
+# Plan: Improve Changes Preview UI in Manage Availability
 
-## Current Architecture
+## Problem
+The current "Changes Preview" section is inconsistent and confusing:
+- **Before** shows "Available all day (recurring)" with a source indicator
+- **After** shows just "Available all day" without context
 
-### Existing Components
-- **`ManageAvailability.tsx`**: Current page for date-specific overrides (uses `calendar_overrides` table)
-- **`EditSpotAvailability.tsx`**: Single-spot management with tabs for Date Override and Weekly Schedule
-- **`WeeklyScheduleGrid.tsx`**: When2Meet-style drag-to-select component for 7-day × 48-slot grid
-- **`DateOverrideManager.tsx`**: Calendar-based date override selection
+This creates confusion because:
+1. The "(recurring)" label only appears on one side
+2. It doesn't clearly communicate that a **date override** is replacing the **recurring schedule**
+3. The visual distinction between the two states is minimal
 
-### Database Tables
-- **`availability_rules`**: Stores recurring weekly rules (day_of_week, start_time, end_time, spot_id)
-- **`calendar_overrides`**: Stores date-specific overrides
+## Solution: Enhanced Changes Preview Design
 
-## Implementation Plan
+Replace the simple Before/After text boxes with a more informative, visually distinct preview that clearly shows:
+1. The **source** of both the current and new availability
+2. **Visual indicators** (icons) for different states
+3. A **clear transition arrow** between states
 
-### 1. Update ManageAvailability.tsx Page Structure
-
-Add tabs to switch between:
-- **Date Override** (current functionality) - for specific date changes
-- **Recurring Schedule** (new) - for weekly recurring availability
+### New UI Layout
 
 ```text
-┌─────────────────────────────────────────────────┐
-│  Manage Availability                            │
-├────────────────┬────────────────────────────────┤
-│ Date Override  │  Recurring Schedule           │
-└────────────────┴────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│  🔄 Changes Preview                                  │
+├──────────────────────────────────────────────────────┤
+│                                                      │
+│  ┌─────────────────────┐     ┌─────────────────────┐│
+│  │ CURRENT             │     │ NEW (Override)      ││
+│  │ ─────────────────── │     │ ─────────────────── ││
+│  │ 🔁 From weekly      │     │ 📅 For selected     ││
+│  │    schedule         │ ──▶ │    dates only       ││
+│  │                     │     │                     ││
+│  │ ✓ Available all day │     │ ✓ Available all day ││
+│  └─────────────────────┘     └─────────────────────┘│
+│                                                      │
+│  Updating 1 spot × 1 date                           │
+└──────────────────────────────────────────────────────┘
 ```
 
-### 2. New Tab: Recurring Schedule
+## Implementation Details
 
-The new tab will have a **different workflow** from the Weekly Schedule in EditSpotAvailability:
+### 1. Update `getCurrentAvailabilityDisplay()` to return structured data
 
-**Workflow:**
-1. Host sees a **blank** When2Meet grid (no pre-populated data)
-2. Host drags to select their desired available hours
-3. Host selects which spots to apply this schedule to (multi-select checkboxes)
-4. Host clicks "Apply to Selected Spots"
+Instead of returning just a string, return an object with:
+- `text`: The availability description (e.g., "Available all day")
+- `source`: The source type ("override" | "recurring" | "none")
+- `icon`: Appropriate icon indicator
 
-**Key Difference:**
-- The existing `EditSpotAvailability` loads rules from a specific spot and saves back to it
-- This new tab starts blank and **pushes** the schedule to selected spots
-
-### 3. UI Components Structure
-
-```text
-┌─────────────────────────────────────────────────────────┐
-│  Recurring Schedule Tab                                 │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  ┌─ Step 1: Set Your Hours ─────────────────────────┐  │
-│  │  [Instructions: Drag to select available hours]  │  │
-│  │                                                   │  │
-│  │  ┌─────────────────────────────────────────────┐ │  │
-│  │  │     S   M   T   W   T   F   S               │ │  │
-│  │  │ 12am ░░░ ░░░ ░░░ ░░░ ░░░ ░░░ ░░░           │ │  │
-│  │  │ 1am  ░░░ ░░░ ░░░ ░░░ ░░░ ░░░ ░░░           │ │  │
-│  │  │ ...  (When2Meet style grid)                 │ │  │
-│  │  │ 11pm ░░░ ░░░ ░░░ ░░░ ░░░ ░░░ ░░░           │ │  │
-│  │  └─────────────────────────────────────────────┘ │  │
-│  │                                                   │  │
-│  │  [24/7] [M-F 9-5] [Undo]                         │  │
-│  └───────────────────────────────────────────────────┘  │
-│                                                         │
-│  ┌─ Step 2: Select Spots to Update ─────────────────┐  │
-│  │  [ ] Select All                                   │  │
-│  │  [x] Downtown Parking - Current: M-F 9-5         │  │
-│  │  [x] Beach Lot - Current: 24/7                   │  │
-│  │  [ ] Night Spot - Current: No schedule           │  │
-│  └───────────────────────────────────────────────────┘  │
-│                                                         │
-│  ┌─ Preview ────────────────────────────────────────┐  │
-│  │  2 spots will be updated with:                   │  │
-│  │  Mon-Fri: 9:00 AM - 5:00 PM                      │  │
-│  │  Sat-Sun: Closed                                  │  │
-│  └───────────────────────────────────────────────────┘  │
-│                                                         │
-│  [Apply to 2 Selected Spots]                            │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
-
-### 4. Technical Implementation Details
-
-#### State Management
 ```typescript
-// New state for recurring tab
-const [recurringRules, setRecurringRules] = useState<AvailabilityRule[]>([]);
-const [recurringSelectedSpots, setRecurringSelectedSpots] = useState<string[]>([]);
+interface AvailabilityDisplayInfo {
+  text: string;
+  source: 'override' | 'recurring' | 'none';
+  sourceLabel: string;
+}
 
-// Existing availability rules per spot (for display)
-const [spotRecurringRules, setSpotRecurringRules] = useState<Record<string, AvailabilityRule[]>>({});
-```
-
-#### Data Flow
-1. On page load: Fetch all spots and their existing `availability_rules`
-2. Display current schedule summary for each spot in the selection list
-3. When host clicks "Apply":
-   - Delete existing `availability_rules` for selected spots
-   - Insert new rules from the grid for each selected spot
-
-#### Save Logic
-```typescript
-const handleApplyRecurringSchedule = async () => {
-  for (const spotId of recurringSelectedSpots) {
-    // Delete existing rules
-    await supabase
-      .from('availability_rules')
-      .delete()
-      .eq('spot_id', spotId);
-    
-    // Insert new rules (if any)
-    if (recurringRules.length > 0) {
-      const rulesWithSpotId = recurringRules.map(rule => ({
-        spot_id: spotId,
-        ...rule
-      }));
-      await supabase
-        .from('availability_rules')
-        .insert(rulesWithSpotId);
-    }
+const getCurrentAvailabilityInfo = (): AvailabilityDisplayInfo => {
+  if (selectedSpots.length === 0) {
+    return { text: 'No spots selected', source: 'none', sourceLabel: '' };
   }
+  
+  const firstSpotId = selectedSpots[0];
+  const data = spotAvailability[firstSpotId];
+  
+  if (!data) {
+    return { text: 'Loading...', source: 'none', sourceLabel: '' };
+  }
+  
+  if (data.overrides.length > 0) {
+    const override = data.overrides[0];
+    const text = !override.is_available 
+      ? 'Blocked'
+      : isFullDayTimeRange(override.start_time, override.end_time)
+        ? 'Available all day'
+        : `${formatTimeDisplay(override.start_time!)} - ${formatTimeDisplay(override.end_time!)}`;
+    return { text, source: 'override', sourceLabel: 'Date override' };
+  }
+  
+  if (data.rules.length > 0) {
+    const rule = data.rules[0];
+    const text = !rule.is_available 
+      ? 'Blocked'
+      : isFullDayTimeRange(rule.start_time, rule.end_time)
+        ? 'Available all day'
+        : `${formatTimeDisplay(rule.start_time)} - ${formatTimeDisplay(rule.end_time)}`;
+    return { text, source: 'recurring', sourceLabel: 'Weekly schedule' };
+  }
+  
+  return { text: 'No schedule set', source: 'none', sourceLabel: '' };
 };
 ```
 
-### 5. Files to Modify
+### 2. Update `getPendingAvailabilityDisplay()` similarly
+
+```typescript
+const getPendingAvailabilityInfo = (): AvailabilityDisplayInfo => {
+  let text: string;
+  
+  if (availabilityMode === 'unavailable') {
+    text = 'Blocked';
+  } else if (availabilityMode === 'available') {
+    text = 'Available all day' + (defaultCustomRate ? ` ($${defaultCustomRate}/hr)` : '');
+  } else {
+    const blocks = timeBlocks.map(b => {
+      const rate = b.customRate ?? defaultCustomRate;
+      const rateStr = rate ? ` ($${rate}/hr)` : '';
+      return `${format(b.startTime, 'h:mm a')} - ${format(b.endTime, 'h:mm a')}${rateStr}`;
+    });
+    text = blocks.join(', ');
+  }
+  
+  return { 
+    text, 
+    source: 'override', 
+    sourceLabel: 'Date override' 
+  };
+};
+```
+
+### 3. Redesign the Changes Preview Section
+
+Replace the simple grid with a more informative layout:
+
+```tsx
+<Card className="p-4 border-primary/30 bg-primary/5">
+  <div className="flex items-center gap-3">
+    {/* Before Card */}
+    <div className="flex-1 bg-background rounded-lg border p-3">
+      <div className="flex items-center gap-1.5 mb-2">
+        {currentInfo.source === 'recurring' ? (
+          <Repeat className="h-3.5 w-3.5 text-muted-foreground" />
+        ) : currentInfo.source === 'override' ? (
+          <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+        ) : null}
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Current
+        </span>
+      </div>
+      {currentInfo.sourceLabel && (
+        <p className="text-xs text-muted-foreground mb-1">{currentInfo.sourceLabel}</p>
+      )}
+      <p className="text-sm font-medium">{currentInfo.text}</p>
+    </div>
+    
+    {/* Arrow */}
+    <ArrowRight className="h-5 w-5 text-primary shrink-0" />
+    
+    {/* After Card */}
+    <div className="flex-1 bg-primary/10 rounded-lg border border-primary/30 p-3">
+      <div className="flex items-center gap-1.5 mb-2">
+        <CalendarDays className="h-3.5 w-3.5 text-primary" />
+        <span className="text-xs font-medium text-primary uppercase tracking-wide">
+          New
+        </span>
+      </div>
+      <p className="text-xs text-muted-foreground mb-1">Date override</p>
+      <p className="text-sm font-medium">{pendingInfo.text}</p>
+    </div>
+  </div>
+  
+  {/* Summary footer */}
+  <div className="mt-3 pt-3 border-t text-xs text-muted-foreground">
+    ...
+  </div>
+</Card>
+```
+
+## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/pages/ManageAvailability.tsx` | Add Tabs component, new "Recurring Schedule" tab content, state for recurring rules, spot selection for recurring, apply logic |
+| `src/pages/ManageAvailability.tsx` | Refactor display functions to return structured data; redesign Changes Preview UI with icons, source labels, and arrow transition |
 
-### 6. UI/UX Considerations
+## Visual Improvements
 
-1. **Blank Grid Start**: Unlike EditSpotAvailability which loads existing rules, this starts blank to represent "creating a new schedule"
+1. **Clear source indicators**: Icons (🔁 Repeat for recurring, 📅 Calendar for override) visually distinguish the source
+2. **Consistent labeling**: Both sides show a source label ("Weekly schedule" vs "Date override")
+3. **Arrow transition**: A clear `→` arrow shows the change direction
+4. **Better hierarchy**: "Current" and "New" headers with source labels underneath, then the actual availability text
 
-2. **Current Schedule Display**: Each spot in the selection list shows its current recurring schedule summary (e.g., "M-F 9-5", "24/7", "No schedule set")
+## Edge Cases
 
-3. **Confirmation Preview**: Before applying, show a summary of what will change:
-   - Number of spots affected
-   - Summary of the new schedule
-   - Warning if replacing existing schedules
+| Scenario | Display |
+|----------|---------|
+| No existing schedule | Current: "No schedule set" (no source label) |
+| Existing override | Current: shows "Date override" as source |
+| Multiple spots with different schedules | Current: shows first selected spot with "(varies)" indicator if others differ |
 
-4. **Success Feedback**: After applying, show toast with number of spots updated and navigate to host calendar
-
-### 7. Edge Cases
-
-| Case | Handling |
-|------|----------|
-| No spots selected | Disable "Apply" button |
-| Empty grid (no hours selected) | This clears the schedule - show confirmation dialog |
-| User has no active spots | Show message with link to list a spot |
-
-## Summary
-
-This implementation adds a second tab to the ManageAvailability page that provides a clean, blank When2Meet-style interface for creating a recurring weekly schedule and bulk-applying it to multiple spots. It reuses the existing `WeeklyScheduleGrid` component and follows the existing patterns in the codebase.
