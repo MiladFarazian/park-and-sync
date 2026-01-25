@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { MapPin, Clock, Shield, Calendar, ChevronRight, Zap } from 'lucide-react';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
@@ -8,6 +8,7 @@ import { marketing } from '@/assets';
 import LocationSearchInput from '@/components/ui/location-search-input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { supabase } from '@/integrations/supabase/client';
 
 const HeroSection = () => {
   const navigate = useNavigate();
@@ -19,6 +20,22 @@ const HeroSection = () => {
   const [mobileStartPickerOpen, setMobileStartPickerOpen] = useState(false);
   const [mobileEndPickerOpen, setMobileEndPickerOpen] = useState(false);
   const [needsEvCharging, setNeedsEvCharging] = useState(false);
+  const [bookingCount, setBookingCount] = useState<number>(0);
+
+  // Fetch total booking count for hero stat
+  useEffect(() => {
+    const fetchBookingCount = async () => {
+      const { count } = await supabase
+        .from('bookings')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['paid', 'active', 'completed']);
+      
+      if (count !== null) {
+        setBookingCount(count);
+      }
+    };
+    fetchBookingCount();
+  }, []);
 
   const handleSelectLocation = (location: { lat: number; lng: number; name: string }) => {
     setSearchCoords({ lat: location.lat, lng: location.lng });
@@ -171,7 +188,7 @@ const HeroSection = () => {
                   <Shield className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">10+</p>
+                  <p className="text-2xl font-bold">{Math.floor(bookingCount / 10) * 10}+</p>
                   <p className="text-sm text-muted-foreground">Secure bookings</p>
                 </div>
               </div>
