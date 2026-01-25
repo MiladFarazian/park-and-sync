@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, Check, Clock, Ban, Settings2, Plus, Trash2, DollarSign, RefreshCw, AlertCircle, X, CalendarDays, Repeat, Search } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Check, Clock, Ban, Settings2, Plus, Trash2, DollarSign, RefreshCw, AlertCircle, X, CalendarDays, Repeat, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -51,6 +51,12 @@ interface TimeBlock {
 }
 
 type AvailabilityMode = 'available' | 'unavailable' | 'custom';
+
+interface AvailabilityDisplayInfo {
+  text: string;
+  source: 'override' | 'recurring' | 'none';
+  sourceLabel: string;
+}
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -539,29 +545,64 @@ const ManageAvailability = () => {
     return `${hour12}:${minutes} ${ampm}`;
   };
 
-  // Get pending availability display (what will be saved)
-  const getPendingAvailabilityDisplay = (): string => {
+  // Get pending availability info (what will be saved)
+  const getPendingAvailabilityInfo = (): AvailabilityDisplayInfo => {
+    let text: string;
+    
     if (availabilityMode === 'unavailable') {
-      return 'Blocked';
+      text = 'Blocked';
     } else if (availabilityMode === 'available') {
-      return 'Available all day' + (defaultCustomRate ? ` ($${defaultCustomRate}/hr)` : '');
+      text = 'Available all day' + (defaultCustomRate ? ` ($${defaultCustomRate}/hr)` : '');
     } else {
       const blocks = timeBlocks.map(b => {
         const rate = b.customRate ?? defaultCustomRate;
         const rateStr = rate ? ` ($${rate}/hr)` : '';
         return `${format(b.startTime, 'h:mm a')} - ${format(b.endTime, 'h:mm a')}${rateStr}`;
       });
-      return blocks.join(', ');
+      text = blocks.join(', ');
     }
+    
+    return { 
+      text, 
+      source: 'override', 
+      sourceLabel: 'Date override' 
+    };
   };
 
-  // Get current availability display for summary
-  const getCurrentAvailabilityDisplay = (): string => {
-    if (selectedSpots.length === 0) return 'No spots selected';
+  // Get current availability info for summary
+  const getCurrentAvailabilityInfo = (): AvailabilityDisplayInfo => {
+    if (selectedSpots.length === 0) {
+      return { text: 'No spots selected', source: 'none', sourceLabel: '' };
+    }
     
-    // Get availability for first selected spot as representative
     const firstSpotId = selectedSpots[0];
-    return getSpotAvailabilityDisplay(firstSpotId).text;
+    const data = spotAvailability[firstSpotId];
+    
+    if (!data) {
+      return { text: 'Loading...', source: 'none', sourceLabel: '' };
+    }
+    
+    if (data.overrides.length > 0) {
+      const override = data.overrides[0];
+      const text = !override.is_available 
+        ? 'Blocked'
+        : isFullDayTimeRange(override.start_time, override.end_time)
+          ? 'Available all day'
+          : `${formatTimeDisplay(override.start_time!)} - ${formatTimeDisplay(override.end_time!)}`;
+      return { text, source: 'override', sourceLabel: 'Date override' };
+    }
+    
+    if (data.rules.length > 0) {
+      const rule = data.rules[0];
+      const text = !rule.is_available 
+        ? 'Blocked'
+        : isFullDayTimeRange(rule.start_time, rule.end_time)
+          ? 'Available all day'
+          : `${formatTimeDisplay(rule.start_time)} - ${formatTimeDisplay(rule.end_time)}`;
+      return { text, source: 'recurring', sourceLabel: 'Weekly schedule' };
+    }
+    
+    return { text: 'No schedule set', source: 'none', sourceLabel: '' };
   };
 
   const handleSave = async () => {
@@ -1082,43 +1123,70 @@ const ManageAvailability = () => {
         </section>
 
         {/* Section 4: Before vs After Summary */}
-        {selectedSpots.length > 0 && selectedDates.length > 0 && (
-          <section>
-            <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <RefreshCw className="h-5 w-5" />
-              Changes Preview
-            </h2>
-            
-            <Card className="p-4 border-primary/30 bg-primary/5">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Before</p>
-                  <div className="text-sm bg-background/80 p-2 rounded border">
-                    {getCurrentAvailabilityDisplay()}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-primary mb-2 uppercase tracking-wide">After</p>
-                  <div className="text-sm font-medium bg-primary/10 p-2 rounded border border-primary/30">
-                    {getPendingAvailabilityDisplay()}
-                  </div>
-                </div>
-              </div>
+        {selectedSpots.length > 0 && selectedDates.length > 0 && (() => {
+          const currentInfo = getCurrentAvailabilityInfo();
+          const pendingInfo = getPendingAvailabilityInfo();
+          
+          return (
+            <section>
+              <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                <RefreshCw className="h-5 w-5" />
+                Changes Preview
+              </h2>
               
-              {/* Affected dates/spots summary */}
-              <div className="mt-3 pt-3 border-t text-xs text-muted-foreground">
-                <p>
-                  <strong>{selectedSpots.length}</strong> spot{selectedSpots.length !== 1 ? 's' : ''} × <strong>{selectedDates.length}</strong> date{selectedDates.length !== 1 ? 's' : ''} will be updated
-                </p>
-                {selectedDates.length > 1 && selectedDates.length <= 5 && (
-                  <p className="mt-1">
-                    Dates: {selectedDates.map(d => format(d, 'MMM d')).join(', ')}
+              <Card className="p-4 border-primary/30 bg-primary/5">
+                <div className="flex items-stretch gap-3">
+                  {/* Current (Before) Card */}
+                  <div className="flex-1 bg-background rounded-lg border p-3">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      {currentInfo.source === 'recurring' ? (
+                        <Repeat className="h-3.5 w-3.5 text-muted-foreground" />
+                      ) : currentInfo.source === 'override' ? (
+                        <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                      ) : null}
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Current
+                      </span>
+                    </div>
+                    {currentInfo.sourceLabel && (
+                      <p className="text-xs text-muted-foreground mb-1">{currentInfo.sourceLabel}</p>
+                    )}
+                    <p className="text-sm font-medium">{currentInfo.text}</p>
+                  </div>
+                  
+                  {/* Arrow */}
+                  <div className="flex items-center">
+                    <ArrowRight className="h-5 w-5 text-primary shrink-0" />
+                  </div>
+                  
+                  {/* New (After) Card */}
+                  <div className="flex-1 bg-primary/10 rounded-lg border border-primary/30 p-3">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <CalendarDays className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-xs font-medium text-primary uppercase tracking-wide">
+                        New
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-1">{pendingInfo.sourceLabel}</p>
+                    <p className="text-sm font-medium">{pendingInfo.text}</p>
+                  </div>
+                </div>
+                
+                {/* Affected dates/spots summary */}
+                <div className="mt-3 pt-3 border-t text-xs text-muted-foreground">
+                  <p>
+                    <strong>{selectedSpots.length}</strong> spot{selectedSpots.length !== 1 ? 's' : ''} × <strong>{selectedDates.length}</strong> date{selectedDates.length !== 1 ? 's' : ''} will be updated
                   </p>
-                )}
-              </div>
-            </Card>
-          </section>
-        )}
+                  {selectedDates.length > 1 && selectedDates.length <= 5 && (
+                    <p className="mt-1">
+                      Dates: {selectedDates.map(d => format(d, 'MMM d')).join(', ')}
+                    </p>
+                  )}
+                </div>
+              </Card>
+            </section>
+          );
+        })()}
 
         {/* Save Button */}
         <Button 
