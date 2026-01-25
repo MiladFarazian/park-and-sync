@@ -38,7 +38,7 @@ export const logos = {
 // Hero & Marketing Images
 // =============================================================================
 import heroParking from './hero-parking.jpg';
-import inglewoodHero from './inglewood.jpg';
+import inglewoodHero from './inglewood-2.jpg';
 
 export const marketing = {
   hero: inglewoodHero,
