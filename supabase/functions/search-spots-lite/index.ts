@@ -202,6 +202,7 @@ serve(async (req) => {
         return { ...spot, distance };
       })
       .filter(spot => spot.distance <= radius)
+      .filter(spot => !userId || spot.host_id !== userId) // Exclude host's own spots
       .sort((a, b) => a.distance - b.distance)
       .slice(0, limit);
 

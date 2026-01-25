@@ -279,6 +279,11 @@ serve(async (req) => {
     // For now, filter by distance manually since PostGIS dwithin might not work as expected
     const availableSpots = [];
     for (const spot of spots || []) {
+      // Skip spots owned by the current user (hosts shouldn't see their own spots as a driver)
+      if (userId && spot.host_id === userId) {
+        continue;
+      }
+
       // Calculate distance using Haversine formula
       const R = 6371e3; // Earth's radius in meters
       const φ1 = latitude * Math.PI / 180;
