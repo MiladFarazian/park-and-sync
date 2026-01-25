@@ -61,9 +61,14 @@ const HeroSection = () => {
       return;
     }
     
-    // If the user selected "Current Location" but coords haven't resolved yet, get them now
-    const isCurrentLocation = searchLocation.toLowerCase().includes('current location');
-    if (isCurrentLocation && navigator.geolocation) {
+    // If there's a text query (user typed an address), navigate with just the query
+    if (searchLocation.trim() && !searchLocation.toLowerCase().includes('current location')) {
+      navigate(`/explore?start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchLocation)}${evParam}`);
+      return;
+    }
+    
+    // No location selected OR "Current Location" selected - get GPS coordinates
+    if (navigator.geolocation) {
       setIsGettingLocation(true);
       try {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -84,14 +89,8 @@ const HeroSection = () => {
       } finally {
         setIsGettingLocation(false);
       }
-      return;
-    }
-    
-    // If there's a text query but no coords (user typed an address), navigate with just the query
-    if (searchLocation.trim()) {
-      navigate(`/explore?start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchLocation)}${evParam}`);
     } else {
-      // Default fallback
+      // No geolocation support - fallback to default
       navigate(`/explore?lat=34.0224&lng=-118.2851&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=University Park, Los Angeles${evParam}`);
     }
   };
