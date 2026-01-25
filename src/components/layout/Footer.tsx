@@ -64,6 +64,11 @@ const Footer = () => {
             <h4 className="font-semibold mb-4">Support</h4>
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li>
+                <Link to="/docs" className="hover:text-foreground transition-colors">
+                  Help Center
+                </Link>
+              </li>
+              <li>
                 <Link to="/messages" className="hover:text-foreground transition-colors">
                   Contact Us
                 </Link>
@@ -80,8 +85,8 @@ const Footer = () => {
         <div className="mt-12 pt-8 border-t flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
           <p>© {new Date().getFullYear()} Parkzy. All rights reserved.</p>
           <div className="flex gap-6">
-            <a href="#" className="hover:text-foreground transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-foreground transition-colors">Terms of Service</a>
+            <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
+            <Link to="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
           </div>
         </div>
       </div>
