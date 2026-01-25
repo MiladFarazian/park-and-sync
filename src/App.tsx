@@ -40,6 +40,7 @@ import PaymentMethods from "./pages/PaymentMethods";
 import Notifications from "./pages/Notifications";
 import PrivacySecurity from "./pages/PrivacySecurity";
 import Privacy from "./pages/Privacy";
+import Docs from "./pages/Docs";
 import Terms from "./pages/Terms";
 import EditSpotAvailability from "./pages/EditSpotAvailability";
 import EditSpot from "./pages/EditSpot";
@@ -117,6 +118,7 @@ const App = () => {
             <Route path="/privacy-security" element={<PrivacySecurity />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
+            <Route path="/docs" element={<Docs />} />
             <Route path="/*" element={
               <SupportRedirect>
                 <AppLayout>
