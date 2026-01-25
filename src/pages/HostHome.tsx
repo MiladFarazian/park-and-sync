@@ -219,7 +219,7 @@ const HostHome = () => {
   }
 
   return (
-    <div className="p-4 space-y-6 pb-4">
+    <div className="p-4 md:p-6 lg:p-8 space-y-6 pb-4 max-w-4xl mx-auto">
       {/* Header */}
       <div className="pt-4">
         <h1 className="text-2xl font-bold">Host Dashboard</h1>
@@ -270,7 +270,7 @@ const HostHome = () => {
         ) : stripeBalance?.connected ? (
           <>
             {/* Available & Pending Balance */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
               <Card className="p-4">
                 <p className="text-xs text-muted-foreground mb-1">Available Balance</p>
                 <p className="text-2xl font-bold text-green-600">${stripeBalance.available_balance.toFixed(2)}</p>
