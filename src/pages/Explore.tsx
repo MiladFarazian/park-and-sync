@@ -359,6 +359,35 @@ const Explore = () => {
           fetchNearbySpots(desired, EXPANDED_RADIUS_METERS, true, { start: start ? startDate : null, end: end ? endDate : null });
         }
       }
+    } else if (query?.toLowerCase().includes('current location') && navigator.geolocation) {
+      // No lat/lng but query is "Current Location" - get GPS coordinates
+      setSearchQuery('Current Location');
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const desired = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          setSearchLocation(desired);
+          setCurrentLocation(desired);
+          fetchNearbySpots(desired, EXPANDED_RADIUS_METERS, true, { start: start ? startDate : null, end: end ? endDate : null });
+          
+          // Update URL with actual coordinates
+          const newParams = new URLSearchParams(searchParams);
+          newParams.set('lat', desired.lat.toString());
+          newParams.set('lng', desired.lng.toString());
+          navigate(`/explore?${newParams.toString()}`, { replace: true });
+        },
+        (error) => {
+          log.warn('GPS failed on Explore page, using default location', { code: error.code });
+          // Fallback to default LA location
+          const defaultLocation = { lat: 34.0224, lng: -118.2851 };
+          setSearchLocation(defaultLocation);
+          setSearchQuery('University Park, Los Angeles');
+          fetchNearbySpots(defaultLocation, EXPANDED_RADIUS_METERS, true, { start: start ? startDate : null, end: end ? endDate : null });
+        },
+        { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
+      );
     } else {
       // No URL lat/lng: show empty state, user needs to search
       setSpotsLoading(false);
