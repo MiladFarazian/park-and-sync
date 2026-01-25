@@ -156,11 +156,22 @@ serve(async (req) => {
     // Try to get authenticated user (optional for search)
     const authHeader = req.headers.get('Authorization');
     let userId: string | null = null;
+    let showOwnSpots = false;
     if (authHeader?.startsWith('Bearer ')) {
       try {
         const token = authHeader.replace('Bearer ', '');
         const { data: userData } = await supabase.auth.getUser(token);
         userId = userData.user?.id || null;
+        
+        // Check if user wants to see their own spots
+        if (userId) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('show_own_spots_in_search')
+            .eq('user_id', userId)
+            .single();
+          showOwnSpots = profile?.show_own_spots_in_search ?? false;
+        }
       } catch {
         // Ignore auth errors for search - it's optional
       }
@@ -279,8 +290,8 @@ serve(async (req) => {
     // For now, filter by distance manually since PostGIS dwithin might not work as expected
     const availableSpots = [];
     for (const spot of spots || []) {
-      // Skip spots owned by the current user (hosts shouldn't see their own spots as a driver)
-      if (userId && spot.host_id === userId) {
+      // Skip spots owned by the current user unless they enabled the setting
+      if (userId && spot.host_id === userId && !showOwnSpots) {
         continue;
       }
 

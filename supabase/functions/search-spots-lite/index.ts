@@ -129,11 +129,22 @@ serve(async (req) => {
     // Try to get authenticated user (optional for search)
     const authHeader = req.headers.get('Authorization');
     let userId: string | null = null;
+    let showOwnSpots = false;
     if (authHeader?.startsWith('Bearer ')) {
       try {
         const token = authHeader.replace('Bearer ', '');
         const { data: userData } = await supabase.auth.getUser(token);
         userId = userData.user?.id || null;
+        
+        // Check if user wants to see their own spots
+        if (userId) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('show_own_spots_in_search')
+            .eq('user_id', userId)
+            .single();
+          showOwnSpots = profile?.show_own_spots_in_search ?? false;
+        }
       } catch {
         // Ignore auth errors for search - it's optional
       }
@@ -202,7 +213,7 @@ serve(async (req) => {
         return { ...spot, distance };
       })
       .filter(spot => spot.distance <= radius)
-      .filter(spot => !userId || spot.host_id !== userId) // Exclude host's own spots
+      .filter(spot => showOwnSpots || !userId || spot.host_id !== userId) // Exclude host's own spots unless they enabled the setting
       .sort((a, b) => a.distance - b.distance)
       .slice(0, limit);
 
