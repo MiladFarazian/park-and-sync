@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Shield, Calendar, ChevronRight, Zap } from 'lucide-react';
+import { MapPin, Clock, Shield, Calendar, ChevronRight, Zap, Loader2 } from 'lucide-react';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { useNavigate } from 'react-router-dom';
 import { format, addHours } from 'date-fns';
@@ -21,6 +21,7 @@ const HeroSection = () => {
   const [mobileEndPickerOpen, setMobileEndPickerOpen] = useState(false);
   const [needsEvCharging, setNeedsEvCharging] = useState(false);
   const [bookingCount, setBookingCount] = useState<number>(0);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
 
   // Fetch total booking count for hero stat
   useEffect(() => {
@@ -50,13 +51,47 @@ const HeroSection = () => {
     setIsUsingCurrentLocation(false);
   };
 
-  const handleSearch = () => {
+
+  const handleSearch = async () => {
     const evParam = needsEvCharging ? '&ev=true' : '';
+    
+    // If we already have coordinates, navigate directly
     if (searchCoords) {
       navigate(`/explore?lat=${searchCoords.lat}&lng=${searchCoords.lng}&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchLocation || 'Current location')}${evParam}`);
-    } else if (searchLocation.trim()) {
+      return;
+    }
+    
+    // If the user selected "Current Location" but coords haven't resolved yet, get them now
+    const isCurrentLocation = searchLocation.toLowerCase().includes('current location');
+    if (isCurrentLocation && navigator.geolocation) {
+      setIsGettingLocation(true);
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            maximumAge: 30000,
+            timeout: 10000,
+          });
+        });
+        const coords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        navigate(`/explore?lat=${coords.lat}&lng=${coords.lng}&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent('Current Location')}${evParam}`);
+      } catch (error) {
+        // Fallback to default location if GPS fails
+        navigate(`/explore?lat=34.0224&lng=-118.2851&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=University Park, Los Angeles${evParam}`);
+      } finally {
+        setIsGettingLocation(false);
+      }
+      return;
+    }
+    
+    // If there's a text query but no coords (user typed an address), navigate with just the query
+    if (searchLocation.trim()) {
       navigate(`/explore?start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchLocation)}${evParam}`);
     } else {
+      // Default fallback
       navigate(`/explore?lat=34.0224&lng=-118.2851&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=University Park, Los Angeles${evParam}`);
     }
   };
@@ -155,8 +190,16 @@ const HeroSection = () => {
                 onClick={handleSearch}
                 size="lg"
                 className="w-full h-14 text-base font-semibold rounded-xl"
+                disabled={isGettingLocation}
               >
-                Find Parking Spots
+                {isGettingLocation ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    Getting Location...
+                  </>
+                ) : (
+                  'Find Parking Spots'
+                )}
               </Button>
             </div>
 
