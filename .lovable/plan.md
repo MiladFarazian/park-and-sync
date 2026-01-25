@@ -1,93 +1,71 @@
 
-## Fix: "Explore Spots" Button Shows Blank Map
+# Plan: Exclude Host's Own Spots from Driver Search Results
 
-### Problem
-When clicking "Explore Spots" from the Saved Spots page (empty state), it navigates to `/explore` without any URL parameters. The Explore page only loads spots when `lat` and `lng` parameters are present in the URL, so users see a blank map.
+## Problem
+When a host is searching for parking as a driver, their own listed spots appear in the search results. This is confusing UX since a host would never want to book their own spot.
 
-### Solution
-Update the "Explore Spots" button to get the user's current location, then navigate to `/explore` with:
-- `lat` and `lng` - user's current position
-- `start` - current time (now)
-- `end` - 2 hours from now
+## Root Cause
+Both `search-spots` and `search-spots-lite` Edge Functions retrieve the authenticated user's ID but never use it to filter out spots where `host_id` matches the current user.
 
-If geolocation fails, fall back to LA's default coordinates.
+## Solution
+Add a filter to both Edge Functions to exclude spots owned by the authenticated user when they are searching as a driver.
 
 ---
 
-### Technical Changes
+## Technical Implementation
 
-**File: `src/pages/SavedSpots.tsx`**
+### 1. Update `search-spots-lite` Edge Function
 
-**Step 1: Add date-fns import for time formatting**
-```tsx
-import { format, addHours } from 'date-fns';
+**File:** `supabase/functions/search-spots-lite/index.ts`
+
+After the distance filtering and before further processing, add a filter to exclude the user's own spots:
+
+```text
+Location: After line 206 (after the initial distance filter and before EV filter)
 ```
 
-**Step 2: Add constants import for default location**
-```tsx
-import { DEFAULT_MAP_CENTER } from '@/lib/constants';
+```javascript
+// Exclude spots owned by the current user (hosts shouldn't see their own spots as a driver)
+if (userId) {
+  spotsWithDistance = spotsWithDistance.filter(spot => spot.host_id !== userId);
+}
 ```
 
-**Step 3: Replace the simple button with a location-aware handler**
+### 2. Update `search-spots` Edge Function
 
-Current code (line 162):
-```tsx
-<Button onClick={() => navigate('/explore')}>Explore Spots</Button>
+**File:** `supabase/functions/search-spots/index.ts`
+
+Add the same filter in the main loop that builds `availableSpots`:
+
+```text
+Location: Inside the loop at line 281, before processing each spot
 ```
 
-New implementation:
-```tsx
-<Button onClick={handleExploreSpots}>Explore Spots</Button>
-```
-
-**Step 4: Add the handler function inside the component**
-
-This function will:
-1. Try to get the user's current GPS location
-2. Calculate start time (now) and end time (+2 hours)
-3. Format the times as ISO strings
-4. Navigate to `/explore` with all required parameters
-5. Fall back to default LA coordinates if geolocation fails
-
-```tsx
-const handleExploreSpots = () => {
-  const now = new Date();
-  const twoHoursLater = addHours(now, 2);
-  const startParam = now.toISOString();
-  const endParam = twoHoursLater.toISOString();
-
-  // Try to get current location
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        navigate(`/explore?lat=${latitude}&lng=${longitude}&start=${startParam}&end=${endParam}`);
-      },
-      () => {
-        // Fallback to default LA location
-        navigate(`/explore?lat=${DEFAULT_MAP_CENTER.lat}&lng=${DEFAULT_MAP_CENTER.lng}&start=${startParam}&end=${endParam}`);
-      },
-      { timeout: 5000, enableHighAccuracy: false }
-    );
-  } else {
-    // No geolocation support - use default
-    navigate(`/explore?lat=${DEFAULT_MAP_CENTER.lat}&lng=${DEFAULT_MAP_CENTER.lng}&start=${startParam}&end=${endParam}`);
-  }
-};
+```javascript
+// Skip spots owned by the current user
+if (userId && spot.host_id === userId) {
+  continue;
+}
 ```
 
 ---
 
-### Summary
+## Why This Approach
 
-| What Changes | Details |
-|-------------|---------|
-| **Imports** | Add `addHours` from date-fns and `DEFAULT_MAP_CENTER` from constants |
-| **New Function** | `handleExploreSpots()` - gets location and builds proper URL |
-| **Button** | Wire to new handler instead of simple navigation |
+| Consideration | Decision |
+|--------------|----------|
+| Performance | Filter early to avoid unnecessary DB queries for own spots |
+| Consistency | Both Edge Functions get the same filtering logic |
+| Backward compatibility | No changes to API response format or client code |
+| Edge case: Guest users | Filter only applies when `userId` is present (authenticated users) |
 
-### User Experience
-- User clicks "Explore Spots"
-- Brief geolocation request (~1-2 seconds)
-- Map loads centered on their location with spots available for the next 2 hours
-- If location denied/unavailable, defaults to Downtown LA
+---
+
+## Testing
+
+After implementation:
+1. Log in as a host who has listed a spot
+2. Switch to Driver mode
+3. Search for parking in the area where the host's spot is located
+4. Verify the host's own spot does NOT appear in search results
+5. Verify other users' spots in the same area DO appear
