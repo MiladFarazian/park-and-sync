@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Shield, Calendar, ChevronRight, Zap, Loader2 } from 'lucide-react';
+import { MapPin, Clock, Shield, Calendar, ChevronRight, Zap } from 'lucide-react';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { useNavigate } from 'react-router-dom';
 import { format, addHours } from 'date-fns';
@@ -21,7 +21,6 @@ const HeroSection = () => {
   const [mobileEndPickerOpen, setMobileEndPickerOpen] = useState(false);
   const [needsEvCharging, setNeedsEvCharging] = useState(false);
   const [bookingCount, setBookingCount] = useState<number>(0);
-  const [isGettingLocation, setIsGettingLocation] = useState(false);
 
   // Fetch total booking count for hero stat
   useEffect(() => {
@@ -52,47 +51,22 @@ const HeroSection = () => {
   };
 
 
-  const handleSearch = async () => {
+  const handleSearch = () => {
     const evParam = needsEvCharging ? '&ev=true' : '';
     
-    // If we already have coordinates, navigate directly
+    // If we have coordinates, navigate with lat/lng
     if (searchCoords) {
-      navigate(`/explore?lat=${searchCoords.lat}&lng=${searchCoords.lng}&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchLocation || 'Current location')}${evParam}`);
+      navigate(`/explore?lat=${searchCoords.lat}&lng=${searchCoords.lng}&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchLocation || 'Selected location')}${evParam}`);
       return;
     }
     
-    // If there's a text query (user typed an address), navigate with just the query
-    if (searchLocation.trim() && !searchLocation.toLowerCase().includes('current location')) {
+    // If there's a text query (user typed an address), navigate with the query
+    if (searchLocation.trim()) {
       navigate(`/explore?start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchLocation)}${evParam}`);
       return;
     }
     
-    // No location selected OR "Current Location" selected - get GPS coordinates
-    if (navigator.geolocation) {
-      setIsGettingLocation(true);
-      try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            maximumAge: 30000,
-            timeout: 10000,
-          });
-        });
-        const coords = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        };
-        navigate(`/explore?lat=${coords.lat}&lng=${coords.lng}&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent('Current Location')}${evParam}`);
-      } catch (error) {
-        // Fallback to default location if GPS fails
-        navigate(`/explore?lat=34.0224&lng=-118.2851&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=University Park, Los Angeles${evParam}`);
-      } finally {
-        setIsGettingLocation(false);
-      }
-    } else {
-      // No geolocation support - fallback to default
-      navigate(`/explore?lat=34.0224&lng=-118.2851&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=University Park, Los Angeles${evParam}`);
-    }
+    // No location entered - do nothing (require input)
   };
 
   const handleStartTimeChange = (date: Date) => {
@@ -189,16 +163,9 @@ const HeroSection = () => {
                 onClick={handleSearch}
                 size="lg"
                 className="w-full h-14 text-base font-semibold rounded-xl"
-                disabled={isGettingLocation}
+                disabled={!searchLocation.trim()}
               >
-                {isGettingLocation ? (
-                  <>
-                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                    Getting Location...
-                  </>
-                ) : (
-                  'Find Parking Spots'
-                )}
+                Find Parking Spots
               </Button>
             </div>
 
