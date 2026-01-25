@@ -788,7 +788,7 @@ const Activity = () => {
       </Card>;
   };
   return <div className="bg-background">
-      <div className="p-4 space-y-4">
+      <div className="p-4 md:p-6 lg:p-8 space-y-4 max-w-4xl mx-auto">
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold">{mode === 'host' ? 'Reservations' : 'My Reservations'}</h1>

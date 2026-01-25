@@ -251,7 +251,7 @@ const Reviews = () => {
       </header>
 
       <main className="flex-1 min-h-0 overflow-auto">
-        <div className="p-4 space-y-4 pb-8">
+        <div className="p-4 md:p-6 lg:p-8 space-y-4 pb-8 max-w-3xl mx-auto">
           {/* Stats Summary */}
           <Card className="p-4 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
             <div className="flex items-center gap-4">

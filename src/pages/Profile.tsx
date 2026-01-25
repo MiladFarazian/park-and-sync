@@ -630,7 +630,7 @@ const Profile = () => {
     subtitle: 'Account security settings',
     onClick: () => navigate('/privacy-security')
   }];
-  return <div className="space-y-6">
+  return <div className="space-y-6 p-4 md:p-6 lg:p-8 max-w-2xl mx-auto">
       {/* Incomplete Profile Overlay Popup */}
       {isProfileIncomplete && !profileAlertDismissed && (
         <div 

@@ -162,7 +162,7 @@ export default function SavedSpots() {
       </div>
 
       {/* Content */}
-      <div className="p-4">
+      <div className="p-4 md:p-6 lg:p-8 max-w-4xl mx-auto">
         {showSkeletons ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
@@ -190,7 +190,7 @@ export default function SavedSpots() {
             <Button onClick={handleExploreSpots}>Explore Spots</Button>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
             {spots.map((spot) => (
               <Card 
                 key={spot.id} 
