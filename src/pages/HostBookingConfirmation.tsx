@@ -256,8 +256,8 @@ const HostBookingConfirmation = () => {
                   <div>
                     <h3 className="font-semibold text-amber-700 dark:text-amber-400">Action Required</h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      The driver's card is authorized for <span className="font-semibold">${booking.total_amount.toFixed(2)}</span>. 
-                      If approved, their card will be charged. If declined, <span className="font-medium text-green-600 dark:text-green-400">no charge will be made</span>.
+                      Approve to confirm this <span className="font-semibold">${booking.total_amount.toFixed(2)}</span> booking. 
+                      If declined, the driver will be notified and <span className="font-medium text-green-600 dark:text-green-400">no charge will be made</span>.
                     </p>
                   </div>
                 </div>
