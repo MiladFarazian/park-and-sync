@@ -1391,6 +1391,38 @@ export type Database = {
         Returns: boolean
       }
       geomfromewkt: { Args: { "": string }; Returns: unknown }
+      get_booking_safe: {
+        Args: { p_booking_id: string }
+        Returns: {
+          cancellation_reason: string
+          created_at: string
+          departed_at: string
+          end_at: string
+          ev_charging_fee: number
+          extension_charges: number
+          guest_car_model: string
+          guest_email: string
+          guest_full_name: string
+          guest_license_plate: string
+          guest_phone: string
+          host_earnings: number
+          hourly_rate: number
+          id: string
+          is_guest: boolean
+          overstay_action: string
+          overstay_detected_at: string
+          platform_fee: number
+          renter_id: string
+          spot_id: string
+          start_at: string
+          status: Database["public"]["Enums"]["booking_status"]
+          subtotal: number
+          total_amount: number
+          total_hours: number
+          updated_at: string
+          vehicle_id: string
+        }[]
+      }
       gettransactionid: { Args: never; Returns: unknown }
       has_role: {
         Args: {
