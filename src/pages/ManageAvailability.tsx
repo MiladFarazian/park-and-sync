@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, Check, Clock, Ban, Settings2, Plus, Trash2, DollarSign, RefreshCw, AlertCircle, X } from 'lucide-react';
+import { ArrowLeft, Loader2, Check, Clock, Ban, Settings2, Plus, Trash2, DollarSign, RefreshCw, AlertCircle, X, CalendarDays, Repeat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -9,12 +9,15 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { format, parseISO, getDay, isSameDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
+import { WeeklyScheduleGrid, AvailabilityRule as GridAvailabilityRule } from '@/components/availability/WeeklyScheduleGrid';
 
 interface Spot {
   id: string;
@@ -58,11 +61,17 @@ const ManageAvailability = () => {
   const dateParam = searchParams.get('date');
   const spotIdParam = searchParams.get('spotId');
   const spotsParam = searchParams.get('spots'); // For bulk selection from QuickAvailabilityActions
+  const tabParam = searchParams.get('tab');
   
   const [spots, setSpots] = useState<Spot[]>([]);
   const [selectedSpots, setSelectedSpots] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'date-override' | 'recurring'>(
+    tabParam === 'recurring' ? 'recurring' : 'date-override'
+  );
   
   // Multi-date selection
   const [selectedDates, setSelectedDates] = useState<Date[]>(
@@ -96,6 +105,13 @@ const ManageAvailability = () => {
 
   // Validation errors
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  
+  // ===== RECURRING SCHEDULE TAB STATE =====
+  const [recurringRules, setRecurringRules] = useState<GridAvailabilityRule[]>([]);
+  const [recurringSelectedSpots, setRecurringSelectedSpots] = useState<string[]>([]);
+  const [spotRecurringRules, setSpotRecurringRules] = useState<Record<string, AvailabilityRule[]>>({});
+  const [isApplyingRecurring, setIsApplyingRecurring] = useState(false);
+  const [showClearScheduleDialog, setShowClearScheduleDialog] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -108,6 +124,13 @@ const ManageAvailability = () => {
       fetchAvailabilityData();
     }
   }, [spots, selectedDates, user]);
+
+  // Fetch recurring rules for all spots (for the recurring tab)
+  useEffect(() => {
+    if (spots.length > 0 && user) {
+      fetchAllRecurringRules();
+    }
+  }, [spots, user]);
 
   // Validate time blocks whenever they change
   useEffect(() => {
@@ -188,6 +211,183 @@ const ManageAvailability = () => {
       setSpotAvailability(availability);
     } catch (error) {
       console.error('Error fetching availability data:', error);
+    }
+  };
+
+  // Fetch ALL recurring rules for all spots (for showing current schedule in recurring tab)
+  const fetchAllRecurringRules = async () => {
+    if (!user || spots.length === 0) return;
+    
+    try {
+      const spotIds = spots.map(s => s.id);
+      
+      const { data, error } = await supabase
+        .from('availability_rules')
+        .select('spot_id, day_of_week, start_time, end_time, is_available, custom_rate')
+        .in('spot_id', spotIds);
+
+      if (error) throw error;
+      
+      // Group by spot_id
+      const rulesBySpot: Record<string, AvailabilityRule[]> = {};
+      for (const spotId of spotIds) {
+        rulesBySpot[spotId] = (data || []).filter(r => r.spot_id === spotId);
+      }
+      
+      setSpotRecurringRules(rulesBySpot);
+    } catch (error) {
+      console.error('Error fetching recurring rules:', error);
+    }
+  };
+
+  // Get summary of recurring schedule for a spot
+  const getRecurringScheduleSummary = (spotId: string): string => {
+    const rules = spotRecurringRules[spotId];
+    if (!rules || rules.length === 0) return 'No schedule set';
+    
+    // Check if 24/7 (all days, all times)
+    if (rules.length === 7) {
+      const all24 = rules.every(r => 
+        r.start_time?.substring(0, 5) === '00:00' && 
+        (r.end_time?.substring(0, 5) === '24:00' || r.end_time?.substring(0, 5) === '23:59')
+      );
+      if (all24) return '24/7';
+    }
+    
+    // Check if M-F 9-5
+    const mfRules = rules.filter(r => r.day_of_week >= 1 && r.day_of_week <= 5);
+    if (mfRules.length === 5 && rules.length === 5) {
+      const is9to5 = mfRules.every(r => 
+        r.start_time?.substring(0, 5) === '09:00' && 
+        r.end_time?.substring(0, 5) === '17:00'
+      );
+      if (is9to5) return 'Mon-Fri 9-5';
+    }
+    
+    // Count active days
+    const activeDays = [...new Set(rules.map(r => r.day_of_week))].length;
+    return `${activeDays} day${activeDays !== 1 ? 's' : ''} scheduled`;
+  };
+
+  // Toggle spot selection for recurring schedule
+  const toggleRecurringSpot = (spotId: string) => {
+    setRecurringSelectedSpots(prev => 
+      prev.includes(spotId) 
+        ? prev.filter(id => id !== spotId)
+        : [...prev, spotId]
+    );
+  };
+
+  const toggleAllRecurring = () => {
+    if (recurringSelectedSpots.length === spots.length) {
+      setRecurringSelectedSpots([]);
+    } else {
+      setRecurringSelectedSpots(spots.map(s => s.id));
+    }
+  };
+
+  // Get preview of new schedule from grid rules
+  const getRecurringPreview = (): string => {
+    if (recurringRules.length === 0) return 'Clear schedule (no hours selected)';
+    
+    // Check if 24/7
+    const daysWithRules = [...new Set(recurringRules.map(r => r.day_of_week))];
+    if (daysWithRules.length === 7) {
+      const totalMinutes = recurringRules.reduce((sum, r) => {
+        const startParts = r.start_time.split(':').map(Number);
+        const endParts = r.end_time.split(':').map(Number);
+        const startMins = startParts[0] * 60 + startParts[1];
+        const endMins = endParts[0] * 60 + endParts[1];
+        return sum + (endMins - startMins);
+      }, 0);
+      if (totalMinutes >= 7 * 24 * 60 - 60) return '24/7 availability';
+    }
+    
+    // Check if M-F 9-5
+    const mfRules = recurringRules.filter(r => r.day_of_week >= 1 && r.day_of_week <= 5);
+    if (mfRules.length === 5 && recurringRules.length === 5) {
+      const is9to5 = mfRules.every(r => 
+        r.start_time === '09:00' && r.end_time === '17:00'
+      );
+      if (is9to5) return 'Mon-Fri 9:00 AM - 5:00 PM';
+    }
+    
+    return `${daysWithRules.length} day${daysWithRules.length !== 1 ? 's' : ''} with custom hours`;
+  };
+
+  // Apply recurring schedule to selected spots
+  const handleApplyRecurringSchedule = async () => {
+    if (recurringSelectedSpots.length === 0) {
+      toast({
+        title: 'No spots selected',
+        description: 'Please select at least one spot to update.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Show confirmation if clearing schedule
+    if (recurringRules.length === 0) {
+      setShowClearScheduleDialog(true);
+      return;
+    }
+
+    await applyRecurringScheduleToSpots();
+  };
+
+  const applyRecurringScheduleToSpots = async () => {
+    setIsApplyingRecurring(true);
+    try {
+      for (const spotId of recurringSelectedSpots) {
+        // Delete existing rules
+        const { error: deleteError } = await supabase
+          .from('availability_rules')
+          .delete()
+          .eq('spot_id', spotId);
+        
+        if (deleteError) throw deleteError;
+        
+        // Insert new rules (if any)
+        if (recurringRules.length > 0) {
+          const rulesWithSpotId = recurringRules.map(rule => ({
+            spot_id: spotId,
+            day_of_week: rule.day_of_week,
+            start_time: rule.start_time,
+            end_time: rule.end_time,
+            is_available: true,
+            custom_rate: null
+          }));
+          
+          const { error: insertError } = await supabase
+            .from('availability_rules')
+            .insert(rulesWithSpotId);
+          
+          if (insertError) throw insertError;
+        }
+      }
+
+      const spotCount = recurringSelectedSpots.length;
+      toast({
+        title: 'Recurring schedule updated',
+        description: `Applied to ${spotCount} spot${spotCount > 1 ? 's' : ''}`
+      });
+      
+      // Refresh data
+      await fetchAllRecurringRules();
+      
+      // Clear selections and navigate
+      setRecurringSelectedSpots([]);
+      navigate('/host-calendar');
+    } catch (error) {
+      console.error('Error applying recurring schedule:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to apply recurring schedule',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsApplyingRecurring(false);
+      setShowClearScheduleDialog(false);
     }
   };
 
@@ -496,13 +696,15 @@ const ManageAvailability = () => {
           <div className="flex-1">
             <h1 className="text-xl font-bold">Manage Availability</h1>
             <p className="text-sm text-muted-foreground">
-              {selectedDates.length === 1 
-                ? format(selectedDates[0], 'EEEE, MMMM d, yyyy')
-                : `${selectedDates.length} dates selected`
+              {activeTab === 'date-override' 
+                ? (selectedDates.length === 1 
+                    ? format(selectedDates[0], 'EEEE, MMMM d, yyyy')
+                    : `${selectedDates.length} dates selected`)
+                : 'Weekly recurring schedule'
               }
             </p>
           </div>
-          {selectedDates.length > 1 && (
+          {activeTab === 'date-override' && selectedDates.length > 1 && (
             <Button variant="ghost" size="sm" onClick={clearDateSelection}>
               <X className="h-4 w-4 mr-1" />
               Clear
@@ -511,7 +713,26 @@ const ManageAvailability = () => {
         </div>
       </div>
 
-      <div className="p-4 space-y-6">
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'date-override' | 'recurring')} className="w-full">
+        <div className="px-4 pt-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="date-override" className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4" />
+              <span className="hidden sm:inline">Date Override</span>
+              <span className="sm:hidden">Dates</span>
+            </TabsTrigger>
+            <TabsTrigger value="recurring" className="flex items-center gap-2">
+              <Repeat className="h-4 w-4" />
+              <span className="hidden sm:inline">Recurring Schedule</span>
+              <span className="sm:hidden">Weekly</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* Date Override Tab Content */}
+        <TabsContent value="date-override" className="mt-0">
+          <div className="p-4 space-y-6">
         {/* Section 1: Spot Selection */}
         <section>
           <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
@@ -871,7 +1092,145 @@ const ManageAvailability = () => {
             `Save Changes`
           )}
         </Button>
-      </div>
+          </div>
+        </TabsContent>
+
+        {/* Recurring Schedule Tab Content */}
+        <TabsContent value="recurring" className="mt-0">
+          <div className="p-4 space-y-6">
+            {/* Step 1: Set Hours */}
+            <section>
+              <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm">1</span>
+                Set Your Weekly Hours
+              </h2>
+              
+              <Card className="p-4">
+                <p className="text-sm text-muted-foreground mb-3">
+                  Drag to select the hours when your spots should be available each week.
+                </p>
+                <WeeklyScheduleGrid
+                  initialRules={[]}
+                  onChange={setRecurringRules}
+                />
+              </Card>
+            </section>
+
+            {/* Step 2: Select Spots */}
+            <section>
+              <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm">2</span>
+                Select Spots to Update
+              </h2>
+              
+              {spots.length === 0 ? (
+                <Card className="p-6 text-center">
+                  <p className="text-muted-foreground mb-4">You don't have any active spots.</p>
+                  <Button onClick={() => navigate('/list-spot')}>List a Spot</Button>
+                </Card>
+              ) : (
+                <div className="space-y-2">
+                  {spots.length > 1 && (
+                    <div 
+                      className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer active:bg-accent/50 transition-colors"
+                      onClick={toggleAllRecurring}
+                    >
+                      <Checkbox 
+                        checked={recurringSelectedSpots.length === spots.length}
+                        onCheckedChange={toggleAllRecurring}
+                      />
+                      <span className="font-medium">
+                        {recurringSelectedSpots.length === spots.length ? 'Deselect All' : 'Select All Spots'}
+                      </span>
+                    </div>
+                  )}
+
+                  {spots.map(spot => {
+                    const currentSchedule = getRecurringScheduleSummary(spot.id);
+                    return (
+                      <Card 
+                        key={spot.id}
+                        className={cn(
+                          "p-4 cursor-pointer transition-colors",
+                          recurringSelectedSpots.includes(spot.id) 
+                            ? "border-primary bg-primary/5" 
+                            : "active:bg-accent/50"
+                        )}
+                        onClick={() => toggleRecurringSpot(spot.id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Checkbox 
+                            checked={recurringSelectedSpots.includes(spot.id)}
+                            onCheckedChange={() => toggleRecurringSpot(spot.id)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium">{spot.title}</div>
+                            <div className="text-sm text-muted-foreground truncate">
+                              ${spot.hourly_rate}/hr
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                              <Repeat className="h-3 w-3" />
+                              Current: {currentSchedule}
+                            </div>
+                          </div>
+                          {recurringSelectedSpots.includes(spot.id) && (
+                            <Check className="h-5 w-5 text-primary" />
+                          )}
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            {/* Preview */}
+            {recurringSelectedSpots.length > 0 && (
+              <section>
+                <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <RefreshCw className="h-5 w-5" />
+                  Preview
+                </h2>
+                
+                <Card className="p-4 border-primary/30 bg-primary/5">
+                  <div className="space-y-2">
+                    <p className="text-sm">
+                      <strong>{recurringSelectedSpots.length}</strong> spot{recurringSelectedSpots.length !== 1 ? 's' : ''} will be updated with:
+                    </p>
+                    <div className="text-sm font-medium bg-primary/10 p-2 rounded border border-primary/30">
+                      {getRecurringPreview()}
+                    </div>
+                    {recurringRules.length === 0 && (
+                      <p className="text-xs text-amber-600 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        This will clear existing recurring schedules
+                      </p>
+                    )}
+                  </div>
+                </Card>
+              </section>
+            )}
+
+            {/* Apply Button */}
+            <Button 
+              className="w-full" 
+              size="lg"
+              disabled={recurringSelectedSpots.length === 0 || isApplyingRecurring}
+              onClick={handleApplyRecurringSchedule}
+            >
+              {isApplyingRecurring ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Applying...
+                </>
+              ) : (
+                `Apply to ${recurringSelectedSpots.length || 0} Spot${recurringSelectedSpots.length !== 1 ? 's' : ''}`
+              )}
+            </Button>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Mobile Time Picker */}
       {activeBlock && (
@@ -893,6 +1252,26 @@ const ManageAvailability = () => {
           startTime={activeTimePickerMode === 'end' ? activeBlock.startTime : undefined}
         />
       )}
+
+      {/* Clear Schedule Confirmation Dialog */}
+      <AlertDialog open={showClearScheduleDialog} onOpenChange={setShowClearScheduleDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear Recurring Schedule?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You haven't selected any hours. This will remove the existing recurring schedule for {recurringSelectedSpots.length} spot{recurringSelectedSpots.length !== 1 ? 's' : ''}.
+              <br /><br />
+              These spots will only be available when you set date-specific overrides.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={applyRecurringScheduleToSpots}>
+              Clear Schedule
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
