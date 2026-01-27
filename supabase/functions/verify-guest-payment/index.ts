@@ -40,14 +40,14 @@ serve(async (req) => {
       .single();
 
     if (bookingError || !booking) {
-      logStep("Booking not found or invalid token", { bookingError });
+      log.warn("Booking not found or invalid token", { bookingError });
       return new Response(JSON.stringify({ error: "Booking not found or invalid token" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    logStep("Booking found", { status: booking.status, payment_intent: booking.stripe_payment_intent_id });
+    log.info("Booking found", { status: booking.status, payment_intent: booking.stripe_payment_intent_id });
 
     // If already active or completed, no need to verify
     if (booking.status === "active" || booking.status === "completed") {
@@ -99,7 +99,7 @@ serve(async (req) => {
     // Initialize Stripe and check payment status
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) {
-      logStep("Stripe key not configured");
+      log.error("Stripe key not configured");
       return new Response(JSON.stringify({ error: "Payment verification unavailable" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -127,7 +127,7 @@ serve(async (req) => {
     }
 
     // Payment succeeded! Update booking to active
-    logStep("Payment verified, updating booking to active");
+    log.info("Payment verified, updating booking to active");
 
     const chargeId = typeof paymentIntent.latest_charge === 'string' 
       ? paymentIntent.latest_charge 
@@ -142,7 +142,7 @@ serve(async (req) => {
       .eq("id", booking_id);
 
     if (updateError) {
-      logStep("Failed to update booking", { updateError });
+      log.error("Failed to update booking", { updateError });
       return new Response(JSON.stringify({ error: "Failed to update booking status" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -167,9 +167,9 @@ serve(async (req) => {
       }
     }
 
-    logStep("Booking successfully recovered and activated");
+    log.info("Booking successfully recovered and activated");
 
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       verified: true, 
       status: "active",
       message: "Payment verified and booking activated",
