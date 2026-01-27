@@ -30,10 +30,34 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    // Fetch booking with token validation
+    // Fetch booking with expanded fields including spot details for email
     const { data: booking, error: bookingError } = await supabaseAdmin
       .from("bookings")
-      .select("id, status, stripe_payment_intent_id, stripe_charge_id, host_earnings, spot_id")
+      .select(`
+        id, 
+        status, 
+        stripe_payment_intent_id, 
+        stripe_charge_id, 
+        host_earnings, 
+        spot_id,
+        guest_full_name,
+        guest_email,
+        guest_phone,
+        guest_access_token,
+        start_at,
+        end_at,
+        total_amount,
+        will_use_ev_charging,
+        spots!inner (
+          id,
+          title,
+          address,
+          access_notes,
+          ev_charging_instructions,
+          has_ev_charging,
+          host_id
+        )
+      `)
       .eq("id", booking_id)
       .eq("guest_access_token", access_token)
       .eq("is_guest", true)
@@ -150,20 +174,84 @@ serve(async (req) => {
     }
 
     // Credit host balance
-    if (booking.host_earnings && booking.host_earnings > 0) {
-      // Get host_id from spot
-      const { data: spot } = await supabaseAdmin
-        .from("spots")
-        .select("host_id")
-        .eq("id", booking.spot_id)
-        .single();
+    const spot = booking.spots;
+    if (booking.host_earnings && booking.host_earnings > 0 && spot?.host_id) {
+      await supabaseAdmin.rpc("increment_balance", {
+        user_id: spot.host_id,
+        amount: booking.host_earnings
+      });
+      log.debug("Host balance credited", { host_id: spot.host_id, amount: booking.host_earnings });
+    }
 
-      if (spot?.host_id) {
-        await supabaseAdmin.rpc("increment_balance", {
-          user_id: spot.host_id,
-          amount: booking.host_earnings
-        });
-        log.debug("Host balance credited", { host_id: spot.host_id, amount: booking.host_earnings });
+    // Fetch host profile for email
+    let hostProfile = null;
+    if (spot?.host_id) {
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("first_name, email")
+        .eq("user_id", spot.host_id)
+        .single();
+      hostProfile = profile;
+    }
+
+    // Send confirmation emails via send-guest-booking-confirmation
+    try {
+      log.info("Sending confirmation emails");
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      
+      const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-guest-booking-confirmation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          guestEmail: booking.guest_email,
+          guestPhone: booking.guest_phone,
+          guestName: booking.guest_full_name,
+          hostName: hostProfile?.first_name || 'Host',
+          hostEmail: hostProfile?.email,
+          spotTitle: spot?.title || 'Parking Spot',
+          spotAddress: spot?.address || '',
+          startAt: booking.start_at,
+          endAt: booking.end_at,
+          totalAmount: booking.total_amount,
+          bookingId: booking.id,
+          guestAccessToken: booking.guest_access_token,
+          accessNotes: spot?.access_notes || '',
+          evChargingInstructions: spot?.ev_charging_instructions || '',
+          hasEvCharging: spot?.has_ev_charging || false,
+          willUseEvCharging: booking.will_use_ev_charging || false,
+        }),
+      });
+
+      if (!emailResponse.ok) {
+        const errorText = await emailResponse.text();
+        log.warn("Email sending failed", { status: emailResponse.status, error: errorText });
+      } else {
+        log.info("Confirmation emails sent successfully");
+      }
+    } catch (emailError) {
+      // Log but don't fail - booking is already confirmed
+      log.error("Error sending emails", { message: emailError.message });
+    }
+
+    // Create host notification
+    if (spot?.host_id) {
+      try {
+        await supabaseAdmin
+          .from("notifications")
+          .insert({
+            user_id: spot.host_id,
+            type: "booking_new",
+            title: "New Guest Booking",
+            message: `${booking.guest_full_name || 'A guest'} has booked ${spot?.title || 'your spot'}`,
+            related_id: booking.id,
+          });
+        log.debug("Host notification created");
+      } catch (notifError) {
+        log.warn("Failed to create host notification", { error: notifError.message });
       }
     }
 
