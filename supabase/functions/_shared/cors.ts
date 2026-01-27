@@ -32,9 +32,16 @@ export function getCorsHeaders(request: Request): Record<string, string> {
   const origin = request.headers.get("origin");
   const allowedOrigins = getAllowedOrigins();
 
-  // If origin is provided and in allowed list, use it; otherwise use first allowed origin
+  // Allow exact matches from allowlist, plus Lovable preview domains.
+  // This prevents CORS breakage when the preview subdomain changes.
+  const isLovablePreviewOrigin = (o: string) =>
+    o.endsWith(".lovable.app") || o.endsWith(".lovableproject.com");
+
+  // If origin is provided and allowed, echo it back; otherwise default to first allowed origin
   const allowedOrigin =
-    origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+    origin && (allowedOrigins.includes(origin) || isLovablePreviewOrigin(origin))
+      ? origin
+      : allowedOrigins[0];
 
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
