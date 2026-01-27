@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -1101,17 +1101,17 @@ const HostCalendar = () => {
         </div>
       )}
 
-      {/* Day Detail Sheet */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="bottom" className="h-[85vh] rounded-t-xl">
-          <SheetHeader className="pb-4 border-b">
-            <SheetTitle className="flex items-center justify-between">
+      {/* Day Detail Drawer - Swipe down to dismiss */}
+      <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+        <DrawerContent className="max-h-[85vh]">
+          <DrawerHeader className="pb-4 border-b">
+            <DrawerTitle className="flex items-center justify-between">
               <span>{selectedDate ? format(selectedDate, 'EEEE, MMMM d, yyyy') : ''}</span>
-            </SheetTitle>
-          </SheetHeader>
+            </DrawerTitle>
+          </DrawerHeader>
           
           {selectedDate && selectedDateData && (
-            <div className="py-4 space-y-6 overflow-y-auto max-h-[calc(85vh-100px)]">
+            <div className="py-4 space-y-6 overflow-y-auto max-h-[calc(85vh-120px)] px-4">
               {/* Availability Status */}
               {!isAllSpotsView && selectedDateData.availableHours && (
                 <Card className={cn(
@@ -1241,8 +1241,8 @@ const HostCalendar = () => {
               )}
             </div>
           )}
-        </SheetContent>
-      </Sheet>
+        </DrawerContent>
+      </Drawer>
 
       {/* Review Modal */}
       <ReviewModal
