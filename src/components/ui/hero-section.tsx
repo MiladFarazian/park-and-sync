@@ -22,16 +22,13 @@ const HeroSection = () => {
   const [needsEvCharging, setNeedsEvCharging] = useState(false);
   const [bookingCount, setBookingCount] = useState<number>(0);
 
-  // Fetch total booking count for hero stat
+  // Fetch total booking count for hero stat using public RPC
   useEffect(() => {
     const fetchBookingCount = async () => {
-      const { count } = await supabase
-        .from('bookings')
-        .select('*', { count: 'exact', head: true })
-        .in('status', ['paid', 'active', 'completed']);
+      const { data, error } = await supabase.rpc('get_public_booking_count');
       
-      if (count !== null) {
-        setBookingCount(count);
+      if (!error && data !== null) {
+        setBookingCount(data);
       }
     };
     fetchBookingCount();
