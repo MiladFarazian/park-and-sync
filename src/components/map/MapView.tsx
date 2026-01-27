@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card } from '@/components/ui/card';
@@ -133,26 +133,24 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     spotsRef.current = spots;
   }, [spots]);
 
-  // Sort spots by distance when spots or searchCenter change
-  useEffect(() => {
-    if (!spots.length || !searchCenter) {
-      setSortedSpots([]);
-      return;
-    }
-
-    const sorted = [...spots].sort((a, b) => {
+  // Memoize sorted spots to avoid re-sorting on every render
+  const memoizedSortedSpots = useMemo(() => {
+    if (!spots.length || !searchCenter) return [];
+    
+    return [...spots].sort((a, b) => {
       const distA = calculateDistance(searchCenter.lat, searchCenter.lng, Number(a.lat), Number(a.lng));
       const distB = calculateDistance(searchCenter.lat, searchCenter.lng, Number(b.lat), Number(b.lng));
       return distA - distB;
     });
-
-    setSortedSpots(sorted);
-    
-    // Set the nearest spot ID (first in sorted array)
-    if (sorted.length > 0) {
-      setNearestSpotId(sorted[0].id);
-    }
   }, [spots, searchCenter]);
+
+  // Update sorted spots state and nearest spot ID
+  useEffect(() => {
+    setSortedSpots(memoizedSortedSpots);
+    if (memoizedSortedSpots.length > 0) {
+      setNearestSpotId(memoizedSortedSpots[0].id);
+    }
+  }, [memoizedSortedSpots]);
 
   // Auto-select nearest spot when sorted spots are ready (only if user hasn't manually selected)
   useEffect(() => {
@@ -509,7 +507,9 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       }
     });
 
-    // Update visible spots count and notify parent when map moves
+    // Debounce map move updates to reduce API calls and re-renders
+    let moveEndTimeout: ReturnType<typeof setTimeout> | null = null;
+    
     const updateVisibleSpots = () => {
       if (!map.current) return;
 
@@ -552,13 +552,17 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       }
     };
 
-    map.current.on('moveend', updateVisibleSpots);
-    map.current.on('zoomend', updateVisibleSpots);
+    // Debounced handler for map movements
+    const debouncedUpdate = () => {
+      if (moveEndTimeout) clearTimeout(moveEndTimeout);
+      moveEndTimeout = setTimeout(updateVisibleSpots, 150); // 150ms debounce
+    };
+
+    map.current.on('moveend', debouncedUpdate);
+    map.current.on('zoomend', debouncedUpdate);
     
-    // Initial update after map loads
-    map.current.on('idle', () => {
-      updateVisibleSpots();
-    });
+    // Initial update after map loads (no debounce needed)
+    map.current.once('idle', updateVisibleSpots);
 
     // Cleanup function
     return () => {
@@ -733,8 +737,12 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
     const pinImageIdWhite = 'pin-white';
     const pinImageIdPurple = 'pin-purple';
 
+    // Track animation frame ID for cleanup
+    let pulseAnimationId: number | null = null;
+    let bounceAnimationId: number | null = null;
+    
     const addLayers = () => {
-      // Add cluster pulse/glow layer (behind the main cluster circle)
+      // Add cluster glow layer (static, no animation for better performance)
       (map.current as any).addLayer({
         id: 'cluster-pulse',
         type: 'circle',
@@ -753,13 +761,13 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           'circle-radius': [
             'step',
             ['get', 'point_count'],
-            28,  // Small clusters pulse
+            28,  // Small clusters
             10,
-            42,  // Medium clusters pulse
+            42,  // Medium clusters
             25,
-            56   // Large clusters pulse
+            56   // Large clusters
           ],
-          'circle-opacity': 0.4,
+          'circle-opacity': 0.25,
           'circle-blur': 0.5
         }
       } as any);
@@ -793,36 +801,6 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
           'circle-stroke-color': '#ffffff'
         }
       } as any);
-      
-      // Animate the pulse layer
-      let pulseDirection = 1;
-      let pulseRadius = 0;
-      
-      const animatePulse = () => {
-        if (!map.current || !map.current.getLayer('cluster-pulse')) return;
-        
-        pulseRadius += 0.02 * pulseDirection;
-        if (pulseRadius >= 1) pulseDirection = -1;
-        if (pulseRadius <= 0) pulseDirection = 1;
-        
-        const opacityValue = 0.15 + (0.25 * (1 - pulseRadius));
-        const radiusMultiplier = 1 + (0.2 * pulseRadius);
-        
-        map.current.setPaintProperty('cluster-pulse', 'circle-opacity', opacityValue);
-        map.current.setPaintProperty('cluster-pulse', 'circle-radius', [
-          'step',
-          ['get', 'point_count'],
-          28 * radiusMultiplier,  // Small
-          10,
-          42 * radiusMultiplier,  // Medium
-          25,
-          56 * radiusMultiplier   // Large
-        ]);
-        
-        requestAnimationFrame(animatePulse);
-      };
-      
-      animatePulse();
 
       // Add cluster count label
       (map.current as any).addLayer({
@@ -915,27 +893,20 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         }
       } as any);
       
-      // Bounce animation for pins when they first appear
-      let bounceFrame: number;
-      let bounceProgress = 0;
-      const bounceDuration = 400; // ms
+      // Bounce animation for pins when they first appear - runs once then stops
+      const bounceDuration = 300; // Reduced from 400ms for snappier feel
       const bounceStartTime = Date.now();
       
       const animateBounce = () => {
         if (!map.current) return;
         
         const elapsed = Date.now() - bounceStartTime;
-        bounceProgress = Math.min(elapsed / bounceDuration, 1);
+        const bounceProgress = Math.min(elapsed / bounceDuration, 1);
         
-        // Easing function with overshoot for bounce effect
-        // Using elastic-out-like easing
-        const easeOutBounce = (t: number) => {
-          const c4 = (2 * Math.PI) / 3;
-          return t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
-        };
-        
-        const easedProgress = easeOutBounce(bounceProgress);
-        const translateY = -30 * (1 - easedProgress); // Animate from -30 to 0
+        // Simple ease-out for better performance
+        const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+        const easedProgress = easeOut(bounceProgress);
+        const translateY = -20 * (1 - easedProgress); // Reduced from -30 for subtler effect
         
         try {
           (map.current as any).setPaintProperty(circleId, 'icon-translate', [0, translateY]);
@@ -945,7 +916,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
         }
         
         if (bounceProgress < 1) {
-          bounceFrame = requestAnimationFrame(animateBounce);
+          bounceAnimationId = requestAnimationFrame(animateBounce);
         }
       };
       
