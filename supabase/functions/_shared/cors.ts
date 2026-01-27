@@ -16,6 +16,8 @@ const getAllowedOrigins = (): string[] => {
   return [
     "https://useparkzy.com",
     "https://www.useparkzy.com",
+    "https://parkzy.lovable.app",
+    "https://id-preview--bcd0f814-3e2f-427f-8e4e-b211f7011a0e.lovable.app",
     "http://localhost:8080",
     "http://localhost:5173",
     "http://localhost:3000",

@@ -12,6 +12,9 @@ import { cn } from '@/lib/utils';
 import { getStreetAddress } from '@/lib/addressUtils';
 import { getHostNetEarnings } from '@/lib/hostEarnings';
 import { getBookingStatus, getBookingStatusColor } from '@/lib/bookingStatus';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('UpcomingReservationsWidget');
 
 interface ReservationPreview {
   id: string;
