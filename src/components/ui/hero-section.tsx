@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { evChargerTypes } from '@/lib/evChargerTypes';
+import { OptimizedImage } from '@/components/ui/optimized-image';
 import {
   Select,
   SelectContent,
@@ -225,13 +226,15 @@ const HeroSection = () => {
 
           {/* Right: Hero Image */}
           <div className="relative hidden lg:block">
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
-              <img
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl h-[560px]">
+              <OptimizedImage
                 src={marketing.hero}
                 alt="Modern parking spot in urban setting"
-                className="w-full h-[560px] object-cover"
+                priority
+                className="w-full h-full"
+                containerClassName="w-full h-full"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
             </div>
 
             {/* Floating Stats Card */}
