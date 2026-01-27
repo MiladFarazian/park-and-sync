@@ -39,6 +39,7 @@ interface Spot {
   imageUrl?: string;
   hostId?: string;
   userBooking?: UserBooking | null;
+  totalPrice?: number; // Total booking cost for selected duration
 }
 
 interface MapViewProps {
@@ -705,10 +706,14 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
             return null;
           }
         }
+        // Show total price if available, otherwise fall back to hourly rate with /hr suffix
+        const priceDisplay = spot.totalPrice 
+          ? `$${Math.round(spot.totalPrice)}`
+          : `$${spot.hourlyRate}/hr`;
         return {
           type: 'Feature',
           id: spot.id, // Add id at feature level for feature-state to work
-          properties: { id: spot.id, title: spot.title, price: `$${spot.hourlyRate}` },
+          properties: { id: spot.id, title: spot.title, price: priceDisplay },
           geometry: { type: 'Point', coordinates: [lng, lat] as [number, number] },
         } as any;
       })
