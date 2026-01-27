@@ -6,6 +6,9 @@ import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 const RATE_LIMIT_PER_MINUTE = 60;
 const RATE_LIMIT_PER_HOUR = 500;
 
+// Distance thresholds for demand notification feature
+const HALF_MILE_METERS = 804; // 0.5 miles - trigger threshold for zero-spot notifications
+
 // Check rate limit using database
 async function checkRateLimit(
   supabase: any,
@@ -535,11 +538,58 @@ serve(async (req) => {
     const duration = Date.now() - startTime;
     console.log(`[search-spots-lite] Found ${transformedSpots.length} spots in ${duration}ms`);
 
+    // Check if we should trigger demand notifications to hosts
+    // Conditions: zero spots found AND search radius is 0.5 miles or less
+    let demandNotificationSent = false;
+    if (transformedSpots.length === 0 && radius <= HALF_MILE_METERS) {
+      console.log(`[search-spots-lite] Zero spots within 0.5mi - triggering host demand notifications`);
+      
+      // Fire-and-forget: notify hosts in the background
+      // Use EdgeRuntime.waitUntil if available, otherwise just fire async
+      const notifyHosts = async () => {
+        try {
+          const response = await fetch(
+            `${Deno.env.get('SUPABASE_URL')}/functions/v1/notify-hosts-demand`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                'X-Internal-Secret': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+              },
+              body: JSON.stringify({
+                latitude,
+                longitude,
+                start_time,
+                end_time,
+              }),
+            }
+          );
+          const result = await response.json();
+          console.log(`[search-spots-lite] Demand notification result:`, result);
+        } catch (err) {
+          console.error(`[search-spots-lite] Failed to send demand notifications:`, err);
+        }
+      };
+
+      // Use EdgeRuntime.waitUntil for background processing
+      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+        EdgeRuntime.waitUntil(notifyHosts());
+      } else {
+        // Fallback: fire async without waiting
+        notifyHosts();
+      }
+      
+      demandNotificationSent = true;
+    }
+
     return new Response(JSON.stringify({
       spots: transformedSpots,
       total: transformedSpots.length,
       ev_filter_applied: evFilterApplied,
-      ev_match_count: evMatchCount
+      ev_match_count: evMatchCount,
+      demand_notification_sent: demandNotificationSent,
+      notification_timeout_seconds: demandNotificationSent ? 45 : undefined,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

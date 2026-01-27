@@ -156,3 +156,6 @@ verify_jwt = false
 
 [functions.expire-review-windows]
 verify_jwt = false
+
+[functions.notify-hosts-demand]
+verify_jwt = false
