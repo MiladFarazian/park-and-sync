@@ -1,61 +1,62 @@
 
-# Plan: Fix Scrolling on GuestBookingDetail Page
+# Plan: Display Total Booking Price on Map Pins
 
-## Problem
-The guest booking detail page (`/guest-booking/:bookingId`) does not scroll on iOS devices, particularly in PWA/standalone mode. Users cannot scroll down to see all booking details, access instructions, the chat pane, or action buttons.
+## Overview
+Currently, map pins on the Explore page show the hourly rate (e.g., "$6/hr"). This change will update them to display the **total estimated price** for the selected booking period (e.g., "$14" for a 2-hour booking), making it easier for drivers to compare spots at a glance.
 
-## Root Cause
-The `GuestBookingDetail.tsx` component renders outside of `AppLayout` (which is correct for guest pages), but it's missing the iOS-specific CSS properties that enable touch scrolling. The app's other scrollable pages (AppLayout, Messages) include these properties, but this standalone page does not.
+The spot cards in the sidebar will remain unchanged - they will continue to show the hourly rate.
 
-The scrollable container on line 213:
-```tsx
-<div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-2xl mx-auto w-full" 
-     style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 2rem)' }}>
+## Technical Changes
+
+### 1. Update Spot Interface (MapView.tsx)
+Add an optional `totalPrice` property to the `Spot` interface:
+
+```text
+interface Spot {
+  ...existing properties...
+  totalPrice?: number;  // NEW: Total booking cost for the selected duration
+}
 ```
 
-Is missing the critical iOS scroll properties.
+### 2. Calculate Total Price in Explore.tsx
+When transforming the fetched spots, calculate the total booking price using the existing `calculateBookingTotal()` utility:
 
-## Solution
-Add iOS-specific scroll properties to the scrollable container in `GuestBookingDetail.tsx`.
+- Import `calculateBookingTotal` from `@/lib/pricing`
+- Calculate hours from `startTime` and `endTime`
+- For each spot, compute `driverTotal` and add it as `totalPrice`
 
-## Implementation Details
+### 3. Update Map Pin Price Display (MapView.tsx)
+Change the feature properties to use `totalPrice` when available:
 
-### File to Modify
-`src/pages/GuestBookingDetail.tsx`
-
-### Change Required (Line 213)
-Update the scrollable container's style to include iOS touch scroll fixes:
-
-**Before:**
-```tsx
-<div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-2xl mx-auto w-full" 
-     style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 2rem)' }}>
+**Before (line 711):**
+```text
+price: `$${spot.hourlyRate}`
 ```
 
 **After:**
-```tsx
-<div 
-  className="flex-1 overflow-y-auto p-4 space-y-4 max-w-2xl mx-auto w-full" 
-  style={{ 
-    paddingBottom: 'calc(env(safe-area-inset-bottom) + 2rem)',
-    WebkitOverflowScrolling: 'touch',
-    overscrollBehaviorY: 'contain',
-    minHeight: 0,
-  } as React.CSSProperties}
->
+```text
+price: spot.totalPrice 
+  ? `$${Math.round(spot.totalPrice)}`  // Show whole dollar for totals
+  : `$${spot.hourlyRate}/hr`           // Fallback to hourly if no duration
 ```
 
-### Why These Properties
+### 4. Files Modified
 
-| Property | Purpose |
-|----------|---------|
-| `WebkitOverflowScrolling: 'touch'` | Enables momentum/inertia scrolling on iOS Safari and PWAs |
-| `overscrollBehaviorY: 'contain'` | Prevents scroll chaining (page doesn't bounce or scroll parent when reaching edges) |
-| `minHeight: 0` | Required for flex children to enable proper overflow behavior in flex containers |
+| File | Change |
+|------|--------|
+| `src/components/map/MapView.tsx` | Add `totalPrice` to Spot interface, update price display logic |
+| `src/pages/Explore.tsx` | Import pricing utility, calculate total for each spot before passing to MapView |
 
-## Testing
-After implementation:
-1. Open the guest booking link on an iOS device (Safari or PWA)
-2. Verify the page scrolls smoothly with momentum
-3. Confirm all content is reachable (photos, details, chat pane, action buttons, account CTA)
-4. Test edge scrolling doesn't cause page bounce or navigation
+## User Experience
+
+| Before | After |
+|--------|-------|
+| Map pins show "$6" (hourly rate) | Map pins show "$14" (total for booking period) |
+| Users must mentally calculate total | Total is immediately visible |
+| Spot cards show "$6/hr" | Spot cards still show "$6/hr" (unchanged) |
+
+## Edge Cases
+
+- **No times selected**: Falls back to showing hourly rate with "/hr" suffix
+- **Very long bookings**: Prices will show whole dollars (rounded) to keep pins readable
+- **EV charging**: Total includes EV charging premium if the EV filter is active
