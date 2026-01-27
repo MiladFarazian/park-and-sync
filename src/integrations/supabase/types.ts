@@ -301,6 +301,38 @@ export type Database = {
           },
         ]
       }
+      demand_notifications_sent: {
+        Row: {
+          created_at: string
+          host_id: string
+          id: string
+          notification_date: string
+          search_location: unknown
+        }
+        Insert: {
+          created_at?: string
+          host_id: string
+          id?: string
+          notification_date?: string
+          search_location: unknown
+        }
+        Update: {
+          created_at?: string
+          host_id?: string
+          id?: string
+          notification_date?: string
+          search_location?: unknown
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_notifications_sent_host_id_fkey"
+            columns: ["host_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       favorite_locations: {
         Row: {
           address: string

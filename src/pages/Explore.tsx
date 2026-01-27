@@ -198,6 +198,11 @@ const Explore = () => {
   const [showNoSpotsNearbyDialog, setShowNoSpotsNearbyDialog] = useState(false);
   const noSpotsNearbyShownRef = useRef(false);
   
+  // Demand notification state - shows when hosts are being notified about driver search
+  const [showDemandNotificationBanner, setShowDemandNotificationBanner] = useState(false);
+  const [demandNotificationTimeoutId, setDemandNotificationTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const demandNotificationShownRef = useRef(false);
+  
   const latestRequestIdRef = useRef(0);
   
   // Guard to prevent duplicate initial fetches
@@ -218,6 +223,122 @@ const Explore = () => {
   const [pendingMapCenter, setPendingMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [pendingMapRadius, setPendingMapRadius] = useState<number>(EXPANDED_RADIUS_METERS);
   const [isSearchingHere, setIsSearchingHere] = useState(false);
+
+  // Real-time subscription for demand-driven spot availability updates
+  useEffect(() => {
+    if (!showDemandNotificationBanner || !searchLocation) return;
+
+    // Subscribe to a global availability updates channel
+    // Hosts broadcast here when they save availability for today
+    const channel = supabase
+      .channel('availability-updates-global')
+      .on('broadcast', { event: 'spot_available' }, async (payload) => {
+        const { spot_id, spot_lat, spot_lng } = payload.payload;
+        
+        log.debug('Received spot_available broadcast', { spot_id, spot_lat, spot_lng });
+        
+        // Calculate distance from search location to spot
+        const R = 6371e3;
+        const φ1 = searchLocation.lat * Math.PI / 180;
+        const φ2 = spot_lat * Math.PI / 180;
+        const Δφ = (spot_lat - searchLocation.lat) * Math.PI / 180;
+        const Δλ = (spot_lng - searchLocation.lng) * Math.PI / 180;
+
+        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                  Math.cos(φ1) * Math.cos(φ2) *
+                  Math.sin(Δλ/2) * Math.sin(Δλ/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c;
+
+        // Only process if within reasonable distance (2 miles = 3219m)
+        if (distance > 3219) {
+          log.debug('Spot too far from search location, ignoring', { distance });
+          return;
+        }
+
+        // Re-fetch this specific spot to check if it matches our search criteria
+        try {
+          const { data, error } = await supabase.functions.invoke('search-spots-lite', {
+            body: {
+              latitude: searchLocation.lat,
+              longitude: searchLocation.lng,
+              radius: EXPANDED_RADIUS_METERS,
+              start_time: startTime?.toISOString(),
+              end_time: endTime?.toISOString(),
+            }
+          });
+
+          if (error) {
+            log.error('Failed to fetch updated spot', { error });
+            return;
+          }
+
+          // Find the spot in results
+          const matchingSpot = data?.spots?.find((s: any) => s.id === spot_id);
+          if (matchingSpot) {
+            // Transform and add to map
+            const bookingHours = startTime && endTime
+              ? Math.max(1, (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60))
+              : null;
+
+            const driverHourlyRate = matchingSpot.hourly_rate;
+            let totalPrice: number | undefined;
+            if (bookingHours) {
+              const driverSubtotal = driverHourlyRate * bookingHours;
+              let hostHourlyRate = driverHourlyRate > 6 ? driverHourlyRate / 1.20 : driverHourlyRate - 1;
+              const hostEarnings = hostHourlyRate * bookingHours;
+              const serviceFee = Math.max(hostEarnings * 0.20, 1.00);
+              const evPremium = matchingSpot.ev_charging_premium_per_hour || 0;
+              const evChargingFee = evChargerType && matchingSpot.has_ev_charging ? evPremium * bookingHours : 0;
+              totalPrice = Math.round((driverSubtotal + serviceFee + evChargingFee) * 100) / 100;
+            }
+
+            const newSpot = {
+              id: matchingSpot.id,
+              title: matchingSpot.title,
+              category: matchingSpot.category,
+              address: matchingSpot.address,
+              hourlyRate: driverHourlyRate,
+              evChargingPremium: matchingSpot.ev_charging_premium_per_hour || 0,
+              rating: matchingSpot.spot_rating || 0,
+              reviews: matchingSpot.spot_review_count || 0,
+              lat: parseFloat(matchingSpot.latitude),
+              lng: parseFloat(matchingSpot.longitude),
+              imageUrl: matchingSpot.primary_photo_url,
+              distance: matchingSpot.distance ? `${(matchingSpot.distance / 1000).toFixed(1)} km` : undefined,
+              amenities: [
+                ...(matchingSpot.has_ev_charging ? ['EV Charging'] : []), 
+                ...(matchingSpot.is_covered ? ['Covered'] : []), 
+                ...(matchingSpot.is_secure ? ['Security Camera'] : []), 
+                ...(matchingSpot.is_ada_accessible ? ['ADA Accessible'] : []),
+              ],
+              hostId: matchingSpot.host_id,
+              sizeConstraints: matchingSpot.size_constraints || [],
+              userBooking: null,
+              instantBook: matchingSpot.instant_book !== false,
+              evChargerType: matchingSpot.ev_charger_type,
+              hasEvCharging: matchingSpot.has_ev_charging,
+              totalPrice,
+            };
+
+            // Add to spots if not already present
+            setParkingSpots(prev => {
+              if (prev.some(s => s.id === newSpot.id)) return prev;
+              log.info('New parking spot available from demand notification', { spotId: newSpot.id, title: newSpot.title });
+              toast.success('New parking spot available!');
+              return [...prev, newSpot];
+            });
+          }
+        } catch (err) {
+          log.error('Error processing spot availability update', { error: err });
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [showDemandNotificationBanner, searchLocation, startTime, endTime, evChargerType]);
   const [skipFlyToSearchCenter, setSkipFlyToSearchCenter] = useState(false);
 
   // Ensure end time is always after start time
@@ -727,6 +848,30 @@ const Explore = () => {
         return;
       }
 
+      // Handle demand notification response - show banner when hosts are being notified
+      if (data.demand_notification_sent) {
+        const demandKey = `demand-notification-v1:${center.lat.toFixed(4)}:${center.lng.toFixed(4)}:${timeKey}`;
+        const alreadyShownDemand = sessionStorage.getItem(demandKey) === '1' || demandNotificationShownRef.current;
+
+        if (!alreadyShownDemand) {
+          sessionStorage.setItem(demandKey, '1');
+          demandNotificationShownRef.current = true;
+          setShowDemandNotificationBanner(true);
+          
+          // Clear any existing timeout
+          if (demandNotificationTimeoutId) {
+            clearTimeout(demandNotificationTimeoutId);
+          }
+          
+          // Auto-hide banner after timeout (default 45 seconds)
+          const timeoutSeconds = data.notification_timeout_seconds || 45;
+          const timeoutId = setTimeout(() => {
+            setShowDemandNotificationBanner(false);
+          }, timeoutSeconds * 1000);
+          setDemandNotificationTimeoutId(timeoutId);
+        }
+      }
+
       // Show fallback dialog if EV filter was applied but no matches found
       if (data.ev_filter_applied && data.ev_match_count === 0) {
         // Persist across React 18 StrictMode remounts so it cannot appear twice
@@ -1209,6 +1354,20 @@ const Explore = () => {
             </div>
           )}
 
+          {/* Demand Notification Banner - Desktop */}
+          {showDemandNotificationBanner && (
+            <div className="absolute top-32 left-1/2 -translate-x-1/2 z-10 max-w-md w-full px-4">
+              <Card className="p-3 bg-primary/10 border-primary/20 backdrop-blur-sm shadow-lg">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary flex-shrink-0" />
+                  <p className="text-sm text-foreground">
+                    Hosts nearby have been notified to update their availability to provide you with more options.
+                  </p>
+                </div>
+              </Card>
+            </div>
+          )}
+
           {/* Current Location Button */}
           <button
             type="button"
@@ -1396,9 +1555,21 @@ const Explore = () => {
             filteredCount={filteredSpots.length}
           />
         </div>
+        
+        {/* Demand Notification Banner - Shows when hosts are being notified */}
+        {showDemandNotificationBanner && (
+          <div className="max-w-md mx-auto mt-2">
+            <Card className="p-3 bg-primary/10 border-primary/20 backdrop-blur-sm shadow-lg">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-5 w-5 animate-spin text-primary flex-shrink-0" />
+                <p className="text-sm text-foreground">
+                  Hosts nearby have been notified to update their availability to provide you with more options.
+                </p>
+              </div>
+            </Card>
+          </div>
+        )}
       </div>
-
-      {/* Current Location Button */}
       <button
         type="button"
         onClick={handleGoToCurrentLocation}

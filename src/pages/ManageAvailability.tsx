@@ -700,6 +700,34 @@ const ManageAvailability = () => {
         }
       }
 
+      // Broadcast availability update for real-time driver map updates
+      // Only broadcast if availability was set for today and it's an available/custom mode (not unavailable)
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const savedToday = selectedDates.some(d => format(d, 'yyyy-MM-dd') === today);
+      
+      if (savedToday && availabilityMode !== 'unavailable') {
+        for (const spotId of selectedSpots) {
+          const spot = spots.find(s => s.id === spotId);
+          if (spot) {
+            try {
+              const channel = supabase.channel('availability-updates-global');
+              await channel.send({
+                type: 'broadcast',
+                event: 'spot_available',
+                payload: { 
+                  spot_id: spotId,
+                  spot_lat: 0, // Spot doesn't have lat/lng in this context, drivers will filter by distance
+                  spot_lng: 0,
+                }
+              });
+              supabase.removeChannel(channel);
+            } catch (err) {
+              log.error('Failed to broadcast availability update', { spotId, error: err });
+            }
+          }
+        }
+      }
+
       const spotCount = selectedSpots.length;
       const dateCount = selectedDates.length;
       
