@@ -382,27 +382,31 @@ serve(async (req) => {
               }
             } else {
               // No override - check recurring rules for this day of week
-              const dayRule = rules.find(r => r.day_of_week === dayOfWeek);
+              // IMPORTANT: Spot must have a matching availability rule with is_available=true to be considered available
+              const dayRule = rules.find(r => r.day_of_week === dayOfWeek && r.is_available === true);
 
-              if (dayRule) {
-                if (dayRule.is_available === false) {
-                  // Day is blocked by recurring rule
+              if (!dayRule) {
+                // No availability rule for this day = spot is unavailable (matches DB check_spot_availability function)
+                isAvailableForAllDates = false;
+                break;
+              }
+
+              // Rule exists and is_available=true - check if search time falls within the available window
+              if (dayRule.start_time && dayRule.end_time) {
+                const ruleStart = normalizeTimeStr(dayRule.start_time);
+                // Handle 24:00 as end-of-day (treat as 23:59:59 for comparison since string comparison fails)
+                let ruleEnd = normalizeTimeStr(dayRule.end_time);
+                if (ruleEnd === '24:00:00') {
+                  ruleEnd = '23:59:59';
+                }
+                
+                // Pacific time string comparison - search time must be within rule window
+                if (searchStartTimeOnDate < ruleStart || searchEndTimeOnDate > ruleEnd) {
                   isAvailableForAllDates = false;
                   break;
                 }
-                // Day has availability hours - check if search time falls within
-                if (dayRule.start_time && dayRule.end_time) {
-                  const ruleStart = normalizeTimeStr(dayRule.start_time);
-                  const ruleEnd = normalizeTimeStr(dayRule.end_time);
-                  
-                  // Pacific time string comparison - search time must be within rule window
-                  if (searchStartTimeOnDate < ruleStart || searchEndTimeOnDate > ruleEnd) {
-                    isAvailableForAllDates = false;
-                    break;
-                  }
-                }
               }
-              // If no rule exists for this day, spot is considered available (no restrictions)
+              // If rule has no time range (null/null), treat as available all day
             }
           }
 
