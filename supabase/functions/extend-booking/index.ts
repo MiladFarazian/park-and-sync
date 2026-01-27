@@ -144,6 +144,27 @@ serve(async (req) => {
       throw new Error(`Another guest has booked this spot soon. You can extend by up to ${maxExtensionText}.`);
     }
 
+    // Validate availability rules/overrides for the extension window
+    const { data: isAvailable, error: availabilityError } = await supabase.rpc(
+      'check_spot_availability',
+      {
+        p_spot_id: booking.spot_id,
+        p_start_at: currentEndTime.toISOString(),
+        p_end_at: newEndTime.toISOString(),
+        p_exclude_booking_id: bookingId,
+        p_exclude_user_id: userData.user.id,
+      }
+    );
+
+    if (availabilityError) {
+      console.error('Error checking availability rules:', availabilityError);
+      throw new Error('Failed to check spot availability');
+    }
+
+    if (!isAvailable) {
+      throw new Error('This spot is not available during the requested extension time.');
+    }
+
     // Calculate extension cost with invisible upcharge + visible service fee + EV charging
     const hostHourlyRate = booking.spots.hourly_rate;
     const hostEarnings = hostHourlyRate * extensionHours;
