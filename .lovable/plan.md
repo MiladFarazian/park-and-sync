@@ -1,62 +1,92 @@
 
-# Plan: Display Total Booking Price on Map Pins
+# Plan: Fix Double-Upcharge on Map Pin Prices
 
-## Overview
-Currently, map pins on the Explore page show the hourly rate (e.g., "$6/hr"). This change will update them to display the **total estimated price** for the selected booking period (e.g., "$14" for a 2-hour booking), making it easier for drivers to compare spots at a glance.
+## Problem Identified
+The map pin prices are being calculated incorrectly due to a **double application of the platform markup**:
 
-The spot cards in the sidebar will remain unchanged - they will continue to show the hourly rate.
+1. The `search-spots-lite` edge function already converts the host's base rate to the driver rate by adding the 20%/$1 markup before returning it as `hourly_rate`
+2. `Explore.tsx` then passes this already-marked-up rate to `calculateBookingTotal()`, which applies the markup **again**
 
-## Technical Changes
+### Example of the Bug
+| Step | Value |
+|------|-------|
+| Host sets rate | $5/hr |
+| Endpoint applies markup | $5 + $1 = **$6/hr** (returned as `hourly_rate`) |
+| Explore.tsx treats $6 as host rate | `calculateBookingTotal(6, 2)` |
+| Function applies markup again | $6 + $1.20 = $7.20/hr |
+| Subtotal | $7.20 × 2 = $14.40 |
+| Service fee (on wrong base) | max($12 × 0.20, $1) = $2.40 |
+| **Wrong total** | **$16.80 ≈ $17** |
+| **Expected total** | **$14** |
 
-### 1. Update Spot Interface (MapView.tsx)
-Add an optional `totalPrice` property to the `Spot` interface:
+## Solution
+Update `Explore.tsx` to calculate the total price correctly since the endpoint already returns the driver rate. Instead of using `calculateBookingTotal()` (which expects a host rate), we should:
 
-```text
-interface Spot {
-  ...existing properties...
-  totalPrice?: number;  // NEW: Total booking cost for the selected duration
+1. Use the returned `hourly_rate` directly as the driver rate (no additional markup)
+2. Calculate the service fee based on the **original host earnings** (driver rate minus the embedded markup)
+
+### Implementation
+
+**File: `src/pages/Explore.tsx`** (lines 753-763)
+
+Replace the current calculation:
+```typescript
+const hostHourlyRate = spot.hourly_rate;
+// ...
+const booking = calculateBookingTotal(hostHourlyRate, bookingHours, evPremium, willUseEvCharging);
+totalPrice = booking.driverTotal;
+```
+
+With correct calculation:
+```typescript
+// spot.hourly_rate from lite endpoint is ALREADY the driver rate (host rate + markup)
+const driverHourlyRate = spot.hourly_rate;
+const evPremium = spot.ev_charging_premium_per_hour || 0;
+
+let totalPrice: number | undefined;
+if (bookingHours) {
+  const willUseEvCharging = evChargerTypeFilter != null && spot.has_ev_charging;
+  
+  // Driver subtotal is simply the displayed rate × hours
+  const driverSubtotal = driverHourlyRate * bookingHours;
+  
+  // Reverse-engineer host rate to calculate correct service fee
+  // If driver rate = host rate + max(host rate × 0.20, $1), we need to find host rate
+  // For rates where 20% > $1 (i.e., host rate > $5): driverRate = hostRate × 1.20
+  // For rates where 20% ≤ $1 (i.e., host rate ≤ $5): driverRate = hostRate + $1
+  let hostHourlyRate: number;
+  if (driverHourlyRate > 6) {
+    // High rate: markup was 20%, so hostRate = driverRate / 1.20
+    hostHourlyRate = driverHourlyRate / 1.20;
+  } else {
+    // Low rate: markup was $1, so hostRate = driverRate - $1
+    hostHourlyRate = driverHourlyRate - 1;
+  }
+  
+  const hostEarnings = hostHourlyRate * bookingHours;
+  const serviceFee = Math.max(hostEarnings * 0.20, 1.00);
+  const evChargingFee = willUseEvCharging ? evPremium * bookingHours : 0;
+  
+  totalPrice = Math.round((driverSubtotal + serviceFee + evChargingFee) * 100) / 100;
 }
 ```
 
-### 2. Calculate Total Price in Explore.tsx
-When transforming the fetched spots, calculate the total booking price using the existing `calculateBookingTotal()` utility:
+### Verification
+With the fix, a $6/hr spot for 2 hours:
+- Driver subtotal: $6 × 2 = $12
+- Host rate (reverse): $6 - $1 = $5/hr
+- Host earnings: $5 × 2 = $10
+- Service fee: max($10 × 0.20, $1) = $2
+- **Total: $12 + $2 = $14** ✓
 
-- Import `calculateBookingTotal` from `@/lib/pricing`
-- Calculate hours from `startTime` and `endTime`
-- For each spot, compute `driverTotal` and add it as `totalPrice`
-
-### 3. Update Map Pin Price Display (MapView.tsx)
-Change the feature properties to use `totalPrice` when available:
-
-**Before (line 711):**
-```text
-price: `$${spot.hourlyRate}`
-```
-
-**After:**
-```text
-price: spot.totalPrice 
-  ? `$${Math.round(spot.totalPrice)}`  // Show whole dollar for totals
-  : `$${spot.hourlyRate}/hr`           // Fallback to hourly if no duration
-```
-
-### 4. Files Modified
+## Files Modified
 
 | File | Change |
 |------|--------|
-| `src/components/map/MapView.tsx` | Add `totalPrice` to Spot interface, update price display logic |
-| `src/pages/Explore.tsx` | Import pricing utility, calculate total for each spot before passing to MapView |
+| `src/pages/Explore.tsx` | Fix total price calculation to avoid double-applying the platform markup |
 
-## User Experience
-
-| Before | After |
-|--------|-------|
-| Map pins show "$6" (hourly rate) | Map pins show "$14" (total for booking period) |
-| Users must mentally calculate total | Total is immediately visible |
-| Spot cards show "$6/hr" | Spot cards still show "$6/hr" (unchanged) |
-
-## Edge Cases
-
-- **No times selected**: Falls back to showing hourly rate with "/hr" suffix
-- **Very long bookings**: Prices will show whole dollars (rounded) to keep pins readable
-- **EV charging**: Total includes EV charging premium if the EV filter is active
+## Edge Cases Handled
+- **Low host rates (≤$5)**: Markup is $1 flat, so hostRate = driverRate - $1
+- **High host rates (>$5)**: Markup is 20%, so hostRate = driverRate / 1.20
+- **EV charging**: EV premium is added correctly on top
+- **No booking duration**: Falls back to hourly rate display (existing behavior)
