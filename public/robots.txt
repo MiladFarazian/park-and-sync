@@ -1,8 +1,13 @@
+# Parkzy Robots.txt
+# https://parkzy.lovable.app
+
 User-agent: Googlebot
 Allow: /
+Crawl-delay: 1
 
 User-agent: Bingbot
 Allow: /
+Crawl-delay: 1
 
 User-agent: Twitterbot
 Allow: /
@@ -10,5 +15,16 @@ Allow: /
 User-agent: facebookexternalhit
 Allow: /
 
+User-agent: LinkedInBot
+Allow: /
+
 User-agent: *
 Allow: /
+Crawl-delay: 2
+
+# Sitemap location
+Sitemap: https://parkzy.lovable.app/sitemap.xml
+
+# Disallow admin and debug routes
+Disallow: /debug/
+Disallow: /admin/

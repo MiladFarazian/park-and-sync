@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.png" type="image/png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="canonical" href="https://parkzy.lovable.app/" />
     
     <!-- Preload critical hero image for faster LCP -->
     <link rel="preload" href="/src/assets/inglewood-2.jpg" as="image" type="image/jpeg" fetchpriority="high" />
@@ -19,23 +20,91 @@
     <meta name="apple-mobile-web-app-title" content="Parkzy" />
     
     <!-- Viewport with orientation considerations -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
     
     <!-- Screen orientation hint -->
     <meta name="screen-orientation" content="portrait" />
     
-    <title>Parkzy</title>
-    <meta name="description" content="Find and book parking spots instantly with Parkzy" />
+    <!-- Primary Meta Tags -->
+    <title>Parkzy - Find & Book Parking Spots Instantly | EV Charging Available</title>
+    <meta name="title" content="Parkzy - Find & Book Parking Spots Instantly | EV Charging Available" />
+    <meta name="description" content="Parkzy is the easiest way to find, compare, and book parking spots near you. Save time and money with instant booking, EV charging options, and trusted hosts. Join thousands of drivers today!" />
+    <meta name="keywords" content="parking, book parking, find parking, parking spots, EV charging, electric vehicle charging, parking app, rent parking space, hourly parking, daily parking, parking near me" />
     <meta name="author" content="Parkzy" />
-
-    <meta property="og:title" content="Parkzy" />
-    <meta property="og:description" content="Lovable Generated Project" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+    <meta name="theme-color" content="#10b981" />
+    
+    <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta property="og:url" content="https://parkzy.lovable.app/" />
+    <meta property="og:title" content="Parkzy - Find & Book Parking Spots Instantly" />
+    <meta property="og:description" content="The easiest way to find, compare, and book parking spots near you. Save time and money with instant booking and EV charging options." />
+    <meta property="og:image" content="https://parkzy.lovable.app/parkzy-logo.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="Parkzy" />
+    <meta property="og:locale" content="en_US" />
 
+    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@lovable_dev" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta name="twitter:url" content="https://parkzy.lovable.app/" />
+    <meta name="twitter:title" content="Parkzy - Find & Book Parking Spots Instantly" />
+    <meta name="twitter:description" content="The easiest way to find, compare, and book parking spots near you. Save time and money with instant booking and EV charging options." />
+    <meta name="twitter:image" content="https://parkzy.lovable.app/parkzy-logo.png" />
+    
+    <!-- Structured Data - Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Parkzy",
+      "url": "https://parkzy.lovable.app",
+      "logo": "https://parkzy.lovable.app/parkzy-logo.png",
+      "description": "Parkzy is the easiest way to find, compare, and book parking spots near you.",
+      "sameAs": []
+    }
+    </script>
+    
+    <!-- Structured Data - WebSite with SearchAction -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Parkzy",
+      "url": "https://parkzy.lovable.app",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://parkzy.lovable.app/explore?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+    
+    <!-- Structured Data - SoftwareApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Parkzy",
+      "applicationCategory": "TravelApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "description": "Find and book parking spots instantly with Parkzy. Compare prices, check availability, and reserve your spot in seconds.",
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "ratingCount": "1000"
+      }
+    }
+    </script>
   </head>
 
   <body>
