@@ -9,6 +9,14 @@ import LocationSearchInput from '@/components/ui/location-search-input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
+import { evChargerTypes } from '@/lib/evChargerTypes';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const HeroSection = () => {
   const navigate = useNavigate();
@@ -20,6 +28,7 @@ const HeroSection = () => {
   const [mobileStartPickerOpen, setMobileStartPickerOpen] = useState(false);
   const [mobileEndPickerOpen, setMobileEndPickerOpen] = useState(false);
   const [needsEvCharging, setNeedsEvCharging] = useState(false);
+  const [selectedChargerType, setSelectedChargerType] = useState<string>('');
   const [bookingCount, setBookingCount] = useState<number>(0);
 
   // Fetch total booking count for hero stat using public RPC
@@ -49,21 +58,34 @@ const HeroSection = () => {
 
 
   const handleSearch = () => {
-    const evParam = needsEvCharging ? '&ev=true' : '';
+    let evParams = '';
+    if (needsEvCharging) {
+      evParams = '&ev=true';
+      if (selectedChargerType) {
+        evParams += `&chargerType=${selectedChargerType}`;
+      }
+    }
     
     // If we have coordinates, navigate with lat/lng
     if (searchCoords) {
-      navigate(`/explore?lat=${searchCoords.lat}&lng=${searchCoords.lng}&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchLocation || 'Selected location')}${evParam}`);
+      navigate(`/explore?lat=${searchCoords.lat}&lng=${searchCoords.lng}&start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchLocation || 'Selected location')}${evParams}`);
       return;
     }
     
     // If there's a text query (user typed an address), navigate with the query
     if (searchLocation.trim()) {
-      navigate(`/explore?start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchLocation)}${evParam}`);
+      navigate(`/explore?start=${startTime.toISOString()}&end=${endTime.toISOString()}&q=${encodeURIComponent(searchLocation)}${evParams}`);
       return;
     }
     
     // No location entered - do nothing (require input)
+  };
+
+  const handleEvToggle = (checked: boolean) => {
+    setNeedsEvCharging(checked);
+    if (!checked) {
+      setSelectedChargerType('');
+    }
   };
 
   const handleStartTimeChange = (date: Date) => {
@@ -139,20 +161,45 @@ const HeroSection = () => {
               </div>
 
               {/* EV Charging Toggle */}
-              <div className="flex items-center justify-between p-4 rounded-xl border border-muted bg-muted/30">
-                <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-full bg-green-500/10 flex items-center justify-center">
-                    <Zap className="h-5 w-5 text-green-500" />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-4 rounded-xl border border-muted bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-full bg-green-500/10 flex items-center justify-center">
+                      <Zap className="h-5 w-5 text-green-500" />
+                    </div>
+                    <Label htmlFor="ev-charging-hero" className="text-sm font-medium cursor-pointer">
+                      I need EV charging
+                    </Label>
                   </div>
-                  <Label htmlFor="ev-charging-hero" className="text-sm font-medium cursor-pointer">
-                    I need EV charging
-                  </Label>
+                  <Switch
+                    id="ev-charging-hero"
+                    checked={needsEvCharging}
+                    onCheckedChange={handleEvToggle}
+                  />
                 </div>
-                <Switch
-                  id="ev-charging-hero"
-                  checked={needsEvCharging}
-                  onCheckedChange={setNeedsEvCharging}
-                />
+
+                {/* EV Charger Type Dropdown - shown when EV charging is enabled */}
+                {needsEvCharging && (
+                  <div className="p-4 rounded-xl border border-muted bg-muted/30">
+                    <Label className="text-xs text-muted-foreground mb-2 block">Charger type (optional)</Label>
+                    <Select value={selectedChargerType} onValueChange={setSelectedChargerType}>
+                      <SelectTrigger className="w-full bg-background">
+                        <SelectValue placeholder="Any charger type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="any">Any charger type</SelectItem>
+                        {evChargerTypes.map((charger) => (
+                          <SelectItem key={charger.id} value={charger.id}>
+                            <div className="flex items-center gap-2">
+                              <img src={charger.iconPath} alt={charger.name} className="w-5 h-5" />
+                              <span>{charger.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
               {/* Search Button */}
