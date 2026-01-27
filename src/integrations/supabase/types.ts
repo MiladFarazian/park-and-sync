@@ -1423,6 +1423,7 @@ export type Database = {
           vehicle_id: string
         }[]
       }
+      get_public_booking_count: { Args: never; Returns: number }
       gettransactionid: { Args: never; Returns: unknown }
       has_role: {
         Args: {
