@@ -210,7 +210,15 @@ const GuestBookingDetail = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-2xl mx-auto w-full" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 2rem)' }}>
+      <div 
+        className="flex-1 overflow-y-auto p-4 space-y-4 max-w-2xl mx-auto w-full" 
+        style={{ 
+          paddingBottom: 'calc(env(safe-area-inset-bottom) + 2rem)',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehaviorY: 'contain',
+          minHeight: 0,
+        } as React.CSSProperties}
+      >
         {/* Status Banner */}
         <Card className="p-4">
           <div className="flex items-center justify-between">
