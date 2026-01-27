@@ -751,15 +751,35 @@ const Explore = () => {
         : null;
 
       const transformedSpots = spots.map((spot: any) => {
-        const hostHourlyRate = spot.hourly_rate;
+        // spot.hourly_rate from lite endpoint is ALREADY the driver rate (host rate + markup)
+        const driverHourlyRate = spot.hourly_rate;
         const evPremium = spot.ev_charging_premium_per_hour || 0;
         
         // Calculate total price for map pins (includes EV charging if EV filter is active)
         let totalPrice: number | undefined;
         if (bookingHours) {
           const willUseEvCharging = evChargerTypeFilter != null && spot.has_ev_charging;
-          const booking = calculateBookingTotal(hostHourlyRate, bookingHours, evPremium, willUseEvCharging);
-          totalPrice = booking.driverTotal;
+          
+          // Driver subtotal is simply the displayed rate × hours (no additional markup)
+          const driverSubtotal = driverHourlyRate * bookingHours;
+          
+          // Reverse-engineer host rate to calculate correct service fee
+          // For rates where 20% > $1 (i.e., host rate > $5): driverRate = hostRate × 1.20
+          // For rates where 20% ≤ $1 (i.e., host rate ≤ $5): driverRate = hostRate + $1
+          let hostHourlyRate: number;
+          if (driverHourlyRate > 6) {
+            // High rate: markup was 20%, so hostRate = driverRate / 1.20
+            hostHourlyRate = driverHourlyRate / 1.20;
+          } else {
+            // Low rate: markup was $1, so hostRate = driverRate - $1
+            hostHourlyRate = driverHourlyRate - 1;
+          }
+          
+          const hostEarnings = hostHourlyRate * bookingHours;
+          const serviceFee = Math.max(hostEarnings * 0.20, 1.00);
+          const evChargingFee = willUseEvCharging ? evPremium * bookingHours : 0;
+          
+          totalPrice = Math.round((driverSubtotal + serviceFee + evChargingFee) * 100) / 100;
         }
 
         return {
@@ -767,7 +787,7 @@ const Explore = () => {
           title: spot.title,
           category: spot.category,
           address: spot.address,
-          hourlyRate: hostHourlyRate, // Already includes platform fee from lite endpoint
+          hourlyRate: driverHourlyRate, // Already includes platform fee from lite endpoint
           evChargingPremium: evPremium,
           rating: spot.spot_rating || 0,
           reviews: spot.spot_review_count || 0,
