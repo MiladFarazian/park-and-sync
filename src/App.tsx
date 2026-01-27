@@ -61,6 +61,7 @@ import { MessagesProvider } from "./contexts/MessagesContext";
 import { SupportRedirect } from "./components/auth/SupportRedirect";
 import RequireHostMode from "./components/auth/RequireHostMode";
 import { useOrientationLock } from "./hooks/useOrientationLock";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -68,18 +69,22 @@ const App = () => {
   // Lock orientation to portrait on mobile devices
   useOrientationLock();
 
-  // Environment verification for debugging cross-build issues
+  // Environment verification for debugging - ONLY in development
   useEffect(() => {
-    console.log('[ENV] VITE_SUPABASE_URL =', import.meta.env.VITE_SUPABASE_URL);
-    console.log('[ENV] VITE_SUPABASE_ANON_KEY set?', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
-    console.log('[ENV] Current URL:', window.location.origin);
+    if (import.meta.env.DEV) {
+      console.log('[ENV] VITE_SUPABASE_URL =', import.meta.env.VITE_SUPABASE_URL);
+      console.log('[ENV] VITE_SUPABASE_ANON_KEY set?', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+      console.log('[ENV] Current URL:', window.location.origin);
+    }
   }, []);
 
   // CRITICAL: Keep Realtime socket authorized after token refresh/sign-in
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       supabase.realtime.setAuth(session?.access_token ?? '');
-      console.log('[realtime-auth] Updated socket token:', session?.access_token ? 'present' : 'none');
+      if (import.meta.env.DEV) {
+        console.log('[realtime-auth] Updated socket token:', session?.access_token ? 'present' : 'none');
+      }
     });
 
     // Set initial auth
@@ -91,25 +96,29 @@ const App = () => {
   }, []);
 
   return (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <ModeProvider>
-        <MessagesProvider>
-          <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/email-confirmation" element={<EmailConfirmation />} />
-            <Route path="/checkout-success" element={<CheckoutSuccess />} />
-            <Route path="/embedded-checkout/:bookingId" element={<EmbeddedCheckout />} />
-            <Route path="/search-results" element={<SearchResults />} />
-            <Route path="/spot/:id" element={<div className="h-screen overflow-y-auto bg-background"><SpotDetail /></div>} />
-            <Route path="/guest-booking/:bookingId" element={<GuestBookingDetail />} />
-            <Route path="/debug/email-verification" element={<DebugEmailVerification />} />
-            <Route path="/personal-information" element={<PersonalInformation />} />
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <ModeProvider>
+          <MessagesProvider>
+            <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/email-confirmation" element={<EmailConfirmation />} />
+              <Route path="/checkout-success" element={<CheckoutSuccess />} />
+              <Route path="/embedded-checkout/:bookingId" element={<EmbeddedCheckout />} />
+              <Route path="/search-results" element={<SearchResults />} />
+              <Route path="/spot/:id" element={<div className="h-screen overflow-y-auto bg-background"><SpotDetail /></div>} />
+              <Route path="/guest-booking/:bookingId" element={<GuestBookingDetail />} />
+              {/* Debug route only available in development */}
+              {import.meta.env.DEV && (
+                <Route path="/debug/email-verification" element={<DebugEmailVerification />} />
+              )}
+              <Route path="/personal-information" element={<PersonalInformation />} />
             <Route path="/my-vehicles" element={<MyVehicles />} />
             <Route path="/add-vehicle" element={<AddVehicle />} />
             <Route path="/edit-vehicle/:id" element={<EditVehicle />} />
@@ -157,13 +166,14 @@ const App = () => {
                 </AppLayout>
               </SupportRedirect>
             } />
-          </Routes>
-    </BrowserRouter>
-          </TooltipProvider>
-        </MessagesProvider>
-      </ModeProvider>
-    </AuthProvider>
-  </QueryClientProvider>
+            </Routes>
+            </BrowserRouter>
+            </TooltipProvider>
+          </MessagesProvider>
+        </ModeProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
   );
 };
 
