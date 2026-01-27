@@ -1,16 +1,17 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
+import { logger } from "../_shared/logger.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const log = logger.scope('delete-payment-method');
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight requests
+  const preflightResponse = handleCorsPreflight(req);
+  if (preflightResponse) return preflightResponse;
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     const authHeader = req.headers.get('Authorization');
@@ -23,7 +24,7 @@ serve(async (req) => {
       throw new Error('Payment method ID is required');
     }
 
-    console.log('[DELETE-PAYMENT-METHOD] Deleting payment method:', paymentMethodId);
+    log.debug('Deleting payment method:', paymentMethodId);
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',

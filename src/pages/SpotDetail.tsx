@@ -24,6 +24,7 @@ import { useFavoriteSpots } from '@/hooks/useFavoriteSpots';
 import { cn } from '@/lib/utils';
 import { formatDisplayName } from '@/lib/displayUtils';
 import { resolveLegacyImagePath, PLACEHOLDER_IMAGE } from '@/assets';
+import { logger } from '@/lib/logger';
 
 const SpotDetail = () => {
   const navigate = useNavigate();
@@ -284,7 +285,7 @@ const SpotDetail = () => {
       setMessageText('');
       setMessageDialogOpen(false);
     } catch (error) {
-      console.error('Error sending message:', error);
+      logger.error('Error sending message:', error);
       toast.error('Failed to send message');
     } finally {
       setSendingMessage(false);
@@ -354,14 +355,14 @@ const SpotDetail = () => {
           reason: reportReason,
           details: reportDetails.trim() || null
         }
-      }).catch(err => console.error('Failed to send report notification:', err));
+      }).catch(err => logger.error('Failed to send report notification:', err));
 
       toast.success('Report submitted. We will review it shortly.');
       setReportReason('');
       setReportDetails('');
       setReportDialogOpen(false);
     } catch (error) {
-      console.error('Error submitting report:', error);
+      logger.error('Error submitting report:', error);
       toast.error('Failed to submit report');
     } finally {
       setSubmittingReport(false);
@@ -371,7 +372,7 @@ const SpotDetail = () => {
   const fetchSpotDetails = async () => {
     try {
       setLoading(true);
-      console.log('[SpotDetail] Fetching spot:', id);
+      logger.debug('[SpotDetail] Fetching spot:', id);
       
       const { data: spotData, error: spotError } = await supabase
         .from('spots')
@@ -401,7 +402,7 @@ const SpotDetail = () => {
         .eq('id', id)
         .single();
 
-      console.log('[SpotDetail] Fetch result:', { 
+      logger.debug('[SpotDetail] Fetch result:', { 
         id, 
         hasData: !!spotData, 
         hasError: !!spotError,
@@ -411,7 +412,7 @@ const SpotDetail = () => {
       });
 
       if (spotError) {
-        console.error('[SpotDetail] RLS/Permission error:', spotError);
+        logger.error('[SpotDetail] RLS/Permission error:', spotError);
         if (spotError.code === 'PGRST116' || spotError.message?.includes('not found')) {
           setError('This parking spot is not available');
         } else if (spotError.code === 'PGRST301' || spotError.message?.includes('permission')) {
@@ -423,13 +424,13 @@ const SpotDetail = () => {
       }
 
       if (!spotData) {
-        console.error('[SpotDetail] No spot data returned for ID:', id);
+        logger.error('[SpotDetail] No spot data returned for ID:', id);
         setError('Parking spot not found');
         return;
       }
 
       if (spotData.status !== 'active') {
-        console.warn('[SpotDetail] Spot is not active:', { id, status: spotData.status });
+        logger.warn('[SpotDetail] Spot is not active:', { id, status: spotData.status });
         setError('This spot is not currently active and cannot be booked');
         return;
       }
@@ -480,7 +481,7 @@ const SpotDetail = () => {
       // Check if user owns this spot
       if (user && transformedData.host_id) {
         const isOwner = user.id === transformedData.host_id;
-        console.log('[SpotDetail] Ownership check:', {
+        logger.debug('[SpotDetail] Ownership check:', {
           userId: user.id,
           hostId: transformedData.host_id,
           isOwner
@@ -567,7 +568,7 @@ const SpotDetail = () => {
       
       setReviews(spotReviews);
     } catch (error) {
-      console.error('Error fetching reviews:', error);
+      logger.error('Error fetching reviews:', error);
     } finally {
       setReviewsLoading(false);
     }

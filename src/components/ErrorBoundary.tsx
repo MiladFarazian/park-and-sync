@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { captureException } from '@/lib/sentry';
 
 interface Props {
   children: ReactNode;
@@ -39,8 +40,16 @@ class ErrorBoundary extends Component<Props, State> {
       console.error('ErrorBoundary caught an error:', error, errorInfo);
     }
 
-    // In production, you would send this to an error tracking service
-    // Example: Sentry.captureException(error, { contexts: { react: errorInfo } });
+    // Send to error tracking service (Sentry)
+    try {
+      captureException(error, {
+        react: {
+          componentStack: errorInfo.componentStack,
+        },
+      });
+    } catch {
+      // Sentry not initialized or not available - ignore
+    }
 
     this.setState({
       error,

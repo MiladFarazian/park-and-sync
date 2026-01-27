@@ -6,6 +6,9 @@ import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('BookingDeclined');
 
 const BookingDeclined = () => {
   const { bookingId } = useParams<{ bookingId: string }>();
@@ -34,7 +37,7 @@ const BookingDeclined = () => {
         if (error) throw error;
         setBooking(data);
       } catch (error) {
-        console.error('Error fetching booking:', error);
+        log.error('Error fetching booking:', error);
       } finally {
         setLoading(false);
       }

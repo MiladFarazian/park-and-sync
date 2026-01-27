@@ -7,6 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Virtuoso } from 'react-virtuoso';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('GuestChatPaneHost');
 
 interface GuestMessage {
   id: string;
@@ -81,7 +84,7 @@ const GuestChatPaneHost = ({ bookingId, guestName, onBack, markAsRead }: GuestCh
         markAsRead(`guest:${bookingId}`);
       }, 1000);
     } catch (err) {
-      console.error('Failed to fetch guest messages:', err);
+      log.error('Failed to fetch guest messages:', err);
     } finally {
       setLoading(false);
     }
@@ -206,7 +209,7 @@ const GuestChatPaneHost = ({ bookingId, guestName, onBack, markAsRead }: GuestCh
       });
       await supabase.removeChannel(channel);
     } catch (err) {
-      console.error('Failed to send message:', err);
+      log.error('Failed to send message:', err);
       // Remove optimistic message on failure
       setMessages((prev) => prev.filter(m => m.id !== tempId));
       setMessageInput(messageText);

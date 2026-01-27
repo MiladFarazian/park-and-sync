@@ -18,6 +18,9 @@ import { format, parseISO, getDay, isSameDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { WeeklyScheduleGrid, AvailabilityRule as GridAvailabilityRule } from '@/components/availability/WeeklyScheduleGrid';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('ManageAvailability');
 
 interface Spot {
   id: string;
@@ -188,7 +191,7 @@ const ManageAvailability = () => {
         }
       }
     } catch (error) {
-      console.error('Error fetching spots:', error);
+      log.error('Error fetching spots:', error);
     } finally {
       setLoading(false);
     }
@@ -229,7 +232,7 @@ const ManageAvailability = () => {
       
       setSpotAvailability(availability);
     } catch (error) {
-      console.error('Error fetching availability data:', error);
+      log.error('Error fetching availability data:', error);
     }
   };
 
@@ -255,7 +258,7 @@ const ManageAvailability = () => {
       
       setSpotRecurringRules(rulesBySpot);
     } catch (error) {
-      console.error('Error fetching recurring rules:', error);
+      log.error('Error fetching recurring rules:', error);
     }
   };
 
@@ -398,7 +401,7 @@ const ManageAvailability = () => {
       setRecurringSelectedSpots([]);
       navigate('/host-calendar');
     } catch (error) {
-      console.error('Error applying recurring schedule:', error);
+      log.error('Error applying recurring schedule:', error);
       toast({
         title: 'Error',
         description: 'Failed to apply recurring schedule',
@@ -707,7 +710,7 @@ const ManageAvailability = () => {
       
       navigate('/host-calendar');
     } catch (error) {
-      console.error('Error saving availability:', error);
+      log.error('Error saving availability:', error);
       toast({
         title: 'Error',
         description: 'Failed to save availability changes',

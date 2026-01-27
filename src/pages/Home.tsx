@@ -21,6 +21,7 @@ import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
 import FixLocationDialog from '@/components/location/FixLocationDialog';
 import EmailVerificationBanner from '@/components/auth/EmailVerificationBanner';
 import { evChargerTypes } from '@/lib/evChargerTypes';
+import { logger } from '@/lib/logger';
 
 const Home = () => {
   const isMobile = useIsMobile();
@@ -119,7 +120,7 @@ const Home = () => {
     }
 
     const logGeoError = (label: string, error: GeolocationPositionError) => {
-      console.log(label, { code: error.code, message: error.message });
+      logger.debug(label, { code: error.code, message: error.message });
     };
 
     const save = (loc: { lat: number; lng: number }) => {
@@ -253,7 +254,7 @@ const Home = () => {
       });
 
       if (error) {
-        console.error('Search error:', error);
+        logger.error('Search error:', error);
         if (error.message?.includes('429') || error.message?.includes('Too many requests')) {
           // Avoid toast spam
           if (nowMs - lastRateLimitToastAtRef.current > 5000) {
@@ -298,7 +299,7 @@ const Home = () => {
 
       setParkingSpots(transformedSpots);
     } catch (err) {
-      console.error('Unexpected error:', err);
+      logger.error('Unexpected error:', err);
     } finally {
       isFetchingNearbyRef.current = false;
       setLoading(false);

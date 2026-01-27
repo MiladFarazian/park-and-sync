@@ -7,6 +7,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import MapView from '@/components/map/MapView';
 import { calculateDriverPrice } from '@/lib/pricing';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('SearchResults');
 
 const SearchResults = () => {
   const navigate = useNavigate();
@@ -79,7 +82,7 @@ const SearchResults = () => {
       const startTime = new Date(`${checkIn}T09:00:00.000Z`).toISOString();
       const endTime = new Date(`${checkOut}T18:00:00.000Z`).toISOString();
 
-      console.log('Searching spots with params:', {
+      log.debug('Searching spots with params:', {
         latitude,
         longitude,
         start_time: startTime,
@@ -97,12 +100,12 @@ const SearchResults = () => {
       });
 
       if (error) {
-        console.error('Search error:', error);
+        log.error('Search error:', error);
         setError('Failed to search parking spots');
         return;
       }
 
-      console.log('Search results:', data);
+      log.debug('Search results:', data);
 
       // Transform the data to match our component structure
       const transformedSpots = data.spots?.map((spot: any) => ({
@@ -143,7 +146,7 @@ const SearchResults = () => {
         setNearestSpotId(nearest.id);
       }
     } catch (err) {
-      console.error('Unexpected error:', err);
+      log.error('Unexpected error:', err);
       setError('An unexpected error occurred');
     } finally {
       setLoading(false);

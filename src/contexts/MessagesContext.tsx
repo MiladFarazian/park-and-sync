@@ -3,6 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMode } from '@/contexts/ModeContext';
 import { SUPPORT_AVATAR } from '@/lib/constants';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('MessagesContext');
 
 // Booking context for conversations
 export interface BookingContext {
@@ -185,7 +188,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       return { ids: relevantIds, bookingsByPartner };
     } catch (error) {
-      console.error('Error fetching relevant user IDs:', error);
+      log.error('Error fetching relevant user IDs:', error);
       return { ids: new Set(), bookingsByPartner: new Map() };
     }
   }, [user, mode]);
@@ -264,7 +267,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       return guestConvs;
     } catch (error) {
-      console.error('Error fetching guest conversations:', error);
+      log.error('Error fetching guest conversations:', error);
       return [];
     }
   }, [user]);
@@ -453,7 +456,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setConversations(convs);
       }
     } catch (error) {
-      console.error('Error loading conversations:', error);
+      log.error('Error loading conversations:', error);
     } finally {
       if (mountedRef.current) {
         setLoading(false);
@@ -491,7 +494,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       }
     } catch (e) {
-      console.error('[MessagesContext] ensureProfileLoaded error:', e);
+      log.error('ensureProfileLoaded error:', e);
     }
   }, []);
 
@@ -562,7 +565,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           .eq('sender_type', 'guest')
           .is('read_at', null);
       } catch (error) {
-        console.error('Error marking guest messages as read:', error);
+        log.error('Error marking guest messages as read:', error);
       }
       return;
     }
@@ -582,7 +585,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         .eq('type', 'message')
         .eq('read', false);
     } catch (error) {
-      console.error('Error marking messages as read:', error);
+      log.error('Error marking messages as read:', error);
     }
   }, [user]);
 
@@ -626,7 +629,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     channel
       .on('broadcast', { event: 'new_message' }, (payload) => {
-        console.log('[MessagesContext] Broadcast new_message received', payload);
+        log.debug('Broadcast new_message received', payload);
         if (payload.payload?.sender_id && payload.payload?.recipient_id) {
           const msg: Message = {
             id: payload.payload.id || `temp-${Date.now()}`,
@@ -644,7 +647,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setTimeout(() => silentRefresh(), 300);
       })
       .subscribe((status, err) => {
-        console.log('[MessagesContext] Broadcast channel status:', status, err || '');
+        log.debug('Broadcast channel status:', status, err || '');
       });
 
     const pollInterval = setInterval(() => {

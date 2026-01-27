@@ -23,6 +23,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('HostBookingConfirmation');
 
 const HostBookingConfirmation = () => {
   const { bookingId } = useParams<{ bookingId: string }>();
@@ -92,7 +95,7 @@ const HostBookingConfirmation = () => {
       setDriver(bookingData.profiles);
       setVehicle(bookingData.vehicles);
     } catch (error) {
-      console.error('Error fetching booking:', error);
+      log.error('Error fetching booking:', error);
       toast({
         title: "Error",
         description: "Failed to load booking details",
@@ -125,7 +128,7 @@ const HostBookingConfirmation = () => {
       // Refresh booking data
       fetchBookingDetails();
     } catch (error: any) {
-      console.error('Error approving booking:', error);
+      log.error('Error approving booking:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to approve booking",
@@ -152,7 +155,7 @@ const HostBookingConfirmation = () => {
 
       navigate('/host-home');
     } catch (error: any) {
-      console.error('Error rejecting booking:', error);
+      log.error('Error rejecting booking:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to decline booking",
@@ -169,7 +172,7 @@ const HostBookingConfirmation = () => {
     try {
       navigate(`/messages?userId=${driver.user_id || driver.id}`);
     } catch (error) {
-      console.error('Error navigating to messages:', error);
+      log.error('Error navigating to messages:', error);
       toast({
         title: "Error",
         description: "Failed to open messages",

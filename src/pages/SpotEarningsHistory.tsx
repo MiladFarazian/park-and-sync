@@ -12,6 +12,9 @@ import { format } from 'date-fns';
 import { getHostNetEarnings } from '@/lib/hostEarnings';
 import { getStreetAddress } from '@/lib/addressUtils';
 import { getBookingStatus, getBookingStatusColor } from '@/lib/bookingStatus';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('SpotEarningsHistory');
 
 interface BookingWithDetails {
   id: string;
@@ -122,7 +125,7 @@ const SpotEarningsHistory = () => {
         .reduce((sum, b) => sum + getHostNetEarnings(b), 0);
       setTotalEarnings(total);
     } catch (error) {
-      console.error('Error fetching spot data:', error);
+      log.error('Error fetching spot data:', error);
       toast.error('Failed to load spot earnings');
     } finally {
       setLoading(false);

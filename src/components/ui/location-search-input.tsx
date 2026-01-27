@@ -4,6 +4,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Search, X, Navigation, MapPin, Loader2, Clock, Star } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('LocationSearchInput');
 
 interface LocationSearchInputProps {
   value: string;
@@ -250,7 +253,7 @@ const LocationSearchInput = ({
         // Also sync to localStorage as backup
         saveLocalFavorites(dbFavorites);
       } catch (error) {
-        console.error('Error loading favorites from database:', error);
+        log.error('Error loading favorites from database:', error);
         // Fall back to localStorage
         setFavorites(loadLocalFavorites());
       }
@@ -303,7 +306,7 @@ const LocationSearchInput = ({
         
         setFavorites(prev => [addedFavorite, ...prev].slice(0, MAX_FAVORITES));
       } catch (error) {
-        console.error('Error adding favorite to database:', error);
+        log.error('Error adding favorite to database:', error);
         // Fall back to localStorage
         const updated = [newFavorite, ...favorites].slice(0, MAX_FAVORITES);
         saveLocalFavorites(updated);
@@ -334,7 +337,7 @@ const LocationSearchInput = ({
         
         setFavorites(prev => prev.filter(f => f.name !== name));
       } catch (error) {
-        console.error('Error removing favorite from database:', error);
+        log.error('Error removing favorite from database:', error);
       } finally {
         setIsSyncingFavorites(false);
       }
@@ -444,7 +447,7 @@ const LocationSearchInput = ({
         }
       }
     } catch (error) {
-      console.error('Error detecting region:', error);
+      log.error('Error detecting region:', error);
     }
   };
 
@@ -485,7 +488,7 @@ const LocationSearchInput = ({
           }
         }
       } catch (error) {
-        console.error('Error fetching Mapbox token:', error);
+        log.error('Error fetching Mapbox token:', error);
       }
     };
     init();
@@ -520,7 +523,7 @@ const LocationSearchInput = ({
         setSuggestions([]);
       }
     } catch (error) {
-      console.error('Search error:', error);
+      log.error('Search error:', error);
       setSuggestions([]);
     } finally {
       setIsLoadingLocation(false);
@@ -561,7 +564,7 @@ const LocationSearchInput = ({
         sessionTokenRef.current = crypto.randomUUID();
       }
     } catch (error) {
-      console.error('Retrieve error:', error);
+      log.error('Retrieve error:', error);
     }
   };
 
@@ -615,7 +618,7 @@ const LocationSearchInput = ({
     setShowDropdown(false);
 
     const logGeoError = (label: string, error: GeolocationPositionError) => {
-      console.log(label, { code: error.code, message: error.message });
+      log.debug(label, { code: error.code, message: error.message });
     };
 
     const onSuccess = async (position: GeolocationPosition) => {
@@ -632,7 +635,7 @@ const LocationSearchInput = ({
         localStorage.setItem('parkzy:lastLocation', JSON.stringify({ ...coords, ts: Date.now() }));
         onSelectLocation({ ...coords, name: 'Current Location' });
       } catch (error) {
-        console.error('Error reverse geocoding:', error);
+        log.error('Error reverse geocoding:', error);
         localStorage.setItem('parkzy:lastLocation', JSON.stringify({ ...coords, ts: Date.now() }));
         onSelectLocation({ ...coords, name: 'Current Location' });
       } finally {

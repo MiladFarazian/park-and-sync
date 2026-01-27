@@ -1,16 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
+import { logger } from "../_shared/logger.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-const logStep = (step: string, details?: Record<string, unknown>) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[HOST-CANCEL-BOOKING] ${step}${detailsStr}`);
-};
+const log = logger.scope('host-cancel-booking');
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -38,7 +32,7 @@ serve(async (req) => {
     if (userError || !user) {
       throw new Error('User not authenticated');
     }
-    logStep('User authenticated', { userId: user.id });
+    log.debug('User authenticated', { userId: user.id });
 
     // Get booking details with spot info
     const { data: booking, error: bookingError } = await supabaseClient
@@ -50,7 +44,7 @@ serve(async (req) => {
     if (bookingError || !booking) {
       throw new Error('Booking not found');
     }
-    logStep('Booking found', { bookingId: booking.id, status: booking.status, renterId: booking.renter_id });
+    log.debug('Booking found', { bookingId: booking.id, status: booking.status, renterId: booking.renter_id });
 
     // Check if user is the host of this spot
     if (booking.spots.host_id !== user.id) {
@@ -65,7 +59,7 @@ serve(async (req) => {
     // Host-initiated cancellations always get full refund
     const refundAmount = booking.total_amount;
     const refundReason = reason || 'Cancelled by host - spot marked unavailable';
-    logStep('Processing full refund', { refundAmount, refundReason });
+    log.debug('Processing full refund', { refundAmount, refundReason });
 
     // Process refund if there's a payment
     let refundId = null;
@@ -76,7 +70,7 @@ serve(async (req) => {
 
       try {
         const pi = await stripe.paymentIntents.retrieve(booking.stripe_payment_intent_id);
-        logStep('PaymentIntent retrieved', { status: pi.status });
+        log.debug('PaymentIntent retrieved', { status: pi.status });
 
         if (pi.status === 'succeeded') {
           // Payment was captured, process refund
@@ -90,14 +84,14 @@ serve(async (req) => {
         } else if (pi.status === 'requires_capture') {
           // Payment was authorized but not captured, cancel the intent
           await stripe.paymentIntents.cancel(pi.id);
-          logStep('PaymentIntent cancelled (was requires_capture)');
+          log.debug('PaymentIntent cancelled (was requires_capture)');
         } else if (pi.status !== 'canceled') {
           // Try to cancel any other non-terminal state
           try {
             await stripe.paymentIntents.cancel(pi.id);
             logStep('PaymentIntent cancelled', { previousStatus: pi.status });
           } catch (cancelErr) {
-            logStep('Could not cancel PaymentIntent', { error: String(cancelErr) });
+            log.warn('Could not cancel PaymentIntent', { error: String(cancelErr) });
           }
         }
       } catch (stripeError) {
@@ -120,7 +114,7 @@ serve(async (req) => {
     if (updateError) {
       throw new Error(`Failed to update booking: ${updateError.message}`);
     }
-    logStep('Booking updated to canceled');
+    log.debug('Booking updated to canceled');
 
     // Create notification for the renter
     const { error: notifError } = await supabaseClient
@@ -136,7 +130,7 @@ serve(async (req) => {
     if (notifError) {
       logStep('Failed to create notification', { error: notifError.message });
     } else {
-      logStep('Notification sent to renter');
+      log.debug('Notification sent to renter');
     }
 
     return new Response(
@@ -153,7 +147,7 @@ serve(async (req) => {
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep('ERROR', { message: errorMessage });
+    log.error('ERROR', { message: errorMessage });
     return new Response(
       JSON.stringify({ error: errorMessage }),
       {

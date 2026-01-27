@@ -13,6 +13,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useAuth } from '@/contexts/AuthContext';
 import RequireAuth from '@/components/auth/RequireAuth';
 import { calculateDriverPrice } from '@/lib/pricing';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('BookingConfirmation');
 
 const BookingConfirmationContent = () => {
   const {
@@ -116,7 +119,7 @@ const BookingConfirmationContent = () => {
         setHost(bookingData.spots.profiles);
         setVehicle(bookingData.vehicles);
       } catch (error) {
-        console.error('Error fetching booking:', error);
+        log.error('Error fetching booking:', error);
         toast({
           title: "Error",
           description: "Failed to load booking details",
@@ -145,7 +148,7 @@ const BookingConfirmationContent = () => {
       // Navigate to messages page with host's user_id
       navigate(`/messages?userId=${host.user_id || host.id}`);
     } catch (error) {
-      console.error('Error navigating to messages:', error);
+      log.error('Error navigating to messages:', error);
       toast({
         title: "Error",
         description: "Failed to open messages",
@@ -279,7 +282,7 @@ const BookingConfirmationContent = () => {
       }
       setCancelDialogOpen(false);
     } catch (error) {
-      console.error('Error cancelling booking:', error);
+      log.error('Error cancelling booking:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to cancel booking",

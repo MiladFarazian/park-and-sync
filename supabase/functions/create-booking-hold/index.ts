@@ -1,10 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
+import { logger } from "../_shared/logger.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const log = logger.scope('create-booking-hold');
 
 // Rate limit configuration (generous for holds since users browse multiple spots)
 const RATE_LIMIT_PER_MINUTE = 10;
@@ -33,19 +32,18 @@ async function checkRateLimit(
     });
 
     if (!minuteOk) {
-      console.warn('Minute rate limit exceeded for user:', userId.substring(0, 8));
+      // Rate limit exceeded - don't log in production to avoid noise
       return { allowed: false, retryAfter: 60 };
     }
 
     if (!hourOk) {
-      console.warn('Hour rate limit exceeded for user:', userId.substring(0, 8));
+      // Rate limit exceeded - don't log in production to avoid noise
       return { allowed: false, retryAfter: 3600 };
     }
 
     return { allowed: true, retryAfter: 0 };
   } catch (error) {
-    console.error('Rate limit check failed:', error);
-    // Fail open - allow the request if rate limiting fails
+    // If rate limiting fails, allow the request
     return { allowed: true, retryAfter: 0 };
   }
 }
@@ -58,9 +56,11 @@ interface HoldRequest {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight requests
+  const preflightResponse = handleCorsPreflight(req);
+  if (preflightResponse) return preflightResponse;
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     const supabase = createClient(

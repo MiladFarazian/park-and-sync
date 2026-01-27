@@ -2,11 +2,10 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { Resend } from "npm:resend@2.0.0";
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
+import { logger } from "../_shared/logger.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const log = logger.scope('approve-booking');
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -48,7 +47,7 @@ serve(async (req) => {
       throw new Error('Missing booking_id');
     }
 
-    console.log('Approving booking:', booking_id);
+    log.debug('Approving booking:', booking_id);
 
     // Get booking with spot info and host info
     const { data: booking, error: bookingError } = await supabase

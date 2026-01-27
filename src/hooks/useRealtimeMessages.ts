@@ -2,6 +2,9 @@ import { useEffect, useRef, useCallback } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import type { Message } from '@/contexts/MessagesContext';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('useRealtimeMessages');
 
 export function useRealtimeMessages(
   conversationUserId: string | null,
@@ -22,7 +25,7 @@ export function useRealtimeMessages(
   const fetchLatestMessages = useCallback(async () => {
     if (!conversationUserId || !currentUserId) return;
     
-    console.log('[realtime] Fetching latest messages');
+    log.debug('Fetching latest messages');
     const { data, error } = await supabase
       .from('messages')
       .select('*')
@@ -46,7 +49,7 @@ export function useRealtimeMessages(
 
       // Ensure socket has valid auth token
       supabase.realtime.setAuth(session.access_token);
-      console.log('[realtime] Setting up broadcast channel for:', conversationUserId);
+      log.debug('Setting up broadcast channel for:', conversationUserId);
 
       // Remove old channel
       if (channelRef.current) {
@@ -97,13 +100,13 @@ export function useRealtimeMessages(
         // Listen on both possible channel directions
         .on('broadcast', { event: 'pending_message' }, handleBroadcast)
         .on('broadcast', { event: 'new_message' }, () => {
-          console.log('[realtime] new_message broadcast received');
+          log.debug('new_message broadcast received');
           if (!cancelled && activeConversationRef.current === thisConversationId) {
             fetchLatestMessages();
           }
         })
         .subscribe((status, err) => {
-          console.log('[realtime] Channel status:', status, err || '');
+          log.debug('Channel status:', status, err || '');
         });
 
       channelRef.current = channel;

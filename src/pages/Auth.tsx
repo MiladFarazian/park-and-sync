@@ -27,6 +27,9 @@ import {
 } from '@/components/ui/select';
 import CompleteProfileStep from '@/components/auth/CompleteProfileStep';
 import { isProfileComplete } from '@/lib/profileUtils';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('Auth');
 
 const REMEMBER_ME_KEY = 'parkzy_remember_me';
 
@@ -219,7 +222,7 @@ const Auth = () => {
       } as any : null;
       
       if (!isProfileComplete(profileForCheck)) {
-        console.log('[Auth] Profile incomplete after OTP, showing complete profile step');
+        log.debug('Profile incomplete after OTP, showing complete profile step');
         setVerifiedPhone(formattedPhone);
         setAuthStep('complete-profile');
         setLoading(false);

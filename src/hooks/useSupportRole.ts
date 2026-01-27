@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('useSupportRole');
 
 export const useSupportRole = () => {
   const { user } = useAuth();
@@ -30,7 +33,7 @@ export const useSupportRole = () => {
           setIsSupport(!!data);
         }
       } catch (err) {
-        console.error('Error checking support role:', err);
+        log.error('Error checking support role:', err);
         setIsSupport(false);
       } finally {
         setLoading(false);

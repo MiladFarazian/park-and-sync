@@ -12,6 +12,9 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ImageCropDialog } from "@/components/profile/ImageCropDialog";
+import { logger } from "@/lib/logger";
+
+const log = logger.scope('ManageAccount');
 
 const ManageAccount = () => {
   const navigate = useNavigate();
@@ -177,17 +180,17 @@ const ManageAccount = () => {
         toast.info("Please check your email to confirm the change");
       }
 
-      console.log('[ManageAccount] Saving profile:', formData);
+      log.debug('Saving profile:', formData);
       const { error } = await updateProfile({
         ...formData,
         avatar_url,
       });
       
       if (error) {
-        console.error('[ManageAccount] Profile save failed:', error);
+        log.error('Profile save failed:', error);
         toast.error("Failed to update profile");
       } else {
-        console.log('[ManageAccount] Profile saved successfully, state refreshed');
+        log.debug('Profile saved successfully, state refreshed');
         toast.success("Profile updated successfully");
         setAvatarFile(null);
       }
@@ -214,7 +217,7 @@ const ManageAccount = () => {
       await signOut();
       navigate('/');
     } catch (error: any) {
-      console.error('Error deleting account:', error);
+      log.error('Error deleting account:', error);
       toast.error('Failed to delete account: ' + error.message);
     } finally {
       setIsDeleting(false);

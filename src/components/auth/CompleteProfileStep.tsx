@@ -7,6 +7,9 @@ import { Loader2, Mail, User, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('CompleteProfileStep');
 
 interface CompleteProfileStepProps {
   phone: string;
@@ -62,7 +65,7 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
         setEmailIsValid(true);
       }
     } catch (error) {
-      console.error('[CompleteProfile] Email check error:', error);
+      log.error('Email check error:', error);
     } finally {
       setIsCheckingEmail(false);
     }
@@ -173,7 +176,7 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
         });
 
       if (profileError) {
-        console.error('[CompleteProfile] Profile save error:', profileError);
+        log.error('Profile save error:', profileError);
         toast({
           title: 'Failed to save profile',
           description: profileError.message,
@@ -190,7 +193,7 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
           email: formData.email
         });
         if (authError) {
-          console.warn('[CompleteProfile] Auth email update error:', authError);
+          log.warn('Auth email update error:', authError);
           // Check if it's a duplicate email error from Supabase Auth
           if (authError.message.toLowerCase().includes('already registered') || 
               authError.message.toLowerCase().includes('already in use') ||
@@ -219,7 +222,7 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
 
       onComplete();
     } catch (error) {
-      console.error('[CompleteProfile] Unexpected error:', error);
+      log.error('Unexpected error:', error);
       toast({
         title: 'Error',
         description: 'An unexpected error occurred. Please try again.',

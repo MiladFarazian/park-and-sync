@@ -1,16 +1,17 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
+import { logger } from "../_shared/logger.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const log = logger.scope('setup-payment-method');
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight requests
+  const preflightResponse = handleCorsPreflight(req);
+  if (preflightResponse) return preflightResponse;
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     // Get authorization header
@@ -36,7 +37,7 @@ serve(async (req) => {
       throw new Error('User not authenticated');
     }
 
-    console.log('[setup-payment-method] Processing for user:', user.id, 'auth email:', user.email, 'phone:', user.phone);
+    log.debug('Processing for user:', user.id, 'auth email:', user.email, 'phone:', user.phone);
 
     const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
       apiVersion: '2025-08-27.basil',
@@ -57,17 +58,17 @@ serve(async (req) => {
       ? `${profile.first_name} ${profile.last_name || ''}`.trim()
       : (user.email || user.phone);
 
-    console.log('[setup-payment-method] Customer email:', customerEmail, 'name:', customerName);
+    log.debug('Customer email:', customerEmail, 'name:', customerName);
 
     if (profile?.stripe_customer_id) {
       // Verify the customer still exists in Stripe
       try {
         await stripe.customers.retrieve(profile.stripe_customer_id);
         customerId = profile.stripe_customer_id;
-        console.log('[setup-payment-method] Found existing customer from profile:', customerId);
+        log.debug('Found existing customer from profile:', customerId);
       } catch (err: any) {
         if (err.code === 'resource_missing') {
-          console.log('[setup-payment-method] Customer in profile no longer exists in Stripe');
+          log.debug('Customer in profile no longer exists in Stripe');
         } else {
           throw err;
         }
@@ -82,7 +83,7 @@ serve(async (req) => {
       });
       if (customers.data.length > 0) {
         customerId = customers.data[0].id;
-        console.log('[setup-payment-method] Found existing customer by email:', customerId);
+        log.debug('Found existing customer by email:', customerId);
       }
     }
 
@@ -97,7 +98,7 @@ serve(async (req) => {
           console.log('[setup-payment-method] Found existing customer by metadata:', customerId);
         }
       } catch (searchError) {
-        console.log('[setup-payment-method] Customer search failed, will create new:', searchError);
+        log.debug('Customer search failed, will create new:', searchError);
       }
     }
 
@@ -113,7 +114,7 @@ serve(async (req) => {
         },
       });
       customerId = customer.id;
-      console.log('[setup-payment-method] Created new customer:', customerId);
+      log.debug('Created new customer:', customerId);
     }
 
     // Always update the profile with the stripe_customer_id to ensure consistency
@@ -123,7 +124,7 @@ serve(async (req) => {
       .eq('user_id', user.id);
     
     if (updateError) {
-      console.error('[setup-payment-method] Failed to update profile with customer ID:', updateError);
+      log.error('Failed to update profile with customer ID:', updateError);
       // Don't throw - continue with setup intent creation
     } else {
       console.log('[setup-payment-method] Updated profile with stripe_customer_id:', customerId);
@@ -146,7 +147,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('Setup payment method error:', error);
+    log.error('Setup payment method error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     return new Response(
       JSON.stringify({ error: errorMessage }),

@@ -17,6 +17,9 @@ import { ActiveBookingBanner } from '@/components/booking/ActiveBookingBanner';
 import { getHostNetEarnings } from '@/lib/hostEarnings';
 import { PLACEHOLDER_IMAGE } from '@/lib/constants';
 import { usePagination, getPaginationRange } from '@/hooks/usePagination';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('Dashboard');
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('listings');
@@ -62,7 +65,7 @@ const Dashboard = () => {
         spot.id === spotId ? { ...spot, status: newStatus } : spot
       ));
     } catch (error: any) {
-      console.error('Error toggling spot status:', error);
+      log.error('Error toggling spot status:', error);
       toast.error('Failed to update spot status');
     }
   };
@@ -78,7 +81,7 @@ const Dashboard = () => {
         .eq('host_id', user?.id);
 
       if (countError) {
-        console.error('Error getting count:', countError);
+        log.error('Error getting count:', countError);
       } else {
         setTotalListings(count || 0);
         pagination.setTotalItems(count || 0);
@@ -158,7 +161,7 @@ const Dashboard = () => {
         totalBookings: allBookings?.length || 0,
       });
     } catch (error) {
-      console.error('Error fetching host data:', error);
+      log.error('Error fetching host data:', error);
       toast.error('Failed to load listings');
     } finally {
       setLoading(false);

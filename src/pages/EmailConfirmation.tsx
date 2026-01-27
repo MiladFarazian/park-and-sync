@@ -9,6 +9,9 @@ import { CheckCircle, XCircle, Loader2, Mail, RefreshCw, ArrowRight, ShieldCheck
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { logos } from '@/assets';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('EmailConfirmation');
 
 const sendWelcomeEmail = async (userId: string, email: string, firstName?: string) => {
   try {
@@ -19,7 +22,7 @@ const sendWelcomeEmail = async (userId: string, email: string, firstName?: strin
       .single();
 
     if (profile?.welcome_email_sent) {
-      console.log('Welcome email already sent');
+      log.debug('Welcome email already sent');
       return;
     }
 
@@ -28,7 +31,7 @@ const sendWelcomeEmail = async (userId: string, email: string, firstName?: strin
     });
 
     if (error) {
-      console.error('Failed to send welcome email:', error);
+      log.error('Failed to send welcome email:', error);
       return;
     }
 
@@ -37,9 +40,9 @@ const sendWelcomeEmail = async (userId: string, email: string, firstName?: strin
       .update({ welcome_email_sent: true })
       .eq('user_id', userId);
 
-    console.log('Welcome email sent successfully');
+    log.debug('Welcome email sent successfully');
   } catch (err) {
-    console.error('Error in sendWelcomeEmail:', err);
+    log.error('Error in sendWelcomeEmail:', err);
   }
 };
 
@@ -86,9 +89,9 @@ const EmailConfirmation = () => {
           onConflict: 'user_id',
           ignoreDuplicates: false
         });
-      console.log('[EmailConfirmation] Profile upserted successfully');
+      log.debug('Profile upserted successfully');
     } catch (error) {
-      console.error('Failed to upsert profile:', error);
+      log.error('Failed to upsert profile:', error);
     }
     
     sendWelcomeEmail(session.user.id, session.user.email || '', firstName);
@@ -110,7 +113,7 @@ const EmailConfirmation = () => {
     if (!tokenParams) return;
     
     setStage('verifying');
-    console.log('[EmailConfirmation] User clicked confirm, calling verifyOtp...');
+    log.debug('User clicked confirm, calling verifyOtp...');
     
     // Try verification up to 2 times
     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -120,17 +123,17 @@ const EmailConfirmation = () => {
       });
 
       if (!error && data.session) {
-        console.log('[EmailConfirmation] verifyOtp succeeded on attempt', attempt);
+        log.debug('verifyOtp succeeded on attempt', attempt);
         await handleVerificationSuccess(data.session);
         return;
       }
 
-      console.log('[EmailConfirmation] verifyOtp attempt', attempt, 'failed:', error?.message);
+      log.debug('verifyOtp attempt', attempt, 'failed:', error?.message);
       
       // After each failure, check if user is actually verified (scanner consumed token)
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.email_confirmed_at) {
-        console.log('[EmailConfirmation] User verified despite error (scanner consumed token)');
+        log.debug('User verified despite error (scanner consumed token)');
         await handleVerificationSuccess(session);
         return;
       }
@@ -138,7 +141,7 @@ const EmailConfirmation = () => {
       // Also try refreshing the session
       const { data: refreshData } = await supabase.auth.refreshSession();
       if (refreshData.session?.user?.email_confirmed_at) {
-        console.log('[EmailConfirmation] User verified after session refresh');
+        log.debug('User verified after session refresh');
         await handleVerificationSuccess(refreshData.session);
         return;
       }
@@ -194,20 +197,20 @@ const EmailConfirmation = () => {
       const code = urlParams.get('code');
       const hash = window.location.hash;
       
-      console.log('[EmailConfirmation] Params check - tokenHash:', !!tokenHash, 'otpType:', !!otpType, 'code:', !!code);
+      log.debug('Params check - tokenHash:', !!tokenHash, 'otpType:', !!otpType, 'code:', !!code);
       
       // Check if user is already verified
       const { data: { session: existingSession } } = await supabase.auth.getSession();
       
       if (existingSession?.user?.email_confirmed_at) {
-        console.log('[EmailConfirmation] User already verified');
+        log.debug('User already verified');
         await handleVerificationSuccess(existingSession);
         return;
       }
 
       // If we have token_hash and type, show "Click to Verify" button (don't auto-verify)
       if (tokenHash && otpType) {
-        console.log('[EmailConfirmation] Token params found, showing confirm button');
+        log.debug('Token params found, showing confirm button');
         setTokenParams({ tokenHash, otpType });
         setStage('ready');
         return;
@@ -215,7 +218,7 @@ const EmailConfirmation = () => {
 
       // Handle PKCE code flow (auto-process as it's a one-time redirect)
       if (code) {
-        console.log('[EmailConfirmation] Processing PKCE code');
+        log.debug('Processing PKCE code');
         setStage('verifying');
         
         const { data, error } = await supabase.auth.exchangeCodeForSession(code);
@@ -272,7 +275,7 @@ const EmailConfirmation = () => {
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[EmailConfirmation] Auth event:', event);
+      log.debug('Auth event:', event);
       if (event === 'SIGNED_IN' && session?.user?.email_confirmed_at) {
         handleVerificationSuccess(session);
       }

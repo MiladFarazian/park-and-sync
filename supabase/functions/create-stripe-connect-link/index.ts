@@ -1,35 +1,31 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
+import { logger } from "../_shared/logger.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-const logStep = (step: string, details?: Record<string, unknown>) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
-  console.log(`[create-stripe-connect-link] ${step}${detailsStr}`);
-};
+const log = logger.scope('create-stripe-connect-link');
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight requests
+  const preflightResponse = handleCorsPreflight(req);
+  if (preflightResponse) return preflightResponse;
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
-    logStep("Function invoked");
+    log.debug("Function invoked");
     
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
-    logStep("Environment check", { 
+    log.debug("Environment check", { 
       hasUrl: !!supabaseUrl, 
       hasServiceKey: !!serviceRoleKey 
     });
 
     if (!supabaseUrl || !serviceRoleKey) {
-      logStep("ERROR: Missing environment variables");
+      log.error("Missing environment variables");
       return new Response(JSON.stringify({ error: "Server configuration error" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -41,7 +37,7 @@ serve(async (req) => {
     });
 
     const authHeader = req.headers.get("Authorization");
-    logStep("Auth header check", { hasAuthHeader: !!authHeader });
+    log.debug("Auth header check", { hasAuthHeader: !!authHeader });
     
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -51,18 +47,18 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    logStep("Token extracted", { tokenLength: token.length });
+    log.debug("Token extracted", { tokenLength: token.length });
     
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
     
-    logStep("getUser result", { 
+    log.debug("getUser result", { 
       hasUser: !!user, 
       userId: user?.id, 
       error: userError?.message 
     });
 
     if (userError || !user) {
-      logStep("ERROR: Invalid token", { error: userError?.message });
+      log.error("Invalid token", { error: userError?.message });
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -76,7 +72,7 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .single();
 
-    logStep("Profile fetch", { 
+    log.debug("Profile fetch", { 
       hasProfile: !!profile, 
       email: profile?.email,
       error: profileError?.message 
@@ -90,7 +86,7 @@ serve(async (req) => {
     }
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    logStep("Stripe key check", { hasStripeKey: !!stripeKey });
+    log.debug("Stripe key check", { hasStripeKey: !!stripeKey });
     
     if (!stripeKey) {
       return new Response(JSON.stringify({ error: "Stripe not configured" }), {
@@ -102,11 +98,11 @@ serve(async (req) => {
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
     let accountId = profile.stripe_account_id;
-    logStep("Existing Stripe account", { accountId });
+    log.debug("Existing Stripe account", { accountId });
 
     // Create Stripe Connect account if doesn't exist
     if (!accountId) {
-      logStep("Creating new Stripe Connect account");
+      log.debug("Creating new Stripe Connect account");
       const account = await stripe.accounts.create({
         type: "express",
         email: profile.email,
@@ -117,7 +113,7 @@ serve(async (req) => {
       });
 
       accountId = account.id;
-      logStep("Created Stripe account", { accountId });
+      log.debug("Created Stripe account", { accountId });
 
       // Save account ID to profile
       await supabaseClient
@@ -128,7 +124,7 @@ serve(async (req) => {
 
     // Create account link for onboarding
     const origin = req.headers.get("origin") || "http://localhost:5173";
-    logStep("Creating account link", { origin });
+    log.debug("Creating account link", { origin });
     
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
@@ -137,7 +133,7 @@ serve(async (req) => {
       type: "account_onboarding",
     });
 
-    logStep("Account link created", { url: accountLink.url });
+    log.debug("Account link created", { url: accountLink.url });
 
     return new Response(
       JSON.stringify({ url: accountLink.url }),
@@ -147,7 +143,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("[create-stripe-connect-link] Error:", error);
+    log.error("Error:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {

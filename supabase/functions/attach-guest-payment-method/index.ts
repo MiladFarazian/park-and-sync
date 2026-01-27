@@ -1,16 +1,17 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
+import { logger } from "../_shared/logger.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const log = logger.scope('attach-guest-payment-method');
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight requests
+  const preflightResponse = handleCorsPreflight(req);
+  if (preflightResponse) return preflightResponse;
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     const supabaseClient = createClient(
@@ -44,7 +45,7 @@ serve(async (req) => {
       throw new Error('Payment intent ID is required');
     }
 
-    console.log('Attaching payment method from PI:', payment_intent_id, 'to user:', userEmail);
+    log.debug('Attaching payment method from PI:', payment_intent_id, 'to user:', userEmail);
 
     // Initialize Stripe
     const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');
@@ -57,7 +58,7 @@ serve(async (req) => {
     const paymentIntent = await stripe.paymentIntents.retrieve(payment_intent_id);
     
     if (!paymentIntent.payment_method) {
-      console.log('No payment method on payment intent');
+      log.debug('No payment method on payment intent');
       return new Response(JSON.stringify({ 
         success: false, 
         message: 'No payment method found on payment intent' 

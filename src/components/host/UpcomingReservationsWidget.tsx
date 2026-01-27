@@ -115,7 +115,7 @@ const UpcomingReservationsWidget = () => {
 
       setReservations(formattedBookings);
     } catch (error) {
-      console.error('Error fetching reservations:', error);
+      log.error('Error fetching reservations:', error);
     } finally {
       setLoading(false);
     }

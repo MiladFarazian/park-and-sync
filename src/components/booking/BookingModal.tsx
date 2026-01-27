@@ -10,6 +10,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, addHours, differenceInHours } from 'date-fns';
 import { useMode } from '@/contexts/ModeContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('BookingModal');
 
 interface BookingModalProps {
   open: boolean;
@@ -63,10 +66,10 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
     const start = new Date(startDateTime);
     const end = new Date(endDateTime);
     
-    console.log('Date objects:', { start, end });
+    log.debug('Date objects:', { start, end });
     
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      console.log('Invalid date objects');
+      log.debug('Invalid date objects');
       return null;
     }
     
@@ -82,7 +85,7 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
     const platformFee = subtotal * 0.15; // 15% platform fee
     const total = subtotal + platformFee;
 
-    console.log('Pricing:', { hours, subtotal, platformFee, total });
+    log.debug('Pricing:', { hours, subtotal, platformFee, total });
 
     return {
       hours: hours.toString(),
@@ -192,7 +195,7 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
 
   const pricing = calculateTotal();
   
-  console.log('Current state:', { startDateTime, endDateTime, pricing });
+  log.debug('Current state:', { startDateTime, endDateTime, pricing });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

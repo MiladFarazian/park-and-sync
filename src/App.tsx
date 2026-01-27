@@ -62,6 +62,10 @@ import { SupportRedirect } from "./components/auth/SupportRedirect";
 import RequireHostMode from "./components/auth/RequireHostMode";
 import { useOrientationLock } from "./hooks/useOrientationLock";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { initSentry } from "./lib/sentry";
+
+// Initialize Sentry for error tracking
+initSentry();
 
 const queryClient = new QueryClient();
 

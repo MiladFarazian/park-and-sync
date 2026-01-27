@@ -16,6 +16,9 @@ import {
   User
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('SupportHome');
 
 interface Report {
   id: string;
@@ -82,7 +85,7 @@ export default function SupportHome() {
       if (error) throw error;
       setReports(data as unknown as Report[]);
     } catch (err) {
-      console.error('Error fetching reports:', err);
+      log.error('Error fetching reports:', err);
     } finally {
       setLoadingReports(false);
     }
@@ -105,7 +108,7 @@ export default function SupportHome() {
       if (error) throw error;
       setTowRequests(data as unknown as TowRequest[]);
     } catch (err) {
-      console.error('Error fetching tow requests:', err);
+      log.error('Error fetching tow requests:', err);
     } finally {
       setLoadingTows(false);
     }

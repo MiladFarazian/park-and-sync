@@ -19,6 +19,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { getHostNetEarnings } from '@/lib/hostEarnings';
 import { getBookingStatus, getBookingStatusColor } from '@/lib/bookingStatus';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('HostCalendar');
 
 interface SpotWithRate {
   id: string;
@@ -232,7 +235,7 @@ const HostCalendar = () => {
       }
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching spots:', error);
+      log.error('Error fetching spots:', error);
       setLoading(false);
     }
   };
@@ -304,7 +307,7 @@ const HostCalendar = () => {
       }
 
     } catch (error) {
-      console.error('Error fetching calendar data:', error);
+      log.error('Error fetching calendar data:', error);
     } finally {
       setLoading(false);
     }
@@ -355,7 +358,7 @@ const HostCalendar = () => {
       if (hostError) throw hostError;
       setAllBookings((hostBookings || []).map(b => ({ ...b, userRole: 'host' })));
     } catch (error) {
-      console.error('Error fetching reservations:', error);
+      log.error('Error fetching reservations:', error);
       toast({
         title: "Error",
         description: "Failed to load reservations",

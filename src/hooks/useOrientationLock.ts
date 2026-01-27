@@ -1,5 +1,8 @@
 import { useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('useOrientationLock');
 
 export const useOrientationLock = () => {
   useEffect(() => {
@@ -9,9 +12,9 @@ export const useOrientationLock = () => {
         try {
           const { ScreenOrientation } = await import('@capacitor/screen-orientation');
           await ScreenOrientation.lock({ orientation: 'portrait' });
-          console.log('[orientation] Locked to portrait via Capacitor');
+          log.debug('Locked to portrait via Capacitor');
         } catch (error) {
-          console.log('[orientation] Capacitor lock failed:', error);
+          log.debug('Capacitor lock failed:', error);
         }
         return;
       }
@@ -23,11 +26,11 @@ export const useOrientationLock = () => {
       try {
         if (screen.orientation && 'lock' in screen.orientation) {
           await (screen.orientation as any).lock('portrait');
-          console.log('[orientation] Locked via Screen Orientation API');
+          log.debug('Locked via Screen Orientation API');
         }
       } catch (error) {
         // Expected to fail on most browsers - this is normal
-        console.log('[orientation] Web API lock not supported (expected on iOS)');
+        log.debug('Web API lock not supported (expected on iOS)');
       }
     };
 

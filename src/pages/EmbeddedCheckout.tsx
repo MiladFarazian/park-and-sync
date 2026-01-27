@@ -6,6 +6,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
+import { logger } from "@/lib/logger";
+
+const log = logger.scope('EmbeddedCheckout');
 
 export default function EmbeddedCheckoutPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
@@ -53,7 +56,7 @@ export default function EmbeddedCheckoutPage() {
 
         setLoading(false);
       } catch (error) {
-        console.error('Error initializing checkout:', error);
+        log.error('Error initializing checkout:', error);
         toast({
           title: "Error",
           description: error instanceof Error ? error.message : "Failed to initialize checkout",

@@ -3,13 +3,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { calculateBookingTotal } from "../_shared/pricing.ts";
 import { logger } from "../_shared/logger.ts";
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 
 const log = logger.scope('create-guest-booking');
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
 
 // Rate limit configuration (strict for booking creation)
 const RATE_LIMIT_PER_MINUTE = 3;
@@ -68,9 +64,11 @@ interface GuestBookingRequest {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight requests
+  const preflightResponse = handleCorsPreflight(req);
+  if (preflightResponse) return preflightResponse;
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     // Create admin client for operations

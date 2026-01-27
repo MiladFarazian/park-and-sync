@@ -10,6 +10,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Heart, MapPin, Star, Zap, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DEFAULT_MAP_CENTER } from '@/lib/constants';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('SavedSpots');
 
 interface SavedSpot {
   id: string;
@@ -83,7 +86,7 @@ export default function SavedSpots() {
 
         setSpots(enrichedSpots);
       } catch (error) {
-        console.error('Error fetching saved spots:', error);
+        log.error('Error fetching saved spots:', error);
       } finally {
         setIsLoading(false);
       }

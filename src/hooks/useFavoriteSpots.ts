@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('useFavoriteSpots');
 
 export function useFavoriteSpots() {
   const { user } = useAuth();
@@ -26,7 +29,7 @@ export function useFavoriteSpots() {
       if (error) throw error;
       setFavorites(data?.map(f => f.spot_id) || []);
     } catch (error) {
-      console.error('Error fetching favorites:', error);
+      log.error('Error fetching favorites:', error);
     } finally {
       setIsInitialized(true);
     }
@@ -91,7 +94,7 @@ export function useFavoriteSpots() {
       }
       return true;
     } catch (error) {
-      console.error('Error toggling favorite:', error);
+      log.error('Error toggling favorite:', error);
       // Revert optimistic update
       if (wasFavorited) {
         setFavorites(prev => [...prev, spotId]);

@@ -8,6 +8,9 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { WeeklyScheduleGrid, AvailabilityRule } from '@/components/availability/WeeklyScheduleGrid';
 import { DateOverrideManager, DateOverride } from '@/components/availability/DateOverrideManager';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('EditSpotAvailability');
 
 const EditSpotAvailability = () => {
   const navigate = useNavigate();
@@ -97,7 +100,7 @@ const EditSpotAvailability = () => {
           })));
         }
       } catch (error) {
-        console.error('Error fetching availability:', error);
+        log.error('Error fetching availability:', error);
         toast.error('Failed to load availability');
       } finally {
         setIsLoading(false);
@@ -170,7 +173,7 @@ const EditSpotAvailability = () => {
       toast.success('Availability updated successfully');
       navigate('/dashboard');
     } catch (error) {
-      console.error('Error saving availability:', error);
+      log.error('Error saving availability:', error);
       toast.error('Failed to save availability');
     } finally {
       setIsSaving(false);

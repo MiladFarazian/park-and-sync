@@ -15,6 +15,9 @@ import { Virtuoso } from 'react-virtuoso';
 import RequireAuth from '@/components/auth/RequireAuth';
 import { SUPPORT_USER_ID } from '@/hooks/useSupportRole';
 import { Badge } from '@/components/ui/badge';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('SupportMessages');
 
 interface Message {
   id: string;
@@ -156,7 +159,7 @@ function SupportChatPane({
 
       if (!alive) return;
       if (error) {
-        console.error('Error fetching messages:', error);
+        log.error('Error fetching messages:', error);
         setLoadingMessages(false);
         return;
       }
@@ -296,7 +299,7 @@ function SupportChatPane({
       // Replace temp message with real one
       setMessages(prev => prev.map(m => m.client_id === clientId ? (data as Message) : m));
     } catch (error) {
-      console.error('Error sending message:', error);
+      log.error('Error sending message:', error);
       toast.error('Failed to send message');
       // Mark as error
       setMessages(prev => prev.map(m => m.client_id === clientId ? { ...m, id: `error-${clientId}` } : m));
@@ -491,7 +494,7 @@ function SupportMessagesContent() {
 
       setConversations(convs);
     } catch (err) {
-      console.error('Error fetching support conversations:', err);
+      log.error('Error fetching support conversations:', err);
       toast.error('Failed to load conversations');
     } finally {
       setLoading(false);

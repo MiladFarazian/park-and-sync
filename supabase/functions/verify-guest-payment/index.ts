@@ -1,24 +1,21 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
+import { logger } from "../_shared/logger.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-const logStep = (step: string, details?: Record<string, unknown>) => {
-  console.log(`[VERIFY-GUEST-PAYMENT] ${step}`, details ? JSON.stringify(details) : '');
-};
+const log = logger.scope('verify-guest-payment');
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight requests
+  const preflightResponse = handleCorsPreflight(req);
+  if (preflightResponse) return preflightResponse;
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     const { booking_id, access_token } = await req.json();
-    logStep("Request received", { booking_id });
+    log.debug("Request received", { booking_id });
 
     if (!booking_id || !access_token) {
       return new Response(JSON.stringify({ error: "Missing booking_id or access_token" }), {
@@ -54,7 +51,7 @@ serve(async (req) => {
 
     // If already active or completed, no need to verify
     if (booking.status === "active" || booking.status === "completed") {
-      logStep("Booking already active/completed");
+      log.debug("Booking already active/completed");
       return new Response(JSON.stringify({ 
         verified: true, 
         status: booking.status,
@@ -66,7 +63,7 @@ serve(async (req) => {
 
     // If canceled or refunded, can't recover
     if (booking.status === "canceled" || booking.status === "refunded") {
-      logStep("Booking is canceled/refunded");
+      log.warn("Booking is canceled/refunded");
       return new Response(JSON.stringify({ 
         verified: false, 
         status: booking.status,
@@ -78,7 +75,7 @@ serve(async (req) => {
 
     // Only verify pending bookings
     if (booking.status !== "pending") {
-      logStep("Unexpected status", { status: booking.status });
+      log.warn("Unexpected status", { status: booking.status });
       return new Response(JSON.stringify({ 
         verified: false, 
         status: booking.status 
@@ -89,7 +86,7 @@ serve(async (req) => {
 
     // Check if we have a payment intent to verify
     if (!booking.stripe_payment_intent_id) {
-      logStep("No payment intent found");
+      log.warn("No payment intent found");
       return new Response(JSON.stringify({ 
         verified: false, 
         status: "pending",
@@ -112,13 +109,13 @@ serve(async (req) => {
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
     const paymentIntent = await stripe.paymentIntents.retrieve(booking.stripe_payment_intent_id);
     
-    logStep("Stripe PaymentIntent retrieved", { 
+    log.debug("Stripe PaymentIntent retrieved", { 
       status: paymentIntent.status, 
       charge: paymentIntent.latest_charge 
     });
 
     if (paymentIntent.status !== "succeeded") {
-      logStep("Payment not succeeded", { stripe_status: paymentIntent.status });
+      log.warn("Payment not succeeded", { stripe_status: paymentIntent.status });
       return new Response(JSON.stringify({ 
         verified: false, 
         status: "pending",
@@ -166,7 +163,7 @@ serve(async (req) => {
           user_id: spot.host_id,
           amount: booking.host_earnings
         });
-        logStep("Host balance credited", { host_id: spot.host_id, amount: booking.host_earnings });
+        log.debug("Host balance credited", { host_id: spot.host_id, amount: booking.host_earnings });
       }
     }
 
@@ -182,7 +179,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    logStep("Error", { message: error.message });
+    log.error("Error", { message: error.message });
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

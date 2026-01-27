@@ -8,6 +8,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useMode } from '@/contexts/ModeContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDisplayName } from '@/lib/displayUtils';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('Reviews');
 
 interface Review {
   id: string;
@@ -218,7 +221,7 @@ const Reviews = () => {
         setReviews(formattedReviews);
       }
     } catch (error) {
-      console.error('Error fetching reviews:', error);
+      log.error('Error fetching reviews:', error);
     } finally {
       setLoading(false);
     }

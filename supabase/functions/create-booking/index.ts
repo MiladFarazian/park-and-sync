@@ -2,13 +2,9 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { logger } from "../_shared/logger.ts";
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 
 const log = logger.scope('create-booking');
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
 
 // Rate limit configuration (strict for booking creation)
 const RATE_LIMIT_PER_MINUTE = 5;
@@ -65,9 +61,11 @@ interface BookingRequest {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight requests
+  const preflightResponse = handleCorsPreflight(req);
+  if (preflightResponse) return preflightResponse;
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     const supabase = createClient(

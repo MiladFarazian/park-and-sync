@@ -15,6 +15,9 @@ import {
   X
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('SupportReservations');
 
 interface Reservation {
   id: string;
@@ -94,7 +97,7 @@ export default function SupportReservations() {
 
       setReservations(filtered);
     } catch (err) {
-      console.error('Error fetching reservations:', err);
+      log.error('Error fetching reservations:', err);
     } finally {
       setLoading(false);
     }

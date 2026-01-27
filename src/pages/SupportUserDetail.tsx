@@ -26,6 +26,9 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import RequireAuth from '@/components/auth/RequireAuth';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('SupportUserDetail');
 
 interface UserProfile {
   user_id: string;
@@ -124,7 +127,7 @@ function SupportUserDetailContent() {
       if (error) throw error;
       setProfile(data as UserProfile);
     } catch (err) {
-      console.error('Error fetching user profile:', err);
+      log.error('Error fetching user profile:', err);
     } finally {
       setLoading(false);
     }
@@ -147,7 +150,7 @@ function SupportUserDetailContent() {
       if (error) throw error;
       setBookings(data as unknown as Booking[]);
     } catch (err) {
-      console.error('Error fetching bookings:', err);
+      log.error('Error fetching bookings:', err);
     } finally {
       setLoadingBookings(false);
     }
@@ -165,7 +168,7 @@ function SupportUserDetailContent() {
       if (error) throw error;
       setVehicles(data as Vehicle[]);
     } catch (err) {
-      console.error('Error fetching vehicles:', err);
+      log.error('Error fetching vehicles:', err);
     } finally {
       setLoadingVehicles(false);
     }
@@ -183,7 +186,7 @@ function SupportUserDetailContent() {
       if (error) throw error;
       setSpots(data as Spot[]);
     } catch (err) {
-      console.error('Error fetching spots:', err);
+      log.error('Error fetching spots:', err);
     } finally {
       setLoadingSpots(false);
     }

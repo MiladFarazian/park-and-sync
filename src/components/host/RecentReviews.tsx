@@ -6,6 +6,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('RecentReviews');
 
 interface Review {
   id: string;
@@ -139,7 +142,7 @@ const RecentReviews = () => {
 
       setReviews(combinedReviews);
     } catch (error) {
-      console.error('Error fetching reviews:', error);
+      log.error('Error fetching reviews:', error);
     } finally {
       setLoading(false);
     }

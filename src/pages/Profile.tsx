@@ -21,6 +21,7 @@ import { useMode } from '@/contexts/ModeContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isProfileComplete } from '@/lib/profileUtils';
 import { formatDisplayName } from '@/lib/displayUtils';
+import { logger } from '@/lib/logger';
 
 const profileSchema = z.object({
   first_name: z.string().trim().min(1, 'First name is required').max(50, 'First name must be less than 50 characters'),
@@ -209,7 +210,7 @@ const Profile = () => {
       const average = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
       setHostRating({ average, count: reviews.length });
     } catch (error) {
-      console.error('Error fetching host rating:', error);
+      logger.error('Error fetching host rating:', error);
     }
   };
 
@@ -346,7 +347,7 @@ const Profile = () => {
         setUserReviews(formattedReviews);
       }
     } catch (error) {
-      console.error('Error fetching user reviews:', error);
+      logger.error('Error fetching user reviews:', error);
     } finally {
       setIsLoadingReviews(false);
     }
@@ -361,7 +362,7 @@ const Profile = () => {
       if (error) throw error;
       setHasListedSpots(data && data.length > 0);
     } catch (error) {
-      console.error('Error checking user spots:', error);
+      logger.error('Error checking user spots:', error);
     }
   };
   const checkStripeConnectStatus = async () => {
@@ -373,7 +374,7 @@ const Profile = () => {
       if (error) throw error;
       setStripeConnectStatus(data);
     } catch (error) {
-      console.error('Error checking Stripe status:', error);
+      logger.error('Error checking Stripe status:', error);
     }
   };
   const handleStripeConnect = async () => {

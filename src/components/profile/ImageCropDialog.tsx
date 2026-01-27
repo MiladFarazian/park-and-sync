@@ -4,6 +4,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Loader2 } from 'lucide-react';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('ImageCropDialog');
 
 interface ImageCropDialogProps {
   open: boolean;
@@ -99,7 +102,7 @@ export const ImageCropDialog: React.FC<ImageCropDialogProps> = ({
       const croppedBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
       onCropComplete(croppedBlob);
     } catch (error) {
-      console.error('Error cropping image:', error);
+      log.error('Error cropping image:', error);
     } finally {
       setIsProcessing(false);
     }

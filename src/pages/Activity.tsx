@@ -18,6 +18,9 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, isToday } from 'date-fns';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { getBookingStatus, getBookingStatusColorWithOverstay, getBookingStatusLabelWithOverstay } from '@/lib/bookingStatus';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('Activity');
 
 // Booking type for Activity page
 interface ActivityBooking {
@@ -203,7 +206,7 @@ const Activity = () => {
       }
       setBookings(bookingsData);
     } catch (error) {
-      console.error('Error fetching bookings:', error);
+      log.error('Error fetching bookings:', error);
       toast({
         title: "Error",
         description: "Failed to load bookings",
@@ -277,7 +280,7 @@ const Activity = () => {
       setCancelDialogOpen(false);
       setSelectedBooking(null);
     } catch (error) {
-      console.error('Error cancelling booking:', error);
+      log.error('Error cancelling booking:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to cancel booking",
@@ -900,7 +903,7 @@ const Activity = () => {
                         navigate(`/explore?lat=${position.coords.latitude}&lng=${position.coords.longitude}&start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
                       },
                       (error) => {
-                        console.error('Location error:', error);
+                        log.error('Location error:', error);
                         navigate(`/explore?start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
                       }
                     );

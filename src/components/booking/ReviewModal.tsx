@@ -5,6 +5,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('ReviewModal');
 
 interface ReviewModalProps {
   open: boolean;
@@ -103,7 +106,7 @@ export const ReviewModal = ({
       onOpenChange(false);
       onReviewSubmitted?.();
     } catch (error) {
-      console.error('Error submitting review:', error);
+      log.error('Error submitting review:', error);
       toast.error('Failed to submit review');
     } finally {
       setSubmitting(false);

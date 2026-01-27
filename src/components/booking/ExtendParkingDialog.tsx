@@ -13,6 +13,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('ExtendParkingDialog');
 
 interface PaymentMethod {
   id: string;
@@ -121,7 +124,7 @@ export const ExtendParkingDialog = ({
         setSelectedPaymentMethod(methods[0]);
       }
     } catch (err) {
-      console.error('Error fetching payment methods:', err);
+      log.error('Error fetching payment methods:', err);
     } finally {
       setLoadingPaymentMethods(false);
     }
@@ -306,7 +309,7 @@ export const ExtendParkingDialog = ({
       onOpenChange(false);
       onExtendSuccess();
     } catch (err: any) {
-      console.error('Error extending booking:', err);
+      log.error('Error extending booking:', err);
       toast.error(err.message || 'Failed to extend booking');
     } finally {
       setExtending(false);
@@ -368,7 +371,7 @@ export const ExtendParkingDialog = ({
       onOpenChange(false);
       onExtendSuccess();
     } catch (err: any) {
-      console.error('Error extending booking:', err);
+      log.error('Error extending booking:', err);
       toast.error(err.message || 'Failed to extend booking');
     } finally {
       setExtending(false);

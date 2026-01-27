@@ -27,6 +27,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { getStreetAddress } from '@/lib/addressUtils';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('QuickAvailabilityActions');
 
 interface Spot {
   id: string;
@@ -89,7 +92,7 @@ export const QuickAvailabilityActions = () => {
         setSelectedSpots(data.map(s => s.id));
       }
     } catch (error) {
-      console.error('Error fetching spots:', error);
+      log.error('Error fetching spots:', error);
       toast.error('Failed to load spots');
     } finally {
       setLoadingSpots(false);
@@ -144,7 +147,7 @@ export const QuickAvailabilityActions = () => {
       .gte('end_at', now.toISOString()); // Only bookings that haven't ended yet
 
     if (error) {
-      console.error('Error checking for conflicts:', error);
+      log.error('Error checking for conflicts:', error);
       return [];
     }
 
@@ -265,7 +268,7 @@ export const QuickAvailabilityActions = () => {
         });
 
         if (error) {
-          console.error(`Error cancelling booking ${booking.id}:`, error);
+          log.error(`Error cancelling booking ${booking.id}:`, error);
           toast.error(`Failed to cancel booking for ${booking.renter_name}`);
         }
       }
@@ -335,7 +338,7 @@ export const QuickAvailabilityActions = () => {
       setDialogOpen(false);
       navigate('/host-calendar');
     } catch (error) {
-      console.error('Error setting availability:', error);
+      log.error('Error setting availability:', error);
       toast.error('Failed to update availability');
     } finally {
       setSaving(false);

@@ -14,6 +14,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format } from 'date-fns';
 import { calculateDriverPrice } from '@/lib/pricing';
 import { PLACEHOLDER_IMAGE } from '@/lib/constants';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('Search');
 
 const Search = () => {
   const navigate = useNavigate();
@@ -147,7 +150,7 @@ const Search = () => {
         .limit(2);
 
       if (error) {
-        console.error('Error fetching recent spots:', error);
+        log.error('Error fetching recent spots:', error);
         return;
       }
 
@@ -164,7 +167,7 @@ const Search = () => {
 
       setRecentlyViewed(transformedSpots);
     } catch (err) {
-      console.error('Error fetching recent spots:', err);
+      log.error('Error fetching recent spots:', err);
     } finally {
       setLoadingRecent(false);
     }

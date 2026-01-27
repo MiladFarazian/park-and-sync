@@ -11,6 +11,9 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { getHostNetEarnings } from '@/lib/hostEarnings';
 import { getBookingStatus, getBookingStatusColor } from '@/lib/bookingStatus';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('HostEarningsHistory');
 
 interface BookingWithDetails {
   id: string;
@@ -91,7 +94,7 @@ const HostEarningsHistory = () => {
         .reduce((sum, b) => sum + getHostNetEarnings(b), 0);
       setTotalEarnings(total);
     } catch (error) {
-      console.error('Error fetching bookings:', error);
+      log.error('Error fetching bookings:', error);
       toast.error('Failed to load earnings history');
     } finally {
       setLoading(false);

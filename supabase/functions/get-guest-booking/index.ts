@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 
 // Rate limit configuration
 const RATE_LIMIT_PER_MINUTE = 10;
@@ -32,18 +28,18 @@ async function checkRateLimit(
     });
 
     if (!minuteOk) {
-      console.warn(`[rate-limit] ${functionName} minute limit exceeded for IP: ${clientIp.substring(0, 8)}...`);
+      // Rate limit exceeded - don't log in production to avoid noise
       return { allowed: false, retryAfter: 60 };
     }
     
     if (!hourOk) {
-      console.warn(`[rate-limit] ${functionName} hour limit exceeded for IP: ${clientIp.substring(0, 8)}...`);
+      // Rate limit exceeded - don't log in production to avoid noise
       return { allowed: false, retryAfter: 3600 };
     }
 
     return { allowed: true, retryAfter: 0 };
   } catch (error) {
-    console.error('[rate-limit] Error checking rate limit:', error);
+    // If rate limiting fails, allow the request
     return { allowed: true, retryAfter: 0 };
   }
 }
@@ -54,9 +50,11 @@ interface GetGuestBookingRequest {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight requests
+  const preflightResponse = handleCorsPreflight(req);
+  if (preflightResponse) return preflightResponse;
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     const supabaseAdmin = createClient(

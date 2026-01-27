@@ -20,6 +20,7 @@ import { sendMessage as sendMessageLib } from '@/lib/sendMessage';
 import { compressImage } from '@/lib/compressImage';
 import { getStreetAddress } from '@/lib/addressUtils';
 import { formatDisplayName } from '@/lib/displayUtils';
+import { logger } from '@/lib/logger';
 import { Virtuoso } from 'react-virtuoso';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
@@ -357,7 +358,7 @@ function ChatPane({
       setMessages,
       onError: error => {
         toast.error('Failed to send message');
-        console.error('Error sending message:', error);
+        logger.error('Error sending message:', error);
       }
     });
     if (mediaToUpload) {

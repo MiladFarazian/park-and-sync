@@ -35,6 +35,7 @@ const DebugUserInfo = () => {
       
       setUserInfo({ authUser: user, session, profile });
     } catch (err) {
+      // Debug page - keep console.error for debugging purposes
       console.error('[DEBUG] Error fetching user info:', err);
     } finally {
       setLoading(false);

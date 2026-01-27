@@ -4,6 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { NOTIFICATION_ICON } from '@/lib/constants';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('Notifications');
 
 interface NotificationPayload {
   title: string;
@@ -47,7 +50,7 @@ export const useNotifications = () => {
     const handleServiceWorkerMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'NOTIFICATION_CLICKED') {
         const data = event.data.data as ServiceWorkerNotificationData;
-        console.log('[Notifications] Received notification click from SW:', data);
+        log.debug('Received notification click from SW:', data);
 
         // If we have a bookingId, verify the booking still exists
         if (data.bookingId && user) {
@@ -58,7 +61,7 @@ export const useNotifications = () => {
             .single();
 
           if (error || !booking) {
-            console.log('[Notifications] Booking no longer exists, redirecting to activity');
+            log.debug('Booking no longer exists, redirecting to activity');
             toast({
               title: "Booking no longer active",
               description: "This booking is no longer available",
@@ -92,10 +95,10 @@ export const useNotifications = () => {
   const registerServiceWorker = async () => {
     try {
       const registration = await navigator.serviceWorker.register('/service-worker.js');
-      console.log('[Notifications] Service Worker registered:', registration);
+      log.debug('Service Worker registered:', registration);
       return registration;
     } catch (error) {
-      console.error('[Notifications] Service Worker registration failed:', error);
+      log.error('Service Worker registration failed:', error);
       return null;
     }
   };
@@ -106,13 +109,13 @@ export const useNotifications = () => {
       const subscription = await registration.pushManager.getSubscription();
       setIsPushSubscribed(!!subscription);
     } catch (error) {
-      console.error('[Notifications] Error checking push subscription:', error);
+      log.error('Error checking push subscription:', error);
     }
   };
 
   const subscribeToPush = useCallback(async () => {
     if (!user) {
-      console.log('[Notifications] No user, skipping push subscription');
+      log.debug('No user, skipping push subscription');
       return false;
     }
 
@@ -127,7 +130,7 @@ export const useNotifications = () => {
         const { data: vapidData, error: vapidError } = await supabase.functions.invoke('get-vapid-public-key');
         
         if (vapidError || !vapidData?.publicKey) {
-          console.error('[Notifications] Failed to get VAPID key:', vapidError);
+          log.error('Failed to get VAPID key:', vapidError);
           return false;
         }
 
@@ -140,7 +143,7 @@ export const useNotifications = () => {
           applicationServerKey: vapidPublicKey as BufferSource,
         });
 
-        console.log('[Notifications] Created new push subscription');
+        log.debug('Created new push subscription');
       }
 
       // Save subscription to database
@@ -158,15 +161,15 @@ export const useNotifications = () => {
         });
 
       if (saveError) {
-        console.error('[Notifications] Error saving subscription:', saveError);
+        log.error('Error saving subscription:', saveError);
         return false;
       }
 
       setIsPushSubscribed(true);
-      console.log('[Notifications] Push subscription saved successfully');
+      log.debug('Push subscription saved successfully');
       return true;
     } catch (error) {
-      console.error('[Notifications] Error subscribing to push:', error);
+      log.error('Error subscribing to push:', error);
       return false;
     }
   }, [user]);
@@ -205,7 +208,7 @@ export const useNotifications = () => {
         return false;
       }
     } catch (error) {
-      console.error('[Notifications] Permission request failed:', error);
+      log.error('Permission request failed:', error);
       return false;
     }
   }, [isSupported, toast, subscribeToPush]);
@@ -234,14 +237,14 @@ export const useNotifications = () => {
         notification.close();
       };
     } catch (error) {
-      console.error('[Notifications] Failed to show notification:', error);
+      log.error('Failed to show notification:', error);
     }
   }, [isSupported, permission]);
 
   const setupRealtimeListeners = useCallback(() => {
     if (!user) return;
 
-    console.log('[Notifications] Setting up realtime listeners for user:', user.id);
+    log.debug('Setting up realtime listeners for user:', user.id);
 
     // Clean up existing channels
     channelsRef.current.forEach(channel => {
@@ -261,7 +264,7 @@ export const useNotifications = () => {
           filter: `renter_id=eq.${user.id},host_id=eq.${user.id}`,
         },
         async (payload) => {
-          console.log('[Notifications] Booking change:', payload);
+          log.debug('Booking change:', payload);
           
           if (payload.eventType === 'INSERT') {
             // Fetch booking details including host_id
@@ -367,7 +370,7 @@ export const useNotifications = () => {
           filter: `recipient_id=eq.${user.id}`,
         },
         async (payload) => {
-          console.log('[Notifications] New message:', payload);
+          log.debug('New message:', payload);
           
           // Fetch sender details
           const { data: sender } = await supabase
@@ -404,7 +407,7 @@ export const useNotifications = () => {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('[Notifications] New app notification:', payload);
+          log.debug('New app notification:', payload);
           
           showNotification({
             title: payload.new.title,

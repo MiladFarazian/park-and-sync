@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { formatPhoneInput } from '@/lib/utils';
 import { vehicleMakes, vehicleModels, vehicleColors } from '@/lib/vehicleData';
+import { logger } from '@/lib/logger';
 
 interface GuestBookingFormProps {
   spot: any;
@@ -247,7 +248,7 @@ const GuestBookingFormContent = ({
         throw new Error('Payment was not successful');
       }
     } catch (err: any) {
-      console.error('Guest booking error:', err);
+      logger.error('Guest booking error:', err);
       toast({ 
         title: "Booking failed", 
         description: err.message || 'Please try again', 

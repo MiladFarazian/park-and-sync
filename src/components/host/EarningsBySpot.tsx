@@ -6,6 +6,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { getHostNetEarnings } from '@/lib/hostEarnings';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('EarningsBySpot');
 
 interface SpotEarnings {
   id: string;
@@ -89,7 +92,7 @@ const EarningsBySpot = () => {
       spotEarnings.sort((a, b) => b.totalEarnings - a.totalEarnings);
       setSpots(spotEarnings);
     } catch (error) {
-      console.error('Error fetching spot earnings:', error);
+      log.error('Error fetching spot earnings:', error);
     } finally {
       setLoading(false);
     }

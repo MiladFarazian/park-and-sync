@@ -23,6 +23,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import VehicleSizeSelector from '@/components/spot/VehicleSizeSelector';
 import { vehicleSizes as vehicleSizeOptions } from '@/lib/vehicleSizes';
 import { getListSpotDraft, clearListSpotDraft, saveListSpotDraft, getStripeFlowState, clearStripeFlowState, isStandaloneMode, fileToDataUrl, dataUrlToFile, PhotoDraft } from '@/lib/stripeSetupFlow';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('ListSpot');
 
 const spotCategories = [
   'Residential Driveway',
@@ -127,7 +130,7 @@ const ListSpot = () => {
           setMapboxToken(data.token);
         }
       } catch (error) {
-        console.error('Error fetching Mapbox token:', error);
+        log.error('Error fetching Mapbox token:', error);
       }
     };
     fetchMapboxToken();
@@ -224,7 +227,7 @@ const ListSpot = () => {
           }
         }
       } catch (error) {
-        console.error('Error checking Stripe status:', error);
+        log.error('Error checking Stripe status:', error);
         setStripeConnected(false);
       } finally {
         setIsCheckingStripe(false);
@@ -317,18 +320,18 @@ const ListSpot = () => {
         `&limit=8` +
         `&types=poi,address,place` +
         `&proximity=${socal_center.lng},${socal_center.lat}` +
-        `&country=US` +
-        `&bbox=-119.5,32.5,-117.0,34.8`;
-      
-      console.log('[ListSpot Search Box API] Calling suggest');
-      
-      const response = await fetch(url);
-      
-      if (!response.ok) throw new Error('Address search failed');
-      
-      const data = await response.json();
-      
-      console.log('[ListSpot Search Box API] Response:', data);
+      `&country=US` +
+      `&bbox=-119.5,32.5,-117.0,34.8`;
+    
+    log.debug('Search Box API: Calling suggest');
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) throw new Error('Address search failed');
+    
+    const data = await response.json();
+    
+    log.debug('Search Box API: Response', data);
       
       if (data.suggestions && data.suggestions.length > 0) {
         setAddressSuggestions(data.suggestions);
@@ -336,7 +339,7 @@ const ListSpot = () => {
         setAddressSuggestions([]);
       }
     } catch (error) {
-      console.error('[ListSpot Search Box API] Error:', error);
+      log.error('Search Box API: Error', error);
       setAddressSuggestions([]);
     } finally {
       setLoadingSuggestions(false);
@@ -364,12 +367,12 @@ const ListSpot = () => {
     try {
       const retrieveUrl = `https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(suggestion.mapbox_id)}?access_token=${mapboxToken}&session_token=${sessionTokenRef.current}`;
       
-      console.log('[ListSpot Search Box API] Retrieving full details');
+      log.debug('Search Box API: Retrieving full details');
       
       const response = await fetch(retrieveUrl);
       const data = await response.json();
       
-      console.log('[ListSpot Search Box API] Retrieve response:', data);
+      log.debug('Search Box API: Retrieve response', data);
       
       if (data?.features?.[0]?.geometry?.coordinates) {
         const [lng, lat] = data.features[0].geometry.coordinates;
@@ -382,14 +385,14 @@ const ListSpot = () => {
         setShowSuggestions(false);
         setAddressSuggestions([]);
         
-        console.log('[ListSpot] Selected coordinates:', { lat, lng });
+        log.debug('Selected coordinates:', { lat, lng });
         
         // Regenerate session token for next search session
         sessionTokenRef.current = crypto.randomUUID();
-        console.log('[ListSpot Search Box API] Session token regenerated');
+        log.debug('Search Box API: Session token regenerated');
       }
     } catch (error) {
-      console.error('[ListSpot Search Box API] Retrieve error:', error);
+      log.error('Search Box API: Retrieve error', error);
       toast.error('Failed to select address. Please try again.');
     }
   };

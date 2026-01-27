@@ -21,6 +21,7 @@ import { getHostNetEarnings, getParkzyFee } from '@/lib/hostEarnings';
 import RequireAuth from '@/components/auth/RequireAuth';
 import { getBookingStatus, getBookingStatusColor, getBookingStatusLabelWithOverstay } from '@/lib/bookingStatus';
 import { formatDisplayName } from '@/lib/displayUtils';
+import { logger } from '@/lib/logger';
 
 interface BookingDetails {
   id: string;
@@ -207,7 +208,7 @@ const BookingDetailContent = () => {
       
       setHasReviewed(!!existingReview);
     } catch (error) {
-      console.error('Error loading booking:', error);
+      logger.error('Error loading booking:', error);
       toast.error('Failed to load booking details');
       navigate('/activity');
     } finally {
@@ -230,7 +231,7 @@ const BookingDetailContent = () => {
       setShowCancelDialog(false);
       navigate('/activity');
     } catch (error: any) {
-      console.error('Error cancelling booking:', error);
+      logger.error('Error cancelling booking:', error);
       toast.error(error.message || 'Failed to cancel booking');
     } finally {
       setCancelling(false);
@@ -263,7 +264,7 @@ const BookingDetailContent = () => {
       toast.success('Tow request cancelled successfully');
       loadBookingDetails(); // Reload to show updated status
     } catch (error: any) {
-      console.error('Error cancelling tow request:', error);
+      logger.error('Error cancelling tow request:', error);
       toast.error(error.message || 'Failed to cancel tow request');
     } finally {
       setCancellingTow(false);
@@ -294,7 +295,7 @@ const BookingDetailContent = () => {
 
       toast.success('Grace period warning sent to driver');
     } catch (error) {
-      console.error('Error sending warning:', error);
+      logger.error('Error sending warning:', error);
       toast.error('Failed to send warning');
     }
 
@@ -339,7 +340,7 @@ const BookingDetailContent = () => {
       );
       loadBookingDetails();
     } catch (error) {
-      console.error('Error updating overstay:', error);
+      logger.error('Error updating overstay:', error);
       toast.error('Failed to update overstay status');
     }
     
@@ -360,7 +361,7 @@ const BookingDetailContent = () => {
       toast.success('Departure confirmed! Thank you.');
       await loadBookingDetails();
     } catch (error) {
-      console.error('Error confirming departure:', error);
+      logger.error('Error confirming departure:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to confirm departure');
     } finally {
       setConfirmingDeparture(false);
@@ -406,7 +407,7 @@ const BookingDetailContent = () => {
       setModifyEndTime(null);
       loadBookingDetails();
     } catch (error: any) {
-      console.error('Error modifying booking:', error);
+      logger.error('Error modifying booking:', error);
       toast.error(error.message || 'Failed to modify booking');
     } finally {
       setModifying(false);
@@ -476,14 +477,14 @@ const BookingDetailContent = () => {
           reason: reportReason,
           details: reportDetails.trim() || null
         }
-      }).catch(err => console.error('Failed to send report notification:', err));
+      }).catch(err => logger.error('Failed to send report notification:', err));
 
       toast.success('Report submitted. We will review it shortly.');
       setReportReason('');
       setReportDetails('');
       setReportDialogOpen(false);
     } catch (error) {
-      console.error('Error submitting report:', error);
+      logger.error('Error submitting report:', error);
       toast.error('Failed to submit report');
     } finally {
       setSubmittingReport(false);

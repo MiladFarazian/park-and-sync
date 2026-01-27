@@ -14,6 +14,9 @@ import { formatDistanceToNow, format } from "date-fns";
 import { ReviewModal } from "./ReviewModal";
 import { ExtendParkingDialog } from "./ExtendParkingDialog";
 import { getStreetAddress } from "@/lib/addressUtils";
+import { logger } from "@/lib/logger";
+
+const log = logger.scope('ActiveBookingBanner');
 
 interface HostProfile {
   user_id: string;
@@ -188,7 +191,7 @@ export const ActiveBookingBanner = () => {
       
       await loadActiveBooking();
     } catch (error) {
-      console.error('Error confirming departure:', error);
+      log.error('Error confirming departure:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to confirm departure');
     } finally {
       setConfirmingDeparture(false);
@@ -233,7 +236,7 @@ export const ActiveBookingBanner = () => {
 
       toast.success('Grace period warning sent to driver');
     } catch (error) {
-      console.error('Error sending warning:', error);
+      log.error('Error sending warning:', error);
       toast.error('Failed to send warning');
     }
 
@@ -278,7 +281,7 @@ export const ActiveBookingBanner = () => {
       );
       loadActiveBooking();
     } catch (error) {
-      console.error('Error updating overstay:', error);
+      log.error('Error updating overstay:', error);
       toast.error('Failed to update overstay status');
     }
     

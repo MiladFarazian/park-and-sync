@@ -15,6 +15,9 @@ import { loadStripe, PaymentRequest } from "@stripe/stripe-js";
 import RequireAuth from "@/components/auth/RequireAuth";
 import RequireVerifiedAuth from "@/components/auth/RequireVerifiedAuth";
 import { isProfileComplete } from "@/lib/profileUtils";
+import { logger } from "@/lib/logger";
+
+const log = logger.scope('PaymentMethods');
 
 let stripePromise: Promise<any> | null = null;
 
@@ -153,7 +156,7 @@ const AddCardForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel:
       
       onSuccess();
     } catch (error: any) {
-      console.error('Error adding card:', error);
+      log.error('Error adding card:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to add payment method",
@@ -226,7 +229,7 @@ const ProfileCompletionForm = ({
     }
 
     setLoading(true);
-    console.log('[PaymentMethods] Saving profile:', formData);
+    log.debug('Saving profile:', formData);
 
     const { error } = await updateProfile({
       first_name: formData.first_name.trim() || null,
@@ -235,7 +238,7 @@ const ProfileCompletionForm = ({
     } as any);
 
     if (error) {
-      console.error('[PaymentMethods] Profile save failed:', error);
+      log.error('Profile save failed:', error);
       toast({
         title: "Failed to save profile",
         description: error.message || "Please try again",
@@ -245,7 +248,7 @@ const ProfileCompletionForm = ({
       return;
     }
 
-    console.log('[PaymentMethods] Profile saved successfully');
+    log.debug('Profile saved successfully');
     await refreshProfile();
     setLoading(false);
     onComplete();
@@ -341,7 +344,7 @@ const PaymentMethodsContent = () => {
 
       setPaymentMethods(data.paymentMethods || []);
     } catch (error: any) {
-      console.error('Error fetching payment methods:', error);
+      log.error('Error fetching payment methods:', error);
       toast({
         title: "Error",
         description: "Failed to load payment methods",
@@ -358,7 +361,7 @@ const PaymentMethodsContent = () => {
         const { data } = await supabase.functions.invoke('get-stripe-publishable-key');
         stripePromise = loadStripe(data.publishableKey);
       } catch (error) {
-        console.error('Failed to get publishable key:', error);
+        log.error('Failed to get publishable key:', error);
         throw error;
       }
     }
@@ -372,7 +375,7 @@ const PaymentMethodsContent = () => {
   const handleAddCardClick = () => {
     // Use centralized profile completeness check
     if (!isProfileComplete(profile)) {
-      console.log('[PaymentMethods] Profile incomplete, showing profile form. Missing:', {
+      log.debug('Profile incomplete, showing profile form. Missing:', {
         first_name: profile?.first_name,
         email: profile?.email
       });
@@ -384,7 +387,7 @@ const PaymentMethodsContent = () => {
   };
 
   const handleProfileComplete = async () => {
-    console.log('[PaymentMethods] Profile completed, refreshing...');
+    log.debug('Profile completed, refreshing...');
     await refreshProfile();
     await fetchPaymentMethods();
     setShowProfileForm(false);
@@ -428,7 +431,7 @@ const PaymentMethodsContent = () => {
       
       fetchPaymentMethods();
     } catch (error: any) {
-      console.error('Error deleting payment method:', error);
+      log.error('Error deleting payment method:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to remove payment method",

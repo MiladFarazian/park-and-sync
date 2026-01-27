@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 
 const RATE_LIMIT_PER_MINUTE = 60;
 const RATE_LIMIT_PER_HOUR = 600;
@@ -40,7 +36,7 @@ async function checkRateLimit(
 
     return { allowed: true, retryAfter: 0 };
   } catch (error) {
-    console.error('[rate-limit] Error:', error);
+    // If rate limiting fails, allow the request
     return { allowed: true, retryAfter: 0 };
   }
 }
@@ -51,9 +47,11 @@ interface GetGuestMessagesRequest {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight requests
+  const preflightResponse = handleCorsPreflight(req);
+  if (preflightResponse) return preflightResponse;
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     const supabaseAdmin = createClient(

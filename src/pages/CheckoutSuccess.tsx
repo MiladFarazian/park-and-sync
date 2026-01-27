@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
+
+const log = logger.scope('CheckoutSuccess');
 
 export default function CheckoutSuccess() {
   const [searchParams] = useSearchParams();
@@ -54,7 +57,7 @@ export default function CheckoutSuccess() {
         if (attempts < maxAttempts) {
           setTimeout(checkStatus, 2000);
         } else {
-          console.error("Booking did not become active in time", {
+          log.error("Booking did not become active in time", {
             bookingId: bookingIdParam,
             status: booking.status,
           });
@@ -65,7 +68,7 @@ export default function CheckoutSuccess() {
           setLoading(false);
         }
       } catch (error) {
-        console.error("Error checking booking status:", error);
+        log.error("Error checking booking status:", error);
         attempts += 1;
         if (attempts < maxAttempts) {
           setTimeout(checkStatus, 2000);

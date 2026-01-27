@@ -10,6 +10,9 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import GuestChatPane from '@/components/guest/GuestChatPane';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('GuestBookingDetail');
 
 interface SpotPhoto {
   url: string;
@@ -121,13 +124,13 @@ const GuestBookingDetail = () => {
               });
             }
           } catch (verifyErr) {
-            console.error('Payment verification failed:', verifyErr);
+            log.error('Payment verification failed:', verifyErr);
           } finally {
             setVerifying(false);
           }
         }
       } catch (err: any) {
-        console.error('Failed to fetch guest booking:', err);
+        log.error('Failed to fetch guest booking:', err);
         setError(err.message || 'Failed to load booking');
       } finally {
         setLoading(false);
@@ -157,7 +160,7 @@ const GuestBookingDetail = () => {
       // Refresh booking data
       setBooking((prev: any) => ({ ...prev, status: 'canceled' }));
     } catch (err: any) {
-      console.error('Failed to cancel booking:', err);
+      log.error('Failed to cancel booking:', err);
       toast({ title: "Cancellation failed", description: err.message, variant: "destructive" });
     } finally {
       setCancelling(false);

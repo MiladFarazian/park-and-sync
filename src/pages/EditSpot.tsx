@@ -21,6 +21,10 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from '@dnd-kit/utilities';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { EVChargerTypeSelector } from '@/components/ev/EVChargerTypeSelector';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('EditSpot');
+
 const spotCategories = [
   'Residential Driveway',
   'Apartment / Condo Lot',
@@ -283,7 +287,7 @@ const EditSpot = () => {
           setMapboxToken(data.token);
         }
       } catch (error) {
-        console.error('Error fetching Mapbox token:', error);
+        log.error('Error fetching Mapbox token:', error);
       }
     };
     fetchMapboxToken();
@@ -356,7 +360,7 @@ const EditSpot = () => {
           if (primary) setStagedPrimaryId(primary.id);
         }
       } catch (error) {
-        console.error('Error fetching spot:', error);
+        log.error('Error fetching spot:', error);
         toast.error('Failed to load spot details');
         navigate('/dashboard');
       } finally {
@@ -386,7 +390,7 @@ const EditSpot = () => {
         setAddressSuggestions([]);
       }
     } catch (error) {
-      console.error('Error searching addresses:', error);
+      log.error('Error searching addresses:', error);
       setAddressSuggestions([]);
     } finally {
       setLoadingSuggestions(false);
@@ -416,7 +420,7 @@ const EditSpot = () => {
         sessionTokenRef.current = crypto.randomUUID();
       }
     } catch (error) {
-      console.error('Error selecting address:', error);
+      log.error('Error selecting address:', error);
       toast.error('Failed to select address. Please try again.');
     }
   };
@@ -530,7 +534,7 @@ const EditSpot = () => {
       toast.success('Listing deleted successfully');
       navigate('/dashboard');
     } catch (error) {
-      console.error('Error deleting spot:', error);
+      log.error('Error deleting spot:', error);
       toast.error('Failed to delete listing');
     } finally {
       setIsDeleting(false);
@@ -632,7 +636,7 @@ const EditSpot = () => {
               progress: 100
             } : status));
           } catch (error) {
-            console.error(`Error uploading ${file.name}:`, error);
+            log.error(`Error uploading ${file.name}:`, error);
             setUploadStatuses(prev => prev.map((status, idx) => idx === i ? {
               ...status,
               status: 'error' as const
@@ -699,7 +703,7 @@ const EditSpot = () => {
       toast.success('Spot updated successfully');
       navigate('/dashboard');
     } catch (error) {
-      console.error('Error updating spot:', error);
+      log.error('Error updating spot:', error);
       toast.error('Failed to update spot');
     } finally {
       setIsSaving(false);

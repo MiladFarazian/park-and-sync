@@ -13,6 +13,9 @@ import { toast } from "sonner";
 import { Shield, XCircle, AlertTriangle, Ban, Eye, Loader2, ArrowLeft } from "lucide-react";
 import { usePagination, getPaginationRange } from "@/hooks/usePagination";
 import { format } from "date-fns";
+import { logger } from "@/lib/logger";
+
+const log = logger.scope('AdminDashboard');
 
 interface SpotReport {
   id: string;
@@ -78,7 +81,7 @@ export default function AdminDashboard() {
       .maybeSingle();
 
     if (error) {
-      console.error("Error checking admin status:", error);
+      log.error("Error checking admin status:", error);
       setIsAdmin(false);
       return;
     }
@@ -101,7 +104,7 @@ export default function AdminDashboard() {
       const { count, error: countError } = await countQuery;
 
       if (countError) {
-        console.error("Error getting count:", countError);
+        log.error("Error getting count:", countError);
       } else {
         setTotalReports(count || 0);
         pagination.setTotalItems(count || 0);
@@ -134,7 +137,7 @@ export default function AdminDashboard() {
       const { data, error } = await query;
 
       if (error) {
-        console.error("Error fetching reports:", error);
+        log.error("Error fetching reports:", error);
         toast.error("Failed to load reports");
         return;
       }
@@ -178,7 +181,7 @@ export default function AdminDashboard() {
 
       fetchReports();
     } catch (error: any) {
-      console.error("Action error:", error);
+      log.error("Action error:", error);
       toast.error(error.message || "Action failed");
     } finally {
       setActionLoading(null);

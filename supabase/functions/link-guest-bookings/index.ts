@@ -1,12 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { Resend } from "npm:resend@2.0.0";
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
+import { logger } from "../_shared/logger.ts";
 
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const log = logger.scope('link-guest-bookings');
 
 interface LinkRequest {
   user_id: string;
@@ -45,7 +43,7 @@ const sendWelcomeEmail = async (
   const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'onboarding@resend.dev';
   
   if (!resendApiKey) {
-    console.log('[link-guest-bookings] RESEND_API_KEY not configured, skipping email');
+    log.debug('RESEND_API_KEY not configured, skipping email');
     return;
   }
 
@@ -135,15 +133,16 @@ const sendWelcomeEmail = async (
     });
     console.log('[link-guest-bookings] Welcome email sent:', result);
   } catch (error) {
-    console.error('[link-guest-bookings] Failed to send welcome email:', error);
+      log.error('Failed to send welcome email:', error);
   }
 };
 
 serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight requests
+  const preflightResponse = handleCorsPreflight(req);
+  if (preflightResponse) return preflightResponse;
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -155,7 +154,7 @@ serve(async (req) => {
     console.log('[link-guest-bookings] Request received, auth header present:', !!authHeader);
 
     if (!authHeader?.startsWith('Bearer ')) {
-      console.warn('[link-guest-bookings] Missing or invalid Authorization header');
+      log.warn('Missing or invalid Authorization header');
       return new Response(
         JSON.stringify({ error: 'Missing session token - user must be signed in to link guest bookings' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -172,7 +171,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('[link-guest-bookings] Token present, length:', token.length);
+    log.debug('Token present, length:', token.length);
 
     // Create service-role client for database operations
     const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
@@ -195,7 +194,7 @@ serve(async (req) => {
     }
 
     if (!userData?.user?.id) {
-      console.warn('[link-guest-bookings] No user returned from getUser');
+      log.warn('No user returned from getUser');
       return new Response(
         JSON.stringify({ error: 'Invalid or expired session' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -207,11 +206,11 @@ serve(async (req) => {
 
     // Parse request body
     const { user_id, email, phone, first_name }: LinkRequest = await req.json();
-    console.log('[link-guest-bookings] Requested user_id:', user_id);
+    log.debug('Requested user_id:', user_id);
 
     // CRITICAL: Verify the user_id matches the authenticated user
     if (user_id !== authUserId) {
-      console.warn(`[link-guest-bookings] User ID mismatch: requested ${user_id}, authenticated ${authUserId}`);
+      log.warn(`User ID mismatch: requested ${user_id}, authenticated ${authUserId}`);
       return new Response(
         JSON.stringify({ error: 'Cannot link bookings for another user' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -249,7 +248,7 @@ serve(async (req) => {
         .ilike('guest_email', email);
       
       if (emailError) {
-        console.error('[link-guest-bookings] Error fetching by email:', emailError);
+        log.error('Error fetching by email:', emailError);
       } else if (emailBookings) {
         bookingsToLink.push(...emailBookings);
       }
@@ -267,7 +266,7 @@ serve(async (req) => {
           .ilike('guest_phone', `%${phoneEnd}`);
         
         if (phoneError) {
-          console.error('[link-guest-bookings] Error fetching by phone:', phoneError);
+          log.error('Error fetching by phone:', phoneError);
         } else if (phoneBookings) {
           // Add only unique bookings
           const existingIds = new Set(bookingsToLink.map(b => b.id));
@@ -299,7 +298,7 @@ serve(async (req) => {
 
     // Update bookings to link them to the user
     const bookingIds = bookingsToLink.map(b => b.id);
-    console.log(`[link-guest-bookings] Linking ${bookingIds.length} bookings:`, bookingIds);
+    log.debug(`Linking ${bookingIds.length} bookings:`, bookingIds);
 
     const { error: updateError } = await supabase
       .from('bookings')
@@ -310,7 +309,7 @@ serve(async (req) => {
       .in('id', bookingIds);
 
     if (updateError) {
-      console.error('[link-guest-bookings] Error updating bookings:', updateError);
+      log.error('Error updating bookings:', updateError);
       return new Response(
         JSON.stringify({ error: 'Failed to link bookings' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -346,7 +345,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('[link-guest-bookings] Unexpected error:', error);
+    log.error('Unexpected error:', error);
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

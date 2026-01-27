@@ -1,5 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Message } from '@/contexts/MessagesContext';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('sendMessage');
 
 export function sendMessage({
   recipientId,
@@ -77,11 +80,11 @@ export function sendMessage({
       client_id: clientId,
     })
     .then(({ error }) => {
-      console.timeEnd('[PERF] send:insert-request');
-      console.log('[PERF] send:insert-latency-ms', performance.now() - insertStartTime);
+      const latency = performance.now() - insertStartTime;
+      log.debug('[PERF] send:insert-latency-ms', latency);
       
       if (error) {
-        console.error('Error sending message:', error);
+        log.error('Error sending message:', error);
         // Mark message as error (keep in UI to allow retry)
         setMessages(prev => 
           prev.map(m => m.id === tempId ? { ...m, id: `error-${clientId}` } : m)

@@ -21,6 +21,8 @@ interface GuestChatPaneProps {
   hostName: string;
 }
 
+import { logger } from '@/lib/logger';
+
 const GuestChatPane = ({ bookingId, accessToken, hostName }: GuestChatPaneProps) => {
   const [messages, setMessages] = useState<GuestMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -49,7 +51,7 @@ const GuestChatPane = ({ bookingId, accessToken, hostName }: GuestChatPaneProps)
       setMessages(data.messages || []);
       setError(null);
     } catch (err: any) {
-      console.error('Failed to fetch messages:', err);
+      logger.error('Failed to fetch messages:', err);
       // Don't show error for rate limiting - just skip this poll
       if (!err.message?.includes('Too many requests')) {
         setError('Failed to load messages');

@@ -15,6 +15,9 @@ import QuickAvailabilityActions from '@/components/host/QuickAvailabilityActions
 import EarningsBySpot from '@/components/host/EarningsBySpot';
 import { getHostNetEarnings } from '@/lib/hostEarnings';
 import { format } from 'date-fns';
+import { logger } from '@/lib/logger';
+
+const log = logger.scope('HostHome');
 
 interface StripeBalanceData {
   connected: boolean;
@@ -90,7 +93,7 @@ const HostHome = () => {
         totalBookings: completedBookings?.length || 0,
       });
     } catch (error) {
-      console.error('Error fetching host stats:', error);
+      log.error('Error fetching host stats:', error);
       toast.error('Failed to load dashboard');
     } finally {
       setLoading(false);
@@ -103,7 +106,7 @@ const HostHome = () => {
       const { data, error } = await supabase.functions.invoke('get-stripe-connect-balance');
 
       if (error) {
-        console.error('Error fetching Stripe balance:', error);
+        log.error('Error fetching Stripe balance:', error);
         setStripeBalance(null);
       } else {
         setStripeBalance(data);

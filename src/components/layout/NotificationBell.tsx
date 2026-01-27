@@ -16,6 +16,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { SwipeableNotificationItem } from "./SwipeableNotificationItem";
 import { cn } from "@/lib/utils";
+import { logger } from "@/lib/logger";
+
+const log = logger.scope('NotificationBell');
 
 interface Notification {
   id: string;
@@ -122,12 +125,12 @@ export const NotificationBell = () => {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('[NotificationBell] Realtime update:', payload.eventType);
+          log.debug('Realtime update:', payload.eventType);
           fetchNotifications();
         }
       )
       .subscribe((status) => {
-        console.log('[NotificationBell] Subscription status:', status);
+        log.debug('Subscription status:', status);
       });
 
     // Polling fallback every 10 seconds for reliability
