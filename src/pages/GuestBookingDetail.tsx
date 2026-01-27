@@ -357,49 +357,6 @@ const GuestBookingDetail = () => {
           />
         )}
 
-        {/* Host Contact */}
-        {host && (
-          <Card className="p-4">
-            <h3 className="font-semibold mb-3">Contact Host</h3>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                {host.avatar_url ? (
-                  <img src={host.avatar_url} alt={host.first_name} className="h-10 w-10 rounded-full object-cover" />
-                ) : (
-                  <User className="h-5 w-5 text-muted-foreground" />
-                )}
-              </div>
-              <div>
-                <p className="font-medium">{host.first_name} {host.last_name?.[0] ? `${host.last_name[0]}.` : ''}</p>
-                <p className="text-xs text-muted-foreground">Your host</p>
-              </div>
-            </div>
-            <div className="space-y-2">
-              {host.phone && (
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
-                  size="sm"
-                  onClick={() => window.open(`tel:${host.phone}`, '_self')}
-                >
-                  <Phone className="h-4 w-4 mr-2" />
-                  Call Host
-                </Button>
-              )}
-              {host.email && (
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
-                  size="sm"
-                  onClick={() => window.open(`mailto:${host.email}?subject=Question about my parking booking`, '_blank')}
-                >
-                  <Mail className="h-4 w-4 mr-2" />
-                  Email Host
-                </Button>
-              )}
-            </div>
-          </Card>
-        )}
 
         {/* Actions */}
         <div className="space-y-3">
