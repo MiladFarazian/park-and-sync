@@ -14,6 +14,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
 import { evChargerTypes, getChargerDisplayName } from '@/lib/evChargerTypes';
 import { logger } from '@/lib/logger';
+import { calculateBookingTotal } from '@/lib/pricing';
 
 // Scoped logger for Explore page
 const log = logger.scope('Explore');
@@ -744,33 +745,52 @@ const Explore = () => {
         }
       }
 
-      const transformedSpots = spots.map((spot: any) => ({
-        id: spot.id,
-        title: spot.title,
-        category: spot.category,
-        address: spot.address,
-        hourlyRate: spot.hourly_rate, // Already includes platform fee from lite endpoint
-        evChargingPremium: spot.ev_charging_premium_per_hour || 0,
-        rating: spot.spot_rating || 0,
-        reviews: spot.spot_review_count || 0,
-        lat: parseFloat(spot.latitude),
-        lng: parseFloat(spot.longitude),
-        imageUrl: spot.primary_photo_url,
-        distance: spot.distance ? `${(spot.distance / 1000).toFixed(1)} km` : undefined,
-        amenities: [
-          ...(spot.has_ev_charging ? ['EV Charging'] : []), 
-          ...(spot.is_covered ? ['Covered'] : []), 
-          ...(spot.is_secure ? ['Security Camera'] : []), 
-          ...(spot.is_ada_accessible ? ['ADA Accessible'] : []),
-          // Note: 24/7 Access, Easy Access, Well Lit are not stored in DB yet
-        ],
-        hostId: spot.host_id,
-        sizeConstraints: spot.size_constraints || [],
-        userBooking: null, // Not available in lite endpoint
-        instantBook: spot.instant_book !== false,
-        evChargerType: spot.ev_charger_type,
-        hasEvCharging: spot.has_ev_charging
-      })) || [];
+      // Calculate booking hours for total price display on map pins
+      const bookingHours = effectiveStartTime && effectiveEndTime
+        ? Math.max(1, (effectiveEndTime.getTime() - effectiveStartTime.getTime()) / (1000 * 60 * 60))
+        : null;
+
+      const transformedSpots = spots.map((spot: any) => {
+        const hostHourlyRate = spot.hourly_rate;
+        const evPremium = spot.ev_charging_premium_per_hour || 0;
+        
+        // Calculate total price for map pins (includes EV charging if EV filter is active)
+        let totalPrice: number | undefined;
+        if (bookingHours) {
+          const willUseEvCharging = evChargerTypeFilter != null && spot.has_ev_charging;
+          const booking = calculateBookingTotal(hostHourlyRate, bookingHours, evPremium, willUseEvCharging);
+          totalPrice = booking.driverTotal;
+        }
+
+        return {
+          id: spot.id,
+          title: spot.title,
+          category: spot.category,
+          address: spot.address,
+          hourlyRate: hostHourlyRate, // Already includes platform fee from lite endpoint
+          evChargingPremium: evPremium,
+          rating: spot.spot_rating || 0,
+          reviews: spot.spot_review_count || 0,
+          lat: parseFloat(spot.latitude),
+          lng: parseFloat(spot.longitude),
+          imageUrl: spot.primary_photo_url,
+          distance: spot.distance ? `${(spot.distance / 1000).toFixed(1)} km` : undefined,
+          amenities: [
+            ...(spot.has_ev_charging ? ['EV Charging'] : []), 
+            ...(spot.is_covered ? ['Covered'] : []), 
+            ...(spot.is_secure ? ['Security Camera'] : []), 
+            ...(spot.is_ada_accessible ? ['ADA Accessible'] : []),
+            // Note: 24/7 Access, Easy Access, Well Lit are not stored in DB yet
+          ],
+          hostId: spot.host_id,
+          sizeConstraints: spot.size_constraints || [],
+          userBooking: null, // Not available in lite endpoint
+          instantBook: spot.instant_book !== false,
+          evChargerType: spot.ev_charger_type,
+          hasEvCharging: spot.has_ev_charging,
+          totalPrice, // Total booking cost for map pin display
+        };
+      }) || [];
 
       setParkingSpots(transformedSpots);
 
