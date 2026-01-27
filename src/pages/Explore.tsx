@@ -774,10 +774,10 @@ const Explore = () => {
     // Skip cache when EV filter is applied to get accurate fallback notification
     // Also skip cache when explicitly requested (map pan/zoom) to ensure pins update
     if (!evChargerTypeFilter && !skipCache) {
-      // Check regional cache first - only for initial loads and back/forward navigation
+      // Check regional cache first - only for initial loads
       const cachedData = findCoveringCache(center.lat, center.lng, radius, timeKey);
-      if (cachedData && !isInitialLoad) {
-        // Only use cache for background refreshes, not map movements
+      if (cachedData && isInitialLoad) {
+        // Only use cache for initial loads - background refreshes should hit API for fresh data
         setParkingSpots(cachedData);
         setSpotsLoading(false);
         return;
