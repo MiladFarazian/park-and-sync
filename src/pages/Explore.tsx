@@ -478,8 +478,10 @@ const Explore = () => {
         if (cachedSpots) {
           setParkingSpots(cachedSpots);
           setSpotsLoading(false);
-          // Still fetch fresh data in background
-          fetchNearbySpots(desired, EXPANDED_RADIUS_METERS, false, { start: start ? startDate : null, end: end ? endDate : null });
+          // Defer background refresh to next tick to ensure time state is committed
+          setTimeout(() => {
+            fetchNearbySpots(desired, EXPANDED_RADIUS_METERS, false, { start: start ? startDate : null, end: end ? endDate : null });
+          }, 0);
         } else {
           fetchNearbySpots(desired, EXPANDED_RADIUS_METERS, true, { start: start ? startDate : null, end: end ? endDate : null });
         }
