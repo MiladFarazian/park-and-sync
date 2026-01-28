@@ -1,72 +1,85 @@
 
-# Plan: Fix Demand Notification Trigger for Explore Page Searches
+# Plan: Fix Parameter Mismatch in Demand Notification Push
 
-## Problem Summary
+## Problem Identified
 
-When a driver searches for parking in Sawtelle and finds zero available spots, the host at 10 Speed Coffee (1947 Sawtelle Blvd) is **never notified** due to a radius mismatch in the demand notification logic.
+The `notify-hosts-demand` edge function is sending push notification requests to `send-push-notification` with **incorrect parameter names**, causing all push notifications to fail silently.
 
-## Root Cause
-
-The `search-spots-lite` edge function only triggers demand notifications when:
-```typescript
-if (transformedSpots.length === 0 && radius <= HALF_MILE_METERS) {  // 804 meters
+### Evidence from Logs
+```
+[notify-hosts-demand] Failed to send notification to host 4b63dc97-3ca5-4e6b-b40b-fc9f77f300ed
+[notify-hosts-demand] Successfully notified 1 hosts  <-- Misleading: it recorded the notification, but delivery failed
 ```
 
-However, the Explore page **always** sends searches with a radius of 5,000-15,000 meters (`EXPANDED_RADIUS_METERS = 15000`), which means the condition `radius <= 804` is never satisfied.
+### Root Cause: Parameter Name Mismatch
 
-**Evidence from edge function logs:**
-- All searches show `radius: 5000` or `radius: 12188`
-- The 0.5-mile threshold (804m) is never met
-- The `notify-hosts-demand` function has zero logs - it's never being called
+| `notify-hosts-demand` SENDS | `send-push-notification` EXPECTS |
+|---------------------------|----------------------------------|
+| `user_id`                 | `userId`                        |
+| `message`                 | `body`                          |
 
-## Solution
-
-Change the trigger logic from checking the **search radius** to checking if **zero spots were found within 0.5 miles of the search center**, regardless of the total search radius.
-
-### Code Changes
-
-**File: `supabase/functions/search-spots-lite/index.ts`**
-
-**Current logic (lines 545-548):**
+**In `notify-hosts-demand/index.ts` (lines 212-218):**
 ```typescript
-// Check if we should trigger demand notifications to hosts
-// Conditions: zero spots found AND search radius is 0.5 miles or less
-let demandNotificationSent = false;
-if (transformedSpots.length === 0 && radius <= HALF_MILE_METERS) {
+body: JSON.stringify({
+  user_id: hostId,           // ❌ Wrong - should be "userId"
+  title: 'Drivers searching nearby!',
+  message: '...',            // ❌ Wrong - should be "body"
+  url: `/manage-availability?date=${pacificDate}`,
+  type: 'demand_availability',
+}),
 ```
 
-**New logic:**
+**In `send-push-notification/index.ts` (line 175-177):**
 ```typescript
-// Check if we should trigger demand notifications to hosts
-// Conditions: zero spots found within 0.5 miles of search center
-let demandNotificationSent = false;
-const spotsWithinHalfMile = transformedSpots.filter(s => s.distance <= HALF_MILE_METERS);
-if (spotsWithinHalfMile.length === 0) {
+const { userId, userIds, title, body, ... } = await req.json();
+const targetUserIds = userIds || (userId ? [userId] : []);
+// Since "user_id" is sent, "userId" is undefined → targetUserIds = []
 ```
 
-This change means:
-- Even with a 15km search radius, if there are zero spots within 0.5 miles of where the driver searched, hosts nearby get notified
-- If there ARE spots within 0.5 miles but just not available (filtered out by time/bookings), hosts still get notified
-- Preserves the intended user experience: "I need parking near HERE, not 5 miles away"
+## The Fix
 
-## Technical Details
+Update `notify-hosts-demand/index.ts` to use the correct parameter names.
 
-| Aspect | Before | After |
-|--------|--------|-------|
-| Trigger condition | `radius <= 804m` | `0 spots within 804m` |
-| Explore page (radius=5000m+) | Never triggers | Triggers correctly |
-| Tight searches (radius<804m) | Works | Works (unchanged behavior) |
+### Code Change
 
-## Files to Modify
+**File: `supabase/functions/notify-hosts-demand/index.ts`**
 
-| File | Change |
-|------|--------|
-| `supabase/functions/search-spots-lite/index.ts` | Change notification trigger from radius-based to distance-based check |
+**Lines 212-218** - Change from:
+```typescript
+body: JSON.stringify({
+  user_id: hostId,
+  title: 'Drivers searching nearby!',
+  message: 'Update your availability today to earn. Tap to manage your spot.',
+  url: `/manage-availability?date=${pacificDate}`,
+  type: 'demand_availability',
+}),
+```
 
-## Expected Behavior After Fix
+To:
+```typescript
+body: JSON.stringify({
+  userId: hostId,
+  title: 'Drivers searching nearby!',
+  body: 'Update your availability today to earn. Tap to manage your spot.',
+  url: `/manage-availability?date=${pacificDate}`,
+  type: 'demand_availability',
+}),
+```
 
-When a driver:
-1. Searches in Sawtelle
-2. The 10 Speed Coffee spot is filtered out (unavailable due to time restrictions: only available midnight-10am)
-3. Zero spots appear within 0.5 miles of the search center
-4. → The host at 10 Speed Coffee receives a push notification: "Drivers searching nearby! Update your availability today to earn."
+## Summary
+
+| Parameter | Before (broken) | After (fixed) |
+|-----------|-----------------|---------------|
+| User ID   | `user_id`       | `userId`      |
+| Message   | `message`       | `body`        |
+
+## Expected Result
+
+After this fix, when a driver searches in Sawtelle and no spots are available within 0.5 miles:
+1. The `notify-hosts-demand` function will correctly pass the host's user ID
+2. `send-push-notification` will find and send to the host's push subscriptions
+3. The host at 10 Speed Coffee will receive a push notification on their devices
+
+## Additional Note: In-App Notifications
+
+This fix only addresses **push notifications**. The system currently does not create an in-app notification record (in the `notifications` table) for demand alerts. If you also want in-app notifications to appear in the notification bell, that would require an additional change to insert into the `notifications` table.
