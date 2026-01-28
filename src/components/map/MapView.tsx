@@ -112,6 +112,9 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
   const isCarouselNavigationRef = useRef(false); // Track carousel-initiated map movements
   const skipNextMapMoveRef = useRef(false); // Prevent refetch on programmatic flyTo (carousel/marker)
   const pendingCarouselSpotIdRef = useRef<string | null>(null); // Ensure marker-click selection always syncs to carousel
+  
+  // Ref to avoid stale closure issue - always access latest onMapMove callback
+  const onMapMoveRef = useRef(onMapMove);
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [nearestSpotId, setNearestSpotId] = useState<string | null>(null);
   const [userSelectedSpot, setUserSelectedSpot] = useState(false);
@@ -133,6 +136,11 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
   useEffect(() => {
     spotsRef.current = spots;
   }, [spots]);
+
+  // Keep onMapMove ref up to date to avoid stale closures in map event handlers
+  useEffect(() => {
+    onMapMoveRef.current = onMapMove;
+  }, [onMapMove]);
 
   // Memoize sorted spots to avoid re-sorting on every render
   const memoizedSortedSpots = useMemo(() => {
@@ -540,7 +548,8 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
       const radiusMeters = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff) * 111320; // Convert to meters
       
       // Notify parent of map movement with center and radius
-      onMapMove?.({ lat: centerLat, lng: centerLng }, Math.max(5000, radiusMeters)); // Min 5km
+      // Use ref to avoid stale closure - always call the latest callback
+      onMapMoveRef.current?.({ lat: centerLat, lng: centerLng }, Math.max(5000, radiusMeters)); // Min 5km
       
       // Update visible spots count
       if (spots.length) {
