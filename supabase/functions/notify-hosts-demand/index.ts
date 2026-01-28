@@ -210,9 +210,9 @@ serve(async (req) => {
             'X-Internal-Secret': serviceRoleKey!,
           },
           body: JSON.stringify({
-            user_id: hostId,
+            userId: hostId,
             title: 'Drivers searching nearby!',
-            message: 'Update your availability today to earn. Tap to manage your spot.',
+            body: 'Update your availability today to earn. Tap to manage your spot.',
             url: `/manage-availability?date=${pacificDate}`,
             type: 'demand_availability',
           }),
