@@ -210,6 +210,9 @@ const Explore = () => {
 
   // Ignore the first onMapMove fired by Mapbox on initial idle
   const ignoreFirstMapMoveRef = useRef(true);
+
+  // Track when initial load + state updates are complete, so handleMapMove can safely fetch
+  const initialLoadCompleteRef = useRef(false);
   
   // Track last fetched center to avoid redundant requests for small movements
   const lastFetchedCenterRef = useRef<{ lat: number; lng: number; radius: number } | null>(null);
@@ -516,6 +519,14 @@ const Explore = () => {
     }
   }, [mapboxToken]);
 
+  // Mark initial load as complete once URL-derived times are committed to state
+  // This allows handleMapMove to safely use the time state for subsequent fetches
+  useEffect(() => {
+    if (!didInitialFetchRef.current) return;
+    // Once initial fetch has run and this effect fires, state updates are committed
+    initialLoadCompleteRef.current = true;
+  }, [startTime, endTime]);
+
   // Continuously watch and update the user's physical location (blue dot marker)
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -633,9 +644,9 @@ const Explore = () => {
         setShowSuggestions(false);
         setSuggestions([]);
         
-        // Fetch spots for the new search location
-        fetchNearbySpots(desired, EXPANDED_RADIUS_METERS, true);
-        
+        // Fetch spots for the new search location (pass current time state)
+        fetchNearbySpots(desired, EXPANDED_RADIUS_METERS, true, { start: startTime, end: endTime });
+
         // Regenerate session token for next search session
         sessionTokenRef.current = crypto.randomUUID();
         log.debug('Search session token regenerated');
@@ -686,7 +697,7 @@ const Explore = () => {
     // If we already have a cached current location, use it immediately
     if (currentLocation) {
       setSearchLocation(currentLocation);
-      fetchNearbySpots(currentLocation, EXPANDED_RADIUS_METERS, true);
+      fetchNearbySpots(currentLocation, EXPANDED_RADIUS_METERS, true, { start: startTime, end: endTime });
 
       // Get address in background
       if (mapboxToken) {
@@ -715,7 +726,7 @@ const Explore = () => {
         if (address) setSearchQuery(address);
       }
 
-      fetchNearbySpots(deviceLoc, EXPANDED_RADIUS_METERS, true);
+      fetchNearbySpots(deviceLoc, EXPANDED_RADIUS_METERS, true, { start: startTime, end: endTime });
       setIsLoadingLocation(false);
     };
 
@@ -800,6 +811,12 @@ const Explore = () => {
 
       // Use search-spots-lite for fast map pin loading
       // Pass time range to filter out already-booked spots
+      console.log('[Explore] Calling search-spots-lite with times:', {
+        startTime: effectiveStartTime?.toISOString() || null,
+        endTime: effectiveEndTime?.toISOString() || null,
+        stateStartTime: startTime?.toISOString() || null,
+        stateEndTime: endTime?.toISOString() || null,
+      });
       const { data, error } = await supabase.functions.invoke('search-spots-lite', {
         body: {
           latitude: center.lat,
@@ -831,8 +848,22 @@ const Explore = () => {
 
       const spots = data.spots || [];
 
+      // Debug logging for availability filtering investigation
+      if (data._debug) {
+        console.log('[Explore] search-spots-lite debug:', data._debug);
+        console.log('[Explore] API returned', spots.length, 'spots, updating map...');
+      }
+
+      // If API returns 0 spots and we had spots before, clear them immediately
+      // This ensures stale cached data doesn't persist on the map
+      if (spots.length === 0 && parkingSpots.length > 0) {
+        console.log('[Explore] Clearing stale spots from map');
+        setParkingSpots([]);
+      }
+
       // If we searched with 2-mile radius and found no spots, show dialog and expand search
       if (shouldCheckTwoMileFirst && spots.length === 0) {
+        console.log('[Explore] 2-mile search returned 0 spots, expanding to 15km...');
         // Prevent showing the dialog multiple times for the same search
         const noSpotsKey = `no-spots-nearby-v1:${center.lat.toFixed(4)}:${center.lng.toFixed(4)}:${timeKey}`;
         const alreadyShown = sessionStorage.getItem(noSpotsKey) === '1' || noSpotsNearbyShownRef.current;
@@ -842,6 +873,9 @@ const Explore = () => {
           noSpotsNearbyShownRef.current = true;
           setShowNoSpotsNearbyDialog(true);
         }
+
+        // Clear any stale spots before expanding search
+        setParkingSpots([]);
 
         // Fetch expanded results to show on the map
         await fetchNearbySpots(center, EXPANDED_RADIUS_METERS, isInitialLoad, timeOverride, evChargerTypeFilter, true);
@@ -957,6 +991,7 @@ const Explore = () => {
         };
       }) || [];
 
+      console.log('[Explore] Setting parkingSpots to', transformedSpots.length, 'spots');
       setParkingSpots(transformedSpots);
 
       // Cache the results for instant back/forward navigation (time-bucketed)
@@ -998,14 +1033,14 @@ const Explore = () => {
     if (evWasOn && evIsNowOff) {
       // EV filter removed - refetch without EV filter to get all spots
       setEvChargerType(null);
-      fetchNearbySpots(searchLocation, EXPANDED_RADIUS_METERS, false);
+      fetchNearbySpots(searchLocation, EXPANDED_RADIUS_METERS, false, { start: startTime, end: endTime });
     } else if (chargerTypesChanged && filters.evChargerTypes && filters.evChargerTypes.length > 0) {
       // Charger type changed - refetch with new filter
       const newChargerType = filters.evChargerTypes[0]; // Use first selected type for API
       setEvChargerType(newChargerType);
-      fetchNearbySpots(searchLocation, EXPANDED_RADIUS_METERS, false, undefined, newChargerType);
+      fetchNearbySpots(searchLocation, EXPANDED_RADIUS_METERS, false, { start: startTime, end: endTime }, newChargerType);
     }
-  }, [filters.evCharging, filters.evChargerTypes, searchLocation, fetchNearbySpots]);
+  }, [filters.evCharging, filters.evChargerTypes, searchLocation, fetchNearbySpots, startTime, endTime]);
 
   const evFallbackDismissedRef = useRef(false);
 
@@ -1050,6 +1085,12 @@ const Explore = () => {
     // Ignore the first automatic map move fired on initial load
     if (ignoreFirstMapMoveRef.current) {
       ignoreFirstMapMoveRef.current = false;
+      return;
+    }
+
+    // Don't trigger fetches until initial load is complete and state is ready
+    // This prevents race conditions where map moves before URL params are committed to state
+    if (!initialLoadCompleteRef.current) {
       return;
     }
     
@@ -1107,7 +1148,8 @@ const Explore = () => {
       lastFetchedCenterRef.current = { lat: center.lat, lng: center.lng, radius: radiusMeters };
       consecutiveMoveCountRef.current = 0; // Reset after successful fetch
       // Pass skipCache=true to ensure fresh API call for map movements
-      fetchNearbySpots(center, radiusMeters, false, undefined, undefined, false, true);
+      // Pass current times to maintain availability filtering during map pan/zoom
+      fetchNearbySpots(center, radiusMeters, false, { start: startTime, end: endTime }, undefined, false, true);
     }, debounceDelay);
   };
 
@@ -1145,10 +1187,10 @@ const Explore = () => {
     
     // Update lastFetchedCenterRef to prevent handleMapMove from triggering another fetch
     lastFetchedCenterRef.current = { lat: savedCenter.lat, lng: savedCenter.lng, radius: savedRadius };
-    
+
     // Fetch spots for the entire visible map area using the current map radius (no zoom)
-    await fetchNearbySpots(savedCenter, savedRadius, false);
-    
+    await fetchNearbySpots(savedCenter, savedRadius, false, { start: startTime, end: endTime });
+
     setIsSearchingHere(false);
     
     // Reset skip flag after a short delay to allow normal behavior for future searches

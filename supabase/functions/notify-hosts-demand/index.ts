@@ -276,9 +276,18 @@ serve(async (req) => {
 
     console.log(`[notify-hosts-demand] Successfully notified ${eligibleHosts.size} hosts`);
 
-    return new Response(JSON.stringify({ 
-      success: true, 
+    return new Response(JSON.stringify({
+      success: true,
       hosts_notified: eligibleHosts.size,
+      _debug: {
+        search_location: { latitude, longitude },
+        pacific_date: pacificDate,
+        spots_within_radius: spotsWithinRadius.length,
+        spots_with_overrides_today: spotsWithOverrides.size,
+        hosts_already_notified_today: alreadyNotifiedHostIds.size,
+        eligible_host_spots: eligibleHostSpots.map(s => ({ spotId: s.spotId, hostId: s.hostId, title: s.spotTitle })),
+        host_ids_notified: hostIdsToRecord,
+      },
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

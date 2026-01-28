@@ -237,6 +237,10 @@ serve(async (req) => {
       // If no matches, spotsWithDistance stays as-is (fallback to all spots)
     }
 
+    // Capture count before availability filtering for debugging
+    const spotsBeforeAvailabilityFilter = spotsWithDistance.length;
+    const spotIdsBeforeFilter = spotsWithDistance.map(s => s.id);
+
     // If time range is provided, filter out spots with conflicting bookings or unavailable overrides
     if (start_time && end_time) {
       const spotIds = spotsWithDistance.map(s => s.id);
@@ -593,6 +597,17 @@ serve(async (req) => {
       demandNotificationSent = true;
     }
 
+    // Debug info for troubleshooting availability filtering
+    const debugInfo = {
+      search_times: start_time && end_time ? { start: start_time, end: end_time } : null,
+      time_filtering_applied: !!(start_time && end_time),
+      spots_before_availability_filter: spotsBeforeAvailabilityFilter,
+      spot_ids_before_filter: spotIdsBeforeFilter,
+      spots_after_all_filters: transformedSpots.length,
+      spot_ids_after_filter: transformedSpots.map(s => s.id),
+      half_mile_count: transformedSpots.filter(s => s.distance <= 804).length,
+    };
+
     return new Response(JSON.stringify({
       spots: transformedSpots,
       total: transformedSpots.length,
@@ -600,6 +615,7 @@ serve(async (req) => {
       ev_match_count: evMatchCount,
       demand_notification_sent: demandNotificationSent,
       notification_timeout_seconds: demandNotificationSent ? 45 : undefined,
+      _debug: debugInfo,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
