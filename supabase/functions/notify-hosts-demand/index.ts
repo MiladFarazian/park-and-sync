@@ -102,10 +102,11 @@ serve(async (req) => {
     });
 
     console.log(`[notify-hosts-demand] Found ${spotsWithinRadius.length} active spots within 0.75 miles`);
+    console.log(`[notify-hosts-demand] Spots within radius:`, spotsWithinRadius.map(s => ({ id: s.id, title: s.title, host_id: s.host_id })));
 
     if (spotsWithinRadius.length === 0) {
-      return new Response(JSON.stringify({ 
-        success: true, 
+      return new Response(JSON.stringify({
+        success: true,
         hosts_notified: 0,
         reason: 'No active spots within radius'
       }), {
@@ -115,6 +116,7 @@ serve(async (req) => {
 
     const spotIds = spotsWithinRadius.map(s => s.id);
     const hostIds = [...new Set(spotsWithinRadius.map(s => s.host_id))];
+    console.log(`[notify-hosts-demand] Unique host IDs:`, hostIds);
 
     // Step 2: Get calendar overrides for today to check who already updated
     const { data: todayOverrides } = await supabase
@@ -153,11 +155,18 @@ serve(async (req) => {
 
     for (const spot of spotsWithinRadius) {
       // Skip if host already notified
-      if (alreadyNotifiedHostIds.has(spot.host_id)) continue;
-      
+      if (alreadyNotifiedHostIds.has(spot.host_id)) {
+        console.log(`[notify-hosts-demand] Skipping spot ${spot.id} (${spot.title}): host already notified today`);
+        continue;
+      }
+
       // Skip if spot has any override for today (means they already updated)
-      if (spotsWithOverrides.has(spot.id)) continue;
-      
+      if (spotsWithOverrides.has(spot.id)) {
+        console.log(`[notify-hosts-demand] Skipping spot ${spot.id} (${spot.title}): already has calendar override for today`);
+        continue;
+      }
+
+      console.log(`[notify-hosts-demand] Spot ${spot.id} (${spot.title}) is eligible for notification`);
       eligibleHostSpots.push({
         hostId: spot.host_id,
         spotId: spot.id,
@@ -192,12 +201,25 @@ serve(async (req) => {
       });
     }
 
-    // Step 5: Send notifications and record in suppression table
+    // Step 5: Collect all eligible spots per host for the deep-link
+    const hostSpotIds = new Map<string, string[]>();
+    for (const item of eligibleHostSpots) {
+      if (!hostSpotIds.has(item.hostId)) {
+        hostSpotIds.set(item.hostId, []);
+      }
+      hostSpotIds.get(item.hostId)!.push(item.spotId);
+    }
+
+    // Step 6: Send notifications and record in suppression table
     const notificationPromises: Promise<any>[] = [];
     const hostIdsToRecord: string[] = [];
 
     for (const [hostId, spotInfo] of eligibleHosts) {
       hostIdsToRecord.push(hostId);
+
+      // Build deep-link URL with spot IDs for direct navigation
+      const spotIdsForHost = hostSpotIds.get(hostId) || [spotInfo.spotId];
+      const deepLinkUrl = `/manage-availability?date=${pacificDate}&spots=${spotIdsForHost.join(',')}`;
 
       // Send push notification via send-push-notification edge function
       const notificationPromise = fetch(
@@ -213,7 +235,7 @@ serve(async (req) => {
             userId: hostId,
             title: 'Drivers searching nearby!',
             body: 'Update your availability today to earn. Tap to manage your spot.',
-            url: `/manage-availability?date=${pacificDate}`,
+            url: deepLinkUrl,
             type: 'demand_availability',
           }),
         }

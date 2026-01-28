@@ -387,6 +387,7 @@ serve(async (req) => {
 
               if (!dayRule) {
                 // No availability rule for this day = spot is unavailable (matches DB check_spot_availability function)
+                console.log(`[search-spots-lite] Spot ${spotId} unavailable: no rule for day ${dayOfWeek}`);
                 isAvailableForAllDates = false;
                 break;
               }
@@ -399,12 +400,16 @@ serve(async (req) => {
                 if (ruleEnd === '24:00:00') {
                   ruleEnd = '23:59:59';
                 }
-                
+
                 // Pacific time string comparison - search time must be within rule window
+                console.log(`[search-spots-lite] Spot ${spotId} rule check: search ${searchStartTimeOnDate}-${searchEndTimeOnDate} vs rule ${ruleStart}-${ruleEnd}`);
                 if (searchStartTimeOnDate < ruleStart || searchEndTimeOnDate > ruleEnd) {
+                  console.log(`[search-spots-lite] Spot ${spotId} unavailable: outside rule window`);
                   isAvailableForAllDates = false;
                   break;
                 }
+              } else {
+                console.log(`[search-spots-lite] Spot ${spotId} has null time range in rule, treating as available all day`);
               }
               // If rule has no time range (null/null), treat as available all day
             }

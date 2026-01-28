@@ -27,6 +27,8 @@ interface Spot {
   title: string;
   hourly_rate: number;
   address: string;
+  latitude: number;
+  longitude: number;
 }
 
 interface AvailabilityRule {
@@ -169,7 +171,7 @@ const ManageAvailability = () => {
     try {
       const { data, error } = await supabase
         .from('spots')
-        .select('id, title, hourly_rate, address')
+        .select('id, title, hourly_rate, address, latitude, longitude')
         .eq('host_id', user.id)
         .eq('status', 'active');
 
@@ -714,10 +716,10 @@ const ManageAvailability = () => {
               await channel.send({
                 type: 'broadcast',
                 event: 'spot_available',
-                payload: { 
+                payload: {
                   spot_id: spotId,
-                  spot_lat: 0, // Spot doesn't have lat/lng in this context, drivers will filter by distance
-                  spot_lng: 0,
+                  spot_lat: spot.latitude,
+                  spot_lng: spot.longitude,
                 }
               });
               supabase.removeChannel(channel);
