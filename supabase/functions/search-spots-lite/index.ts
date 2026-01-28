@@ -543,9 +543,10 @@ serve(async (req) => {
     console.log(`[search-spots-lite] Found ${transformedSpots.length} spots in ${duration}ms`);
 
     // Check if we should trigger demand notifications to hosts
-    // Conditions: zero spots found AND search radius is 0.5 miles or less
+    // Conditions: zero spots found within 0.5 miles of search center
     let demandNotificationSent = false;
-    if (transformedSpots.length === 0 && radius <= HALF_MILE_METERS) {
+    const spotsWithinHalfMile = transformedSpots.filter(s => s.distance <= HALF_MILE_METERS);
+    if (spotsWithinHalfMile.length === 0) {
       console.log(`[search-spots-lite] Zero spots within 0.5mi - triggering host demand notifications`);
       
       // Fire-and-forget: notify hosts in the background
