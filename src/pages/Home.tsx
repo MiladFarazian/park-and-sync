@@ -38,8 +38,14 @@ const Home = () => {
   const [locationResolved, setLocationResolved] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false);
-  const [startTime, setStartTime] = useState(new Date());
-  const [endTime, setEndTime] = useState(new Date(Date.now() + 2 * 60 * 60 * 1000));
+  const [startTime, setStartTime] = useState(() => {
+    const now = new Date();
+    return new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
+  });
+  const [endTime, setEndTime] = useState(() => {
+    const now = new Date();
+    return new Date(now.getTime() + 3 * 60 * 60 * 1000); // 3 hours from now
+  });
   const [mobileStartPickerOpen, setMobileStartPickerOpen] = useState(false);
   const [mobileEndPickerOpen, setMobileEndPickerOpen] = useState(false);
   const [locationErrorCode, setLocationErrorCode] = useState<number | null>(null);
