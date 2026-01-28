@@ -532,12 +532,15 @@ serve(async (req) => {
 
         log.info('Booking set to held status, awaiting host approval');
 
-        // Get host and renter profiles for notifications
+        // Get host and renter profiles for notifications (make unconditional with fallbacks)
         const { data: hostProfile } = await supabase
           .from('profiles')
           .select('first_name, email')
           .eq('user_id', spot.host_id)
           .single();
+
+        // Get host's auth email using service role client
+        const { data: { user: hostUser } } = await supabaseAdmin.auth.admin.getUserById(spot.host_id);
 
         const { data: renterProfile } = await supabase
           .from('profiles')
@@ -545,32 +548,118 @@ serve(async (req) => {
           .eq('user_id', userData.user.id)
           .single();
 
-        // Create notifications
-        if (hostProfile && renterProfile) {
-          // Host notification - needs to approve
-          const hostNotification = {
-            user_id: spot.host_id,
-            type: 'booking_approval_required',
-            title: 'New Booking Request',
-            message: `${renterProfile.first_name || 'A driver'} wants to book your spot at ${spot.address}. Approve within 1 hour.`,
-            related_id: booking.id,
-          };
+        // Use fallbacks for names - don't require both profiles
+        const driverName = renterProfile?.first_name || userData.user.user_metadata?.first_name || 'A driver';
+        const hostName = hostProfile?.first_name || 'Host';
+        const hostEmail = hostUser?.email || hostProfile?.email || '';
 
-          // Driver notification - pending approval
-          const renterNotification = {
-            user_id: userData.user.id,
-            type: 'booking_pending',
-            title: 'Booking Request Sent',
-            message: `Your booking request at ${spot.address} is awaiting host approval. You'll be notified when they respond.`,
-            related_id: booking.id,
-          };
+        // Create notifications UNCONDITIONALLY
+        const hostNotification = {
+          user_id: spot.host_id,
+          type: 'booking_approval_required',
+          title: 'New Booking Request',
+          message: `${driverName} wants to book your spot at ${spot.address}. Approve within 1 hour.`,
+          related_id: booking.id,
+        };
 
-          const { error: notificationError } = await supabaseAdmin
-            .from('notifications')
-            .insert([hostNotification, renterNotification]);
+        const renterNotification = {
+          user_id: userData.user.id,
+          type: 'booking_pending',
+          title: 'Booking Request Sent',
+          message: `Your booking request at ${spot.address} is awaiting host approval. You'll be notified when they respond.`,
+          related_id: booking.id,
+        };
 
-          if (notificationError) {
-            log.error('Failed to create booking notifications', { error: notificationError.message });
+        const { error: notificationError } = await supabaseAdmin
+          .from('notifications')
+          .insert([hostNotification, renterNotification]);
+
+        if (notificationError) {
+          log.error('Failed to create booking notifications', { error: notificationError.message });
+        }
+
+        // Send push notification to host
+        try {
+          await supabaseAdmin.functions.invoke('send-push-notification', {
+            body: {
+              userId: spot.host_id,
+              title: '🔔 New Booking Request',
+              body: `${driverName} wants to book your spot. Respond within 1 hour.`,
+              url: `/host-booking-confirmation/${booking.id}`,
+              type: 'booking_approval_required',
+            },
+          });
+          log.debug('Push notification sent to host');
+        } catch (pushError) {
+          log.error('Failed to send push notification to host', { error: pushError instanceof Error ? pushError.message : pushError });
+        }
+
+        // Send email notification to host
+        if (hostEmail && hostEmail.includes('@')) {
+          try {
+            const { Resend } = await import("https://esm.sh/resend@2.0.0");
+            const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+            const appUrl = Deno.env.get('APP_URL') || 'https://parkzy.lovable.app';
+            const startTime = new Date(start_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+            const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'Parkzy <notifications@useparkzy.com>';
+
+            await resend.emails.send({
+              from: fromEmail,
+              to: [hostEmail],
+              subject: "🔔 New Booking Request - Action Required",
+              html: `
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                  <div style="text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); padding: 24px; border-radius: 12px;">
+                    <img src="https://mqbupmusmciijsjmzbcu.supabase.co/storage/v1/object/public/assets/parkzy-logo-white.png" alt="Parkzy" style="height: 40px; width: auto;" />
+                  </div>
+                  
+                  <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+                    <h2 style="color: #92400e; margin: 0 0 8px 0; font-size: 20px;">🔔 New Booking Request!</h2>
+                    <p style="color: #78350f; margin: 0; font-size: 14px;">You have 1 hour to respond</p>
+                  </div>
+                  
+                  <p style="color: #374151; font-size: 16px; line-height: 1.6;">Hi ${hostName},</p>
+                  <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                    <strong>${driverName}</strong> wants to book your parking spot. Please approve or decline within <strong>1 hour</strong>.
+                  </p>
+                  
+                  <div style="background: #f9fafb; border-radius: 12px; padding: 20px; margin: 24px 0;">
+                    <h3 style="color: #111827; margin: 0 0 16px 0; font-size: 16px;">Booking Details</h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                      <tr>
+                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Address</td>
+                        <td style="padding: 8px 0; color: #111827; font-size: 14px; text-align: right;">${spot.address}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Start Time</td>
+                        <td style="padding: 8px 0; color: #111827; font-size: 14px; text-align: right;">${startTime}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Total</td>
+                        <td style="padding: 8px 0; color: #111827; font-size: 14px; font-weight: 600; text-align: right;">$${totalAmount.toFixed(2)}</td>
+                      </tr>
+                    </table>
+                  </div>
+                  
+                  <div style="text-align: center; margin: 32px 0;">
+                    <a href="${appUrl}/host-booking-confirmation/${booking.id}" 
+                       style="display: inline-block; background: #6B4EFF; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+                      Review & Respond
+                    </a>
+                  </div>
+                  
+                  <p style="color: #6b7280; font-size: 14px; text-align: center;">
+                    If you don't respond in 1 hour, the request will expire automatically.
+                  </p>
+                  
+                  <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;" />
+                  <p style="color: #9ca3af; font-size: 12px; text-align: center;">© ${new Date().getFullYear()} Parkzy. All rights reserved.</p>
+                </div>
+              `,
+            });
+            log.debug('Email notification sent to host', { email: hostEmail });
+          } catch (emailError) {
+            log.error('Failed to send email notification to host', { error: emailError instanceof Error ? emailError.message : emailError });
           }
         }
 
