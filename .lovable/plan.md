@@ -1,149 +1,118 @@
 
-Goal: fix (1) current build failure blocking edge-function deploys, and (2) missing booking-request notifications + “Request Expired” behavior for both driver and host.
+# Plan: Fix Map Pin Total Price Reverting to Hourly Rate
 
----
+## Problem Summary
 
-## 1) Fix the current build error (Resend import)
-### What’s happening
-Your build is failing with:
-- “Could not find a matching package for `npm:resend@2.0.0` in the node_modules directory…”
+When the Explore page loads, map pins initially show the correct **total price** (e.g., "$24") but then revert to showing the **hourly rate** (e.g., "$6/hr") after a brief moment.
 
-This happens because multiple Supabase Edge Functions import Resend via `npm:resend@2.0.0`, but this repo does not have a Deno config (`deno.json`) enabling npm auto-install / node_modules resolution.
+## Root Cause
 
-### Fix approach (lowest-risk)
-Stop using `npm:` imports for Resend inside edge functions and switch to the already-working pattern you have elsewhere:
-- `import { Resend } from "https://esm.sh/resend@2.0.0";`
+There's a race condition between the cache rendering and the background refresh:
 
-### Files to update (all occurrences)
-Update every edge function that imports `Resend` from `npm:resend@2.0.0` to use `https://esm.sh/resend@2.0.0` instead (examples from your repo):
-- `supabase/functions/approve-booking/index.ts` (this is the one currently breaking the build)
-- `supabase/functions/reject-booking/index.ts`
-- `supabase/functions/expire-pending-bookings/index.ts`
-- `supabase/functions/send-booking-confirmation/index.ts`
-- `supabase/functions/send-guest-booking-confirmation/index.ts`
-- `supabase/functions/send-report-notification/index.ts`
-- `supabase/functions/detect-overstays/index.ts`
-- `supabase/functions/forward-support-messages/index.ts`
-(and any other matches found by search)
+1. **Initial render**: Cached spots are loaded instantly with correct `totalPrice` values
+2. **Background refresh**: A fresh API call is triggered immediately after
+3. **Race condition**: The background refresh runs before React has committed the `startTime`/`endTime` state updates from URL params
+4. **Result**: The refresh calculates `totalPrice` with `null` time values, causing it to be `undefined`, which makes pins fall back to hourly rate display
 
-Expected outcome: the project builds again, and edge functions can deploy.
-
----
-
-## 2) Fix booking-request notifications not being sent (host + driver)
-### What’s happening
-For “request” bookings (non-instant), `create-booking` sets the booking status to `held` and tries to create notifications, but it only inserts notifications if BOTH `hostProfile` and `renterProfile` exist:
-
-```ts
-if (hostProfile && renterProfile) { insert notifications }
+```text
+Timeline:
+┌──────────────────────────────────────────────────────────────────────┐
+│ Initial Load Effect Runs                                            │
+│   ├─ setStartTime(startDate)        ← State update queued           │
+│   ├─ setEndTime(endDate)            ← State update queued           │
+│   ├─ setCachedSpots(...)            ← Shows pins with totalPrice    │
+│   └─ fetchNearbySpots(..., false)   ← Background refresh triggered  │
+│                                                                      │
+│ Background Refresh (runs immediately)                                │
+│   └─ effectiveStartTime = null      ← State not committed yet!      │
+│   └─ totalPrice = undefined         ← No time range to calculate    │
+│   └─ setParkingSpots(...)           ← Overwrites with no totalPrice │
+│                                                                      │
+│ React Commits State Updates                                          │
+│   └─ startTime/endTime now available (too late)                     │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-If either profile lookup fails or returns null (missing profile row, RLS quirks, partial data), NO notifications are created at all — which matches your “no in-app notification” symptom.
+## Solution
 
-### Fix approach
-Make notification creation unconditional and resilient:
-1) In `supabase/functions/create-booking/index.ts` (non-instant path):
-   - Always insert the host and driver notifications after setting `status = 'held'`.
-   - Use safe fallbacks for names:
-     - driverName: `renterProfile?.first_name || userData.user.user_metadata?.first_name || 'A driver'`
-     - hostName: `hostProfile?.first_name || 'Host'`
-   - Don’t require both profiles to exist.
+**Pass the time values explicitly to the background refresh call** instead of relying on React state (which may not be committed yet).
 
-2) Add delivery channels beyond “in-app bell”:
-   - Push notification: send a push to the host (if they have `push_subscriptions` rows), using your existing `send-push-notification` edge function.
-   - Email: send an email to the host (“New booking request — approve within 1 hour”) using Resend (after we fix the build).
+The fix is already partially in place - the `timeOverride` parameter exists in `fetchNearbySpots`. The issue is that on line 482, the background refresh passes time values, but inside the function, it can still fall back to stale state values.
 
-Notes:
-- “Text/SMS” for signed-in hosts/drivers is not implemented for booking requests today (Twilio is used in guest booking confirmation only). If you want SMS for booking requests too, we can add it as an optional follow-up once the core system is working reliably.
+### Primary Fix (Explore.tsx, line 482)
 
----
+Currently, the background refresh is called correctly with time override:
+```typescript
+fetchNearbySpots(desired, EXPANDED_RADIUS_METERS, false, { start: start ? startDate : null, end: end ? endDate : null });
+```
 
-## 3) Ensure booking requests actually expire (backend + UI)
-### What’s happening
-Your screenshot shows the UI still in “Booking Request Sent” state even though it says “expires about 5 hours ago.”
-Right now:
-- `BookingConfirmation.tsx` shows “Pending Approval” purely when `booking.status === 'held'`
-- It never flips to an “Expired” UI unless the booking status changes in the database
-- The database status change depends on background expiry logic; in your environment, it appears the expiry job is not reliably running, so bookings can remain `held` indefinitely.
+But the issue is in `fetchNearbySpots` callback stale closure. The callback has `startTime` and `endTime` in its closure via line 1008:
+```typescript
+}, [parkingSpots.length, startTime, endTime]);
+```
 
-Also: `expire-pending-bookings` currently expires held requests after ~90 minutes, while the UI says 1 hour. That mismatch needs to be corrected.
+When the background refresh runs, the closure captures the *old* values of `startTime` and `endTime` (which are `null` at mount time).
 
-### Fix approach (reliable + consistent)
-A) Backend “failsafe” expiry function (user-triggered)
-Create a small edge function that can expire a single booking request when it’s past its 1-hour response window:
-- Validates the caller is either:
-  - the renter (driver) of the booking, OR
-  - the host of the booked spot
-- Validates booking is still `held` and `created_at + 1 hour < now`
-- Cancels the Stripe PaymentIntent (manual capture hold) using Stripe secret
-- Updates booking status to `canceled` with a clear `cancellation_reason` (e.g., “Booking request expired - host did not respond within 1 hour”)
-- Inserts notifications for BOTH parties:
-  - Driver: “Booking Request Expired”
-  - Host: “Booking Request Expired (no response)”
+**The fix**: Update the background refresh call to ensure it uses the time override values throughout the entire function, not falling back to stale state.
 
-This creates determinism: even if a cron/background job isn’t running, the UI can trigger the correct state transition.
+### Changes Required
 
-B) Frontend: show “Request Expired” state automatically
-Update both pages to detect expiry and react:
-- `src/pages/BookingConfirmation.tsx`
-  - Compute expiryAt = created_at + 1 hour
-  - If booking.status is still `held` but now > expiryAt:
-    - Show a new “Request Expired” UI (red/alert styling)
-    - Call the new expiry edge function once (idempotent) to ensure backend catches up
-    - Provide CTAs like “Search again” and “Back to Activity”
-- `src/pages/HostBookingConfirmation.tsx`
-  - Same expiry detection
-  - If expired:
-    - Disable Approve/Decline actions
-    - Show “Request Expired” and explain that the driver was not charged and has been notified
+**File: `src/pages/Explore.tsx`**
 
-C) Align expiry timing everywhere
-Update `supabase/functions/expire-pending-bookings/index.ts` (once build is fixed) to match the promised “1 hour” logic if you still want the background expiry mechanism:
-- Reminder at 30 minutes before expiry (optional)
-- Expire at 60 minutes (not 90)
+The `timeOverride` values are correctly passed and used at lines 781-783:
+```typescript
+const effectiveStartTime = timeOverride?.start ?? startTime;
+const effectiveEndTime = timeOverride?.end ?? endTime;
+```
 
-(We’ll keep the “failsafe” function anyway; it’s a safety net.)
+However, the issue is the **callback closure** - when `fetchNearbySpots` is called during initial mount, the callback was created with `startTime = null` and `endTime = null` in its closure.
 
----
+**Solution**: Remove `startTime` and `endTime` from the `useCallback` dependencies since the function should exclusively use `timeOverride` when provided. The function already handles this correctly via `effectiveStartTime/effectiveEndTime`, but React re-creates the callback with stale closures when dependencies change.
 
-## 4) Fix push delivery reliability for booking events
-There is a secondary reliability issue in `src/hooks/useNotifications.tsx`:
-- It attempts to subscribe to bookings with a filter string: `renter_id=eq.${user.id},host_id=eq.${user.id}`
-- Supabase realtime filters don’t work like “OR” with comma-separated clauses; this likely results in missing booking-change notifications.
+**Better solution**: Use refs for the time values instead of state in the callback dependencies, OR ensure the callback always uses the passed `timeOverride` and never falls back to potentially stale closure values during the initial load sequence.
 
-Fix:
-- Remove or simplify this bookings realtime listener (it’s not the source of the in-app bell, but it impacts browser notifications).
-- Rely on:
-  - notifications table realtime (`notifications` INSERT) for showing browser notifications, and
-  - NotificationBell polling + realtime for the in-app list.
+**Simplest fix**: Ensure the background refresh in line 482 doesn't run until after React has committed the state updates. We can do this by wrapping the background refresh in a `setTimeout(..., 0)` to defer it to the next event loop tick, giving React time to commit the state updates.
 
----
+### Recommended Fix
 
-## 5) Implementation order (to minimize downtime)
-1) Fix Resend imports in edge functions so the build passes again.
-2) Patch `create-booking` (held path) to always create notifications + send push + send email.
-3) Add the “expire single booking request” edge function and wire it into BookingConfirmation + HostBookingConfirmation.
-4) Align background expiry timing in `expire-pending-bookings` to 60 minutes and ensure it also sends push/email for expiry notifications.
-5) Fix `useNotifications.tsx` booking realtime filter to improve browser notifications.
+**Change in `src/pages/Explore.tsx` (lines 478-482)**:
 
----
+```typescript
+// From:
+if (cachedSpots) {
+  setParkingSpots(cachedSpots);
+  setSpotsLoading(false);
+  // Still fetch fresh data in background
+  fetchNearbySpots(desired, EXPANDED_RADIUS_METERS, false, { start: start ? startDate : null, end: end ? endDate : null });
+}
 
-## 6) How we’ll verify end-to-end
-We’ll test one “request” booking from a driver account against a host’s request-based spot:
-1) Driver books a request-only spot → immediately check:
-   - Host in-app bell has a “New Booking Request” item
-   - Host receives push (if subscribed) and email (if configured)
-2) Host does nothing → after 60 minutes:
-   - Driver page becomes “Request Expired”
-   - Booking status in DB becomes `canceled` with expiration reason
-   - Driver receives in-app notification + push/email (depending on channel availability)
-   - Host receives in-app notification + push/email indicating it expired
-3) Host approves/declines quickly:
-   - Driver gets “Approved” / “Declined” notifications as expected
+// To:
+if (cachedSpots) {
+  setParkingSpots(cachedSpots);
+  setSpotsLoading(false);
+  // Defer background refresh to next tick to ensure time state is committed
+  setTimeout(() => {
+    fetchNearbySpots(desired, EXPANDED_RADIUS_METERS, false, { start: start ? startDate : null, end: end ? endDate : null });
+  }, 0);
+}
+```
 
----
+This ensures:
+1. Cached spots render instantly with correct `totalPrice`
+2. State updates (`setStartTime`, `setEndTime`) are committed
+3. Background refresh runs with the correct time values available
 
-## Notes / constraints
-- SMS (“Text”) for signed-in host/driver booking-request events is not currently part of the platform’s booking notification pathways. We can add Twilio SMS for booking requests if you confirm you want it (and define when to send it + phone number requirements).
-- The in-app notification bell should work even without browser notification permission; push/OS notifications require permission + a push subscription.
+## Summary of Changes
 
+| File | Change |
+|------|--------|
+| `src/pages/Explore.tsx` | Wrap background refresh in `setTimeout(..., 0)` to defer until after React commits state updates |
+
+## Expected Behavior After Fix
+
+1. User navigates to Explore page with time params in URL
+2. Cached spots render instantly with correct total prices on map pins
+3. React commits the time state updates
+4. Background refresh runs with correct time values
+5. Fresh spots replace cached spots, still showing correct total prices
+6. No visual "flicker" from total → hourly rate
