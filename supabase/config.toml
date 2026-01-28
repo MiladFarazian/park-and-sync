@@ -126,6 +126,9 @@ verify_jwt = true
 [functions.cancel-tow-request]
 verify_jwt = true
 
+[functions.expire-booking-request]
+verify_jwt = true
+
 # === INTERNAL ENDPOINTS (protected by internal secret) ===
 # These are called by other edge functions or cron jobs
 # They validate X-Internal-Secret header instead of JWT

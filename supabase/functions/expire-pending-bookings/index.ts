@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
-import { Resend } from "npm:resend@2.0.0";
+import { Resend } from "https://esm.sh/resend@2.0.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,11 +34,11 @@ serve(async (req) => {
     console.log('Checking for pending bookings needing reminders or expiration...');
 
     const now = Date.now();
+    const thirtyMinutesAgo = new Date(now - 30 * 60 * 1000).toISOString();
     const sixtyMinutesAgo = new Date(now - 60 * 60 * 1000).toISOString();
-    const ninetyMinutesAgo = new Date(now - 90 * 60 * 1000).toISOString();
 
     // ============================================
-    // PART 1: Send reminders for bookings at 60+ minutes (30 min before expiration)
+    // PART 1: Send reminders for bookings at 30+ minutes (30 min before 1-hour expiration)
     // ============================================
     const { data: bookingsNeedingReminder, error: reminderFetchError } = await supabaseAdmin
       .from('bookings')
@@ -52,8 +52,8 @@ serve(async (req) => {
         spots (host_id, address, category, title)
       `)
       .eq('status', 'held')
-      .lt('created_at', sixtyMinutesAgo)
-      .gte('created_at', ninetyMinutesAgo);
+      .lt('created_at', thirtyMinutesAgo)
+      .gte('created_at', sixtyMinutesAgo);
 
     if (reminderFetchError) {
       console.error('Error fetching bookings for reminders:', reminderFetchError);
@@ -222,7 +222,7 @@ serve(async (req) => {
     }
 
     // ============================================
-    // PART 2: Expire bookings older than 90 minutes
+    // PART 2: Expire bookings older than 60 minutes (1 hour)
     // ============================================
     const { data: expiredBookings, error: fetchError } = await supabaseAdmin
       .from('bookings')
@@ -231,10 +231,10 @@ serve(async (req) => {
         stripe_payment_intent_id,
         renter_id,
         spot_id,
-        spots (address)
+        spots (address, host_id)
       `)
       .eq('status', 'held')
-      .lt('created_at', ninetyMinutesAgo);
+      .lt('created_at', sixtyMinutesAgo);
 
     if (fetchError) {
       console.error('Error fetching expired bookings:', fetchError);
@@ -276,7 +276,7 @@ serve(async (req) => {
           .from('bookings')
           .update({ 
             status: 'canceled',
-            cancellation_reason: 'Booking request expired - host did not respond within 1.5 hours'
+            cancellation_reason: 'Booking request expired - host did not respond within 1 hour'
           })
           .eq('id', booking.id);
 
@@ -287,6 +287,8 @@ serve(async (req) => {
           .eq('spot_id', booking.spot_id)
           .eq('user_id', booking.renter_id);
 
+        const hostId = booking.spots?.host_id;
+
         // Notify driver
         await supabaseAdmin
           .from('notifications')
@@ -294,9 +296,22 @@ serve(async (req) => {
             user_id: booking.renter_id,
             type: 'booking',
             title: 'Booking Request Expired',
-            message: `Your booking request at ${booking.spots?.address || 'the parking spot'} expired because the host didn't respond within 1.5 hours. Your card was not charged.`,
+            message: `Your booking request at ${booking.spots?.address || 'the parking spot'} expired because the host didn't respond within 1 hour. Your card was not charged.`,
             related_id: booking.id,
           });
+
+        // Notify host that they missed the request
+        if (hostId) {
+          await supabaseAdmin
+            .from('notifications')
+            .insert({
+              user_id: hostId,
+              type: 'booking_host',
+              title: 'Booking Request Expired',
+              message: `A booking request at ${booking.spots?.address || 'your spot'} expired because you didn't respond within 1 hour.`,
+              related_id: booking.id,
+            });
+        }
 
         expiredCount++;
         console.log(`Expired booking ${booking.id}`);

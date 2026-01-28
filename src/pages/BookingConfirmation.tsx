@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Clock, MapPin, Star, MessageCircle, Car, Calendar, XCircle, Navigation, Copy, AlertTriangle, Zap, Key, CalendarPlus } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, MapPin, Star, MessageCircle, Car, Calendar, XCircle, Navigation, Copy, AlertTriangle, Zap, Key, CalendarPlus, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { differenceInHours, format, formatDistanceToNow } from 'date-fns';
+import { differenceInHours, format, formatDistanceToNow, isPast, addHours } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import RequireAuth from '@/components/auth/RequireAuth';
@@ -37,6 +37,9 @@ const BookingConfirmationContent = () => {
   const [cancelling, setCancelling] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [directionsDialogOpen, setDirectionsDialogOpen] = useState(false);
+  const [isExpired, setIsExpired] = useState(false);
+  const [expiringRequest, setExpiringRequest] = useState(false);
+  const expireAttemptedRef = useRef(false);
   const magicLoginToastShown = useRef(false);
 
   // Show magic login toast if user arrived via magic link
@@ -292,6 +295,53 @@ const BookingConfirmationContent = () => {
       setCancelling(false);
     }
   };
+  // Calculate expiry values (safe even when booking is null)
+  const expiryAt = booking ? addHours(new Date(booking.created_at), 1) : new Date();
+  const isPendingApproval = booking?.status === 'held';
+  const hasExpired = isPendingApproval && isPast(expiryAt);
+
+  // Expire the booking request if it's past the expiry time
+  const expireBookingRequest = useCallback(async () => {
+    if (!booking?.id || expireAttemptedRef.current || expiringRequest) return;
+    expireAttemptedRef.current = true;
+    setExpiringRequest(true);
+
+    try {
+      log.debug('Expiring booking request', { bookingId: booking.id });
+      const { data, error } = await supabase.functions.invoke('expire-booking-request', {
+        body: { booking_id: booking.id }
+      });
+
+      if (error) {
+        log.error('Failed to expire booking request', { error });
+      } else {
+        log.debug('Booking request expired', { result: data });
+        setIsExpired(true);
+        // Refetch booking to get updated status
+        const { data: updatedBooking } = await supabase
+          .from('bookings')
+          .select('status, cancellation_reason')
+          .eq('id', booking.id)
+          .single();
+        if (updatedBooking) {
+          setBooking((prev: any) => ({ ...prev, ...updatedBooking }));
+        }
+      }
+    } catch (error) {
+      log.error('Error expiring booking request', { error });
+    } finally {
+      setExpiringRequest(false);
+    }
+  }, [booking?.id, expiringRequest]);
+
+  // Check for expiry on mount and trigger expire function
+  useEffect(() => {
+    if (hasExpired && !expireAttemptedRef.current) {
+      setIsExpired(true);
+      expireBookingRequest();
+    }
+  }, [hasExpired, expireBookingRequest]);
+
   if (loading) {
     return <div className="flex items-center justify-center py-20">
         <div className="text-muted-foreground">Loading...</div>
@@ -305,8 +355,7 @@ const BookingConfirmationContent = () => {
   const hostName = host ? `${host.first_name || ''} ${host.last_name || ''}`.trim() : 'Host';
   const hostInitial = hostName.charAt(0).toUpperCase();
   const bookingNumber = `#PK-${new Date(booking.created_at).getFullYear()}-${booking.id.slice(0, 3).toUpperCase()}`;
-  const isPendingApproval = booking.status === 'held';
-  const timeUntilExpiry = isPendingApproval ? formatDistanceToNow(new Date(new Date(booking.created_at).getTime() + 60 * 60 * 1000), { addSuffix: true }) : null;
+  const timeUntilExpiry = isPendingApproval && !hasExpired ? formatDistanceToNow(expiryAt, { addSuffix: true }) : null;
 
   return <div className="bg-background">
       {/* Header */}
@@ -329,8 +378,46 @@ const BookingConfirmationContent = () => {
       </div>
 
       <div className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
-        {/* Pending Approval UI */}
-        {isPendingApproval ? (
+        {/* Request Expired UI */}
+        {(isExpired || hasExpired) && isPendingApproval ? (
+          <>
+            <div className="text-center space-y-4">
+              <div className="flex justify-center">
+                <div className="rounded-full bg-destructive/10 p-6">
+                  <AlertCircle className="h-16 w-16 text-destructive" />
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold text-destructive">Request Expired</h2>
+              <p className="text-muted-foreground">
+                The host didn't respond within the 1-hour window. Your card was not charged.
+              </p>
+            </div>
+
+            <Card className="p-4 border-destructive/30 bg-destructive/5">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-sm">What happened?</h4>
+                  <ul className="text-sm text-muted-foreground mt-1 space-y-1">
+                    <li>• The host had 1 hour to approve your request</li>
+                    <li>• They didn't respond in time</li>
+                    <li>• The authorization on your card has been released</li>
+                    <li>• You can search for another spot</li>
+                  </ul>
+                </div>
+              </div>
+            </Card>
+
+            <div className="flex flex-col gap-3">
+              <Button onClick={() => navigate('/explore')} className="w-full">
+                Search for Another Spot
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/activity')} className="w-full">
+                Back to Activity
+              </Button>
+            </div>
+          </>
+        ) : isPendingApproval ? (
           <>
             <div className="text-center space-y-4">
               <div className="flex justify-center">

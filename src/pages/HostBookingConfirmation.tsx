@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, DollarSign, MapPin, Star, MessageCircle, Car, Calendar, AlertTriangle, Clock, XCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, DollarSign, MapPin, Star, MessageCircle, Car, Calendar, AlertTriangle, Clock, XCircle, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { differenceInHours, format, formatDistanceToNow } from 'date-fns';
+import { differenceInHours, format, formatDistanceToNow, isPast, addHours } from 'date-fns';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +41,9 @@ const HostBookingConfirmation = () => {
   const [loading, setLoading] = useState(true);
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  const [isExpired, setIsExpired] = useState(false);
+  const [expiringRequest, setExpiringRequest] = useState(false);
+  const expireAttemptedRef = useRef(false);
   const magicLoginToastShown = useRef(false);
 
   // Show magic login toast if user arrived via magic link
@@ -181,6 +184,46 @@ const HostBookingConfirmation = () => {
     }
   };
 
+  // Calculate expiry values (safe even when booking is null)
+  const expiryAt = booking ? addHours(new Date(booking.created_at), 1) : new Date();
+  const isPendingApproval = booking?.status === 'held';
+  const hasExpired = isPendingApproval && isPast(expiryAt);
+
+  // Expire the booking request if it's past the expiry time
+  const expireBookingRequest = useCallback(async () => {
+    if (!booking?.id || expireAttemptedRef.current || expiringRequest) return;
+    expireAttemptedRef.current = true;
+    setExpiringRequest(true);
+
+    try {
+      log.debug('Expiring booking request', { bookingId: booking.id });
+      const { data, error } = await supabase.functions.invoke('expire-booking-request', {
+        body: { booking_id: booking.id }
+      });
+
+      if (error) {
+        log.error('Failed to expire booking request', { error });
+      } else {
+        log.debug('Booking request expired', { result: data });
+        setIsExpired(true);
+        // Refetch booking to get updated status
+        fetchBookingDetails();
+      }
+    } catch (error) {
+      log.error('Error expiring booking request', { error });
+    } finally {
+      setExpiringRequest(false);
+    }
+  }, [booking?.id, expiringRequest]);
+
+  // Check for expiry on mount and trigger expire function
+  useEffect(() => {
+    if (hasExpired && !expireAttemptedRef.current) {
+      setIsExpired(true);
+      expireBookingRequest();
+    }
+  }, [hasExpired, expireBookingRequest]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -204,8 +247,7 @@ const HostBookingConfirmation = () => {
   const driverInitial = driverName.charAt(0).toUpperCase();
   const bookingNumber = `#PK-${new Date(booking.created_at).getFullYear()}-${booking.id.slice(0, 3).toUpperCase()}`;
   const hostEarnings = getHostNetEarnings(booking);
-  const isPendingApproval = booking.status === 'held';
-  const timeUntilExpiry = isPendingApproval ? formatDistanceToNow(new Date(new Date(booking.created_at).getTime() + 60 * 60 * 1000), { addSuffix: true }) : null;
+  const timeUntilExpiry = isPendingApproval && !hasExpired ? formatDistanceToNow(expiryAt, { addSuffix: true }) : null;
 
   return (
     <div className="bg-background min-h-screen">
@@ -232,8 +274,40 @@ const HostBookingConfirmation = () => {
       </div>
 
       <div className="container mx-auto px-4 py-6 max-w-lg space-y-5">
-        {/* Status Message */}
-        {isPendingApproval ? (
+        {/* Request Expired UI */}
+        {(isExpired || hasExpired) && isPendingApproval ? (
+          <>
+            <div className="text-center space-y-3">
+              <div className="flex justify-center">
+                <div className="rounded-full bg-destructive/10 p-5">
+                  <AlertCircle className="h-12 w-12 text-destructive" />
+                </div>
+              </div>
+              <h2 className="text-xl font-bold text-destructive">Request Expired</h2>
+              <p className="text-sm text-muted-foreground">
+                This booking request expired because you didn't respond within 1 hour.
+              </p>
+            </div>
+
+            <Card className="p-4 border-destructive/30 bg-destructive/5">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-sm">What happened?</h4>
+                  <ul className="text-sm text-muted-foreground mt-1 space-y-1">
+                    <li>• You had 1 hour to approve or decline</li>
+                    <li>• The driver's card was not charged</li>
+                    <li>• They have been notified</li>
+                  </ul>
+                </div>
+              </div>
+            </Card>
+
+            <Button onClick={() => navigate('/host-home')} className="w-full">
+              Back to Dashboard
+            </Button>
+          </>
+        ) : isPendingApproval ? (
           <>
             {/* Pending Approval UI */}
             <div className="text-center space-y-3">

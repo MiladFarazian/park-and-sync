@@ -252,111 +252,31 @@ export const useNotifications = () => {
     });
     channelsRef.current = [];
 
-    // Listen to bookings updates (new bookings, cancellations, etc.)
-    const bookingsChannel = supabase
-      .channel('bookings-notifications')
+    // Listen to notifications table for all notifications (primary source for in-app bell)
+    const notificationsChannel = supabase
+      .channel('app-notifications')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
-          table: 'bookings',
-          filter: `renter_id=eq.${user.id},host_id=eq.${user.id}`,
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
         },
-        async (payload) => {
-          log.debug('Booking change:', payload);
+        (payload) => {
+          log.debug('New app notification:', payload);
           
-          if (payload.eventType === 'INSERT') {
-            // Fetch booking details including host_id
-            const { data: booking } = await supabase
-              .from('bookings')
-              .select('*, spots(title, address, host_id)')
-              .eq('id', payload.new.id)
-              .single();
-
-            if (booking) {
-              const isHost = (booking.spots as any)?.host_id === user.id;
-              showNotification({
-                title: isHost ? '🎉 New Booking!' : '✅ Booking Confirmed',
-                body: isHost 
-                  ? `Someone booked your spot at ${(booking.spots as any)?.address}`
-                  : `Your parking at ${(booking.spots as any)?.title} is confirmed`,
-                tag: `booking-${booking.id}`,
-                url: isHost ? `/host-booking-confirmation/${booking.id}` : `/booking-confirmation/${booking.id}`,
-                requireInteraction: true,
-              });
-            }
-          } else if (payload.eventType === 'UPDATE') {
-            const oldStatus = payload.old.status;
-            const newStatus = payload.new.status;
-            
-            if (oldStatus !== newStatus) {
-              if (newStatus === 'canceled') {
-                showNotification({
-                  title: '❌ Booking Canceled',
-                  body: 'A booking has been canceled',
-                  tag: `booking-canceled-${payload.new.id}`,
-                  url: `/booking/${payload.new.id}`,
-                });
-              } else if (newStatus === 'active') {
-                showNotification({
-                  title: '✅ Booking Active',
-                  body: 'Your booking is now active',
-                  tag: `booking-active-${payload.new.id}`,
-                  url: `/booking/${payload.new.id}`,
-                });
-              } else if (newStatus === 'completed') {
-                showNotification({
-                  title: '✔️ Booking Completed',
-                  body: 'Your booking has been completed',
-                  tag: `booking-completed-${payload.new.id}`,
-                  url: `/booking/${payload.new.id}`,
-                });
-              }
-            }
-
-            // Check for overstay detection
-            if (!payload.old.overstay_detected_at && payload.new.overstay_detected_at) {
-              const isHost = payload.new.host_id === user.id;
-              showNotification({
-                title: isHost ? '⚠️ Overstay Detected' : '⏰ Grace Period Started',
-                body: isHost 
-                  ? 'A driver has entered the grace period on your spot'
-                  : 'You have 10 minutes to leave before overstay charges apply',
-                tag: `overstay-${payload.new.id}`,
-                url: `/booking/${payload.new.id}`,
-                requireInteraction: true,
-              });
-            }
-
-            // Check for overstay action
-            if (!payload.old.overstay_action && payload.new.overstay_action) {
-              const isHost = payload.new.host_id === user.id;
-              if (payload.new.overstay_action === 'towing') {
-                showNotification({
-                  title: isHost ? '🚗 Tow Requested' : '🚨 TOW REQUEST',
-                  body: isHost 
-                    ? 'Tow request has been initiated'
-                    : 'HOST HAS REQUESTED A TOW - Please vacate immediately!',
-                  tag: `tow-${payload.new.id}`,
-                  url: `/booking/${payload.new.id}`,
-                  requireInteraction: true,
-                });
-              } else if (payload.new.overstay_action === 'charging') {
-                showNotification({
-                  title: '💳 Overtime Charges',
-                  body: 'You are being charged for overtime parking',
-                  tag: `charging-${payload.new.id}`,
-                  url: `/booking/${payload.new.id}`,
-                });
-              }
-            }
-          }
+          showNotification({
+            title: payload.new.title,
+            body: payload.new.message,
+            tag: `notification-${payload.new.id}`,
+            url: payload.new.related_id ? `/booking/${payload.new.related_id}` : '/activity',
+          });
         }
       )
       .subscribe();
 
-    channelsRef.current.push(bookingsChannel);
+    channelsRef.current.push(notificationsChannel);
 
     // Listen to new messages
     const messagesChannel = supabase
@@ -394,32 +314,6 @@ export const useNotifications = () => {
       .subscribe();
 
     channelsRef.current.push(messagesChannel);
-
-    // Listen to notifications table for general notifications
-    const notificationsChannel = supabase
-      .channel('app-notifications')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          log.debug('New app notification:', payload);
-          
-          showNotification({
-            title: payload.new.title,
-            body: payload.new.message,
-            tag: `notification-${payload.new.id}`,
-            url: payload.new.related_id ? `/booking/${payload.new.related_id}` : '/activity',
-          });
-        }
-      )
-      .subscribe();
-
-    channelsRef.current.push(notificationsChannel);
 
   }, [user, showNotification]);
 
