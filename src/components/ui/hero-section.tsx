@@ -24,8 +24,8 @@ const HeroSection = () => {
   const [searchLocation, setSearchLocation] = useState('');
   const [searchCoords, setSearchCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false);
-  const [startTime, setStartTime] = useState<Date>(addHours(new Date(), 1));
-  const [endTime, setEndTime] = useState<Date>(addHours(new Date(), 3));
+  const [startTime, setStartTime] = useState<Date>(new Date());
+  const [endTime, setEndTime] = useState<Date>(addHours(new Date(), 2));
   const [mobileStartPickerOpen, setMobileStartPickerOpen] = useState(false);
   const [mobileEndPickerOpen, setMobileEndPickerOpen] = useState(false);
   const [needsEvCharging, setNeedsEvCharging] = useState(false);
