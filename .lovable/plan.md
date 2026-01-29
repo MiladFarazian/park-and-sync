@@ -1,104 +1,85 @@
 
-# Plan: Fix Stale Closure in MapView Causing Price Display Flicker
+# Plan: Align Earnings Calculations Across Host Views
 
 ## Problem Summary
 
-Map pins initially display the correct total price (e.g., "$7") but revert to the hourly rate (e.g., "$3/hr") after approximately 5 seconds. This occurs because:
+The "Total Earnings" shown per listing in the **Listings tab** (Dashboard.tsx) does not match the figures displayed in:
+- The **Host Dashboard** "All-Time Earnings" card
+- The **Earnings by Spot** widget
+- The individual **Spot Earnings History** pages
 
-1. The `MapView` component captures the `onMapMove` callback in a closure when the `mapboxToken` becomes available
-2. This closure is never updated when the parent component re-renders with new state
-3. When the Mapbox `flyTo` animation completes (~1.5s later) and triggers `moveend`, the stale `onMapMove` callback is called
-4. The stale callback has `startTime = null` and `endTime = null` in its scope
-5. This triggers a new API call without time filtering, which returns spots without `totalPrice` calculated
-6. The map pins update to show hourly rates instead of total prices
+## Root Cause
 
-## Root Cause Analysis
+Two issues in `src/pages/Dashboard.tsx`:
 
-In `src/components/map/MapView.tsx` (lines 510-573):
+1. **Status filter mismatch**: The bookings query only includes `'completed'` status, while all other earnings views include `['completed', 'active', 'paid']`:
 
 ```typescript
-useEffect(() => {
-  // ... map initialization ...
-  
-  const updateVisibleSpots = () => {
-    // ...
-    onMapMove?.({ lat, lng }, radiusMeters);  // ← Captures onMapMove from closure
-  };
-  
-  map.current.on('moveend', debouncedUpdate);
-  map.current.on('zoomend', debouncedUpdate);
-  map.current.once('idle', updateVisibleSpots);
-  
-}, [mapboxToken]);  // ← Only re-runs when mapboxToken changes, not when onMapMove changes!
+// Dashboard.tsx (line 127) - INCORRECT
+.eq('status', 'completed')
+
+// vs. HostHome.tsx, EarningsBySpot.tsx, SpotEarningsHistory.tsx - CORRECT
+.in('status', ['completed', 'active', 'paid'])
 ```
 
-The `onMapMove` prop is captured in the closure when the effect runs, but the effect only has `mapboxToken` in its dependencies. When the parent re-renders with updated `handleMapMove` (containing current `startTime`/`endTime` values), the MapView effect doesn't re-run, so it continues using the stale callback.
+2. **Missing `extension_charges` field**: The booking query doesn't select `extension_charges`, which is required by `getHostNetEarnings()` to calculate correct earnings for bookings that were extended:
+
+```typescript
+// Dashboard.tsx (line 125) - Missing extension_charges
+.select('id, spot_id, host_earnings, hourly_rate, start_at, end_at, status')
+
+// vs. HostHome.tsx (line 82) - Has extension_charges
+.select('host_earnings, hourly_rate, start_at, end_at, status, extension_charges')
+```
+
+## Impact
+
+- **Active bookings** (currently in progress) are not counted in listing earnings
+- **Paid bookings** (approved but not yet started) are not counted
+- **Extended bookings** may show incorrect earnings due to missing `extension_charges`
+
+This causes the per-listing "Total Earnings" to be lower than expected, while the dashboard total and earnings history show higher (correct) figures.
 
 ## Solution
 
-Use a **ref** to always access the latest `onMapMove` callback, avoiding stale closures.
+Update `src/pages/Dashboard.tsx` to match the earnings calculation logic used everywhere else:
 
-### Changes Required
+### Change 1: Update status filter (line 127)
 
-**File: `src/components/map/MapView.tsx`**
-
-1. Create a ref to store the latest `onMapMove` callback:
 ```typescript
-const onMapMoveRef = useRef(onMapMove);
-useEffect(() => {
-  onMapMoveRef.current = onMapMove;
-}, [onMapMove]);
+// From:
+.eq('status', 'completed')
+
+// To:
+.in('status', ['completed', 'active', 'paid'])
 ```
 
-2. Update the `updateVisibleSpots` function to use the ref instead of the prop directly:
+### Change 2: Add extension_charges to query (line 125)
+
 ```typescript
-const updateVisibleSpots = () => {
-  // ...
-  onMapMoveRef.current?.({ lat: centerLat, lng: centerLng }, Math.max(5000, radiusMeters));
-};
+// From:
+.select('id, spot_id, host_earnings, hourly_rate, start_at, end_at, status')
+
+// To:
+.select('id, spot_id, host_earnings, hourly_rate, start_at, end_at, status, extension_charges')
 ```
 
-This ensures that when `moveend` fires, the callback executed is always the current one from the parent, not a stale closure.
-
-## Alternative Consideration
-
-We could also add `onMapMove` to the effect's dependency array, but this would cause the map event handlers to be re-attached on every render where `onMapMove` changes. The ref approach is more efficient and doesn't cause unnecessary re-initialization.
-
-## Summary of Changes
+## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/map/MapView.tsx` | Add `onMapMoveRef` to capture latest callback, use ref in `updateVisibleSpots` |
+| `src/pages/Dashboard.tsx` | Update booking query to include correct statuses and extension_charges field |
 
-## Expected Behavior After Fix
+## Expected Result
 
-1. User navigates to Explore page with time params
-2. Cached spots render with correct total prices on map pins
-3. `flyTo` animation starts
-4. Background refresh runs with correct times → spots still show total prices
-5. `flyTo` completes, `moveend` fires
-6. `handleMapMove` is called with **current** `startTime`/`endTime` values (not stale null)
-7. Subsequent API call includes correct time filtering
-8. Spots continue to display total prices
-9. No visual flicker from total → hourly rate
+After the fix:
+- Per-listing "Total Earnings" in the Listings tab will match the figures in EarningsBySpot widget
+- Dashboard total will equal the sum of all individual listing earnings
+- Spot Earnings History totals will match their respective listing card totals
 
-## Technical Details
+## Verification
 
-The fix follows a common React pattern for handling callbacks in effects that shouldn't re-run when the callback changes:
-
-```typescript
-// Store latest callback in ref
-const callbackRef = useRef(callback);
-useEffect(() => {
-  callbackRef.current = callback;
-}, [callback]);
-
-// Use ref in effect that has other dependencies
-useEffect(() => {
-  someEventEmitter.on('event', () => {
-    callbackRef.current?.();  // Always calls latest callback
-  });
-}, [otherDependency]);
-```
-
-This pattern is recommended by the React team for exactly this type of scenario where you want stable event handler registration but always-current callback execution.
+1. Navigate to Host Dashboard → note the "All-Time Earnings" total
+2. Navigate to Listings tab → sum up all "Total Earnings" per listing
+3. Values should now match
+4. Click into any spot's Earnings History → total should match the listing card
