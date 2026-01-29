@@ -158,6 +158,26 @@ const ManageAvailability = () => {
     }
   }, [spots, user]);
 
+  // Pre-select source spot and recurring selected spots when coming from Dashboard
+  useEffect(() => {
+    if (
+      activeTab === 'recurring' &&
+      spotIdParam &&
+      spots.length > 0 &&
+      spots.some(s => s.id === spotIdParam) &&
+      Object.keys(spotRecurringRules).length > 0
+    ) {
+      // Set as source spot (loads its schedule into the grid)
+      if (!sourceSpotId) {
+        setSourceSpotId(spotIdParam);
+      }
+      // Pre-select for "Apply to" if not already selected
+      if (!recurringSelectedSpots.includes(spotIdParam)) {
+        setRecurringSelectedSpots(prev => [...prev, spotIdParam]);
+      }
+    }
+  }, [activeTab, spotIdParam, spots, spotRecurringRules]);
+
   // Validate time blocks whenever they change
   useEffect(() => {
     if (availabilityMode === 'custom') {
