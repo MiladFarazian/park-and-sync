@@ -14,9 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import RequireAuth from '@/components/auth/RequireAuth';
 import { calculateDriverPrice } from '@/lib/pricing';
 import { logger } from '@/lib/logger';
-
 const log = logger.scope('BookingConfirmation');
-
 const BookingConfirmationContent = () => {
   const {
     bookingId
@@ -28,7 +26,11 @@ const BookingConfirmationContent = () => {
   const {
     toast
   } = useToast();
-  const { user, profile, loading: authLoading } = useAuth();
+  const {
+    user,
+    profile,
+    loading: authLoading
+  } = useAuth();
   const [booking, setBooking] = useState<any>(null);
   const [spot, setSpot] = useState<any>(null);
   const [host, setHost] = useState<any>(null);
@@ -50,14 +52,13 @@ const BookingConfirmationContent = () => {
       const displayName = profile?.email || user.email || profile?.phone || 'your account';
       toast({
         title: "Logged in successfully",
-        description: `Signed in as ${displayName}`,
+        description: `Signed in as ${displayName}`
       });
       // Clean up URL
       const newUrl = window.location.pathname;
       window.history.replaceState({}, '', newUrl);
     }
   }, [searchParams, user, profile, toast]);
-
   useEffect(() => {
     const fetchBookingDetails = async () => {
       // Wait for auth to be resolved before fetching
@@ -305,30 +306,42 @@ const BookingConfirmationContent = () => {
     if (!booking?.id || expireAttemptedRef.current || expiringRequest) return;
     expireAttemptedRef.current = true;
     setExpiringRequest(true);
-
     try {
-      log.debug('Expiring booking request', { bookingId: booking.id });
-      const { data, error } = await supabase.functions.invoke('expire-booking-request', {
-        body: { booking_id: booking.id }
+      log.debug('Expiring booking request', {
+        bookingId: booking.id
       });
-
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('expire-booking-request', {
+        body: {
+          booking_id: booking.id
+        }
+      });
       if (error) {
-        log.error('Failed to expire booking request', { error });
+        log.error('Failed to expire booking request', {
+          error
+        });
       } else {
-        log.debug('Booking request expired', { result: data });
+        log.debug('Booking request expired', {
+          result: data
+        });
         setIsExpired(true);
         // Refetch booking to get updated status
-        const { data: updatedBooking } = await supabase
-          .from('bookings')
-          .select('status, cancellation_reason')
-          .eq('id', booking.id)
-          .single();
+        const {
+          data: updatedBooking
+        } = await supabase.from('bookings').select('status, cancellation_reason').eq('id', booking.id).single();
         if (updatedBooking) {
-          setBooking((prev: any) => ({ ...prev, ...updatedBooking }));
+          setBooking((prev: any) => ({
+            ...prev,
+            ...updatedBooking
+          }));
         }
       }
     } catch (error) {
-      log.error('Error expiring booking request', { error });
+      log.error('Error expiring booking request', {
+        error
+      });
     } finally {
       setExpiringRequest(false);
     }
@@ -341,7 +354,6 @@ const BookingConfirmationContent = () => {
       expireBookingRequest();
     }
   }, [hasExpired, expireBookingRequest]);
-
   if (loading) {
     return <div className="flex items-center justify-center py-20">
         <div className="text-muted-foreground">Loading...</div>
@@ -355,8 +367,9 @@ const BookingConfirmationContent = () => {
   const hostName = host ? `${host.first_name || ''} ${host.last_name || ''}`.trim() : 'Host';
   const hostInitial = hostName.charAt(0).toUpperCase();
   const bookingNumber = `#PK-${new Date(booking.created_at).getFullYear()}-${booking.id.slice(0, 3).toUpperCase()}`;
-  const timeUntilExpiry = isPendingApproval && !hasExpired ? formatDistanceToNow(expiryAt, { addSuffix: true }) : null;
-
+  const timeUntilExpiry = isPendingApproval && !hasExpired ? formatDistanceToNow(expiryAt, {
+    addSuffix: true
+  }) : null;
   return <div className="bg-background">
       {/* Header */}
       <div className="border-b bg-card sticky top-0 z-10">
@@ -368,19 +381,16 @@ const BookingConfirmationContent = () => {
             <h1 className="text-xl font-bold">
               {isPendingApproval ? 'Booking Request Sent' : 'Booking Confirmed'}
             </h1>
-            {isPendingApproval && (
-              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+            {isPendingApproval && <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
                 Pending Approval
-              </Badge>
-            )}
+              </Badge>}
           </div>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
         {/* Request Expired UI */}
-        {(isExpired || hasExpired) && isPendingApproval ? (
-          <>
+        {(isExpired || hasExpired) && isPendingApproval ? <>
             <div className="text-center space-y-4">
               <div className="flex justify-center">
                 <div className="rounded-full bg-destructive/10 p-6">
@@ -416,9 +426,7 @@ const BookingConfirmationContent = () => {
                 Back to Activity
               </Button>
             </div>
-          </>
-        ) : isPendingApproval ? (
-          <>
+          </> : isPendingApproval ? <>
             <div className="text-center space-y-4">
               <div className="flex justify-center">
                 <div className="rounded-full bg-yellow-100 dark:bg-yellow-900/20 p-6">
@@ -448,9 +456,7 @@ const BookingConfirmationContent = () => {
                 </div>
               </div>
             </Card>
-          </>
-        ) : (
-          <>
+          </> : <>
             {/* Compact Success Header for Confirmed Bookings */}
             <div className="flex items-center justify-center gap-3 py-2">
               <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full">
@@ -462,8 +468,7 @@ const BookingConfirmationContent = () => {
               </div>
             </div>
 
-          </>
-        )}
+          </>}
 
         {/* Parking Spot Card - Combined with navigation for confirmed bookings */}
         <Card className={`p-4 ${!isPendingApproval ? 'border-primary/30 bg-primary/5' : ''}`}>
@@ -475,28 +480,24 @@ const BookingConfirmationContent = () => {
             <div className="flex-1">
               <div className="font-semibold">{spot.title}</div>
               {/* Address with copy button for confirmed bookings */}
-              {!isPendingApproval && (
-                <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+              {!isPendingApproval && <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
                   <MapPin className="h-3 w-3 flex-shrink-0" />
                   <span className="flex-1">{spot.address}</span>
-                  <button 
-                    onClick={() => {
-                      navigator.clipboard.writeText(spot.address);
-                      toast({ title: "Address copied", description: "Ready to paste in your navigation app" });
-                    }}
-                    className="p-1 hover:bg-muted rounded"
-                  >
+                  <button onClick={() => {
+                navigator.clipboard.writeText(spot.address);
+                toast({
+                  title: "Address copied",
+                  description: "Ready to paste in your navigation app"
+                });
+              }} className="p-1 hover:bg-muted rounded">
                     <Copy className="h-3 w-3" />
                   </button>
-                </div>
-              )}
+                </div>}
               {/* Address for pending bookings */}
-              {isPendingApproval && (
-                <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+              {isPendingApproval && <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
                   <MapPin className="h-3 w-3 flex-shrink-0" />
                   <span>{spot.address}</span>
-                </div>
-              )}
+                </div>}
               {/* Booking time */}
               <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                 <Calendar className="h-3 w-3" />
@@ -506,42 +507,34 @@ const BookingConfirmationContent = () => {
           </div>
 
           {/* Get Directions button - prominent for confirmed bookings */}
-          {!isPendingApproval && (
-            <Button size="lg" className="w-full mt-4" onClick={handleDirections}>
+          {!isPendingApproval && <Button size="lg" className="w-full mt-4" onClick={handleDirections}>
               <Navigation className="mr-2 h-5 w-5" />
               Get Directions
-            </Button>
-          )}
+            </Button>}
           
           {/* Spot Description */}
-          {spot.description && (
-            <div className="mt-4 pt-4 border-t">
+          {spot.description && <div className="mt-4 pt-4 border-t">
               <h4 className="text-sm font-semibold mb-2">About This Spot</h4>
               <p className="text-sm text-muted-foreground">{spot.description}</p>
-            </div>
-          )}
+            </div>}
 
           {/* Access Instructions - inside Parking Spot card for confirmed bookings */}
-          {!isPendingApproval && spot.access_notes && (
-            <div className="mt-4 pt-4 border-t">
+          {!isPendingApproval && spot.access_notes && <div className="mt-4 pt-4 border-t">
               <div className="flex items-center gap-2 mb-2">
                 <Key className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                 <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300">Access Instructions</h4>
               </div>
               <p className="text-sm text-amber-900 dark:text-amber-100">{spot.access_notes}</p>
-            </div>
-          )}
+            </div>}
 
           {/* EV Charging Instructions - inside Parking Spot card for confirmed bookings */}
-          {!isPendingApproval && booking.will_use_ev_charging && spot?.ev_charging_instructions && (
-            <div className="mt-4 pt-4 border-t">
+          {!isPendingApproval && booking.will_use_ev_charging && spot?.ev_charging_instructions && <div className="mt-4 pt-4 border-t">
               <div className="flex items-center gap-2 mb-2">
                 <Zap className="h-4 w-4 text-green-600 dark:text-green-400" />
                 <h4 className="text-sm font-semibold text-green-800 dark:text-green-300">EV Charging Instructions</h4>
               </div>
               <p className="text-sm text-green-700 dark:text-green-400">{spot.ev_charging_instructions}</p>
-            </div>
-          )}
+            </div>}
         </Card>
 
         {/* Booking Summary Card */}
@@ -565,32 +558,26 @@ const BookingConfirmationContent = () => {
               <span className="text-muted-foreground">Service fee</span>
               <span className="font-medium">${booking.platform_fee?.toFixed(2) || '0.00'}</span>
             </div>
-            {booking.will_use_ev_charging && (booking.ev_charging_fee ?? 0) > 0 && (
-              <div className="flex justify-between items-center text-sm">
+            {booking.will_use_ev_charging && (booking.ev_charging_fee ?? 0) > 0 && <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground flex items-center gap-1">
                   <Zap className="h-3 w-3 text-green-600" />
                   EV Charging
                 </span>
                 <span className="font-medium">${(booking.ev_charging_fee ?? 0).toFixed(2)}</span>
-              </div>
-            )}
-            {(booking.extension_charges ?? 0) > 0 && (
-              <div className="flex justify-between items-center text-sm">
+              </div>}
+            {(booking.extension_charges ?? 0) > 0 && <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground">Extensions</span>
                 <span className="font-medium">${(booking.extension_charges ?? 0).toFixed(2)}</span>
-              </div>
-            )}
+              </div>}
             <Separator />
             <div className="flex justify-between items-center text-lg">
               <span className="font-bold">Total Paid</span>
               <span className="font-bold text-primary">${booking.total_amount.toFixed(2)}</span>
             </div>
-            {booking.will_use_ev_charging && (
-              <div className="flex items-center gap-2 pt-2 text-sm text-green-700 dark:text-green-400">
+            {booking.will_use_ev_charging && <div className="flex items-center gap-2 pt-2 text-sm text-green-700 dark:text-green-400">
                 <Zap className="h-4 w-4" />
                 <span>EV Charging included in this booking</span>
-              </div>
-            )}
+              </div>}
           </div>
         </Card>
 
@@ -672,14 +659,10 @@ const BookingConfirmationContent = () => {
               </Avatar>
               <div>
                 <div className="font-semibold">{hostName}</div>
-                {host?.rating ? (
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                {host?.rating ? <div className="flex items-center gap-1 text-sm text-muted-foreground">
                     <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
                     <span>{Number(host.rating).toFixed(1)}</span>
-                  </div>
-                ) : (
-                  <span className="text-sm text-muted-foreground">New host</span>
-                )}
+                  </div> : <span className="text-sm text-muted-foreground">New host</span>}
               </div>
             </div>
             <Button variant="outline" size="sm" onClick={handleContactHost}>
@@ -701,7 +684,7 @@ const BookingConfirmationContent = () => {
             <CalendarPlus className="h-4 w-4 mr-2" />
             Book This Spot Again
           </Button>
-          <Button variant="ghost" className="w-full" size="lg" onClick={() => navigate('/')}>
+          <Button variant="ghost" className="w-full border" size="lg" onClick={() => navigate('/')}>
             Find Other Parking
           </Button>
           
@@ -742,13 +725,9 @@ const BookingConfirmationContent = () => {
       </div>
     </div>;
 };
-
 const BookingConfirmation = () => {
-  return (
-    <RequireAuth feature="booking">
+  return <RequireAuth feature="booking">
       <BookingConfirmationContent />
-    </RequireAuth>
-  );
+    </RequireAuth>;
 };
-
 export default BookingConfirmation;
