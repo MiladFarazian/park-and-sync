@@ -122,8 +122,8 @@ serve(async (req) => {
       });
     }
 
-    // Check if booking can be cancelled
-    if (!['pending', 'active'].includes(booking.status)) {
+    // Check if booking can be cancelled (include 'held' for pending approval bookings)
+    if (!['pending', 'active', 'held'].includes(booking.status)) {
       return new Response(JSON.stringify({ 
         error: 'This booking cannot be cancelled' 
       }), {
@@ -139,9 +139,10 @@ serve(async (req) => {
     const isEligibleForRefund = hoursUntilStart >= 1;
 
     let refundAmount = 0;
+    let authorizationReleased = false;
 
-    // Process refund if eligible and payment exists
-    if (isEligibleForRefund && booking.stripe_payment_intent_id) {
+    // Process refund/cancellation if payment exists
+    if (booking.stripe_payment_intent_id) {
       const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
         apiVersion: '2025-08-27.basil',
       });
@@ -149,7 +150,13 @@ serve(async (req) => {
       try {
         const paymentIntent = await stripe.paymentIntents.retrieve(booking.stripe_payment_intent_id);
         
-        if (paymentIntent.status === 'succeeded') {
+        if (paymentIntent.status === 'requires_capture') {
+          // Payment is only authorized (held status) - cancel the authorization
+          await stripe.paymentIntents.cancel(booking.stripe_payment_intent_id);
+          authorizationReleased = true;
+          console.log('Authorization released for held booking:', booking.stripe_payment_intent_id);
+        } else if (paymentIntent.status === 'succeeded' && isEligibleForRefund) {
+          // Payment was captured - issue refund if eligible
           const refund = await stripe.refunds.create({
             payment_intent: booking.stripe_payment_intent_id,
           });
@@ -157,8 +164,8 @@ serve(async (req) => {
           console.log('Refund processed:', refund.id);
         }
       } catch (stripeError) {
-        console.error('Stripe refund error:', stripeError);
-        // Continue with cancellation even if refund fails
+        console.error('Stripe refund/cancel error:', stripeError);
+        // Continue with cancellation even if Stripe operation fails
       }
     }
 
@@ -189,10 +196,19 @@ serve(async (req) => {
 
     console.log('Guest booking cancelled successfully:', booking_id);
 
+    // Build appropriate message
+    let message = 'Booking cancelled';
+    if (authorizationReleased) {
+      message = 'Booking request cancelled. Authorization released.';
+    } else if (refundAmount > 0) {
+      message = 'Booking cancelled and refund processed';
+    }
+
     return new Response(JSON.stringify({
       success: true,
       refund_amount: refundAmount,
-      message: refundAmount > 0 ? 'Booking cancelled and refund processed' : 'Booking cancelled',
+      authorization_released: authorizationReleased,
+      message,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

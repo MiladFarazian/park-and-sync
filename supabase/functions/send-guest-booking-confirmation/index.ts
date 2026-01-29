@@ -9,6 +9,7 @@ const corsHeaders = {
 };
 
 interface GuestBookingConfirmationRequest {
+  type?: 'confirmed' | 'request';  // Default: 'confirmed'
   guestEmail: string;
   guestPhone: string;
   guestName: string;
@@ -97,6 +98,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const {
+      type = 'confirmed',  // Default to confirmed for backward compatibility
       guestEmail,
       guestPhone,
       guestName,
@@ -114,6 +116,8 @@ const handler = async (req: Request): Promise<Response> => {
       hasEvCharging,
       willUseEvCharging,
     }: GuestBookingConfirmationRequest = await req.json();
+
+    const isRequest = type === 'request';
 
     const startDate = new Date(startAt).toLocaleString('en-US', { 
       weekday: 'short', 
@@ -136,6 +140,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Guest booking URL with access token
     const guestBookingUrl = `${appUrl}/guest-booking/${bookingId}?token=${guestAccessToken}`;
     const hostBookingUrl = `${appUrl}/host-booking-confirmation/${bookingId}`;
+    const activityUrl = `${appUrl}/activity`;
 
     const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'Parkzy <onboarding@resend.dev>';
 
@@ -144,7 +149,20 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send SMS to guest if phone provided
     if (guestPhone && guestPhone.length >= 10) {
-      const smsBody = `✅ Parkzy Booking Confirmed!
+      const smsBody = isRequest 
+        ? `📋 Parkzy Booking Request Submitted!
+
+Hi ${guestName}, your request is pending host approval.
+
+📍 ${spotTitle}
+📫 ${spotAddress}
+🕐 ${startDate} - ${endDate}
+💳 $${totalAmount.toFixed(2)} authorized (not charged yet)
+
+View status: ${guestBookingUrl}
+
+We'll notify you within 1 hour.`
+        : `✅ Parkzy Booking Confirmed!
 
 Hi ${guestName}, your parking is secured!
 
@@ -166,17 +184,36 @@ Get directions: ${directionsUrl}`;
 
     // Send email to guest
     if (guestEmail && guestEmail.includes('@')) {
+      const guestSubject = isRequest 
+        ? "📋 Booking Request Submitted" 
+        : "✅ Booking Confirmed!";
+      
+      const guestHeaderTitle = isRequest
+        ? "📋 Booking Request Submitted"
+        : "✅ Booking Confirmed!";
+      
+      const guestHeaderSubtitle = isRequest
+        ? "Awaiting host approval"
+        : "Your parking is secured";
+      
+      const guestIntroText = isRequest
+        ? `Your booking request has been submitted and is <strong>awaiting host approval</strong>. Your payment method has been authorized for $${totalAmount.toFixed(2)} but won't be charged until the host approves. We'll notify you within 1 hour.`
+        : `Great news! Your parking spot is confirmed and ready for you. Save the details below and use your personal booking link to manage your reservation.`;
+      
+      const paymentStatusLabel = isRequest ? "💳 Authorized" : "💳 Total Paid";
+      const paymentStatusNote = isRequest ? "(Not charged until approved)" : "";
+
       const guestEmailResponse = await resend.emails.send({
         from: fromEmail,
         to: [guestEmail],
-        subject: "✅ Booking Confirmed!",
+        subject: guestSubject,
         html: `
           <!DOCTYPE html>
           <html>
             <head>
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>Booking Confirmed</title>
+              <title>${guestSubject}</title>
               <style>
                 @media only screen and (max-width: 600px) {
                   .email-container { width: 100% !important; }
@@ -194,10 +231,10 @@ Get directions: ${directionsUrl}`;
                     <table class="email-container" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                       <!-- Header -->
                       <tr>
-                        <td class="header-cell" style="background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); padding: 40px 24px; text-align: center;">
+                        <td class="header-cell" style="background: linear-gradient(135deg, ${isRequest ? '#f59e0b' : '#6B4EFF'} 0%, ${isRequest ? '#d97706' : '#5B3EEF'} 100%); padding: 40px 24px; text-align: center;">
                           <img src="https://mqbupmusmciijsjmzbcu.supabase.co/storage/v1/object/public/assets/parkzy-logo-white.png" alt="Parkzy" style="height: 36px; width: auto; margin-bottom: 16px;" />
-                          <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700;">✅ Booking Confirmed!</h1>
-                          <p style="margin: 10px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 15px;">Your parking is secured</p>
+                          <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700;">${guestHeaderTitle}</h1>
+                          <p style="margin: 10px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 15px;">${guestHeaderSubtitle}</p>
                         </td>
                       </tr>
                       
@@ -208,14 +245,28 @@ Get directions: ${directionsUrl}`;
                             Hi <strong>${guestName}</strong>,
                           </p>
                           <p style="margin: 0 0 20px 0; color: #1f2937; font-size: 15px; line-height: 1.5;">
-                            Great news! Your parking spot is confirmed and ready for you. Save the details below and use your personal booking link to manage your reservation.
+                            ${guestIntroText}
                           </p>
+                          
+                          ${isRequest ? `
+                          <!-- Pending Approval Notice -->
+                          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; margin: 20px 0;">
+                            <tr>
+                              <td style="padding: 16px;">
+                                <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">⏳ Awaiting Host Approval</p>
+                                <p style="margin: 8px 0 0 0; color: #a16207; font-size: 13px; line-height: 1.5;">
+                                  The host has up to 1 hour to approve or decline your request. You'll receive a notification as soon as they respond.
+                                </p>
+                              </td>
+                            </tr>
+                          </table>
+                          ` : ''}
                           
                           <!-- Booking Details Card -->
                           <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; border-radius: 12px; margin: 20px 0;">
                             <tr>
                               <td style="padding: 20px;">
-                                <h2 style="margin: 0 0 16px 0; color: #6B4EFF; font-size: 16px; font-weight: 600;">Your Parking Details</h2>
+                                <h2 style="margin: 0 0 16px 0; color: #6B4EFF; font-size: 16px; font-weight: 600;">${isRequest ? 'Request Details' : 'Your Parking Details'}</h2>
                                 
                                 <table class="detail-table" width="100%" cellpadding="0" cellspacing="0" style="font-size: 14px;">
                                   <tr>
@@ -242,9 +293,14 @@ Get directions: ${directionsUrl}`;
                                     <td colspan="2" style="padding: 12px 0 0 0; border-top: 2px solid #e5e7eb;">
                                       <table width="100%">
                                         <tr>
-                                          <td style="color: #1f2937; font-size: 15px; font-weight: 700;">💳 Total Paid</td>
-                                          <td style="color: #6B4EFF; font-size: 18px; font-weight: 700; text-align: right;">$${totalAmount.toFixed(2)}</td>
+                                          <td style="color: #1f2937; font-size: 15px; font-weight: 700;">${paymentStatusLabel}</td>
+                                          <td style="color: ${isRequest ? '#f59e0b' : '#6B4EFF'}; font-size: 18px; font-weight: 700; text-align: right;">$${totalAmount.toFixed(2)}</td>
                                         </tr>
+                                        ${paymentStatusNote ? `
+                                        <tr>
+                                          <td colspan="2" style="color: #6b7280; font-size: 12px; text-align: right; padding-top: 4px;">${paymentStatusNote}</td>
+                                        </tr>
+                                        ` : ''}
                                       </table>
                                     </td>
                                   </tr>
@@ -253,7 +309,7 @@ Get directions: ${directionsUrl}`;
                             </tr>
                           </table>
                           
-                          ${accessNotes ? `
+                          ${!isRequest && accessNotes ? `
                           <!-- Access Notes Section (Blue) -->
                           <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #e0f2fe; border-left: 4px solid #0ea5e9; border-radius: 8px; margin: 20px 0;">
                             <tr>
@@ -265,7 +321,7 @@ Get directions: ${directionsUrl}`;
                           </table>
                           ` : ''}
                           
-                          ${willUseEvCharging && evChargingInstructions ? `
+                          ${!isRequest && willUseEvCharging && evChargingInstructions ? `
                           <!-- EV Charging Section (Green - opted in) -->
                           <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #dcfce7; border-left: 4px solid #22c55e; border-radius: 8px; margin: 20px 0;">
                             <tr>
@@ -275,7 +331,7 @@ Get directions: ${directionsUrl}`;
                               </td>
                             </tr>
                           </table>
-                          ` : hasEvCharging && !willUseEvCharging ? `
+                          ` : !isRequest && hasEvCharging && !willUseEvCharging ? `
                           <!-- EV Charging Available (Gray - not opted in) -->
                           <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; border-left: 4px solid #9ca3af; border-radius: 8px; margin: 20px 0;">
                             <tr>
@@ -293,7 +349,7 @@ Get directions: ${directionsUrl}`;
                               <td>
                                 <p style="margin: 0; color: #1e40af; font-size: 13px; font-weight: 600;">🔗 Your Booking Link</p>
                                 <p style="margin: 8px 0 0 0; color: #1e3a8a; font-size: 12px; line-height: 1.5;">
-                                  Bookmark this link to view, manage, or cancel your booking anytime:<br>
+                                  Bookmark this link to view${isRequest ? ' status,' : ','} manage, or cancel your booking anytime:<br>
                                   <a href="${guestBookingUrl}" style="color: #3b82f6; word-break: break-all;">${guestBookingUrl}</a>
                                 </p>
                               </td>
@@ -304,8 +360,12 @@ Get directions: ${directionsUrl}`;
                           <table width="100%" cellpadding="0" cellspacing="0" style="margin: 24px 0 20px 0;">
                             <tr>
                               <td align="center">
+                                ${isRequest ? `
+                                <a class="cta-button" href="${guestBookingUrl}" style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; margin: 4px;">View Request Status</a>
+                                ` : `
                                 <a class="cta-button" href="${directionsUrl}" style="display: inline-block; background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; margin: 4px;">🗺️ Get Directions</a>
                                 <a class="cta-button" href="${guestBookingUrl}" style="display: inline-block; background-color: #f3f4f6; color: #1f2937; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; margin: 4px;">View Booking</a>
+                                `}
                               </td>
                             </tr>
                           </table>
@@ -337,22 +397,42 @@ Get directions: ${directionsUrl}`;
       });
 
       emailSent = !guestEmailResponse.error;
-      console.log("Guest confirmation email sent:", guestEmailResponse);
+      console.log("Guest email sent:", guestEmailResponse);
     }
 
     // Send notification email to host
     if (hostEmail && hostEmail.includes('@')) {
+      const hostSubject = isRequest 
+        ? "🔔 New Booking Request - Action Required" 
+        : "🎉 New Guest Booking!";
+      
+      const hostHeaderTitle = isRequest
+        ? "🔔 New Booking Request"
+        : "🎉 New Guest Booking!";
+      
+      const hostHeaderSubtitle = isRequest
+        ? "Action required within 1 hour"
+        : `You've earned $${totalAmount.toFixed(2)}`;
+      
+      const hostIntroText = isRequest
+        ? `<strong>${guestName}</strong> (a guest user) wants to book your parking spot. Please approve or decline within <strong>1 hour</strong> or the request will expire automatically.`
+        : `Great news! <strong>${guestName}</strong> (a guest user) has booked your parking spot.`;
+      
+      const hostPaymentNote = isRequest 
+        ? `<tr><td colspan="2" style="color: #6b7280; font-size: 12px; padding-top: 8px;">Payment is authorized and will be captured upon approval.</td></tr>` 
+        : '';
+
       const hostEmailResponse = await resend.emails.send({
         from: fromEmail,
         to: [hostEmail],
-        subject: "🎉 New Guest Booking!",
+        subject: hostSubject,
         html: `
           <!DOCTYPE html>
           <html>
             <head>
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>New Guest Booking</title>
+              <title>${hostSubject}</title>
             </head>
             <body style="margin: 0; padding: 0; background-color: #f8f9fa; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
               <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; padding: 40px 20px;">
@@ -361,10 +441,10 @@ Get directions: ${directionsUrl}`;
                     <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                       <!-- Header -->
                       <tr>
-                        <td style="background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); padding: 40px 30px; text-align: center;">
+                        <td style="background: linear-gradient(135deg, ${isRequest ? '#f59e0b' : '#6B4EFF'} 0%, ${isRequest ? '#d97706' : '#5B3EEF'} 100%); padding: 40px 30px; text-align: center;">
                           <img src="https://mqbupmusmciijsjmzbcu.supabase.co/storage/v1/object/public/assets/parkzy-logo-white.png" alt="Parkzy" style="height: 40px; width: auto; margin-bottom: 16px;" />
-                          <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">🎉 New Guest Booking!</h1>
-                          <p style="margin: 10px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px;">You've earned $${totalAmount.toFixed(2)}</p>
+                          <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">${hostHeaderTitle}</h1>
+                          <p style="margin: 10px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 16px;">${hostHeaderSubtitle}</p>
                         </td>
                       </tr>
                       
@@ -375,14 +455,28 @@ Get directions: ${directionsUrl}`;
                             Hi <strong>${hostName}</strong>,
                           </p>
                           <p style="margin: 0 0 24px 0; color: #1f2937; font-size: 16px; line-height: 1.5;">
-                            Great news! <strong>${guestName}</strong> (a guest user) has booked your parking spot.
+                            ${hostIntroText}
                           </p>
+                          
+                          ${isRequest ? `
+                          <!-- Urgent Action Notice -->
+                          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; margin: 24px 0;">
+                            <tr>
+                              <td style="padding: 16px;">
+                                <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">⏰ Time-Sensitive Request</p>
+                                <p style="margin: 8px 0 0 0; color: #a16207; font-size: 13px; line-height: 1.5;">
+                                  This request will automatically expire in 1 hour if no action is taken. Please respond promptly to secure the booking.
+                                </p>
+                              </td>
+                            </tr>
+                          </table>
+                          ` : ''}
                           
                           <!-- Booking Details Card -->
                           <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; border-radius: 12px; padding: 24px; margin: 24px 0;">
                             <tr>
                               <td>
-                                <h2 style="margin: 0 0 16px 0; color: #6B4EFF; font-size: 18px; font-weight: 600;">Booking Details</h2>
+                                <h2 style="margin: 0 0 16px 0; color: #6B4EFF; font-size: 18px; font-weight: 600;">${isRequest ? 'Request Details' : 'Booking Details'}</h2>
                                 
                                 <table width="100%" cellpadding="8" cellspacing="0">
                                   <tr>
@@ -405,9 +499,10 @@ Get directions: ${directionsUrl}`;
                                     <td colspan="2" style="padding: 12px 0 8px 0; border-top: 2px solid #e5e7eb;">
                                       <table width="100%">
                                         <tr>
-                                          <td style="color: #1f2937; font-size: 16px; font-weight: 700;">💰 Your Earnings</td>
-                                          <td style="color: #6B4EFF; font-size: 20px; font-weight: 700; text-align: right;">$${totalAmount.toFixed(2)}</td>
+                                          <td style="color: #1f2937; font-size: 16px; font-weight: 700;">💰 ${isRequest ? 'Potential' : 'Your'} Earnings</td>
+                                          <td style="color: ${isRequest ? '#f59e0b' : '#6B4EFF'}; font-size: 20px; font-weight: 700; text-align: right;">$${totalAmount.toFixed(2)}</td>
                                         </tr>
+                                        ${hostPaymentNote}
                                       </table>
                                     </td>
                                   </tr>
@@ -420,7 +515,11 @@ Get directions: ${directionsUrl}`;
                           <table width="100%" cellpadding="0" cellspacing="0" style="margin: 32px 0 24px 0;">
                             <tr>
                               <td align="center">
+                                ${isRequest ? `
+                                <a href="${activityUrl}" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 4px;">✓ Review & Approve</a>
+                                ` : `
                                 <a href="${hostBookingUrl}" style="display: inline-block; background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Booking</a>
+                                `}
                               </td>
                             </tr>
                           </table>
@@ -451,6 +550,7 @@ Get directions: ${directionsUrl}`;
       success: true, 
       emailSent, 
       smsSent,
+      type,
       message: smsSent ? 'SMS confirmation sent' : emailSent ? 'Email confirmation sent' : 'No confirmation sent'
     }), {
       status: 200,
