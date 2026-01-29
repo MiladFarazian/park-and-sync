@@ -27,6 +27,7 @@ import {
 import { format } from 'date-fns';
 import RequireAuth from '@/components/auth/RequireAuth';
 import { logger } from '@/lib/logger';
+import { getBookingStatus, getBookingStatusColor } from '@/lib/bookingStatus';
 
 const log = logger.scope('SupportUserDetail');
 
@@ -60,6 +61,7 @@ interface Booking {
     id: string;
     title: string;
     address: string;
+    instant_book: boolean;
   } | null;
   vehicle: {
     make: string | null;
@@ -140,7 +142,7 @@ function SupportUserDetailContent() {
         .from('bookings')
         .select(`
           id, status, start_at, end_at, total_amount, hourly_rate, created_at,
-          spot:spots!bookings_spot_id_fkey (id, title, address),
+          spot:spots!bookings_spot_id_fkey (id, title, address, instant_book),
           vehicle:vehicles!bookings_vehicle_id_fkey (make, model, license_plate)
         `)
         .eq('renter_id', userId)
@@ -192,19 +194,18 @@ function SupportUserDetailContent() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusColors: Record<string, string> = {
-      pending: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
-      held: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
-      paid: 'bg-green-500/10 text-green-600 border-green-500/20',
-      active: 'bg-primary/10 text-primary border-primary/20',
-      completed: 'bg-muted text-muted-foreground border-muted',
-      canceled: 'bg-destructive/10 text-destructive border-destructive/20',
-      refunded: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
-    };
+  const getStatusBadgeForBooking = (booking: Booking) => {
+    const { label } = getBookingStatus({
+      status: booking.status,
+      instantBook: booking.spot?.instant_book ?? true,
+      startAt: booking.start_at,
+      endAt: booking.end_at,
+      isHost: false, // Support views from neutral perspective
+    });
+    const colorClass = getBookingStatusColor(label);
     return (
-      <Badge variant="outline" className={statusColors[status] || ''}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <Badge variant="outline" className={colorClass}>
+        {label}
       </Badge>
     );
   };
@@ -399,7 +400,7 @@ function SupportUserDetailContent() {
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          {getStatusBadge(booking.status)}
+                          {getStatusBadgeForBooking(booking)}
                           <span className="text-sm font-medium">${booking.total_amount.toFixed(2)}</span>
                         </div>
                         <p className="font-medium truncate">{booking.spot?.title || 'Unknown Spot'}</p>

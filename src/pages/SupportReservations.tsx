@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { logger } from '@/lib/logger';
+import { getBookingStatus, getBookingStatusColor } from '@/lib/bookingStatus';
 
 const log = logger.scope('SupportReservations');
 
@@ -29,6 +30,7 @@ interface Reservation {
     id: string;
     title: string;
     address: string;
+    instant_book: boolean;
   };
   renter: {
     user_id: string;
@@ -67,7 +69,7 @@ export default function SupportReservations() {
         .from('bookings')
         .select(`
           id, status, start_at, end_at, total_amount,
-          spot:spots!bookings_spot_id_fkey (id, title, address),
+          spot:spots!bookings_spot_id_fkey (id, title, address, instant_book),
           renter:profiles!bookings_renter_id_fkey (user_id, first_name, last_name, email)
         `)
         .order('created_at', { ascending: false })
@@ -103,20 +105,18 @@ export default function SupportReservations() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; className?: string }> = {
-      pending: { variant: 'secondary' },
-      held: { variant: 'outline' },
-      paid: { variant: 'default', className: 'bg-blue-500' },
-      active: { variant: 'default', className: 'bg-green-500' },
-      completed: { variant: 'secondary', className: 'bg-gray-500 text-white' },
-      canceled: { variant: 'destructive' },
-      refunded: { variant: 'outline', className: 'border-amber-500 text-amber-500' },
-    };
-    const config = variants[status] || { variant: 'outline' as const };
+  const getStatusBadgeForBooking = (res: Reservation) => {
+    const { label } = getBookingStatus({
+      status: res.status,
+      instantBook: res.spot?.instant_book ?? true,
+      startAt: res.start_at,
+      endAt: res.end_at,
+      isHost: false, // Support views from neutral perspective
+    });
+    const colorClass = getBookingStatusColor(label);
     return (
-      <Badge variant={config.variant} className={config.className}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <Badge variant="outline" className={colorClass}>
+        {label}
       </Badge>
     );
   };
@@ -216,7 +216,7 @@ export default function SupportReservations() {
                 >
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      {getStatusBadge(res.status)}
+                      {getStatusBadgeForBooking(res)}
                       <span className="text-xs text-muted-foreground font-mono">
                         {res.id.slice(0, 8)}...
                       </span>
