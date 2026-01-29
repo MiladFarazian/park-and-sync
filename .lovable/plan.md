@@ -1,85 +1,191 @@
 
+# Booking Extension Notifications - Implementation Plan
 
-# Fix: PostgreSQL Function Overloading Conflict (create_booking_atomic)
+## Current Gap Analysis
 
-## Problem Summary
+The booking extension flow currently has incomplete notification coverage:
 
-The booking edge function is returning a 500 error because PostgreSQL has **two versions** of the `create_booking_atomic` function with identical parameter types but in different order. PostgREST cannot determine which function to call, resulting in error `PGRST203`.
+| Notification Type | Host | Driver |
+|-------------------|------|--------|
+| In-app (Bell) | Yes (`booking_extended`) | Missing |
+| Push | Yes | Yes |
+| Email | Missing | Missing |
 
-## Root Cause
+## Implementation Overview
 
-When the multi-spot migration ran, it created a new version of `create_booking_atomic` without dropping the old version first. Both functions have the same 14 parameter types, just ordered differently:
-
-| Parameter Position | Old Version | New Version |
-|--------------------|-------------|-------------|
-| 3 | p_start_at (TIMESTAMPTZ) | p_vehicle_id (UUID) |
-| 4 | p_end_at (TIMESTAMPTZ) | p_start_at (TIMESTAMPTZ) |
-| 5 | p_vehicle_id (UUID) | p_end_at (TIMESTAMPTZ) |
-
-PostgreSQL treats these as **two separate functions** (overloaded by name) because parameter order differs, but PostgREST cannot resolve named parameters to either candidate.
-
-## Solution
-
-Create a database migration that:
-1. Drops **both** existing function signatures explicitly
-2. Creates a single, definitive version with quantity-aware logic
+We will add complete notification parity for booking extensions, matching the experience of the initial booking confirmation.
 
 ---
 
-## Database Migration
+## 1. Database: Add `extension_confirmed` Notification Type
 
+Add a new notification type to the database constraint for driver extension confirmations.
+
+**Migration:**
 ```sql
--- Drop old function signatures to resolve overloading conflict
-DROP FUNCTION IF EXISTS public.create_booking_atomic(
-  UUID, UUID, TIMESTAMPTZ, TIMESTAMPTZ, UUID, TEXT, BOOLEAN, 
-  NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC
-);
-
-DROP FUNCTION IF EXISTS public.create_booking_atomic(
-  UUID, UUID, UUID, TIMESTAMPTZ, TIMESTAMPTZ, NUMERIC, 
-  NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, BOOLEAN, NUMERIC, TEXT
-);
-
--- Recreate with consistent parameter order matching edge function calls
-CREATE OR REPLACE FUNCTION public.create_booking_atomic(
-  p_spot_id UUID,
-  p_user_id UUID,
-  p_start_at TIMESTAMPTZ,
-  p_end_at TIMESTAMPTZ,
-  p_vehicle_id UUID,
-  p_idempotency_key TEXT,
-  p_will_use_ev_charging BOOLEAN,
-  p_hourly_rate NUMERIC,
-  p_total_hours NUMERIC,
-  p_subtotal NUMERIC,
-  p_platform_fee NUMERIC,
-  p_total_amount NUMERIC,
-  p_host_earnings NUMERIC,
-  p_ev_charging_fee NUMERIC
-)
-RETURNS TABLE(success BOOLEAN, booking_id UUID, error_message TEXT)
-...
--- Function body includes quantity-aware availability logic
+ALTER TABLE notifications DROP CONSTRAINT notifications_type_check;
+ALTER TABLE notifications ADD CONSTRAINT notifications_type_check 
+CHECK (type = ANY (ARRAY[
+  -- existing types...
+  'extension_confirmed'::text  -- NEW: for driver extension confirmation
+]));
 ```
 
-The new function will:
-- Match the edge function's parameter order exactly
-- Include quantity-aware availability checks (`get_spot_available_quantity`)
-- Use `FOR UPDATE` row locking on the spot
-- Support the multi-spot listing feature
+---
+
+## 2. Edge Function: Create Driver In-App Notification
+
+**File:** `supabase/functions/extend-booking/index.ts`
+
+Add an in-app notification for the driver (currently only push notification is sent):
+
+```typescript
+// After host notification - add driver in-app notification
+const { error: driverNotifError } = await supabase
+  .from('notifications')
+  .insert({
+    user_id: userData.user.id,
+    type: 'extension_confirmed',
+    title: 'Extension Confirmed',
+    message: driverMessage,
+    related_id: bookingId,
+  });
+```
+
+This change applies to both the finalize path (line ~300) and the direct payment path (line ~488).
 
 ---
 
-## Files to Modify
+## 3. Edge Function: Send Extension Confirmation Emails
 
-| File | Change |
+**New File:** `supabase/functions/send-extension-confirmation/index.ts`
+
+Create a new edge function to send styled HTML emails for extension confirmations:
+
+- **Driver Email:** "Extension Confirmed" with updated booking times and total
+- **Host Email:** "Booking Extended" with extension details and updated earnings
+
+The email templates will follow the same design pattern as `send-booking-confirmation`, including:
+- Parkzy branding header
+- Updated booking details (new end time, extension duration)
+- Updated payment summary (original + extension cost)
+- Magic link authentication for one-click access
+- CTA buttons to view booking
+
+---
+
+## 4. Edge Function: Trigger Email from extend-booking
+
+**File:** `supabase/functions/extend-booking/index.ts`
+
+Add call to the new email function after successful extension:
+
+```typescript
+// Send extension confirmation emails
+try {
+  await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-extension-confirmation`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+    },
+    body: JSON.stringify({
+      bookingId,
+      driverEmail,
+      driverName,
+      hostEmail,
+      hostName,
+      spotTitle: booking.spots.title,
+      spotAddress: booking.spots.address,
+      originalEndTime: booking.end_at,
+      newEndTime: newEndTime.toISOString(),
+      extensionHours,
+      extensionCost,
+      newTotalAmount: booking.total_amount + extensionCost,
+      hostEarnings,
+    }),
+  });
+} catch (emailError) {
+  console.error('Failed to send extension emails:', emailError);
+}
+```
+
+---
+
+## 5. Frontend: Update NotificationBell Routing
+
+**File:** `src/components/layout/NotificationBell.tsx`
+
+Add handling for `extension_confirmed` notification type:
+
+```typescript
+// In getNotificationIcon
+case 'extension_confirmed':
+case 'booking_extended':
+  return CalendarPlus;  // Or Clock icon for time extension
+
+// In getIconColor
+case 'extension_confirmed':
+case 'booking_extended':
+  return "text-green-600";  // Success color
+
+// In navigateToNotification
+} else if (notification.type === "extension_confirmed") {
+  // Driver's extension confirmed - switch to driver mode
+  if (mode === 'host') setMode('driver');
+  navigate(`/booking/${notification.related_id}`);
+} else if (notification.type === "booking_extended") {
+  // Host sees booking was extended - switch to host mode
+  if (mode === 'driver') setMode('host');
+  navigate(`/booking/${notification.related_id}`);
+}
+```
+
+---
+
+## 6. Import CalendarPlus Icon
+
+**File:** `src/components/layout/NotificationBell.tsx`
+
+Add the `CalendarPlus` icon import for extension notifications:
+
+```typescript
+import { Bell, Calendar, MessageCircle, AlertTriangle, Check, Clock, CheckCheck, CalendarPlus } from "lucide-react";
+```
+
+---
+
+## Files to Modify/Create
+
+| File | Action |
 |------|--------|
-| `supabase/migrations/YYYYMMDD_fix_create_booking_atomic_overload.sql` | New migration to drop old signatures and recreate function |
+| `supabase/migrations/YYYYMMDD_add_extension_confirmed_type.sql` | Create |
+| `supabase/functions/extend-booking/index.ts` | Modify (add driver notification + email trigger) |
+| `supabase/functions/send-extension-confirmation/index.ts` | Create (new email function) |
+| `src/components/layout/NotificationBell.tsx` | Modify (add icon + routing) |
 
-## Expected Outcome
+---
 
-After this migration:
-- Only one version of `create_booking_atomic` will exist
-- Edge function calls will resolve correctly
-- Bookings will work again with multi-spot quantity support
+## User Experience After Implementation
 
+### Driver Experience
+1. Extends booking
+2. Receives in-app notification "Extension Confirmed" with new end time
+3. Receives push notification "Extension Confirmed"
+4. Receives email "Extension Confirmed" with updated booking details
+5. Clicking notification navigates to `/booking/:id` showing updated info
+
+### Host Experience
+1. Driver extends booking
+2. Receives in-app notification "Booking Extended" with new end time
+3. Receives push notification "Booking Extended"
+4. Receives email "Booking Extended" with updated earnings
+5. Clicking notification navigates to `/booking/:id` showing updated info
+
+---
+
+## Technical Notes
+
+- The existing `BookingDetail.tsx` page already displays `extension_charges` in the Payment Details section, so no page modifications are needed
+- The booking data already includes `original_total_amount` and `extension_charges` fields for accurate display
+- Email template will require fetching driver/host profile data for names and emails
