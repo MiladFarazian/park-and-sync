@@ -824,10 +824,10 @@ const ListSpot = () => {
                     {formData.category && (
                       <div className="mt-4 p-4 bg-muted/50 rounded-lg border">
                         <Label htmlFor="quantity" className="text-base font-medium">
-                          How many identical parking spots?
+                          How many identical parking spaces?
                         </Label>
                         <p className="text-sm text-muted-foreground mt-1 mb-3">
-                          All spots share the same price, schedule, and rules
+                          All spaces share the same listing, price, schedule, and rules
                         </p>
                         <div className="flex items-center gap-3">
                           <Input
@@ -839,11 +839,11 @@ const ListSpot = () => {
                             onChange={(e) => setQuantity(Math.max(1, Math.min(1000, parseInt(e.target.value) || 1)))}
                             className="w-28"
                           />
-                          <span className="text-sm text-muted-foreground">spots</span>
+                          <span className="text-sm text-muted-foreground">spaces</span>
                         </div>
                         {quantity > 1 && (
                           <p className="text-sm text-primary mt-2">
-                            ✓ {quantity} spots will share one listing
+                            ✓ This listing will have {quantity} spaces
                           </p>
                         )}
                       </div>

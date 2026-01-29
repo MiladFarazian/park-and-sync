@@ -210,7 +210,7 @@ const Dashboard = () => {
             )}
             {listing.quantity > 1 && (
               <Badge variant="outline" className="text-xs px-2 py-0.5">
-                {listing.quantity} spots
+                {listing.quantity} spaces
               </Badge>
             )}
           </div>
