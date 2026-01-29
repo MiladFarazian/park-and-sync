@@ -1,206 +1,205 @@
 
+# Remove Hidden Driver Rate Upcharge from Platform Pricing
 
-# Fix: Guest Booking Emails + Cancellation for Held Bookings
+## Overview
 
-## Issues Identified
+This plan eliminates the "secret" upcharge applied to the driver's hourly rate. Currently, drivers see an inflated rate (host rate + 20% or $1 minimum) without knowing about it. After this change, the driver's displayed rate will exactly match what the host sets.
 
-### Issue 1: "Booking Requested" Emails Not Being Sent
+**Current pricing model:**
+- Host sets rate: $5/hr
+- Driver sees: $6/hr (invisible $1 markup)
+- Service fee: $2 (20% of $10 host earnings for 2 hours)
+- Driver total: $6 × 2 + $2 = $14
 
-**Root Cause**: The `verify-guest-payment` function calls `send-booking-confirmation` with a `type: 'host_request'` parameter, but this function doesn't support a `type` field - it expects `hostEmail` and `driverEmail` directly.
-
-The edge function logs confirm this:
-```
-Skipping host email: no valid recipient. Email provided: undefined
-Skipping driver email: no valid recipient. Email provided: undefined
-```
-
-The call in `verify-guest-payment` (lines 255-272):
-```typescript
-body: JSON.stringify({
-  to: hostProfile.email,       // Wrong parameter name - should be hostEmail
-  type: 'host_request',        // This parameter is not supported
-  hostName: hostProfile.first_name,
-  // ... rest of fields
-}),
-```
-
-**Additionally**: No email is being sent to the guest when their booking request is submitted (held status). Only the host is notified.
-
-### Issue 2: Cancellation Fails for 'held' Status
-
-**Root Cause**: Line 126 in `cancel-guest-booking` only allows cancellation for `['pending', 'active']` statuses:
-
-```typescript
-if (!['pending', 'active'].includes(booking.status)) {
-  return new Response(JSON.stringify({ 
-    error: 'This booking cannot be cancelled' 
-  }), { status: 400 });
-}
-```
-
-Bookings awaiting host approval have status `'held'`, which is not in this list.
-
----
-
-## Solution
-
-### Part 1: Fix cancel-guest-booking to Allow 'held' Status
-
-Add `'held'` to the allowed statuses and handle Stripe authorization release (cancel the PaymentIntent instead of refunding):
-
-```typescript
-// Line 126: Add 'held' to allowed statuses
-if (!['pending', 'active', 'held'].includes(booking.status)) {
-  return new Response(JSON.stringify({ 
-    error: 'This booking cannot be cancelled' 
-  }), { status: 400 });
-}
-
-// Update Stripe handling to cancel authorization for held bookings
-if (booking.stripe_payment_intent_id) {
-  const paymentIntent = await stripe.paymentIntents.retrieve(booking.stripe_payment_intent_id);
-  
-  if (paymentIntent.status === 'requires_capture') {
-    // Cancel the authorization - releases the hold
-    await stripe.paymentIntents.cancel(booking.stripe_payment_intent_id);
-  } else if (paymentIntent.status === 'succeeded') {
-    // Already captured - issue refund if eligible
-    if (isEligibleForRefund) {
-      const refund = await stripe.refunds.create({ payment_intent: ... });
-    }
-  }
-}
-```
-
-### Part 2: Fix Email Sending for "Booking Requested" Flow
-
-For **non-instant-book** guest bookings (status = 'held'), we need to:
-
-1. **Send "Booking Request Submitted" email to Guest** - Let them know their request is pending
-2. **Send "New Booking Request" email to Host** - Notify them to approve/decline
-
-Create a new email template section in `verify-guest-payment` that calls `send-guest-booking-confirmation` with a new `isRequest` flag, or create dedicated request email templates.
-
-**Recommended approach**: Add a `type` parameter to `send-guest-booking-confirmation` to distinguish between:
-- `type: 'confirmed'` - Current behavior (booking is active)
-- `type: 'request'` - New behavior (awaiting host approval)
-
-This allows reusing the existing infrastructure while customizing the email content:
-
-| Recipient | Email Type | Subject | Key Message |
-|-----------|------------|---------|-------------|
-| Guest | Request | "📋 Booking Request Submitted" | "Your request is pending host approval. We'll notify you within 1 hour." |
-| Host | Request | "🔔 New Booking Request" | "A guest wants to book your spot. Approve or decline within 1 hour." |
+**New pricing model (simplified):**
+- Host sets rate: $5/hr
+- Driver sees: $5/hr (same as host rate)
+- Service fee: $2 (20% of $10 host earnings for 2 hours)
+- Driver total: $5 × 2 + $2 = $12
 
 ---
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| `supabase/functions/cancel-guest-booking/index.ts` | Add 'held' to allowed statuses; handle authorization cancellation |
-| `supabase/functions/send-guest-booking-confirmation/index.ts` | Add `type` parameter to support 'request' vs 'confirmed' emails |
-| `supabase/functions/verify-guest-payment/index.ts` | Fix email call to use correct function with proper parameters |
+| Category | File | Changes |
+|----------|------|---------|
+| Core Pricing | `src/lib/pricing.ts` | Remove upcharge from `calculateDriverPrice`, update `calculateBookingTotal` |
+| Core Pricing | `supabase/functions/_shared/pricing.ts` | Mirror changes to shared edge function pricing |
+| Frontend Display | `src/pages/SpotDetail.tsx` | Remove `calculateDriverPrice` calls, use raw `hourlyRate` |
+| Frontend Display | `src/pages/Booking.tsx` | Update pricing display and calculations |
+| Frontend Display | `src/pages/Explore.tsx` | Remove reverse-engineering of host rate logic |
+| Frontend Display | `src/pages/SearchResults.tsx` | Remove `calculateDriverPrice` call |
+| Frontend Display | `src/components/map/MapView.tsx` | Update price pin display if needed |
+| Edge Functions | `supabase/functions/create-booking/index.ts` | Remove upcharge calculation |
+| Edge Functions | `supabase/functions/create-guest-booking/index.ts` | Remove upcharge (already uses shared pricing) |
+| Edge Functions | `supabase/functions/extend-booking/index.ts` | Remove upcharge calculation |
+| Edge Functions | `supabase/functions/modify-booking-times/index.ts` | Remove upcharge calculation |
+| Edge Functions | `supabase/functions/search-spots-lite/index.ts` | No changes needed (returns raw host rate) |
 
 ---
 
-## Technical Implementation
+## Technical Implementation Details
 
-### cancel-guest-booking/index.ts Changes
+### 1. `src/lib/pricing.ts` - Core Frontend Pricing
 
-```text
-Line 126: Change allowed statuses from ['pending', 'active'] to ['pending', 'active', 'held']
+```typescript
+// BEFORE: Added invisible upcharge
+export function calculateDriverPrice(hostHourlyRate: number): number {
+  const upcharge = Math.max(hostHourlyRate * 0.20, 1.00);
+  return Math.round((hostHourlyRate + upcharge) * 100) / 100;
+}
 
-Lines 144-163: Update Stripe refund logic:
-- If status === 'requires_capture': Cancel the PaymentIntent (releases authorization)
-- If status === 'succeeded': Create refund as before
-- Update response message for held bookings ("Authorization released" instead of "Refund processed")
+// AFTER: Driver rate equals host rate (no upcharge)
+export function calculateDriverPrice(hostHourlyRate: number): number {
+  return Math.round(hostHourlyRate * 100) / 100;
+}
 ```
 
-### send-guest-booking-confirmation/index.ts Changes
+The `calculateBookingTotal` function will automatically reflect this change since it calls `calculateDriverPrice` internally.
 
-```text
-Add new interface field:
-  type?: 'confirmed' | 'request';  // Default: 'confirmed'
+### 2. `supabase/functions/_shared/pricing.ts` - Backend Pricing
 
-For type === 'request':
-  - Guest email subject: "📋 Booking Request Submitted"
-  - Guest email body: "Your request is awaiting host approval..."
-  - Host email subject: "🔔 New Booking Request - Action Required"
-  - Host email body: Include Approve/Decline buttons linking to Activity page
-  
-Keep current email templates as default for 'confirmed' type.
+Apply the same change to ensure consistency between frontend and backend:
+
+```typescript
+// AFTER: No upcharge
+export function calculateDriverPrice(hostHourlyRate: number): number {
+  return Math.round(hostHourlyRate * 100) / 100;
+}
 ```
 
-### verify-guest-payment/index.ts Changes
+### 3. `src/pages/SpotDetail.tsx` - Spot Detail Page
 
-```text
-Lines 252-278: Replace the send-booking-confirmation call with send-guest-booking-confirmation:
+Multiple places call `calculateDriverPrice(spot.hourlyRate)`. After the change, these will return the correct value, but we can simplify the code to use `spot.hourlyRate` directly:
 
-await fetch(`${supabaseUrl}/functions/v1/send-guest-booking-confirmation`, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${serviceRoleKey}`,
-  },
-  body: JSON.stringify({
-    type: 'request',  // NEW: Indicates this is a pending request
-    guestEmail: metadata.guest_email || null,
-    guestPhone: metadata.guest_phone || null,
-    guestName: metadata.guest_full_name,
-    hostName: hostProfile?.first_name || 'Host',
-    hostEmail: hostProfile?.email,
-    spotTitle: spot?.title || 'Parking Spot',
-    spotAddress: spot?.address || '',
-    startAt: metadata.start_at,
-    endAt: metadata.end_at,
-    totalAmount: parseFloat(metadata.total_amount),
-    bookingId,
-    guestAccessToken: metadata.guest_access_token,
-  }),
-});
+**Lines 757-771**: Update price display
+```typescript
+// BEFORE
+<p className="text-2xl font-bold">${calculateDriverPrice(spot.hourlyRate).toFixed(2)}</p>
+
+// AFTER (simplified - calculateDriverPrice now returns same value)
+<p className="text-2xl font-bold">${spot.hourlyRate.toFixed(2)}</p>
+```
+
+### 4. `src/pages/Explore.tsx` - Map and Search Results
+
+**Lines 287-296 and 943-968**: Remove the reverse-engineering of host rate from driver rate
+
+Currently the code does complex math to figure out what the host rate was:
+```typescript
+// BEFORE: Reverse-engineer host rate from driver rate
+let hostHourlyRate: number;
+if (driverHourlyRate > 6) {
+  hostHourlyRate = driverHourlyRate / 1.20;
+} else {
+  hostHourlyRate = driverHourlyRate - 1;
+}
+```
+
+This becomes unnecessary:
+```typescript
+// AFTER: Driver rate IS host rate
+const hostHourlyRate = spot.hourly_rate;
+const driverHourlyRate = hostHourlyRate;
+```
+
+### 5. `supabase/functions/create-booking/index.ts`
+
+**Lines 170-195**: Remove upcharge calculation
+
+```typescript
+// BEFORE: Lines 180-184
+const upcharge = Math.max(hostHourlyRate * 0.20, 1.00);
+const driverHourlyRate = hostHourlyRate + upcharge;
+const driverSubtotal = Math.round(driverHourlyRate * totalHours * 100) / 100;
+
+// AFTER: No upcharge
+const driverHourlyRate = hostHourlyRate;
+const driverSubtotal = Math.round(driverHourlyRate * totalHours * 100) / 100;
+```
+
+### 6. `supabase/functions/extend-booking/index.ts`
+
+**Lines 169-181**: Remove upcharge from extension pricing
+
+```typescript
+// BEFORE
+const upcharge = Math.max(hostHourlyRate * 0.20, 1.00);
+const driverHourlyRate = hostHourlyRate + upcharge;
+const driverSubtotal = Math.round(driverHourlyRate * extensionHours * 100) / 100;
+
+// AFTER
+const driverHourlyRate = hostHourlyRate;
+const driverSubtotal = Math.round(driverHourlyRate * extensionHours * 100) / 100;
+```
+
+### 7. `supabase/functions/modify-booking-times/index.ts`
+
+**Lines around 77-89**: Remove upcharge from time modification pricing
+
+```typescript
+// BEFORE
+const upcharge = Math.max(hostHourlyRate * 0.20, 1.00);
+const driverHourlyRate = hostHourlyRate + upcharge;
+
+// AFTER
+const driverHourlyRate = hostHourlyRate;
+```
+
+### 8. `src/pages/SearchResults.tsx`
+
+**Line 116**: Remove `calculateDriverPrice` wrapper
+
+```typescript
+// BEFORE
+hourlyRate: spot.driver_hourly_rate || calculateDriverPrice(parseFloat(spot.hourly_rate)),
+
+// AFTER
+hourlyRate: parseFloat(spot.hourly_rate),
 ```
 
 ---
 
-## Expected Email Flow After Fix
+## What Stays the Same
 
-### For Non-Instant Book (Booking Request)
-
-```text
-1. Guest submits booking → Payment authorized (not captured)
-2. IMMEDIATELY:
-   - Guest receives: "Booking Request Submitted - Awaiting host approval"
-   - Host receives: "New Booking Request - Approve within 1 hour"
-3. If host approves:
-   - Guest receives: "Booking Confirmed!"
-   - Host receives: "Booking Confirmed - Earn $X"
-4. If host declines or timeout:
-   - Guest receives: "Booking Request Declined/Expired"
-   - Authorization released
-```
-
-### For Instant Book (Current Behavior - No Changes)
-
-```text
-1. Guest submits booking → Payment captured
-2. IMMEDIATELY:
-   - Guest receives: "Booking Confirmed!"
-   - Host receives: "New Guest Booking!"
-```
+- **Service Fee**: The visible 20% service fee (or $1 minimum) based on host earnings remains unchanged
+- **EV Charging Premium**: Optional EV charging fees remain unchanged
+- **Host Earnings**: What hosts receive stays the same (their rate × hours)
+- **Platform Revenue**: Will come solely from the visible service fee now (reduced from ~28% to ~20% of driver payment)
 
 ---
 
-## Cancellation Flow After Fix
+## Pricing Example After Change
 
-### Guest Cancels Held Booking (Awaiting Approval)
+| Item | Before | After |
+|------|--------|-------|
+| Host sets rate | $5/hr | $5/hr |
+| Driver sees hourly | $6/hr | $5/hr |
+| 2-hour subtotal | $12.00 | $10.00 |
+| Service fee | $2.00 | $2.00 |
+| **Driver Total** | **$14.00** | **$12.00** |
+| Host Receives | $10.00 | $10.00 |
+| Platform Revenue | $4.00 | $2.00 |
 
-```text
-1. Guest clicks "Cancel Request" on /guest-booking page
-2. cancel-guest-booking detects status = 'held'
-3. Stripe PaymentIntent cancelled (releases authorization)
-4. Booking status updated to 'canceled'
-5. Host notified: "A guest cancelled their booking request"
-6. Guest sees success: "Request cancelled. Authorization released."
-```
+---
 
+## Impact Summary
+
+1. **Transparency**: Drivers see the exact rate hosts set
+2. **Simplicity**: Removes confusing reverse-engineering calculations in Explore page
+3. **Consistency**: Same pricing logic across all booking flows (new, extend, modify)
+4. **Revenue Impact**: Platform revenue decreases (hidden markup eliminated) - only visible service fee remains
+
+---
+
+## Testing Checklist
+
+After implementation, verify:
+- [ ] Explore page shows correct hourly rates from spots table
+- [ ] Spot detail page shows host's actual rate
+- [ ] Booking page calculates correct totals without hidden markup
+- [ ] Guest booking flow charges correct amount
+- [ ] Booking extensions charge correct additional amount
+- [ ] Time modifications calculate correct price differences
+- [ ] Map pins show correct total prices for selected duration
+- [ ] All emails show correct pricing
