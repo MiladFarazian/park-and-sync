@@ -112,7 +112,7 @@ serve(async (req) => {
       save_payment_method
     }: GuestBookingRequest = await req.json();
 
-    log.info('Creating guest booking:', { spot_id, start_at, end_at, guest_full_name, guest_email, guest_phone });
+    log.info('Creating guest booking PaymentIntent:', { spot_id, start_at, end_at, guest_full_name, guest_email, guest_phone });
 
     // Validate required fields
     if (!guest_full_name?.trim()) {
@@ -280,67 +280,49 @@ serve(async (req) => {
     }
     const stripe = new Stripe(stripeSecret, { apiVersion: '2025-08-27.basil' });
 
-    // Generate guest access token
+    // Generate guest access token (will be saved when booking is created after payment)
     const guestAccessToken = crypto.randomUUID();
-    const bookingId = crypto.randomUUID();
     
-    // Determine initial booking status based on instant_book setting
-    // For non-instant spots, status will be 'held' (awaiting approval)
-    // For instant spots, status remains 'pending' until payment completes, then becomes 'active'
-    const initialStatus = isInstantBook ? 'pending' : 'held';
-    
-    // Create booking for guest
-    const { data: booking, error: bookingError } = await supabaseAdmin
-      .from('bookings')
-      .insert({
-        id: bookingId,
-        spot_id,
-        renter_id: spot.host_id, // Use host_id as placeholder for guest bookings (required field)
-        start_at,
-        end_at,
-        status: initialStatus,
-        hourly_rate: spot.hourly_rate,
-        total_hours: totalHours,
-        subtotal,
-        platform_fee: platformFee,
-        total_amount: totalAmount,
-        host_earnings: hostEarnings,
-        will_use_ev_charging: useEvCharging,
-        ev_charging_fee: evChargingFee,
-        is_guest: true,
-        guest_full_name: sanitizedName,
-        guest_email: sanitizedEmail,
-        guest_phone: sanitizedPhone,
-        guest_car_model: sanitizedCarModel,
-        guest_license_plate: sanitizedLicensePlate,
-        guest_access_token: guestAccessToken,
-      })
-      .select()
-      .single();
-
-    if (bookingError) {
-      log.error('Booking creation failed', { error: bookingError.message });
-      throw bookingError;
-    }
-
-    log.info('Guest booking created', { bookingId: booking.id, status: initialStatus, isInstantBook });
-
-    // Create PaymentIntent for the guest
-    // For non-instant book spots, use manual capture (authorization hold)
-    // For instant book spots, use automatic capture
+    // Create PaymentIntent with ALL booking data in metadata
+    // NO database booking is created yet - that happens in verify-guest-payment after payment succeeds
     const paymentIntentParams: Stripe.PaymentIntentCreateParams = {
       amount: Math.round(totalAmount * 100),
       currency: 'usd',
       metadata: {
-        booking_id: booking.id,
+        // Spot and host info
         spot_id,
         host_id: spot.host_id,
+        spot_title: spot.title || '',
+        spot_address: spot.address || '',
+        
+        // Guest info
         is_guest: 'true',
+        guest_full_name: sanitizedName,
         guest_email: sanitizedEmail || '',
         guest_phone: sanitizedPhone || '',
+        guest_car_model: sanitizedCarModel,
+        guest_license_plate: sanitizedLicensePlate || '',
         guest_access_token: guestAccessToken,
-        save_payment_method: save_payment_method ? 'true' : 'false',
+        
+        // Booking times
+        start_at,
+        end_at,
+        
+        // Pricing (stored as strings in metadata)
+        hourly_rate: spot.hourly_rate.toString(),
+        total_hours: totalHours.toString(),
+        subtotal: subtotal.toString(),
+        platform_fee: platformFee.toString(),
+        total_amount: totalAmount.toString(),
+        host_earnings: hostEarnings.toString(),
+        
+        // EV charging
+        will_use_ev_charging: useEvCharging ? 'true' : 'false',
+        ev_charging_fee: evChargingFee.toString(),
+        
+        // Booking type
         instant_book: isInstantBook ? 'true' : 'false',
+        save_payment_method: save_payment_method ? 'true' : 'false',
       },
       description: `Parking at ${spot.title} - Guest: ${sanitizedName}`,
     };
@@ -353,106 +335,22 @@ serve(async (req) => {
     // For non-instant book spots, use manual capture to hold funds without charging
     if (!isInstantBook) {
       paymentIntentParams.capture_method = 'manual';
-      log.info('Using manual capture for non-instant book spot', { bookingId: booking.id });
+      log.info('Using manual capture for non-instant book spot');
     }
 
     const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
 
-    log.info('PaymentIntent created for guest', { 
+    log.info('PaymentIntent created (no booking yet)', { 
       paymentIntentId: paymentIntent.id, 
       captureMethod: paymentIntentParams.capture_method || 'automatic',
       isInstantBook
     });
 
-    // Update booking with payment intent ID
-    await supabaseAdmin
-      .from('bookings')
-      .update({ stripe_payment_intent_id: paymentIntent.id })
-      .eq('id', booking.id);
-
-    // For non-instant book spots, send host notification about the booking request
-    if (!isInstantBook) {
-      log.info('Sending host notification for booking request', { hostId: spot.host_id });
-      
-      // Create in-app notification for host
-      await supabaseAdmin
-        .from('notifications')
-        .insert({
-          user_id: spot.host_id,
-          type: 'booking_approval_required',
-          title: 'New Booking Request',
-          message: `${sanitizedName} has requested to book ${spot.title}. You have 1 hour to respond.`,
-          related_id: booking.id,
-        });
-
-      // Get host profile for email/push notifications
-      const { data: hostProfile } = await supabaseAdmin
-        .from('profiles')
-        .select('email, first_name')
-        .eq('user_id', spot.host_id)
-        .single();
-
-      // Send push notification to host
-      try {
-        const supabaseUrl = Deno.env.get('SUPABASE_URL');
-        const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-        
-        await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${serviceRoleKey}`,
-            'X-Internal-Secret': serviceRoleKey || '',
-          },
-          body: JSON.stringify({
-            userId: spot.host_id,
-            title: 'New Booking Request',
-            body: `${sanitizedName} wants to book ${spot.title}. Respond within 1 hour.`,
-            url: `/activity`,
-          }),
-        });
-        log.debug('Push notification sent to host');
-      } catch (pushError) {
-        log.warn('Failed to send push notification to host', { error: (pushError as Error).message });
-      }
-
-      // Send email notification to host
-      if (hostProfile?.email) {
-        try {
-          const supabaseUrl = Deno.env.get('SUPABASE_URL');
-          const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-          
-          await fetch(`${supabaseUrl}/functions/v1/send-booking-confirmation`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${serviceRoleKey}`,
-            },
-            body: JSON.stringify({
-              to: hostProfile.email,
-              type: 'host_request',
-              hostName: hostProfile.first_name || 'Host',
-              driverName: sanitizedName,
-              spotTitle: spot.title,
-              spotAddress: spot.address,
-              startAt: start_at,
-              endAt: end_at,
-              totalAmount,
-              bookingId: booking.id,
-            }),
-          });
-          log.debug('Email notification sent to host');
-        } catch (emailError) {
-          log.warn('Failed to send email notification to host', { error: (emailError as Error).message });
-        }
-      }
-    }
-
     // Return client secret for Stripe Elements
+    // NO booking_id is returned because booking is not created until payment is verified
     return new Response(JSON.stringify({
       client_secret: paymentIntent.client_secret,
       payment_intent_id: paymentIntent.id,
-      booking_id: booking.id,
       guest_access_token: guestAccessToken,
       approval_required: !isInstantBook,
       pricing: {

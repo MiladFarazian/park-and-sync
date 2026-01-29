@@ -126,10 +126,8 @@ const GuestBookingFormContent = ({
 
     setLoading(true);
 
-    let paymentIntentId: string | null = null;
-
     try {
-      // Create guest booking
+      // Phase 1: Create PaymentIntent (no booking yet)
       const { data, error } = await supabase.functions.invoke('create-guest-booking', {
         body: {
           spot_id: spot.id,
@@ -140,15 +138,14 @@ const GuestBookingFormContent = ({
           guest_phone: phone.trim(),
           guest_car_model: [vehicleColor, vehicleMake, vehicleModel].filter(Boolean).join(' '),
           guest_license_plate: licensePlate.trim(),
-          save_payment_method: saveInfo, // Tell backend to set up for future use
+          save_payment_method: saveInfo,
         },
       });
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      const { client_secret, payment_intent_id, booking_id, guest_access_token } = data;
-      paymentIntentId = payment_intent_id;
+      const { client_secret, payment_intent_id, guest_access_token } = data;
 
       // Confirm payment with Stripe
       const cardElement = elements.getElement(CardElement);
@@ -169,7 +166,18 @@ const GuestBookingFormContent = ({
         throw new Error(stripeError.message);
       }
 
-      if (paymentIntent?.status === 'succeeded') {
+      // Phase 2: Payment succeeded/authorized - now verify and create booking
+      if (paymentIntent?.status === 'succeeded' || paymentIntent?.status === 'requires_capture') {
+        // Call verify-guest-payment to create the actual booking
+        const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-guest-payment', {
+          body: { payment_intent_id },
+        });
+
+        if (verifyError) throw verifyError;
+        if (verifyData?.error) throw new Error(verifyData.error);
+
+        const booking_id = verifyData.booking_id;
+        
         // Create account if user opted in
         if (saveInfo && email.trim() && password) {
           try {
@@ -205,10 +213,10 @@ const GuestBookingFormContent = ({
               });
               
               // Attach the payment method to the new account
-              if (paymentIntentId && signUpData.session) {
+              if (payment_intent_id && signUpData.session) {
                 try {
                   await supabase.functions.invoke('attach-guest-payment-method', {
-                    body: { payment_intent_id: paymentIntentId },
+                    body: { payment_intent_id },
                   });
                   console.log('Payment method attached to new account');
                 } catch (attachErr) {
@@ -216,9 +224,7 @@ const GuestBookingFormContent = ({
                 }
               }
               
-              // Try to link the guest booking to the new user ONLY if we have a valid session.
-              // If email verification is required, signUpData.session will be null and linking will
-              // happen later on SIGNED_IN (see AuthContext).
+              // Try to link the guest booking to the new user
               if (signUpData.session && signUpData.user) {
                 try {
                   await supabase.functions.invoke('link-guest-bookings', {
