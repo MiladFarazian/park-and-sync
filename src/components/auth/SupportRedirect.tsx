@@ -9,6 +9,7 @@ const SUPPORT_ALLOWED_ROUTES = [
   '/support-messages',
   '/support-reservations',
   '/support-account',
+  '/support-user/', // Allow viewing user details
   '/booking/', // Allow viewing booking details
   '/auth',
 ];

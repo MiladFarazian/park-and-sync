@@ -22,6 +22,7 @@ import RequireAuth from '@/components/auth/RequireAuth';
 import { getBookingStatus, getBookingStatusColor, getBookingStatusLabelWithOverstay } from '@/lib/bookingStatus';
 import { formatDisplayName } from '@/lib/displayUtils';
 import { logger } from '@/lib/logger';
+import { useSupportRole } from '@/hooks/useSupportRole';
 
 interface BookingDetails {
   id: string;
@@ -80,6 +81,7 @@ const BookingDetailContent = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const { isSupport } = useSupportRole();
   const [booking, setBooking] = useState<BookingDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
@@ -972,7 +974,14 @@ const BookingDetailContent = () => {
           <h3 className="font-semibold">
             {isHost ? (booking.is_guest ? 'Guest' : 'Driver') : 'Host'}
           </h3>
-          <div className="flex items-center gap-3">
+          <div 
+            className={`flex items-center gap-3 ${isSupport ? 'cursor-pointer hover:bg-muted/50 -m-2 p-2 rounded-lg transition-colors' : ''}`}
+            onClick={isSupport ? () => {
+              // Support users can click to view user profile
+              const targetUserId = isHost ? booking.renter_id : booking.spots.host_id;
+              navigate(`/support-user/${targetUserId}`);
+            } : undefined}
+          >
             <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
               {isHost && booking.is_guest ? (
                 <span className="text-lg font-semibold text-primary">
@@ -1002,16 +1011,21 @@ const BookingDetailContent = () => {
                 </>
               )}
             </div>
-            <Button variant="outline" size="sm" onClick={() => {
-              if (isHost && booking.is_guest) {
-                navigate(`/messages?userId=guest:${booking.id}`);
-              } else {
-                handleMessage();
-              }
-            }}>
-              <MessageCircle className="h-4 w-4 mr-1" />
-              Message
-            </Button>
+            {isSupport ? (
+              <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+            ) : (
+              <Button variant="outline" size="sm" onClick={(e) => {
+                e.stopPropagation();
+                if (isHost && booking.is_guest) {
+                  navigate(`/messages?userId=guest:${booking.id}`);
+                } else {
+                  handleMessage();
+                }
+              }}>
+                <MessageCircle className="h-4 w-4 mr-1" />
+                Message
+              </Button>
+            )}
           </div>
         </Card>
 
