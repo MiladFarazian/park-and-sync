@@ -412,17 +412,8 @@ const HostBookingConfirmation = () => {
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-primary">
                 <DollarSign className="h-5 w-5" />
-                <h3 className="font-semibold">Earnings Breakdown</h3>
+                 <h3 className="font-semibold">Payout Summary</h3>
               </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Booking Subtotal</span>
-                <span className="font-medium">${booking.subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Platform Fee</span>
-                <span className="font-medium text-destructive">-${booking.platform_fee.toFixed(2)}</span>
-              </div>
-              <Separator />
               <div className="flex justify-between items-center">
                 <span className="font-semibold">Your Earnings</span>
                 <span className="font-bold text-xl text-primary">${hostEarnings.toFixed(2)}</span>
