@@ -26,11 +26,17 @@ interface Reservation {
   start_at: string;
   end_at: string;
   total_amount: number;
+  is_guest: boolean | null;
+  guest_full_name: string | null;
   spot: {
     id: string;
     title: string;
     address: string;
     instant_book: boolean;
+    host_profile: {
+      first_name: string | null;
+      last_name: string | null;
+    } | null;
   };
   renter: {
     user_id: string;
@@ -68,8 +74,8 @@ export default function SupportReservations() {
       let query = supabase
         .from('bookings')
         .select(`
-          id, status, start_at, end_at, total_amount,
-          spot:spots!bookings_spot_id_fkey (id, title, address, instant_book),
+          id, status, start_at, end_at, total_amount, is_guest, guest_full_name,
+          spot:spots!bookings_spot_id_fkey (id, title, address, instant_book, host_profile:profiles!spots_host_id_fkey(first_name, last_name)),
           renter:profiles!bookings_renter_id_fkey (user_id, first_name, last_name, email)
         `)
         .order('created_at', { ascending: false })
@@ -222,14 +228,23 @@ export default function SupportReservations() {
                       </span>
                     </div>
                     <p className="font-medium truncate">{res.spot?.title}</p>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>{res.renter?.first_name} {res.renter?.last_name}</span>
-                      <span className="hidden sm:inline">•</span>
-                      <span className="hidden sm:inline">{res.renter?.email}</span>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm text-muted-foreground">
+                      <span>
+                        <span className="text-xs font-medium text-foreground/70">Driver:</span>{' '}
+                        {res.is_guest 
+                          ? <>{res.guest_full_name || 'Guest'} <Badge variant="outline" className="text-[10px] py-0 px-1 ml-1">Guest</Badge></>
+                          : `${res.renter?.first_name || ''} ${res.renter?.last_name || ''}`.trim() || 'Unknown'
+                        }
+                      </span>
+                      <span className="hidden sm:inline text-muted-foreground/50">•</span>
+                      <span>
+                        <span className="text-xs font-medium text-foreground/70">Host:</span>{' '}
+                        {`${res.spot?.host_profile?.first_name || ''} ${res.spot?.host_profile?.last_name || ''}`.trim() || 'Unknown'}
+                      </span>
                     </div>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span>{format(new Date(res.start_at), 'MMM d, h:mm a')} → {format(new Date(res.end_at), 'h:mm a')}</span>
-                      <span className="font-medium text-foreground">${(res.total_amount / 100).toFixed(2)}</span>
+                      <span className="font-medium text-foreground">${res.total_amount.toFixed(2)}</span>
                     </div>
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
