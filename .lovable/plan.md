@@ -1,204 +1,229 @@
 
-# Fix Payout Breakdown on Host Booking Confirmation
+# Recurring Calendar Tab Redesign
 
-## Problem Summary
+## Overview
 
-The `/host-booking-confirmation` page shows `$10.50` as host earnings when the user expects `$10`. After investigating the database, here's what's happening:
+The current Recurring Schedule tab has a flow where users:
+1. First set hours on a blank weekly grid
+2. Then select which spots to apply those hours to
 
-**Database values for this booking:**
-| Field | Value |
-|-------|-------|
-| start_at | 20:15 |
-| end_at | 23:45 |
-| hourly_rate | $3.00 |
-| host_earnings | $10.50 |
-| total_hours | 3.00 (original) |
-| extension_charges | $3.00 |
+The user wants to change this to:
+1. First select a spot from a dropdown to view its existing schedule
+2. The grid populates with that spot's current weekly schedule
+3. Modify the schedule as needed
+4. Select which spots to apply the new schedule to (with the source spot pre-selected)
+5. Save to override all selected spots' recurring schedules
 
-**Actual time**: 3h 30m = 3.5 hours  
-**Host earnings**: $3.00 × 3.5 = $10.50 ✓
-
-The $10.50 is actually **correct** because the booking was extended by 30 minutes. The user expected $10 because they were thinking of the original 3-hour booking.
-
-However, the **display** is confusing because it only shows "Your Earnings: $10.50" without explaining:
-- How much goes to the host
-- How much goes to Parkzy (service fee)
-- If EV charging was included, where that goes
+This creates a more intuitive "copy and modify" workflow.
 
 ---
 
-## Solution: Show Clear Payout Breakdown
-
-Replace the simple "Your Earnings" display with a detailed breakdown that recalculates using current pricing rules:
+## Current vs New Flow
 
 ```text
-┌─────────────────────────────────────────┐
-│  Payout Breakdown                       │
-├─────────────────────────────────────────┤
-│  To Host (3.5 hrs × $3.00)    $10.50    │
-│  To Parkzy (Service Fee)       $2.10    │
-│  [EV Charging to Host          $X.XX]   │ ← only if applicable
-├─────────────────────────────────────────┤
-│  Host Payout                  $10.50    │ ← host gets base + EV
-│  (or $10.50 + EV if charging)           │
-└─────────────────────────────────────────┘
+CURRENT FLOW:
+Step 1: Draw schedule on blank grid
+Step 2: Select spots to apply it to
+Step 3: Save
+
+NEW FLOW:
+Step 1: Select source spot from dropdown (grid auto-fills with its schedule)
+Step 2: Modify schedule as needed
+Step 3: Select which spots to apply it to (source spot pre-selected)
+Step 4: Save
 ```
+
+---
+
+## UI Changes
+
+### Step 1: Source Spot Dropdown (NEW)
+
+Add a dropdown at the top of the recurring tab labeled "Load schedule from:" with all the host's spots listed. When a spot is selected:
+- The WeeklyScheduleGrid initializes with that spot's existing rules
+- The spot is auto-selected in the "apply to" list
+
+### Step 2: Schedule Grid
+
+- Grid is no longer blank by default
+- Initializes with the selected source spot's rules
+- Host can modify freely using drag, quick actions (24/7, M-F 9-5), or undo
+
+### Step 3: Apply To Selection
+
+- The source spot from Step 1 is pre-checked
+- Host can select additional spots to apply the same schedule to
+- Shows current schedule summary for each spot so host can see what will be replaced
 
 ---
 
 ## Technical Implementation
 
 ### File to Modify
-`src/pages/HostBookingConfirmation.tsx`
+`src/pages/ManageAvailability.tsx`
 
-### Changes
+### State Changes
 
-**1. Import utility for calculating service fee**
-
+Add new state variable:
 ```typescript
-import { calculateServiceFee } from '@/lib/pricing';
+const [sourceSpotId, setSourceSpotId] = useState<string | null>(null);
 ```
 
-**2. Calculate breakdown values (around line 238)**
+### Logic Changes
 
-After `const hostEarnings = getHostNetEarnings(booking);`, add:
+1. When `sourceSpotId` changes, load that spot's rules from `spotRecurringRules[sourceSpotId]` and update `recurringRules`
 
-```typescript
-// Calculate the driver's service fee (what Parkzy takes)
-const parkzyFee = calculateServiceFee(hostEarnings);
+2. Auto-add the source spot to `recurringSelectedSpots` when it's selected
 
-// EV charging goes to host
-const evChargingFee = booking.ev_charging_fee || 0;
+3. Convert stored rules format to grid format (they're the same `AvailabilityRule` type)
 
-// Total host payout = base earnings + EV charging
-const hostPayout = hostEarnings + evChargingFee;
-```
+### WeeklyScheduleGrid Changes
 
-**3. Update the Payout Card (lines 409-425)**
+The `WeeklyScheduleGrid` component needs a way to reset with new initial rules. Currently it only uses `initialRules` on mount. Two options:
 
-Replace the current simple display with a detailed breakdown:
-
-For confirmed bookings:
+**Option A**: Add a `key` prop that forces remount when source spot changes
 ```tsx
-<Card className="p-5 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-  <div className="space-y-3">
-    <div className="flex items-center gap-2 text-primary">
-      <DollarSign className="h-5 w-5" />
-      <h3 className="font-semibold">Payout Breakdown</h3>
-    </div>
-    
-    {/* To Host line */}
-    <div className="flex justify-between items-center text-sm">
-      <span className="text-muted-foreground">
-        To Host ({duration} hr{duration !== 1 ? 's' : ''} × ${booking.hourly_rate.toFixed(2)})
-      </span>
-      <span className="font-medium">${hostEarnings.toFixed(2)}</span>
-    </div>
-    
-    {/* EV Charging line - only if applicable */}
-    {evChargingFee > 0 && (
-      <div className="flex justify-between items-center text-sm">
-        <span className="text-muted-foreground">
-          EV Charging (to Host)
-        </span>
-        <span className="font-medium">${evChargingFee.toFixed(2)}</span>
-      </div>
-    )}
-    
-    {/* To Parkzy line */}
-    <div className="flex justify-between items-center text-sm">
-      <span className="text-muted-foreground">To Parkzy</span>
-      <span className="font-medium text-muted-foreground">${parkzyFee.toFixed(2)}</span>
-    </div>
-    
-    <Separator />
-    
-    {/* Host Payout total */}
-    <div className="flex justify-between items-center">
-      <span className="font-semibold">Host Payout</span>
-      <span className="font-bold text-xl text-primary">${hostPayout.toFixed(2)}</span>
-    </div>
-    
-    <p className="text-xs text-muted-foreground">
-      Funds available after booking completion
-    </p>
-  </div>
-</Card>
+<WeeklyScheduleGrid
+  key={sourceSpotId || 'blank'}
+  initialRules={spotRecurringRules[sourceSpotId] || []}
+  onChange={setRecurringRules}
+/>
 ```
 
-**4. Update Pending Bookings Card (lines 428-438)**
+**Option B**: Add a controlled mode or `reset` mechanism to the component
 
-Also update the pending booking card to show potential breakdown:
-
-```tsx
-<Card className="p-4">
-  <div className="space-y-2">
-    <div className="flex items-center gap-2 text-muted-foreground">
-      <DollarSign className="h-5 w-5" />
-      <span className="font-medium">Potential Payout</span>
-    </div>
-    <div className="flex justify-between text-sm">
-      <span>To Host</span>
-      <span>${hostEarnings.toFixed(2)}</span>
-    </div>
-    {evChargingFee > 0 && (
-      <div className="flex justify-between text-sm">
-        <span>EV Charging (to Host)</span>
-        <span>${evChargingFee.toFixed(2)}</span>
-      </div>
-    )}
-    <div className="flex justify-between text-sm">
-      <span>To Parkzy</span>
-      <span className="text-muted-foreground">${parkzyFee.toFixed(2)}</span>
-    </div>
-    <Separator className="my-2" />
-    <div className="flex justify-between">
-      <span className="font-medium">Host Payout</span>
-      <span className="font-bold text-lg">${hostPayout.toFixed(2)}</span>
-    </div>
-  </div>
-</Card>
-```
-
-**5. Fix duration calculation**
-
-Currently `duration` is calculated using `differenceInHours` which rounds down. Update to use the actual fractional hours:
-
-```typescript
-// Change from:
-const duration = differenceInHours(new Date(booking.end_at), new Date(booking.start_at));
-
-// To (more precise):
-const durationMinutes = differenceInMinutes(new Date(booking.end_at), new Date(booking.start_at));
-const duration = Math.round(durationMinutes / 60 * 100) / 100; // e.g., 3.5 hours
-```
+Option A (using key) is simpler and works well for this use case.
 
 ---
 
-## Expected Result
-
-For the booking in question (3.5 hours at $3/hr):
+## Updated Recurring Tab Layout
 
 ```text
-┌─────────────────────────────────────────┐
-│  Payout Breakdown                       │
-├─────────────────────────────────────────┤
-│  To Host (3.5 hrs × $3.00)    $10.50    │
-│  To Parkzy                     $2.10    │
-├─────────────────────────────────────────┤
-│  Host Payout                  $10.50    │
-└─────────────────────────────────────────┘
-```
++------------------------------------------------------+
+| 1. Load Schedule From                                |
+|                                                      |
+| [ Select a spot to load its schedule... v ]  <- Dropdown
+|                                                      |
++------------------------------------------------------+
 
-The host payout equals "To Host" because the Parkzy fee comes from the driver's service fee, not subtracted from the host's earnings.
++------------------------------------------------------+
+| 2. Set Your Weekly Hours                             |
+|                                                      |
+| +--------------------------------------------------+ |
+| |  When2Meet Grid (pre-filled if spot selected)    | |
+| |                                                  | |
+| |  [24/7] [M-F 9-5] [Undo]                         | |
+| +--------------------------------------------------+ |
++------------------------------------------------------+
+
++------------------------------------------------------+
+| 3. Apply to Spots                                    |
+|                                                      |
+| [ ] Select All                                       |
+| [x] Venice Beach Driveway ($5/hr) - Current: 24/7    |  <- Pre-selected
+| [ ] Santa Monica Spot ($3/hr) - Current: M-F 9-5     |
+| [ ] Downtown Garage ($8/hr) - Current: No schedule   |
++------------------------------------------------------+
+
++------------------------------------------------------+
+|             [ Apply to 1 Spot ]                      |
++------------------------------------------------------+
+```
 
 ---
 
-## Important Note
+## Changes Required
 
-The user mentioned expecting `$10` but the correct amount is `$10.50` because:
-- Original booking: 3 hours
-- Extension: 30 minutes  
-- Total: 3.5 hours × $3/hr = $10.50
+### 1. Add Source Spot Dropdown
 
-The breakdown will make this clear by showing the calculation.
+Import the Select components and add above the grid:
+
+```tsx
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+```
+
+Add in the recurring tab before the grid section:
+
+```tsx
+<section>
+  <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+    <span className="bg-primary...">1</span>
+    Load Schedule From
+  </h2>
+  
+  <Select value={sourceSpotId || ''} onValueChange={(value) => {
+    setSourceSpotId(value || null);
+    // Auto-select this spot for applying
+    if (value && !recurringSelectedSpots.includes(value)) {
+      setRecurringSelectedSpots(prev => [...prev, value]);
+    }
+  }}>
+    <SelectTrigger>
+      <SelectValue placeholder="Select a spot to load its schedule..." />
+    </SelectTrigger>
+    <SelectContent className="bg-background">
+      {spots.map(spot => (
+        <SelectItem key={spot.id} value={spot.id}>
+          {spot.title} - {getRecurringScheduleSummary(spot.id)}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+  
+  <p className="text-xs text-muted-foreground mt-2">
+    Or start with a blank schedule and use the quick actions below
+  </p>
+</section>
+```
+
+### 2. Update WeeklyScheduleGrid with Dynamic Key
+
+```tsx
+<WeeklyScheduleGrid
+  key={sourceSpotId || 'blank'}
+  initialRules={sourceSpotId ? (spotRecurringRules[sourceSpotId] || []) : []}
+  onChange={setRecurringRules}
+/>
+```
+
+### 3. Renumber Steps
+
+- Step 1: Load Schedule From (new)
+- Step 2: Set Your Weekly Hours (was Step 1)
+- Step 3: Select Spots to Update (was Step 2)
+
+### 4. Update Preview Section Text
+
+Clarify that the new schedule will replace existing schedules:
+
+```tsx
+<p className="text-sm">
+  <strong>{recurringSelectedSpots.length}</strong> spot{recurringSelectedSpots.length !== 1 ? 's' : ''} 
+  will have their recurring schedule replaced with:
+</p>
+```
+
+---
+
+## Edge Cases Handled
+
+1. **No source spot selected**: Grid starts blank, user can draw or use quick actions
+2. **Source spot has no schedule**: Grid starts blank, same as above
+3. **User changes source spot**: Grid resets to new spot's schedule (via key change)
+4. **Source spot removed from apply list**: Allowed (user might want to copy but not update source)
+
+---
+
+## Summary of Changes
+
+| File | Change |
+|------|--------|
+| `src/pages/ManageAvailability.tsx` | Add `sourceSpotId` state, add Select dropdown section, pass `key` and `initialRules` to grid, renumber sections, update Preview text |
+
+No changes needed to `WeeklyScheduleGrid.tsx` since using the `key` prop handles the reset behavior.
