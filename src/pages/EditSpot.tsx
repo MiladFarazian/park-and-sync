@@ -236,6 +236,9 @@ const EditSpot = () => {
   const [evChargingPremium, setEvChargingPremium] = useState('0');
   const [evChargerType, setEvChargerType] = useState<string | null>(null);
   
+  // Quantity state
+  const [quantity, setQuantity] = useState<number>(1);
+  
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -347,6 +350,9 @@ const EditSpot = () => {
         setEvChargingInstructions(spotData.ev_charging_instructions || '');
         setEvChargingPremium(spotData.ev_charging_premium_per_hour?.toString() || '0');
         setEvChargerType(spotData.ev_charger_type || null);
+        
+        // Load quantity
+        setQuantity(spotData.quantity || 1);
         const {
           data: photosData,
           error: photosError
@@ -694,6 +700,7 @@ const EditSpot = () => {
         ev_charging_instructions: hasEvCharging ? evChargingInstructions : null,
         ev_charging_premium_per_hour: hasEvCharging ? parseFloat(evChargingPremium) || 0 : 0,
         ev_charger_type: hasEvCharging ? evChargerType : null,
+        quantity: quantity,
         updated_at: new Date().toISOString()
       };
       const {
@@ -810,6 +817,32 @@ const EditSpot = () => {
                   {errors.hourlyRate && <p className="text-sm text-destructive mt-1">{String(errors.hourlyRate.message)}</p>}
                 </div>
 
+                {/* Quantity field */}
+                <div className="p-4 bg-muted/50 rounded-lg border">
+                  <Label htmlFor="quantity" className="text-base font-medium">
+                    Number of Identical Spots
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-1 mb-3">
+                    All spots share the same price, schedule, and rules
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      id="quantity"
+                      type="number"
+                      min="1"
+                      max="1000"
+                      value={quantity}
+                      onChange={(e) => setQuantity(Math.max(1, Math.min(1000, parseInt(e.target.value) || 1)))}
+                      className="w-28"
+                    />
+                    <span className="text-sm text-muted-foreground">spots</span>
+                  </div>
+                  {quantity > 1 && (
+                    <p className="text-sm text-primary mt-2">
+                      ✓ {quantity} spots share one listing
+                    </p>
+                  )}
+                </div>
                 <div>
                   <Label htmlFor="description">Spot Description</Label>
                   <Textarea id="description" placeholder="Describe your parking spot, access instructions, and any important details..." rows={6} {...register('description')} className="mt-1.5 resize-none" />

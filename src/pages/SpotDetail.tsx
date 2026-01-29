@@ -402,6 +402,8 @@ const SpotDetail = () => {
         .eq('id', id)
         .single();
 
+      // Note: quantity field is now included via * selector
+
       logger.debug('[SpotDetail] Fetch result:', { 
         id, 
         hasData: !!spotData, 
@@ -452,6 +454,7 @@ const SpotDetail = () => {
         images: transformedImages,
         availability_rules: spotData.availability_rules || [],
         host_id: spotData.host_id,
+        quantity: spotData.quantity || 1,
         amenities: [
           ...(spotData.is_covered ? [{ icon: Shield, title: 'Covered Parking', subtitle: 'Protected from weather' }] : []),
           ...(spotData.is_secure ? [{ icon: Camera, title: 'Security', subtitle: 'Monitored parking area' }] : []),
@@ -706,7 +709,7 @@ const SpotDetail = () => {
           <div className="flex justify-between items-start mb-4">
             <div className="flex flex-col gap-2">
               {spot.category && (
-                <span className="inline-flex items-center gap-2.5 px-4 py-2 bg-primary/10 text-primary rounded-full text-base font-semibold">
+              <span className="inline-flex items-center gap-2.5 px-4 py-2 bg-primary/10 text-primary rounded-full text-base font-semibold">
                   {spot.category === 'Residential Driveway' && <span className="text-lg">🏠</span>}
                   {spot.category === 'Apartment / Condo Lot' && <span className="text-lg">🏢</span>}
                   {spot.category === 'Commercial Lot' && <span className="text-lg">🅿️</span>}
@@ -715,6 +718,12 @@ const SpotDetail = () => {
                   {spot.category === 'Event / Venue Lot' && <span className="text-lg">🎭</span>}
                   {spot.category}
                 </span>
+              )}
+              {/* Show quantity badge for multi-spot listings */}
+              {spot.quantity > 1 && (
+                <Badge variant="outline" className="w-fit text-sm">
+                  {spot.quantity} spots available
+                </Badge>
               )}
               <TooltipProvider>
                 <Tooltip>

@@ -176,6 +176,7 @@ serve(async (req) => {
         latitude,
         longitude,
         hourly_rate,
+        quantity,
         has_ev_charging,
         ev_charger_type,
         ev_charging_premium_per_hour,
@@ -429,11 +430,12 @@ serve(async (req) => {
           console.log(`[search-spots-lite] Filtered out ${unavailableSpotIds.size} unavailable spots (availability rules/overrides)`);
         }
 
-        // Get all bookings that overlap with the requested time range
-        // A booking overlaps if: booking.start_at < end_time AND booking.end_at > start_time
+        // For multi-spot listings, we need to check available quantity instead of simple conflict detection
+        // Get all bookings and holds that overlap with the requested time range
         const remainingSpotIds = spotsWithDistance.map(s => s.id);
         
         if (remainingSpotIds.length > 0) {
+          // Get booking counts per spot for the time range
           const { data: conflictingBookings } = await supabase
             .from('bookings')
             .select('spot_id')
@@ -442,36 +444,67 @@ serve(async (req) => {
             .lt('start_at', end_time)
             .gt('end_at', start_time);
           
-          const bookedSpotIds = new Set((conflictingBookings || []).map(b => b.spot_id));
+          // Get active holds per spot for the time range
+          const { data: activeHolds } = await supabase
+            .from('booking_holds')
+            .select('spot_id')
+            .in('spot_id', remainingSpotIds)
+            .gt('expires_at', new Date().toISOString())
+            .lt('start_at', end_time)
+            .gt('end_at', start_time);
           
-          // Filter out spots that have conflicting bookings (unless it's the current user's booking)
-          if (bookedSpotIds.size > 0) {
-            // If user is authenticated, check if any of the "conflicting" bookings are their own
-            let userBookedSpotIds = new Set<string>();
-            if (userId) {
-              const { data: userBookings } = await supabase
-                .from('bookings')
-                .select('spot_id')
-                .in('spot_id', Array.from(bookedSpotIds))
-                .eq('renter_id', userId)
-                .in('status', ['pending', 'held', 'paid', 'active'])
-                .lt('start_at', end_time)
-                .gt('end_at', start_time);
-              
-              userBookedSpotIds = new Set((userBookings || []).map(b => b.spot_id));
+          // Count bookings and holds per spot
+          const bookingCountBySpot = new Map<string, number>();
+          for (const b of conflictingBookings || []) {
+            bookingCountBySpot.set(b.spot_id, (bookingCountBySpot.get(b.spot_id) || 0) + 1);
+          }
+          
+          const holdCountBySpot = new Map<string, number>();
+          for (const h of activeHolds || []) {
+            holdCountBySpot.set(h.spot_id, (holdCountBySpot.get(h.spot_id) || 0) + 1);
+          }
+          
+          // If user is authenticated, get their own bookings (don't count against availability for them)
+          let userBookingCountBySpot = new Map<string, number>();
+          if (userId) {
+            const { data: userBookings } = await supabase
+              .from('bookings')
+              .select('spot_id')
+              .in('spot_id', remainingSpotIds)
+              .eq('renter_id', userId)
+              .in('status', ['pending', 'held', 'paid', 'active'])
+              .lt('start_at', end_time)
+              .gt('end_at', start_time);
+            
+            for (const b of userBookings || []) {
+              userBookingCountBySpot.set(b.spot_id, (userBookingCountBySpot.get(b.spot_id) || 0) + 1);
             }
+          }
+          
+          // Filter spots based on available quantity
+          const spotsToRemove: string[] = [];
+          for (const spot of spotsWithDistance) {
+            const spotQuantity = spot.quantity || 1;
+            const bookingCount = bookingCountBySpot.get(spot.id) || 0;
+            const holdCount = holdCountBySpot.get(spot.id) || 0;
+            const userBookingCount = userBookingCountBySpot.get(spot.id) || 0;
             
-            // Remove spots that are booked by someone else
-            spotsWithDistance = spotsWithDistance.filter(spot => {
-              // If spot has no conflicting booking, keep it
-              if (!bookedSpotIds.has(spot.id)) return true;
-              // If the booking is the user's own, keep it (they can view their booking)
-              if (userBookedSpotIds.has(spot.id)) return true;
-              // Otherwise, filter it out
-              return false;
-            });
+            // Available = quantity - (bookings not by this user) - holds
+            // User's own bookings don't reduce availability from their perspective
+            const othersBookingCount = bookingCount - userBookingCount;
+            const availableQuantity = spotQuantity - othersBookingCount - holdCount;
             
-            console.log(`[search-spots-lite] Filtered out ${bookedSpotIds.size - userBookedSpotIds.size} booked spots`);
+            // Store available quantity on spot for UI display
+            (spot as any).available_quantity = Math.max(availableQuantity, 0);
+            
+            if (availableQuantity < 1) {
+              spotsToRemove.push(spot.id);
+            }
+          }
+          
+          if (spotsToRemove.length > 0) {
+            spotsWithDistance = spotsWithDistance.filter(spot => !spotsToRemove.includes(spot.id));
+            console.log(`[search-spots-lite] Filtered out ${spotsToRemove.length} fully booked spots`);
           }
         }
       }
@@ -544,7 +577,9 @@ serve(async (req) => {
         is_ada_accessible: spot.is_ada_accessible,
         instant_book: spot.instant_book,
         distance: spot.distance,
-        size_constraints: spot.size_constraints
+        size_constraints: spot.size_constraints,
+        quantity: spot.quantity || 1,
+        available_quantity: (spot as any).available_quantity ?? (spot.quantity || 1),
       };
     });
 
