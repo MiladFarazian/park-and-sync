@@ -81,7 +81,10 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         }}
       >
         <NotificationPermissionBanner />
-        <header className="flex-shrink-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4 sticky top-0">
+        <header
+          className="flex-shrink-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4 sticky top-0"
+          style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(3.5rem + env(safe-area-inset-top))' }}
+        >
           <div className="flex items-center gap-3">
             <img
               src={logos.primary}
