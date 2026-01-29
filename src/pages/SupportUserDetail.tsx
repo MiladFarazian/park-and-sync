@@ -241,7 +241,13 @@ function SupportUserDetailContent() {
           <CardContent className="p-8 text-center">
             <User className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-muted-foreground">User not found</p>
-            <Button className="mt-4" onClick={() => navigate(-1)}>
+            <Button className="mt-4" onClick={() => {
+              if (window.history.length > 1) {
+                navigate(-1);
+              } else {
+                navigate('/support-reservations');
+              }
+            }}>
               <ArrowLeft className="h-4 w-4 mr-2" /> Go Back
             </Button>
           </CardContent>
@@ -254,7 +260,13 @@ function SupportUserDetailContent() {
     <div className="container mx-auto p-4 md:p-6 max-w-4xl space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+        <Button variant="ghost" size="icon" onClick={() => {
+          if (window.history.length > 1) {
+            navigate(-1);
+          } else {
+            navigate('/support-reservations');
+          }
+        }}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
