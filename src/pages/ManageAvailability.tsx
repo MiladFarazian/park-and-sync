@@ -1277,10 +1277,10 @@ const ManageAvailability = () => {
                         return (
                           <div
                             key={spotId}
-                            className="bg-background border rounded px-2 py-1 text-xs font-medium truncate max-w-[120px]"
-                            title={spot.title}
+                            className="bg-background border rounded px-2 py-1 text-xs font-medium truncate max-w-[140px]"
+                            title={spot.address}
                           >
-                            {spot.title}
+                            {spot.address}
                           </div>
                         );
                       })}
@@ -1515,10 +1515,10 @@ const ManageAvailability = () => {
                           return (
                             <div
                               key={spotId}
-                              className="bg-background border rounded px-2 py-1 text-xs font-medium truncate max-w-[120px]"
-                              title={spot.title}
+                              className="bg-background border rounded px-2 py-1 text-xs font-medium truncate max-w-[140px]"
+                              title={spot.address}
                             >
-                              {spot.title}
+                              {spot.address}
                             </div>
                           );
                         })}
