@@ -266,7 +266,7 @@ export const WeeklyScheduleGrid = ({
   };
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col flex-shrink-0">
       {/* Instructions & Legend - Compact */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-1">
         <p className="text-[10px] sm:text-xs text-muted-foreground">

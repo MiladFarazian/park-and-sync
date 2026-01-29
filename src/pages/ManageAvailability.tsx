@@ -1332,8 +1332,8 @@ const ManageAvailability = () => {
         </TabsContent>
 
         {/* Recurring Schedule Tab Content */}
-        <TabsContent value="recurring" className="mt-0">
-          <div className="p-4 space-y-6">
+        <TabsContent value="recurring" className="mt-0 flex-1 overflow-y-auto">
+          <div className="p-4 space-y-4">
             {/* Step 1: Load Schedule From */}
             <section>
               <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
@@ -1375,7 +1375,7 @@ const ManageAvailability = () => {
                 Set Your Weekly Hours
               </h2>
               
-              <Card className="p-4">
+              <Card className="p-4 flex-shrink-0">
                 <p className="text-sm text-muted-foreground mb-3">
                   Drag to select the hours when your spots should be available each week.
                 </p>
