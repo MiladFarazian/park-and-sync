@@ -1,4 +1,4 @@
-import { Bell, Calendar, MessageCircle, AlertTriangle, Check, Clock, CheckCheck } from "lucide-react";
+import { Bell, Calendar, MessageCircle, AlertTriangle, Check, Clock, CheckCheck, CalendarPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -40,6 +40,9 @@ const getNotificationIcon = (type: string) => {
     case 'booking_declined':
     case 'booking_rejected':
       return Calendar;
+    case 'extension_confirmed':
+    case 'booking_extended':
+      return CalendarPlus;
     case 'message':
       return MessageCircle;
     case 'overstay_warning':
@@ -72,6 +75,8 @@ const getIconColor = (type: string, isRead: boolean) => {
       return "text-destructive";
     case 'departure_confirmed':
     case 'overstay_booking_completed':
+    case 'extension_confirmed':
+    case 'booking_extended':
       return "text-green-600";
     case 'message':
       return "text-primary";
@@ -206,7 +211,12 @@ export const NotificationBell = () => {
         if (mode === 'driver') setMode('host');
         navigate(`/host-booking-confirmation/${notification.related_id}`);
       }
+    } else if (notification.type === "extension_confirmed") {
+      // Driver's extension confirmed - switch to driver mode
+      if (mode === 'host') setMode('driver');
+      navigate(`/booking/${notification.related_id}`);
     } else if (notification.type === "booking_extended") {
+      // Host sees booking was extended - switch to host mode
       if (mode === 'driver') setMode('host');
       navigate(`/booking/${notification.related_id}`);
     } else if (notification.type === "message") {

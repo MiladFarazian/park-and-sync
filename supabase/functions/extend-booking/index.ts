@@ -301,6 +301,19 @@ serve(async (req) => {
       // Notify driver of successful extension
       const driverMessage = `Your parking has been extended by ${extensionDisplay.trim()}. New end time: ${newEndTime.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true })}`;
       
+      // Insert driver in-app notification
+      const { error: driverNotifError } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: userData.user.id,
+          type: 'extension_confirmed',
+          title: 'Extension Confirmed',
+          message: driverMessage,
+          related_id: bookingId,
+        });
+      if (driverNotifError) console.error('Error creating driver notification:', driverNotifError);
+
+      // Send push notification to driver
       try {
         const driverPushResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-push-notification`, {
           method: 'POST',
@@ -321,6 +334,52 @@ serve(async (req) => {
         }
       } catch (pushError) {
         console.error('Error sending driver push notification:', pushError);
+      }
+
+      // Send extension confirmation emails
+      try {
+        // Fetch driver and host profiles for email
+        const { data: driverProfile } = await supabase
+          .from('profiles')
+          .select('email, first_name, last_name')
+          .eq('user_id', userData.user.id)
+          .single();
+        
+        const { data: hostProfile } = await supabase
+          .from('profiles')
+          .select('email, first_name, last_name')
+          .eq('user_id', booking.spots.host_id)
+          .single();
+
+        const emailPayload = {
+          bookingId,
+          driverEmail: driverProfile?.email || userData.user.email,
+          driverName: driverProfile?.first_name || 'Driver',
+          hostEmail: hostProfile?.email,
+          hostName: hostProfile?.first_name || 'Host',
+          spotTitle: booking.spots.title,
+          spotAddress: booking.spots.address,
+          originalEndTime: booking.end_at,
+          newEndTime: newEndTime.toISOString(),
+          extensionHours,
+          extensionCost,
+          newTotalAmount: booking.total_amount + extensionCost,
+          hostEarnings,
+        };
+
+        const emailResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-extension-confirmation`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify(emailPayload),
+        });
+        if (!emailResponse.ok) {
+          console.error('Extension email failed:', await emailResponse.text());
+        }
+      } catch (emailError) {
+        console.error('Error sending extension confirmation emails:', emailError);
       }
 
       return new Response(JSON.stringify({
@@ -488,6 +547,19 @@ serve(async (req) => {
     // Notify driver of successful extension
     const driverMessage = `Your parking has been extended by ${extensionDisplay.trim()}. New end time: ${newEndTime.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true })}`;
     
+    // Insert driver in-app notification
+    const { error: driverNotifError } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: userData.user.id,
+        type: 'extension_confirmed',
+        title: 'Extension Confirmed',
+        message: driverMessage,
+        related_id: bookingId,
+      });
+    if (driverNotifError) console.error('Error creating driver notification:', driverNotifError);
+
+    // Send push notification to driver
     try {
       const driverPushResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-push-notification`, {
         method: 'POST',
@@ -508,6 +580,52 @@ serve(async (req) => {
       }
     } catch (pushError) {
       console.error('Error sending driver push notification:', pushError);
+    }
+
+    // Send extension confirmation emails
+    try {
+      // Fetch driver and host profiles for email
+      const { data: driverProfile } = await supabase
+        .from('profiles')
+        .select('email, first_name, last_name')
+        .eq('user_id', userData.user.id)
+        .single();
+      
+      const { data: hostProfile } = await supabase
+        .from('profiles')
+        .select('email, first_name, last_name')
+        .eq('user_id', booking.spots.host_id)
+        .single();
+
+      const emailPayload = {
+        bookingId,
+        driverEmail: driverProfile?.email || userData.user.email,
+        driverName: driverProfile?.first_name || 'Driver',
+        hostEmail: hostProfile?.email,
+        hostName: hostProfile?.first_name || 'Host',
+        spotTitle: booking.spots.title,
+        spotAddress: booking.spots.address,
+        originalEndTime: booking.end_at,
+        newEndTime: newEndTime.toISOString(),
+        extensionHours,
+        extensionCost,
+        newTotalAmount: booking.total_amount + extensionCost,
+        hostEarnings,
+      };
+
+      const emailResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-extension-confirmation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify(emailPayload),
+      });
+      if (!emailResponse.ok) {
+        console.error('Extension email failed:', await emailResponse.text());
+      }
+    } catch (emailError) {
+      console.error('Error sending extension confirmation emails:', emailError);
     }
 
     return new Response(JSON.stringify({
