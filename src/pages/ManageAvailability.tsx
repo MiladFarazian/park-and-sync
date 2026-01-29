@@ -11,6 +11,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
@@ -123,6 +124,7 @@ const ManageAvailability = () => {
   const [spotRecurringRules, setSpotRecurringRules] = useState<Record<string, AvailabilityRule[]>>({});
   const [isApplyingRecurring, setIsApplyingRecurring] = useState(false);
   const [showClearScheduleDialog, setShowClearScheduleDialog] = useState(false);
+  const [sourceSpotId, setSourceSpotId] = useState<string | null>(null);
   
   // Search filter state
   const [spotSearchQuery, setSpotSearchQuery] = useState('');
@@ -1243,10 +1245,44 @@ const ManageAvailability = () => {
         {/* Recurring Schedule Tab Content */}
         <TabsContent value="recurring" className="mt-0">
           <div className="p-4 space-y-6">
-            {/* Step 1: Set Hours */}
+            {/* Step 1: Load Schedule From */}
             <section>
               <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
                 <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm">1</span>
+                Load Schedule From
+              </h2>
+              
+              <Select 
+                value={sourceSpotId || ''} 
+                onValueChange={(value) => {
+                  setSourceSpotId(value || null);
+                  // Auto-select this spot for applying
+                  if (value && !recurringSelectedSpots.includes(value)) {
+                    setRecurringSelectedSpots(prev => [...prev, value]);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a spot to load its schedule..." />
+                </SelectTrigger>
+                <SelectContent className="bg-background">
+                  {spots.map(spot => (
+                    <SelectItem key={spot.id} value={spot.id}>
+                      {spot.title} — {getRecurringScheduleSummary(spot.id)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <p className="text-xs text-muted-foreground mt-2">
+                Or start with a blank schedule and use the quick actions below
+              </p>
+            </section>
+
+            {/* Step 2: Set Hours */}
+            <section>
+              <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm">2</span>
                 Set Your Weekly Hours
               </h2>
               
@@ -1255,17 +1291,18 @@ const ManageAvailability = () => {
                   Drag to select the hours when your spots should be available each week.
                 </p>
                 <WeeklyScheduleGrid
-                  initialRules={[]}
+                  key={sourceSpotId || 'blank'}
+                  initialRules={sourceSpotId ? (spotRecurringRules[sourceSpotId] || []) : []}
                   onChange={setRecurringRules}
                 />
               </Card>
             </section>
 
-            {/* Step 2: Select Spots */}
+            {/* Step 3: Select Spots */}
             <section>
               <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm">2</span>
-                Select Spots to Update
+                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm">3</span>
+                Apply to Spots
               </h2>
               
               {spots.length === 0 ? (
@@ -1370,9 +1407,9 @@ const ManageAvailability = () => {
                 </h2>
                 
                 <Card className="p-4 border-primary/30 bg-primary/5">
-                  <div className="space-y-2">
+                <div className="space-y-2">
                     <p className="text-sm">
-                      <strong>{recurringSelectedSpots.length}</strong> spot{recurringSelectedSpots.length !== 1 ? 's' : ''} will be updated with:
+                      <strong>{recurringSelectedSpots.length}</strong> spot{recurringSelectedSpots.length !== 1 ? 's' : ''} will have their recurring schedule replaced with:
                     </p>
                     <div className="text-sm font-medium bg-primary/10 p-2 rounded border border-primary/30">
                       {getRecurringPreview()}
