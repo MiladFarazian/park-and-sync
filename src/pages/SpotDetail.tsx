@@ -52,6 +52,7 @@ const SpotDetail = () => {
   const [submittingReport, setSubmittingReport] = useState(false);
   const [userBooking, setUserBooking] = useState<{ id: string; start_at: string; end_at: string; status: string } | null>(null);
   const [guestBookingModalOpen, setGuestBookingModalOpen] = useState(false);
+  const [availableQuantity, setAvailableQuantity] = useState<number | null>(null);
   
   // Favorites hook
   const { isFavorite, toggleFavorite, isLoading: favoriteLoading } = useFavoriteSpots();
@@ -161,6 +162,42 @@ const SpotDetail = () => {
       fetchSpotDetails();
     }
   }, [id, user]);
+
+  // Fetch available quantity for multi-space listings
+  useEffect(() => {
+    const fetchAvailableQuantity = async () => {
+      if (!spot?.id || spot.quantity <= 1) return;
+      
+      const requestedStart = searchParams.get('start');
+      const requestedEnd = searchParams.get('end');
+      
+      // Only fetch if we have a time range
+      if (!requestedStart || !requestedEnd) {
+        setAvailableQuantity(spot.quantity);
+        return;
+      }
+      
+      try {
+        const { data, error } = await supabase.rpc('get_spot_available_quantity', {
+          p_spot_id: spot.id,
+          p_start_at: requestedStart,
+          p_end_at: requestedEnd,
+          p_exclude_user_id: user?.id || null
+        });
+        
+        if (!error && data !== null) {
+          setAvailableQuantity(data);
+        } else {
+          setAvailableQuantity(spot.quantity);
+        }
+      } catch (err) {
+        logger.error('[SpotDetail] Error fetching available quantity:', err);
+        setAvailableQuantity(spot.quantity);
+      }
+    };
+    
+    fetchAvailableQuantity();
+  }, [spot?.id, spot?.quantity, searchParams, user?.id]);
 
   const isMobile = () => {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -719,10 +756,10 @@ const SpotDetail = () => {
                   {spot.category}
                 </span>
               )}
-              {/* Show quantity badge for multi-spot listings */}
+              {/* Show quantity badge for multi-space listings */}
               {spot.quantity > 1 && (
                 <Badge variant="outline" className="w-fit text-sm">
-                  {spot.quantity} spots available
+                  {availableQuantity ?? spot.quantity} of {spot.quantity} spaces available
                 </Badge>
               )}
               <TooltipProvider>

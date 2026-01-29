@@ -820,10 +820,10 @@ const EditSpot = () => {
                 {/* Quantity field */}
                 <div className="p-4 bg-muted/50 rounded-lg border">
                   <Label htmlFor="quantity" className="text-base font-medium">
-                    Number of Identical Spots
+                    Number of Identical Spaces
                   </Label>
                   <p className="text-sm text-muted-foreground mt-1 mb-3">
-                    All spots share the same price, schedule, and rules
+                    All spaces share the same listing, price, schedule, and rules
                   </p>
                   <div className="flex items-center gap-3">
                     <Input
@@ -835,11 +835,11 @@ const EditSpot = () => {
                       onChange={(e) => setQuantity(Math.max(1, Math.min(1000, parseInt(e.target.value) || 1)))}
                       className="w-28"
                     />
-                    <span className="text-sm text-muted-foreground">spots</span>
+                    <span className="text-sm text-muted-foreground">spaces</span>
                   </div>
                   {quantity > 1 && (
                     <p className="text-sm text-primary mt-2">
-                      ✓ {quantity} spots share one listing
+                      ✓ This listing has {quantity} spaces
                     </p>
                   )}
                 </div>

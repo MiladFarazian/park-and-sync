@@ -615,10 +615,10 @@ const DesktopSpotList = ({
                               Your Booking
                             </Badge>
                           )}
-                          {/* Show available quantity for multi-spot listings */}
+                          {/* Show available quantity for multi-space listings */}
                           {(spot.quantity ?? 1) > 1 && (
                             <Badge variant="outline" className="text-xs">
-                              {spot.availableQuantity ?? spot.quantity} of {spot.quantity} available
+                              {spot.availableQuantity ?? spot.quantity} of {spot.quantity} spaces
                             </Badge>
                           )}
                           {isNearest && !spot.userBooking && (
