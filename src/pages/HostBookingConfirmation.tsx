@@ -7,11 +7,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { differenceInHours, format, formatDistanceToNow, isPast, addHours } from 'date-fns';
+import { differenceInMinutes, format, formatDistanceToNow, isPast, addHours } from 'date-fns';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { getHostNetEarnings } from '@/lib/hostEarnings';
+import { calculateServiceFee } from '@/lib/pricing';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -236,7 +237,8 @@ const HostBookingConfirmation = () => {
     return null;
   }
 
-  const duration = differenceInHours(new Date(booking.end_at), new Date(booking.start_at));
+  const durationMinutes = differenceInMinutes(new Date(booking.end_at), new Date(booking.start_at));
+  const duration = Math.round(durationMinutes / 60 * 100) / 100;
   const primaryPhoto = spot?.spot_photos?.find((p: any) => p.is_primary)?.url || spot?.spot_photos?.[0]?.url;
   
   // For guest bookings, use guest_full_name; for registered users, use profile
@@ -247,6 +249,9 @@ const HostBookingConfirmation = () => {
   const driverInitial = driverName.charAt(0).toUpperCase();
   const bookingNumber = `#PK-${new Date(booking.created_at).getFullYear()}-${booking.id.slice(0, 3).toUpperCase()}`;
   const hostEarnings = getHostNetEarnings(booking);
+  const parkzyFee = calculateServiceFee(hostEarnings);
+  const evChargingFee = booking.ev_charging_fee || 0;
+  const hostPayout = hostEarnings + evChargingFee;
   const timeUntilExpiry = isPendingApproval && !hasExpired ? formatDistanceToNow(expiryAt, { addSuffix: true }) : null;
 
   return (
@@ -406,18 +411,47 @@ const HostBookingConfirmation = () => {
           </>
         )}
 
-        {/* Earnings Breakdown Card - Only show for confirmed bookings */}
+        {/* Payout Breakdown Card - Only show for confirmed bookings */}
         {!isPendingApproval && (
           <Card className="p-5 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-primary">
                 <DollarSign className="h-5 w-5" />
-                 <h3 className="font-semibold">Payout Summary</h3>
+                <h3 className="font-semibold">Payout Breakdown</h3>
               </div>
+              
+              {/* To Host line */}
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">
+                  To Host ({duration} hr{duration !== 1 ? 's' : ''} × ${booking.hourly_rate.toFixed(2)})
+                </span>
+                <span className="font-medium">${hostEarnings.toFixed(2)}</span>
+              </div>
+              
+              {/* EV Charging line - only if applicable */}
+              {evChargingFee > 0 && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">
+                    EV Charging (to Host)
+                  </span>
+                  <span className="font-medium">${evChargingFee.toFixed(2)}</span>
+                </div>
+              )}
+              
+              {/* To Parkzy line */}
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">To Parkzy</span>
+                <span className="font-medium text-muted-foreground">${parkzyFee.toFixed(2)}</span>
+              </div>
+              
+              <Separator />
+              
+              {/* Host Payout total */}
               <div className="flex justify-between items-center">
-                <span className="font-semibold">Your Earnings</span>
-                <span className="font-bold text-xl text-primary">${hostEarnings.toFixed(2)}</span>
+                <span className="font-semibold">Host Payout</span>
+                <span className="font-bold text-xl text-primary">${hostPayout.toFixed(2)}</span>
               </div>
+              
               <p className="text-xs text-muted-foreground">
                 Funds available after booking completion
               </p>
@@ -425,15 +459,33 @@ const HostBookingConfirmation = () => {
           </Card>
         )}
 
-        {/* Potential Earnings Card - Show for pending bookings */}
+        {/* Potential Payout Card - Show for pending bookings */}
         {isPendingApproval && (
           <Card className="p-4">
-            <div className="flex items-center justify-between">
+            <div className="space-y-2">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <DollarSign className="h-5 w-5" />
-                <span className="font-medium">Potential Earnings</span>
+                <span className="font-medium">Potential Payout</span>
               </div>
-              <span className="font-bold text-lg">${hostEarnings.toFixed(2)}</span>
+              <div className="flex justify-between text-sm">
+                <span>To Host</span>
+                <span>${hostEarnings.toFixed(2)}</span>
+              </div>
+              {evChargingFee > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span>EV Charging (to Host)</span>
+                  <span>${evChargingFee.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm">
+                <span>To Parkzy</span>
+                <span className="text-muted-foreground">${parkzyFee.toFixed(2)}</span>
+              </div>
+              <Separator className="my-2" />
+              <div className="flex justify-between">
+                <span className="font-medium">Host Payout</span>
+                <span className="font-bold text-lg">${hostPayout.toFixed(2)}</span>
+              </div>
             </div>
           </Card>
         )}
