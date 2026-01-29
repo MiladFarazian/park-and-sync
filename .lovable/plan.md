@@ -1,73 +1,96 @@
 
 
-# Fix: Orphaned Bookings from Failed Payments
+# Fix: Guest Booking Emails + Cancellation for Held Bookings
 
-## Root Cause Identified
+## Issues Identified
 
-You experienced the **orphaned booking bug**. Here's exactly what happened:
+### Issue 1: "Booking Requested" Emails Not Being Sent
 
-```text
-Timeline of your experience:
-1. You filled out the form and clicked "Pay"
-2. Backend created a booking with "held" status (line 293-319 of create-guest-booking)
-3. Backend created a Stripe PaymentIntent
-4. Frontend called stripe.confirmCardPayment() - THIS FAILED (missing zip code)
-5. Frontend showed error toast "Booking failed"
-6. BUT: The booking record stayed in the database with "held" status
-7. When you tried again with correct info, availability check saw the held booking
-8. System returned 409: "Spot is not available"
+**Root Cause**: The `verify-guest-payment` function calls `send-booking-confirmation` with a `type: 'host_request'` parameter, but this function doesn't support a `type` field - it expects `hostEmail` and `driverEmail` directly.
+
+The edge function logs confirm this:
+```
+Skipping host email: no valid recipient. Email provided: undefined
+Skipping driver email: no valid recipient. Email provided: undefined
 ```
 
-**The core problem**: The booking is created BEFORE Stripe payment is confirmed. If the payment fails for any reason (wrong zip, card declined, expired card), the booking remains in the database blocking that time slot.
+The call in `verify-guest-payment` (lines 255-272):
+```typescript
+body: JSON.stringify({
+  to: hostProfile.email,       // Wrong parameter name - should be hostEmail
+  type: 'host_request',        // This parameter is not supported
+  hostName: hostProfile.first_name,
+  // ... rest of fields
+}),
+```
+
+**Additionally**: No email is being sent to the guest when their booking request is submitted (held status). Only the host is notified.
+
+### Issue 2: Cancellation Fails for 'held' Status
+
+**Root Cause**: Line 126 in `cancel-guest-booking` only allows cancellation for `['pending', 'active']` statuses:
+
+```typescript
+if (!['pending', 'active'].includes(booking.status)) {
+  return new Response(JSON.stringify({ 
+    error: 'This booking cannot be cancelled' 
+  }), { status: 400 });
+}
+```
+
+Bookings awaiting host approval have status `'held'`, which is not in this list.
 
 ---
 
-## Solution: Two-Phase Booking Creation
+## Solution
 
-Instead of creating the booking before payment, we need to:
+### Part 1: Fix cancel-guest-booking to Allow 'held' Status
 
-1. **Phase 1 (Pre-payment)**: Only create the PaymentIntent - no database booking yet
-2. **Phase 2 (Post-payment)**: Create the booking AFTER payment is confirmed/authorized
+Add `'held'` to the allowed statuses and handle Stripe authorization release (cancel the PaymentIntent instead of refunding):
 
-This mirrors how most e-commerce sites work - they don't create an order until payment succeeds.
+```typescript
+// Line 126: Add 'held' to allowed statuses
+if (!['pending', 'active', 'held'].includes(booking.status)) {
+  return new Response(JSON.stringify({ 
+    error: 'This booking cannot be cancelled' 
+  }), { status: 400 });
+}
 
----
-
-## Implementation Plan
-
-### Part 1: Restructure `create-guest-booking` Edge Function
-
-**Current flow (broken):**
-```text
-1. Check availability
-2. Create booking in database ← TOO EARLY
-3. Create PaymentIntent
-4. Return client_secret
-5. Frontend confirms payment (CAN FAIL)
-6. Orphaned booking if payment fails
+// Update Stripe handling to cancel authorization for held bookings
+if (booking.stripe_payment_intent_id) {
+  const paymentIntent = await stripe.paymentIntents.retrieve(booking.stripe_payment_intent_id);
+  
+  if (paymentIntent.status === 'requires_capture') {
+    // Cancel the authorization - releases the hold
+    await stripe.paymentIntents.cancel(booking.stripe_payment_intent_id);
+  } else if (paymentIntent.status === 'succeeded') {
+    // Already captured - issue refund if eligible
+    if (isEligibleForRefund) {
+      const refund = await stripe.refunds.create({ payment_intent: ... });
+    }
+  }
+}
 ```
 
-**New flow (fixed):**
-```text
-1. Check availability
-2. Create PaymentIntent with all booking data in metadata
-3. Return client_secret (NO booking created yet)
-4. Frontend confirms payment
-5. On success, call verify-guest-payment
-6. verify-guest-payment creates the booking
-```
+### Part 2: Fix Email Sending for "Booking Requested" Flow
 
-### Part 2: Update `verify-guest-payment` Edge Function
+For **non-instant-book** guest bookings (status = 'held'), we need to:
 
-This function currently just updates existing bookings. We need to:
-- If booking doesn't exist yet, CREATE it using data from PaymentIntent metadata
-- This ensures bookings only exist when payment is confirmed
+1. **Send "Booking Request Submitted" email to Guest** - Let them know their request is pending
+2. **Send "New Booking Request" email to Host** - Notify them to approve/decline
 
-### Part 3: Frontend Adjustments
+Create a new email template section in `verify-guest-payment` that calls `send-guest-booking-confirmation` with a new `isRequest` flag, or create dedicated request email templates.
 
-Update `GuestBookingForm.tsx` to:
-- Call `verify-guest-payment` after successful `confirmCardPayment`
-- The verify function will create the booking and return the booking ID
+**Recommended approach**: Add a `type` parameter to `send-guest-booking-confirmation` to distinguish between:
+- `type: 'confirmed'` - Current behavior (booking is active)
+- `type: 'request'` - New behavior (awaiting host approval)
+
+This allows reusing the existing infrastructure while customizing the email content:
+
+| Recipient | Email Type | Subject | Key Message |
+|-----------|------------|---------|-------------|
+| Guest | Request | "📋 Booking Request Submitted" | "Your request is pending host approval. We'll notify you within 1 hour." |
+| Host | Request | "🔔 New Booking Request" | "A guest wants to book your spot. Approve or decline within 1 hour." |
 
 ---
 
@@ -75,165 +98,109 @@ Update `GuestBookingForm.tsx` to:
 
 | File | Changes |
 |------|---------|
-| `supabase/functions/create-guest-booking/index.ts` | Remove booking creation; only create PaymentIntent |
-| `supabase/functions/verify-guest-payment/index.ts` | Add booking creation logic using PaymentIntent metadata |
-| `src/components/booking/GuestBookingForm.tsx` | Call verify-guest-payment after successful payment confirmation |
+| `supabase/functions/cancel-guest-booking/index.ts` | Add 'held' to allowed statuses; handle authorization cancellation |
+| `supabase/functions/send-guest-booking-confirmation/index.ts` | Add `type` parameter to support 'request' vs 'confirmed' emails |
+| `supabase/functions/verify-guest-payment/index.ts` | Fix email call to use correct function with proper parameters |
 
 ---
 
-## Detailed Technical Changes
+## Technical Implementation
 
-### create-guest-booking/index.ts
+### cancel-guest-booking/index.ts Changes
 
-**Remove lines 292-324** (booking creation) and **move that data to PaymentIntent metadata**:
+```text
+Line 126: Change allowed statuses from ['pending', 'active'] to ['pending', 'active', 'held']
 
-```typescript
-// Store ALL booking data in PaymentIntent metadata
-const paymentIntentParams = {
-  amount: Math.round(totalAmount * 100),
-  currency: 'usd',
-  capture_method: isInstantBook ? 'automatic' : 'manual',
-  metadata: {
-    // Existing metadata
-    spot_id,
-    host_id: spot.host_id,
-    is_guest: 'true',
-    guest_email: sanitizedEmail || '',
-    guest_phone: sanitizedPhone || '',
-    instant_book: isInstantBook ? 'true' : 'false',
-    
-    // NEW: All booking data needed to create booking later
-    start_at,
-    end_at,
-    guest_full_name: sanitizedName,
-    guest_car_model: sanitizedCarModel,
-    guest_license_plate: sanitizedLicensePlate || '',
-    hourly_rate: spot.hourly_rate.toString(),
-    total_hours: totalHours.toString(),
-    subtotal: subtotal.toString(),
-    platform_fee: platformFee.toString(),
-    total_amount: totalAmount.toString(),
-    host_earnings: hostEarnings.toString(),
-    will_use_ev_charging: useEvCharging ? 'true' : 'false',
-    ev_charging_fee: evChargingFee.toString(),
-  },
-};
-
-// Generate access token now but don't save to DB yet
-const guestAccessToken = crypto.randomUUID();
-paymentIntentParams.metadata.guest_access_token = guestAccessToken;
-
-// Return token to frontend for redirect after verify
-return {
-  client_secret: paymentIntent.client_secret,
-  payment_intent_id: paymentIntent.id,
-  guest_access_token: guestAccessToken,
-  approval_required: !isInstantBook,
-  // NO booking_id yet - will be created after payment
-};
+Lines 144-163: Update Stripe refund logic:
+- If status === 'requires_capture': Cancel the PaymentIntent (releases authorization)
+- If status === 'succeeded': Create refund as before
+- Update response message for held bookings ("Authorization released" instead of "Refund processed")
 ```
 
-### verify-guest-payment/index.ts
+### send-guest-booking-confirmation/index.ts Changes
 
-**Add booking creation logic**:
+```text
+Add new interface field:
+  type?: 'confirmed' | 'request';  // Default: 'confirmed'
 
-```typescript
-// After verifying payment succeeded/authorized with Stripe:
-const metadata = paymentIntent.metadata;
-
-// Check if booking already exists (idempotency)
-const { data: existingBooking } = await supabaseAdmin
-  .from('bookings')
-  .select('id')
-  .eq('stripe_payment_intent_id', paymentIntent.id)
-  .single();
-
-if (!existingBooking) {
-  // Re-check availability (critical - prevents race conditions)
-  const { data: isAvailable } = await supabaseAdmin.rpc('check_spot_availability', {
-    p_spot_id: metadata.spot_id,
-    p_start_at: metadata.start_at,
-    p_end_at: metadata.end_at,
-  });
-
-  if (!isAvailable) {
-    // Cancel the PaymentIntent and refund if needed
-    await stripe.paymentIntents.cancel(paymentIntent.id);
-    return { error: 'Spot no longer available', refunded: true };
-  }
-
-  // Create booking NOW (payment confirmed)
-  const bookingId = crypto.randomUUID();
-  const initialStatus = metadata.instant_book === 'true' ? 
-    (paymentIntent.status === 'succeeded' ? 'active' : 'pending') : 
-    'held';
-
-  await supabaseAdmin.from('bookings').insert({
-    id: bookingId,
-    spot_id: metadata.spot_id,
-    renter_id: metadata.host_id, // placeholder for guest bookings
-    start_at: metadata.start_at,
-    end_at: metadata.end_at,
-    status: initialStatus,
-    // ... all other fields from metadata
-    stripe_payment_intent_id: paymentIntent.id,
-    guest_access_token: metadata.guest_access_token,
-    is_guest: true,
-  });
-
-  // Send notifications for non-instant bookings
-  if (initialStatus === 'held') {
-    // Create host notification...
-  }
-
-  return { booking_id: bookingId, status: initialStatus };
-}
-
-return { booking_id: existingBooking.id };
-```
-
-### GuestBookingForm.tsx
-
-**Update payment confirmation flow**:
-
-```typescript
-// After confirmCardPayment succeeds:
-if (paymentIntent?.status === 'succeeded' || paymentIntent?.status === 'requires_capture') {
-  // NOW verify and create the booking
-  const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-guest-payment', {
-    body: { payment_intent_id: payment_intent_id },
-  });
-
-  if (verifyError || verifyData?.error) {
-    throw new Error(verifyData?.error || 'Failed to verify payment');
-  }
-
-  const booking_id = verifyData.booking_id;
+For type === 'request':
+  - Guest email subject: "📋 Booking Request Submitted"
+  - Guest email body: "Your request is awaiting host approval..."
+  - Host email subject: "🔔 New Booking Request - Action Required"
+  - Host email body: Include Approve/Decline buttons linking to Activity page
   
-  // Navigate to booking confirmation
-  navigate(`/guest-booking/${booking_id}?token=${guest_access_token}`);
-}
+Keep current email templates as default for 'confirmed' type.
+```
+
+### verify-guest-payment/index.ts Changes
+
+```text
+Lines 252-278: Replace the send-booking-confirmation call with send-guest-booking-confirmation:
+
+await fetch(`${supabaseUrl}/functions/v1/send-guest-booking-confirmation`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${serviceRoleKey}`,
+  },
+  body: JSON.stringify({
+    type: 'request',  // NEW: Indicates this is a pending request
+    guestEmail: metadata.guest_email || null,
+    guestPhone: metadata.guest_phone || null,
+    guestName: metadata.guest_full_name,
+    hostName: hostProfile?.first_name || 'Host',
+    hostEmail: hostProfile?.email,
+    spotTitle: spot?.title || 'Parking Spot',
+    spotAddress: spot?.address || '',
+    startAt: metadata.start_at,
+    endAt: metadata.end_at,
+    totalAmount: parseFloat(metadata.total_amount),
+    bookingId,
+    guestAccessToken: metadata.guest_access_token,
+  }),
+});
 ```
 
 ---
 
-## Benefits of This Approach
+## Expected Email Flow After Fix
 
-1. **No orphaned bookings** - Booking only created after payment succeeds
-2. **Cleaner retry experience** - Users can retry payment without blocking issues
-3. **Race condition protection** - Availability is re-checked before booking creation
-4. **Idempotent** - Multiple verify calls won't create duplicate bookings
+### For Non-Instant Book (Booking Request)
+
+```text
+1. Guest submits booking → Payment authorized (not captured)
+2. IMMEDIATELY:
+   - Guest receives: "Booking Request Submitted - Awaiting host approval"
+   - Host receives: "New Booking Request - Approve within 1 hour"
+3. If host approves:
+   - Guest receives: "Booking Confirmed!"
+   - Host receives: "Booking Confirmed - Earn $X"
+4. If host declines or timeout:
+   - Guest receives: "Booking Request Declined/Expired"
+   - Authorization released
+```
+
+### For Instant Book (Current Behavior - No Changes)
+
+```text
+1. Guest submits booking → Payment captured
+2. IMMEDIATELY:
+   - Guest receives: "Booking Confirmed!"
+   - Host receives: "New Guest Booking!"
+```
 
 ---
 
-## Immediate Relief (While Fix Is Implemented)
+## Cancellation Flow After Fix
 
-To clean up the stuck booking so you can test:
-```sql
-UPDATE bookings 
-SET status = 'canceled' 
-WHERE id = '9ea6e909-4887-4384-926f-4664baed19da';
+### Guest Cancels Held Booking (Awaiting Approval)
+
+```text
+1. Guest clicks "Cancel Request" on /guest-booking page
+2. cancel-guest-booking detects status = 'held'
+3. Stripe PaymentIntent cancelled (releases authorization)
+4. Booking status updated to 'canceled'
+5. Host notified: "A guest cancelled their booking request"
+6. Guest sees success: "Request cancelled. Authorization released."
 ```
-
-Or I can implement the full fix now.
 
