@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Calendar, Clock, Car, Check, Navigation, Loader2, Phone, Mail, User, Zap, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Clock, Car, Check, Navigation, Loader2, Phone, Mail, User, Zap, ChevronLeft, ChevronRight, Clock3, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -87,6 +87,7 @@ const GuestBookingDetail = () => {
   const [verifying, setVerifying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [awaitingApproval, setAwaitingApproval] = useState(false);
 
   useEffect(() => {
     const fetchBooking = async () => {
@@ -108,15 +109,18 @@ const GuestBookingDetail = () => {
         setSpot(data.spot);
         setHost(data.host);
 
-        // If booking is pending, verify payment status
-        if (data.booking?.status === 'pending') {
+        // If booking is pending or held, verify payment status
+        if (data.booking?.status === 'pending' || data.booking?.status === 'held') {
           setVerifying(true);
           try {
             const { data: verifyData } = await supabase.functions.invoke('verify-guest-payment', {
               body: { booking_id: bookingId, access_token: token },
             });
             
-            if (verifyData?.verified && verifyData?.status === 'active') {
+            if (verifyData?.awaiting_approval) {
+              setAwaitingApproval(true);
+              setBooking((prev: any) => ({ ...prev, status: 'held' }));
+            } else if (verifyData?.verified && verifyData?.status === 'active') {
               setBooking((prev: any) => ({ ...prev, status: 'active' }));
               toast({ 
                 title: "Payment confirmed!", 
@@ -128,6 +132,11 @@ const GuestBookingDetail = () => {
           } finally {
             setVerifying(false);
           }
+        }
+        
+        // Check if already held (awaiting approval)
+        if (data.booking?.status === 'held') {
+          setAwaitingApproval(true);
         }
       } catch (err: any) {
         log.error('Failed to fetch guest booking:', err);
@@ -159,6 +168,7 @@ const GuestBookingDetail = () => {
       
       // Refresh booking data
       setBooking((prev: any) => ({ ...prev, status: 'canceled' }));
+      setAwaitingApproval(false);
     } catch (err: any) {
       log.error('Failed to cancel booking:', err);
       toast({ title: "Cancellation failed", description: err.message, variant: "destructive" });
@@ -194,8 +204,16 @@ const GuestBookingDetail = () => {
   const statusColors: Record<string, string> = {
     active: 'bg-green-100 text-green-800',
     pending: 'bg-yellow-100 text-yellow-800',
+    held: 'bg-amber-100 text-amber-800',
     completed: 'bg-blue-100 text-blue-800',
     canceled: 'bg-red-100 text-red-800',
+  };
+
+  const getStatusDisplay = (status: string) => {
+    if (status === 'held' || awaitingApproval) {
+      return 'Awaiting Approval';
+    }
+    return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
   return (
@@ -219,6 +237,22 @@ const GuestBookingDetail = () => {
           minHeight: 0,
         } as React.CSSProperties}
       >
+        {/* Awaiting Approval Banner */}
+        {awaitingApproval && booking.status !== 'canceled' && (
+          <Card className="p-4 bg-amber-50 border-amber-200">
+            <div className="flex items-start gap-3">
+              <Clock3 className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+              <div>
+                <h3 className="font-semibold text-amber-800">Awaiting Host Approval</h3>
+                <p className="text-sm text-amber-700 mt-1">
+                  Your booking request has been sent to the host. They have up to 1 hour to respond. 
+                  Your payment method has been authorized but will only be charged if the host approves.
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Status Banner */}
         <Card className="p-4">
           <div className="flex items-center justify-between">
@@ -231,12 +265,15 @@ const GuestBookingDetail = () => {
                 </div>
               ) : (
                 <Badge className={statusColors[booking.status] || 'bg-gray-100 text-gray-800'}>
-                  {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                  {getStatusDisplay(booking.status)}
                 </Badge>
               )}
             </div>
             {booking.status === 'active' && !verifying && (
               <Check className="h-8 w-8 text-green-600" />
+            )}
+            {awaitingApproval && booking.status !== 'canceled' && !verifying && (
+              <Clock3 className="h-8 w-8 text-amber-600" />
             )}
           </div>
         </Card>
@@ -331,22 +368,27 @@ const GuestBookingDetail = () => {
             </div>
             <Separator />
             <div className="flex justify-between font-semibold">
-              <span>Total paid</span>
+              <span>{awaitingApproval ? 'Total (on hold)' : 'Total paid'}</span>
               <span>${booking.total_amount.toFixed(2)}</span>
             </div>
+            {awaitingApproval && (
+              <p className="text-xs text-muted-foreground mt-2">
+                This amount is authorized on your card but won't be charged until the host approves.
+              </p>
+            )}
           </div>
         </Card>
 
-        {/* Access Notes */}
-        {spot.access_notes && (
+        {/* Access Notes - only show if booking is active (approved) */}
+        {spot.access_notes && booking.status === 'active' && (
           <Card className="p-4">
             <h3 className="font-semibold mb-2">Access Instructions</h3>
             <p className="text-sm text-muted-foreground">{spot.access_notes}</p>
           </Card>
         )}
 
-        {/* EV Charging Instructions */}
-        {booking.will_use_ev_charging && spot.has_ev_charging && spot.ev_charging_instructions && (
+        {/* EV Charging Instructions - only show if booking is active */}
+        {booking.will_use_ev_charging && spot.has_ev_charging && spot.ev_charging_instructions && booking.status === 'active' && (
           <Card className="p-4 border-green-200 bg-green-50/50">
             <div className="flex items-center gap-2 mb-2">
               <Zap className="h-5 w-5 text-green-600" />
@@ -356,8 +398,8 @@ const GuestBookingDetail = () => {
           </Card>
         )}
 
-        {/* Guest Chat */}
-        {token && (
+        {/* Guest Chat - only show if booking is active */}
+        {token && booking.status === 'active' && (
           <GuestChatPane 
             bookingId={bookingId!} 
             accessToken={token} 
@@ -368,27 +410,34 @@ const GuestBookingDetail = () => {
 
         {/* Actions */}
         <div className="space-y-3">
-          <Button className="w-full" size="lg" onClick={openDirections}>
-            <Navigation className="h-4 w-4 mr-2" />
-            Get Directions
-          </Button>
+          {booking.status === 'active' && (
+            <Button className="w-full" size="lg" onClick={openDirections}>
+              <Navigation className="h-4 w-4 mr-2" />
+              Get Directions
+            </Button>
+          )}
 
-          {['pending', 'active'].includes(booking.status) && (
+          {['pending', 'active', 'held'].includes(booking.status) && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" className="w-full" size="lg">
-                  Cancel Booking
+                  {awaitingApproval ? 'Cancel Request' : 'Cancel Booking'}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Cancel Booking?</AlertDialogTitle>
+                  <AlertDialogTitle>
+                    {awaitingApproval ? 'Cancel Booking Request?' : 'Cancel Booking?'}
+                  </AlertDialogTitle>
                   <AlertDialogDescription>
-                    Cancellations more than 1 hour before the start time are eligible for a full refund.
+                    {awaitingApproval 
+                      ? 'This will cancel your booking request. The hold on your card will be released.'
+                      : 'Cancellations more than 1 hour before the start time are eligible for a full refund.'
+                    }
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Keep Booking</AlertDialogCancel>
+                  <AlertDialogCancel>Keep {awaitingApproval ? 'Request' : 'Booking'}</AlertDialogCancel>
                   <AlertDialogAction onClick={handleCancel} disabled={cancelling}>
                     {cancelling ? 'Cancelling...' : 'Yes, Cancel'}
                   </AlertDialogAction>

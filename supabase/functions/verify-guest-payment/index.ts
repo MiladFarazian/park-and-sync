@@ -55,7 +55,8 @@ serve(async (req) => {
           access_notes,
           ev_charging_instructions,
           has_ev_charging,
-          host_id
+          host_id,
+          instant_book
         )
       `)
       .eq("id", booking_id)
@@ -71,7 +72,14 @@ serve(async (req) => {
       });
     }
 
-    log.info("Booking found", { status: booking.status, payment_intent: booking.stripe_payment_intent_id });
+    const spot = booking.spots;
+    const isInstantBook = spot?.instant_book !== false;
+    
+    log.info("Booking found", { 
+      status: booking.status, 
+      payment_intent: booking.stripe_payment_intent_id,
+      isInstantBook 
+    });
 
     // If already active or completed, no need to verify
     if (booking.status === "active" || booking.status === "completed") {
@@ -92,6 +100,19 @@ serve(async (req) => {
         verified: false, 
         status: booking.status,
         message: "Booking has been canceled" 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Handle held bookings (non-instant book awaiting host approval)
+    if (booking.status === "held") {
+      log.info("Booking is held, awaiting host approval");
+      return new Response(JSON.stringify({ 
+        verified: true, 
+        status: "held",
+        awaiting_approval: true,
+        message: "Your booking request is awaiting host approval" 
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -135,9 +156,33 @@ serve(async (req) => {
     
     log.debug("Stripe PaymentIntent retrieved", { 
       status: paymentIntent.status, 
-      charge: paymentIntent.latest_charge 
+      charge: paymentIntent.latest_charge,
+      captureMethod: paymentIntent.capture_method
     });
 
+    // For non-instant book spots, check if payment was authorized (requires_capture)
+    // This means the guest's card was successfully held, now awaiting host approval
+    if (!isInstantBook && paymentIntent.status === "requires_capture") {
+      log.info("Payment authorized, updating booking to held for host approval");
+      
+      // Update booking status to 'held' if it's still pending
+      await supabaseAdmin
+        .from("bookings")
+        .update({ status: "held" })
+        .eq("id", booking_id)
+        .eq("status", "pending");
+      
+      return new Response(JSON.stringify({ 
+        verified: true, 
+        status: "held",
+        awaiting_approval: true,
+        message: "Payment authorized. Awaiting host approval." 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // For instant book spots or captured payments, check if payment succeeded
     if (paymentIntent.status !== "succeeded") {
       log.warn("Payment not succeeded", { stripe_status: paymentIntent.status });
       return new Response(JSON.stringify({ 
@@ -174,7 +219,6 @@ serve(async (req) => {
     }
 
     // Credit host balance
-    const spot = booking.spots;
     if (booking.host_earnings && booking.host_earnings > 0 && spot?.host_id) {
       await supabaseAdmin.rpc("increment_balance", {
         user_id: spot.host_id,

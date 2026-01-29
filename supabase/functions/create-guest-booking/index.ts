@@ -112,7 +112,7 @@ serve(async (req) => {
       save_payment_method
     }: GuestBookingRequest = await req.json();
 
-    console.log('Creating guest booking:', { spot_id, start_at, end_at, guest_full_name, guest_email, guest_phone });
+    log.info('Creating guest booking:', { spot_id, start_at, end_at, guest_full_name, guest_email, guest_phone });
 
     // Validate required fields
     if (!guest_full_name?.trim()) {
@@ -254,6 +254,10 @@ serve(async (req) => {
       });
     }
 
+    // Determine if this is an instant book spot
+    const isInstantBook = spot.instant_book !== false;
+    log.info('Spot instant_book setting', { spotId: spot_id, isInstantBook });
+
     // Calculate pricing using shared module (ensures consistency with frontend)
     const startDate = new Date(start_at);
     const endDate = new Date(end_at);
@@ -267,7 +271,7 @@ serve(async (req) => {
     const subtotal = driverSubtotal;
     const platformFee = serviceFee;
 
-    log.info('Pricing calculated', { totalHours, totalAmount });
+    log.info('Pricing calculated', { totalHours, totalAmount, isInstantBook });
 
     // Initialize Stripe
     const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');
@@ -280,7 +284,12 @@ serve(async (req) => {
     const guestAccessToken = crypto.randomUUID();
     const bookingId = crypto.randomUUID();
     
-    // Create pending booking for guest
+    // Determine initial booking status based on instant_book setting
+    // For non-instant spots, status will be 'held' (awaiting approval)
+    // For instant spots, status remains 'pending' until payment completes, then becomes 'active'
+    const initialStatus = isInstantBook ? 'pending' : 'held';
+    
+    // Create booking for guest
     const { data: booking, error: bookingError } = await supabaseAdmin
       .from('bookings')
       .insert({
@@ -289,7 +298,7 @@ serve(async (req) => {
         renter_id: spot.host_id, // Use host_id as placeholder for guest bookings (required field)
         start_at,
         end_at,
-        status: 'pending',
+        status: initialStatus,
         hourly_rate: spot.hourly_rate,
         total_hours: totalHours,
         subtotal,
@@ -314,28 +323,46 @@ serve(async (req) => {
       throw bookingError;
     }
 
-    log.info('Guest booking created', { bookingId: booking.id });
+    log.info('Guest booking created', { bookingId: booking.id, status: initialStatus, isInstantBook });
 
-    // Create PaymentIntent for the guest (no customer ID)
-    // If save_payment_method is true, set up for future use
-    const paymentIntent = await stripe.paymentIntents.create({
+    // Create PaymentIntent for the guest
+    // For non-instant book spots, use manual capture (authorization hold)
+    // For instant book spots, use automatic capture
+    const paymentIntentParams: Stripe.PaymentIntentCreateParams = {
       amount: Math.round(totalAmount * 100),
       currency: 'usd',
-      ...(save_payment_method && { setup_future_usage: 'off_session' }),
       metadata: {
         booking_id: booking.id,
         spot_id,
         host_id: spot.host_id,
         is_guest: 'true',
-        guest_email: guest_email || '',
-        guest_phone: guest_phone || '',
+        guest_email: sanitizedEmail || '',
+        guest_phone: sanitizedPhone || '',
         guest_access_token: guestAccessToken,
         save_payment_method: save_payment_method ? 'true' : 'false',
+        instant_book: isInstantBook ? 'true' : 'false',
       },
-      description: `Parking at ${spot.title} - Guest: ${guest_full_name}`,
-    });
+      description: `Parking at ${spot.title} - Guest: ${sanitizedName}`,
+    };
 
-    console.log('PaymentIntent created for guest:', paymentIntent.id);
+    // Add setup_future_usage if saving payment method
+    if (save_payment_method) {
+      paymentIntentParams.setup_future_usage = 'off_session';
+    }
+
+    // For non-instant book spots, use manual capture to hold funds without charging
+    if (!isInstantBook) {
+      paymentIntentParams.capture_method = 'manual';
+      log.info('Using manual capture for non-instant book spot', { bookingId: booking.id });
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
+
+    log.info('PaymentIntent created for guest', { 
+      paymentIntentId: paymentIntent.id, 
+      captureMethod: paymentIntentParams.capture_method || 'automatic',
+      isInstantBook
+    });
 
     // Update booking with payment intent ID
     await supabaseAdmin
@@ -343,12 +370,91 @@ serve(async (req) => {
       .update({ stripe_payment_intent_id: paymentIntent.id })
       .eq('id', booking.id);
 
+    // For non-instant book spots, send host notification about the booking request
+    if (!isInstantBook) {
+      log.info('Sending host notification for booking request', { hostId: spot.host_id });
+      
+      // Create in-app notification for host
+      await supabaseAdmin
+        .from('notifications')
+        .insert({
+          user_id: spot.host_id,
+          type: 'booking_approval_required',
+          title: 'New Booking Request',
+          message: `${sanitizedName} has requested to book ${spot.title}. You have 1 hour to respond.`,
+          related_id: booking.id,
+        });
+
+      // Get host profile for email/push notifications
+      const { data: hostProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('email, first_name')
+        .eq('user_id', spot.host_id)
+        .single();
+
+      // Send push notification to host
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL');
+        const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+        
+        await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'X-Internal-Secret': serviceRoleKey || '',
+          },
+          body: JSON.stringify({
+            userId: spot.host_id,
+            title: 'New Booking Request',
+            body: `${sanitizedName} wants to book ${spot.title}. Respond within 1 hour.`,
+            url: `/activity`,
+          }),
+        });
+        log.debug('Push notification sent to host');
+      } catch (pushError) {
+        log.warn('Failed to send push notification to host', { error: (pushError as Error).message });
+      }
+
+      // Send email notification to host
+      if (hostProfile?.email) {
+        try {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL');
+          const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+          
+          await fetch(`${supabaseUrl}/functions/v1/send-booking-confirmation`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${serviceRoleKey}`,
+            },
+            body: JSON.stringify({
+              to: hostProfile.email,
+              type: 'host_request',
+              hostName: hostProfile.first_name || 'Host',
+              driverName: sanitizedName,
+              spotTitle: spot.title,
+              spotAddress: spot.address,
+              startAt: start_at,
+              endAt: end_at,
+              totalAmount,
+              bookingId: booking.id,
+            }),
+          });
+          log.debug('Email notification sent to host');
+        } catch (emailError) {
+          log.warn('Failed to send email notification to host', { error: (emailError as Error).message });
+        }
+      }
+    }
+
     // Return client secret for Stripe Elements
     return new Response(JSON.stringify({
       client_secret: paymentIntent.client_secret,
       payment_intent_id: paymentIntent.id,
       booking_id: booking.id,
       guest_access_token: guestAccessToken,
+      approval_required: !isInstantBook,
       pricing: {
         subtotal,
         platform_fee: platformFee,
@@ -361,7 +467,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Guest booking error:', error);
+    log.error('Guest booking error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
