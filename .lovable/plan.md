@@ -1,59 +1,79 @@
 
-# Recurring Calendar Tab Redesign
+# Detailed Preview for Manage Availability
 
 ## Overview
 
-The current Recurring Schedule tab has a flow where users:
-1. First set hours on a blank weekly grid
-2. Then select which spots to apply those hours to
+The current preview section on `/manage-availability` shows a summary like "24/7 availability" or "3 days with custom hours". The user wants a more detailed preview that:
 
-The user wants to change this to:
-1. First select a spot from a dropdown to view its existing schedule
-2. The grid populates with that spot's current weekly schedule
-3. Modify the schedule as needed
-4. Select which spots to apply the new schedule to (with the source spot pre-selected)
-5. Save to override all selected spots' recurring schedules
-
-This creates a more intuitive "copy and modify" workflow.
+1. Lists specific day names and time ranges
+2. Shows small, narrow cards for each spot being updated
 
 ---
 
-## Current vs New Flow
+## Current vs Proposed Preview
 
+### Date Override Tab - Current
 ```text
-CURRENT FLOW:
-Step 1: Draw schedule on blank grid
-Step 2: Select spots to apply it to
-Step 3: Save
-
-NEW FLOW:
-Step 1: Select source spot from dropdown (grid auto-fills with its schedule)
-Step 2: Modify schedule as needed
-Step 3: Select which spots to apply it to (source spot pre-selected)
-Step 4: Save
++----------------------------------------------+
+| Changes Preview                              |
+|                                              |
+| [Current: Available all day] → [New: Blocked]|
+|                                              |
+| 3 spots × 2 dates will be updated            |
+| Dates: Jan 29, Jan 30                        |
++----------------------------------------------+
 ```
 
----
+### Date Override Tab - Proposed
+```text
++----------------------------------------------+
+| Changes Preview                              |
+|                                              |
+| [Current: Available all day] → [New: Blocked]|
+|                                              |
+| Applies to:                                  |
+| +--------+ +--------+ +--------+             |
+| |Venice  | |Santa   | |Downtown|             |
+| |Beach   | |Monica  | |Garage  |             |
+| +--------+ +--------+ +--------+             |
+|                                              |
+| Dates: Wed Jan 29, Thu Jan 30                |
++----------------------------------------------+
+```
 
-## UI Changes
+### Recurring Tab - Current
+```text
++----------------------------------------------+
+| Preview                                      |
+|                                              |
+| 2 spots will have their recurring schedule   |
+| replaced with:                               |
+|                                              |
+| [3 days with custom hours]                   |
++----------------------------------------------+
+```
 
-### Step 1: Source Spot Dropdown (NEW)
-
-Add a dropdown at the top of the recurring tab labeled "Load schedule from:" with all the host's spots listed. When a spot is selected:
-- The WeeklyScheduleGrid initializes with that spot's existing rules
-- The spot is auto-selected in the "apply to" list
-
-### Step 2: Schedule Grid
-
-- Grid is no longer blank by default
-- Initializes with the selected source spot's rules
-- Host can modify freely using drag, quick actions (24/7, M-F 9-5), or undo
-
-### Step 3: Apply To Selection
-
-- The source spot from Step 1 is pre-checked
-- Host can select additional spots to apply the same schedule to
-- Shows current schedule summary for each spot so host can see what will be replaced
+### Recurring Tab - Proposed
+```text
++----------------------------------------------+
+| Preview                                      |
+|                                              |
+| New Schedule:                                |
+| • Mon:  9:00 AM - 5:00 PM                    |
+| • Tue:  9:00 AM - 5:00 PM                    |
+| • Wed:  9:00 AM - 12:00 PM, 2:00 PM - 6:00 PM|
+| • Thu:  Closed                               |
+| • Fri:  9:00 AM - 5:00 PM                    |
+| • Sat:  10:00 AM - 4:00 PM                   |
+| • Sun:  Closed                               |
+|                                              |
+| Applies to:                                  |
+| +--------+ +--------+                        |
+| |Venice  | |Downtown|                        |
+| |Beach   | |Garage  |                        |
+| +--------+ +--------+                        |
++----------------------------------------------+
+```
 
 ---
 
@@ -62,168 +82,184 @@ Add a dropdown at the top of the recurring tab labeled "Load schedule from:" wit
 ### File to Modify
 `src/pages/ManageAvailability.tsx`
 
-### State Changes
+### 1. Create Helper Function for Detailed Day/Time Breakdown
 
-Add new state variable:
+Add a new function that converts `recurringRules` into a detailed per-day breakdown:
+
 ```typescript
-const [sourceSpotId, setSourceSpotId] = useState<string | null>(null);
-```
-
-### Logic Changes
-
-1. When `sourceSpotId` changes, load that spot's rules from `spotRecurringRules[sourceSpotId]` and update `recurringRules`
-
-2. Auto-add the source spot to `recurringSelectedSpots` when it's selected
-
-3. Convert stored rules format to grid format (they're the same `AvailabilityRule` type)
-
-### WeeklyScheduleGrid Changes
-
-The `WeeklyScheduleGrid` component needs a way to reset with new initial rules. Currently it only uses `initialRules` on mount. Two options:
-
-**Option A**: Add a `key` prop that forces remount when source spot changes
-```tsx
-<WeeklyScheduleGrid
-  key={sourceSpotId || 'blank'}
-  initialRules={spotRecurringRules[sourceSpotId] || []}
-  onChange={setRecurringRules}
-/>
-```
-
-**Option B**: Add a controlled mode or `reset` mechanism to the component
-
-Option A (using key) is simpler and works well for this use case.
-
----
-
-## Updated Recurring Tab Layout
-
-```text
-+------------------------------------------------------+
-| 1. Load Schedule From                                |
-|                                                      |
-| [ Select a spot to load its schedule... v ]  <- Dropdown
-|                                                      |
-+------------------------------------------------------+
-
-+------------------------------------------------------+
-| 2. Set Your Weekly Hours                             |
-|                                                      |
-| +--------------------------------------------------+ |
-| |  When2Meet Grid (pre-filled if spot selected)    | |
-| |                                                  | |
-| |  [24/7] [M-F 9-5] [Undo]                         | |
-| +--------------------------------------------------+ |
-+------------------------------------------------------+
-
-+------------------------------------------------------+
-| 3. Apply to Spots                                    |
-|                                                      |
-| [ ] Select All                                       |
-| [x] Venice Beach Driveway ($5/hr) - Current: 24/7    |  <- Pre-selected
-| [ ] Santa Monica Spot ($3/hr) - Current: M-F 9-5     |
-| [ ] Downtown Garage ($8/hr) - Current: No schedule   |
-+------------------------------------------------------+
-
-+------------------------------------------------------+
-|             [ Apply to 1 Spot ]                      |
-+------------------------------------------------------+
-```
-
----
-
-## Changes Required
-
-### 1. Add Source Spot Dropdown
-
-Import the Select components and add above the grid:
-
-```tsx
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-```
-
-Add in the recurring tab before the grid section:
-
-```tsx
-<section>
-  <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-    <span className="bg-primary...">1</span>
-    Load Schedule From
-  </h2>
+const getDetailedRecurringPreview = (): { day: string; times: string }[] => {
+  const DAYS_FULL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const result: { day: string; times: string }[] = [];
   
-  <Select value={sourceSpotId || ''} onValueChange={(value) => {
-    setSourceSpotId(value || null);
-    // Auto-select this spot for applying
-    if (value && !recurringSelectedSpots.includes(value)) {
-      setRecurringSelectedSpots(prev => [...prev, value]);
+  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+    const dayRules = recurringRules.filter(r => r.day_of_week === dayIndex);
+    
+    if (dayRules.length === 0) {
+      result.push({ day: DAYS_FULL[dayIndex], times: 'Closed' });
+    } else {
+      // Check for 24h
+      const totalMinutes = dayRules.reduce((sum, r) => {
+        const [sh, sm] = r.start_time.split(':').map(Number);
+        const [eh, em] = r.end_time.split(':').map(Number);
+        return sum + ((eh * 60 + em) - (sh * 60 + sm));
+      }, 0);
+      
+      if (totalMinutes >= 24 * 60 - 30) {
+        result.push({ day: DAYS_FULL[dayIndex], times: '24 hours' });
+      } else {
+        // Format each time range
+        const ranges = dayRules.map(r => {
+          return `${formatTime12h(r.start_time)} - ${formatTime12h(r.end_time)}`;
+        });
+        result.push({ day: DAYS_FULL[dayIndex], times: ranges.join(', ') });
+      }
     }
-  }}>
-    <SelectTrigger>
-      <SelectValue placeholder="Select a spot to load its schedule..." />
-    </SelectTrigger>
-    <SelectContent className="bg-background">
-      {spots.map(spot => (
-        <SelectItem key={spot.id} value={spot.id}>
-          {spot.title} - {getRecurringScheduleSummary(spot.id)}
-        </SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
+  }
   
-  <p className="text-xs text-muted-foreground mt-2">
-    Or start with a blank schedule and use the quick actions below
-  </p>
-</section>
+  return result;
+};
 ```
 
-### 2. Update WeeklyScheduleGrid with Dynamic Key
+### 2. Add Time Formatting Helper
+
+```typescript
+const formatTime12h = (time: string): string => {
+  const [hours, minutes] = time.split(':').map(Number);
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const hour12 = hours % 12 || 12;
+  if (minutes === 0) return `${hour12} ${ampm}`;
+  return `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+};
+```
+
+### 3. Update Recurring Tab Preview Section (lines ~1401-1425)
+
+Replace the simple preview with detailed day breakdown and spot cards:
 
 ```tsx
-<WeeklyScheduleGrid
-  key={sourceSpotId || 'blank'}
-  initialRules={sourceSpotId ? (spotRecurringRules[sourceSpotId] || []) : []}
-  onChange={setRecurringRules}
-/>
+{recurringSelectedSpots.length > 0 && (
+  <section>
+    <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+      <RefreshCw className="h-5 w-5" />
+      Preview
+    </h2>
+    
+    <Card className="p-4 border-primary/30 bg-primary/5">
+      <div className="space-y-4">
+        {/* Day/Time Breakdown */}
+        <div>
+          <p className="text-xs font-medium text-muted-foreground uppercase mb-2">
+            New Schedule
+          </p>
+          {recurringRules.length === 0 ? (
+            <p className="text-sm text-amber-600 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              Schedule will be cleared (no hours)
+            </p>
+          ) : (
+            <div className="space-y-1">
+              {getDetailedRecurringPreview().map(({ day, times }) => (
+                <div key={day} className="flex text-sm">
+                  <span className="w-10 font-medium text-muted-foreground">{day}:</span>
+                  <span className={cn(
+                    times === 'Closed' && 'text-muted-foreground italic'
+                  )}>
+                    {times}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        {/* Spot Cards */}
+        <div>
+          <p className="text-xs font-medium text-muted-foreground uppercase mb-2">
+            Applies to
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {recurringSelectedSpots.map(spotId => {
+              const spot = spots.find(s => s.id === spotId);
+              if (!spot) return null;
+              return (
+                <div
+                  key={spotId}
+                  className="bg-background border rounded px-2 py-1 text-xs font-medium truncate max-w-[120px]"
+                  title={spot.title}
+                >
+                  {spot.title}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </Card>
+  </section>
+)}
 ```
 
-### 3. Renumber Steps
+### 4. Update Date Override Tab Preview Section (lines ~1160-1224)
 
-- Step 1: Load Schedule From (new)
-- Step 2: Set Your Weekly Hours (was Step 1)
-- Step 3: Select Spots to Update (was Step 2)
-
-### 4. Update Preview Section Text
-
-Clarify that the new schedule will replace existing schedules:
+Add spot cards below the current before/after comparison:
 
 ```tsx
-<p className="text-sm">
-  <strong>{recurringSelectedSpots.length}</strong> spot{recurringSelectedSpots.length !== 1 ? 's' : ''} 
-  will have their recurring schedule replaced with:
-</p>
+{/* Affected spots/dates summary */}
+<div className="mt-3 pt-3 border-t space-y-3">
+  {/* Dates List */}
+  <div>
+    <p className="text-xs font-medium text-muted-foreground uppercase mb-1.5">
+      Dates
+    </p>
+    <p className="text-sm">
+      {selectedDates.length <= 5 
+        ? selectedDates.map(d => format(d, 'EEE MMM d')).join(', ')
+        : `${selectedDates.length} dates selected`
+      }
+    </p>
+  </div>
+  
+  {/* Spot Cards */}
+  <div>
+    <p className="text-xs font-medium text-muted-foreground uppercase mb-1.5">
+      Applies to
+    </p>
+    <div className="flex flex-wrap gap-1.5">
+      {selectedSpots.map(spotId => {
+        const spot = spots.find(s => s.id === spotId);
+        if (!spot) return null;
+        return (
+          <div
+            key={spotId}
+            className="bg-background border rounded px-2 py-1 text-xs font-medium truncate max-w-[120px]"
+            title={spot.title}
+          >
+            {spot.title}
+          </div>
+        );
+      })}
+    </div>
+  </div>
+</div>
 ```
-
----
-
-## Edge Cases Handled
-
-1. **No source spot selected**: Grid starts blank, user can draw or use quick actions
-2. **Source spot has no schedule**: Grid starts blank, same as above
-3. **User changes source spot**: Grid resets to new spot's schedule (via key change)
-4. **Source spot removed from apply list**: Allowed (user might want to copy but not update source)
 
 ---
 
 ## Summary of Changes
 
-| File | Change |
-|------|--------|
-| `src/pages/ManageAvailability.tsx` | Add `sourceSpotId` state, add Select dropdown section, pass `key` and `initialRules` to grid, renumber sections, update Preview text |
+| Location | Change |
+|----------|--------|
+| New helper function | `getDetailedRecurringPreview()` - returns per-day time breakdown |
+| New helper function | `formatTime12h()` - formats "HH:MM" to "12:00 PM" style |
+| Recurring tab preview (lines ~1401-1425) | Replace simple summary with day-by-day breakdown + spot cards |
+| Date override tab preview (lines ~1210-1220) | Add spot cards below dates summary |
 
-No changes needed to `WeeklyScheduleGrid.tsx` since using the `key` prop handles the reset behavior.
+---
+
+## Design Notes
+
+- **Spot cards**: Small, narrow (height ~24px), with truncated text and max-width of 120px
+- **Day breakdown**: Compact list with abbreviated day names (Mon, Tue, etc.)
+- **Closed days**: Shown in italic muted text
+- **Time format**: 12-hour format without leading zeros (9 AM, 12 PM, etc.)
+- **Multiple ranges**: Shown comma-separated on same line (e.g., "9 AM - 12 PM, 2 PM - 6 PM")
