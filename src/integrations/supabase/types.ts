@@ -1231,53 +1231,29 @@ export type Database = {
       }
       cleanup_expired_holds: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: number }
-      create_booking_atomic:
-        | {
-            Args: {
-              p_end_at: string
-              p_ev_charging_fee: number
-              p_host_earnings: number
-              p_hourly_rate: number
-              p_idempotency_key: string
-              p_platform_fee: number
-              p_spot_id: string
-              p_start_at: string
-              p_subtotal: number
-              p_total_amount: number
-              p_total_hours: number
-              p_user_id: string
-              p_vehicle_id: string
-              p_will_use_ev_charging: boolean
-            }
-            Returns: {
-              booking_id: string
-              error_message: string
-              success: boolean
-            }[]
-          }
-        | {
-            Args: {
-              p_end_at: string
-              p_ev_charging_fee: number
-              p_host_earnings: number
-              p_hourly_rate: number
-              p_idempotency_key: string
-              p_platform_fee: number
-              p_spot_id: string
-              p_start_at: string
-              p_subtotal: number
-              p_total_amount: number
-              p_total_hours: number
-              p_user_id: string
-              p_vehicle_id: string
-              p_will_use_ev_charging: boolean
-            }
-            Returns: {
-              booking_id: string
-              error_message: string
-              success: boolean
-            }[]
-          }
+      create_booking_atomic: {
+        Args: {
+          p_end_at: string
+          p_ev_charging_fee: number
+          p_host_earnings: number
+          p_hourly_rate: number
+          p_idempotency_key: string
+          p_platform_fee: number
+          p_spot_id: string
+          p_start_at: string
+          p_subtotal: number
+          p_total_amount: number
+          p_total_hours: number
+          p_user_id: string
+          p_vehicle_id: string
+          p_will_use_ev_charging: boolean
+        }
+        Returns: {
+          booking_id: string
+          error_message: string
+          success: boolean
+        }[]
+      }
       create_booking_hold: {
         Args: {
           p_end_at: string
