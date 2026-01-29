@@ -838,7 +838,7 @@ const ManageAvailability = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-4">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-3">
@@ -884,7 +884,7 @@ const ManageAvailability = () => {
 
         {/* Date Override Tab Content */}
         <TabsContent value="date-override" className="mt-0">
-          <div className="p-4 space-y-6">
+          <div className="px-4 pt-4 pb-2 space-y-4">
         {/* Section 1: Spot Selection */}
         <section>
           <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
@@ -1332,8 +1332,8 @@ const ManageAvailability = () => {
         </TabsContent>
 
         {/* Recurring Schedule Tab Content */}
-        <TabsContent value="recurring" className="mt-0 flex-1 overflow-y-auto">
-          <div className="p-4 space-y-4">
+        <TabsContent value="recurring" className="mt-0">
+          <div className="px-4 pt-4 pb-2 space-y-4">
             {/* Step 1: Load Schedule From */}
             <section>
               <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
