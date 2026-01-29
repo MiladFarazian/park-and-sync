@@ -284,11 +284,12 @@ const Explore = () => {
               ? Math.max(1, (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60))
               : null;
 
-            const driverHourlyRate = matchingSpot.hourly_rate;
+            // Driver rate equals host rate - no hidden upcharge
+            const hostHourlyRate = matchingSpot.hourly_rate;
+            const driverHourlyRate = hostHourlyRate;
             let totalPrice: number | undefined;
             if (bookingHours) {
               const driverSubtotal = driverHourlyRate * bookingHours;
-              let hostHourlyRate = driverHourlyRate > 6 ? driverHourlyRate / 1.20 : driverHourlyRate - 1;
               const hostEarnings = hostHourlyRate * bookingHours;
               const serviceFee = Math.max(hostEarnings * 0.20, 1.00);
               const evPremium = matchingSpot.ev_charging_premium_per_hour || 0;
@@ -941,21 +942,9 @@ const Explore = () => {
         if (bookingHours) {
           const willUseEvCharging = evChargerTypeFilter != null && spot.has_ev_charging;
           
-          // Driver subtotal is simply the displayed rate × hours (no additional markup)
+          // Driver rate equals host rate - no hidden upcharge
+          const hostHourlyRate = driverHourlyRate;
           const driverSubtotal = driverHourlyRate * bookingHours;
-          
-          // Reverse-engineer host rate to calculate correct service fee
-          // For rates where 20% > $1 (i.e., host rate > $5): driverRate = hostRate × 1.20
-          // For rates where 20% ≤ $1 (i.e., host rate ≤ $5): driverRate = hostRate + $1
-          let hostHourlyRate: number;
-          if (driverHourlyRate > 6) {
-            // High rate: markup was 20%, so hostRate = driverRate / 1.20
-            hostHourlyRate = driverHourlyRate / 1.20;
-          } else {
-            // Low rate: markup was $1, so hostRate = driverRate - $1
-            hostHourlyRate = driverHourlyRate - 1;
-          }
-          
           const hostEarnings = hostHourlyRate * bookingHours;
           const serviceFee = Math.max(hostEarnings * 0.20, 1.00);
           const evChargingFee = willUseEvCharging ? evPremium * bookingHours : 0;

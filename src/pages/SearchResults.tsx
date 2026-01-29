@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import MapView from '@/components/map/MapView';
-import { calculateDriverPrice } from '@/lib/pricing';
+// calculateDriverPrice import removed - driver rate now equals host rate
 import { logger } from '@/lib/logger';
 
 const log = logger.scope('SearchResults');
@@ -113,7 +113,7 @@ const SearchResults = () => {
         title: spot.title,
         category: spot.category,
         address: spot.address,
-        hourlyRate: spot.driver_hourly_rate || calculateDriverPrice(parseFloat(spot.hourly_rate)),
+        hourlyRate: parseFloat(spot.hourly_rate),
         rating: parseFloat(spot.profiles?.rating || 0),
         reviews: spot.profiles?.review_count || 0,
         lat: parseFloat(spot.latitude),
