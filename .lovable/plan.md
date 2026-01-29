@@ -1,113 +1,131 @@
 
-# Support App Improvements Plan
+# Support App: Back Button & Booking Details Fix
 
 ## Overview
 
-This plan addresses two main improvements to the Support version of the app:
+Two issues need to be resolved for the Support version of the app:
 
-1. **Standardize booking status naming** across Support pages to match Driver/Host conventions (Booked, Active, Completed, Cancelled)
-2. **Enable clickable user profiles** from Booking Details that navigate to the existing User Profile page
+1. **Back button for `/support-user` routes** - Ensure reliable navigation
+2. **Booking Details accuracy** - Show both Driver AND Host correctly for Support users
 
 ---
 
-## Part 1: Standardize Booking Status Labels
+## Issue 1: Back Button Navigation
 
 ### Current State
-- Support pages (`SupportReservations.tsx`, `SupportUserDetail.tsx`) display raw database statuses: "Pending", "Held", "Paid", "Active", etc.
-- Driver/Host pages use a standardized system with: "Booked", "Active", "Completed", "Cancelled", "Requested", "Expired"
+The back button in `SupportUserDetail.tsx` uses `navigate(-1)` which relies on browser history. This works when there's history, but may fail if:
+- Support user directly lands on a `/support-user/:id` URL
+- The redirect from disallowed routes clears history
 
-### Changes Required
-
-**File: `src/pages/SupportReservations.tsx`**
-- Import `getBookingStatus` and `getBookingStatusColor` from `@/lib/bookingStatus`
-- Replace the `getStatusBadge` function to use the standardized terminology
-- The function will transform raw statuses to user-friendly labels (e.g., "paid" → "Booked", "canceled" → "Cancelled")
+### Solution
+Add a fallback route when `navigate(-1)` has no history to go back to. Use `/support-reservations` as the default fallback since that's the most common origin for viewing user details.
 
 **File: `src/pages/SupportUserDetail.tsx`**
-- Same changes as above for the `getStatusBadge` function in the Bookings tab
-- Import and use the booking status utilities
 
-### Status Mapping
-| Database Status | Display Label |
-|-----------------|---------------|
-| pending (before start) | Requested or Booked |
-| held | Booked |
-| paid | Active (if ongoing) or Booked (if upcoming) |
-| active | Active (if ongoing) or Booked (if upcoming) |
-| completed | Completed |
-| canceled | Cancelled |
-| refunded | Cancelled |
+```text
+Lines 257 and 244 - Update back button handlers:
+
+Current:
+onClick={() => navigate(-1)}
+
+Updated:
+onClick={() => {
+  if (window.history.length > 1) {
+    navigate(-1);
+  } else {
+    navigate('/support-reservations');
+  }
+}}
+```
 
 ---
 
-## Part 2: Clickable User Profiles from Booking Details
+## Issue 2: Booking Details - Accurate Driver/Host Display for Support
 
-### Goal
-When a Support user views a booking's details, clicking on the Host or Driver section should navigate to `/support-user/:userId` to view their full profile.
+### Current Problem
+When a Support user views a booking:
+- `isHost` = `user?.id === booking.spots.host_id` evaluates to `false` (Support isn't the host)
+- The page shows only ONE user card labeled "Host"
+- BUT it displays the **renter's profile** (`profiles!bookings_renter_id_fkey`) incorrectly labeled as "Host"
+- The actual Host's information is never fetched or displayed
 
-### Changes Required
+### Solution
 
-**File: `src/components/auth/SupportRedirect.tsx`**
-- Add `/support-user/` to the allowed routes array (currently missing, which would cause support users to be blocked)
+**Part A: Fetch Host Profile**
+
+Update the Supabase query to also fetch the host's profile via the spots relationship.
 
 **File: `src/pages/BookingDetail.tsx`**
-- Import `useSupportRole` hook
-- Detect if current user is a support user
-- For the Host/Driver card section (around line 970-1016):
-  - Add click handlers when `isSupport` is true
-  - Make the user info section clickable
-  - Navigate to `/support-user/:userId` on click
-  - Add visual indicators (cursor, hover state) that it's clickable
-  - Show the user's role context (e.g., "View Driver Profile" or "View Host Profile")
-
-### Visual Changes
-- When support user hovers over user info, show a subtle highlight
-- Add a "View Profile" button or chevron indicator
-- Click navigates to the existing SupportUserDetail page
-
----
-
-## Implementation Details
-
-### SupportReservations.tsx Changes
 
 ```text
-Replace getStatusBadge function:
-1. Import getBookingStatus, getBookingStatusColor
-2. Update function to call getBookingStatus with booking data
-3. Use returned label and color for consistent styling
+1. Update BookingDetails interface (add host_profile):
+
+interface BookingDetails {
+  // ... existing fields ...
+  spots: {
+    // ... existing fields ...
+    host_profile: {
+      first_name: string;
+      last_name: string;
+      avatar_url: string | null;
+      privacy_show_profile_photo?: boolean | null;
+      privacy_show_full_name?: boolean | null;
+    } | null;
+  };
+  profiles: { ... }; // This is the RENTER's profile
+}
+
+2. Update the Supabase query to join host profile through spots:
+
+spots!inner(
+  id, title, address, host_id, description, access_notes, 
+  has_ev_charging, ev_charging_instructions, instant_book, 
+  spot_photos(url, is_primary, sort_order),
+  host_profile:profiles!spots_host_id_fkey(
+    first_name, last_name, avatar_url, 
+    privacy_show_profile_photo, privacy_show_full_name
+  )
+)
 ```
 
-### SupportUserDetail.tsx Changes
+**Part B: Conditional UI for Support Users**
+
+For Support users, render TWO separate cards instead of one:
 
 ```text
-Same pattern as SupportReservations:
-1. Import booking status utilities
-2. Update getStatusBadge in bookings tab
-3. Each booking row already navigates to /booking/:id on click (keep this)
-```
+{/* For Support users - show BOTH Driver and Host */}
+{isSupport && (
+  <>
+    {/* Driver Card */}
+    <Card className="p-4 space-y-4">
+      <h3 className="font-semibold">Driver</h3>
+      <div 
+        className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 -m-2 p-2 rounded-lg transition-colors"
+        onClick={() => navigate(`/support-user/${booking.renter_id}`)}
+      >
+        {/* Renter avatar and info */}
+        <ChevronRight />
+      </div>
+    </Card>
+    
+    {/* Host Card */}
+    <Card className="p-4 space-y-4">
+      <h3 className="font-semibold">Host</h3>
+      <div 
+        className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 -m-2 p-2 rounded-lg transition-colors"
+        onClick={() => navigate(`/support-user/${booking.spots.host_id}`)}
+      >
+        {/* Host avatar and info from spots.host_profile */}
+        <ChevronRight />
+      </div>
+    </Card>
+  </>
+)}
 
-### BookingDetail.tsx Changes
-
-```text
-1. Import useSupportRole hook
-2. Get isSupport from hook
-3. In Host/Driver card section:
-   - Wrap user info in clickable container when isSupport
-   - Add onClick handler: navigate(`/support-user/${userId}`)
-   - Add ChevronRight icon as visual indicator
-   - Add hover:bg-muted/50 for visual feedback
-4. Determine correct userId:
-   - If viewing as host: use renter_id
-   - If viewing as driver: use host_id
-   - For support: show both options with clear labels
-```
-
-### SupportRedirect.tsx Changes
-
-```text
-Add to SUPPORT_ALLOWED_ROUTES array:
-'/support-user/'
+{/* For regular users (Driver/Host) - show existing single card */}
+{!isSupport && (
+  <Card>...</Card>
+)}
 ```
 
 ---
@@ -116,31 +134,62 @@ Add to SUPPORT_ALLOWED_ROUTES array:
 
 | File | Changes |
 |------|---------|
-| `src/pages/SupportReservations.tsx` | Use getBookingStatus for labels |
-| `src/pages/SupportUserDetail.tsx` | Use getBookingStatus for labels |
-| `src/pages/BookingDetail.tsx` | Add clickable user navigation for support |
-| `src/components/auth/SupportRedirect.tsx` | Add /support-user/ to allowed routes |
+| `src/pages/SupportUserDetail.tsx` | Add fallback navigation for back button |
+| `src/pages/BookingDetail.tsx` | Fetch host profile, show both Driver + Host cards for Support |
 
 ---
 
-## Expected Behavior After Implementation
+## Implementation Details
 
-### Status Labels
-- All Support pages will display consistent terminology matching Driver/Host views
-- "Booked" for upcoming confirmed bookings
-- "Active" for in-progress bookings
-- "Completed" for finished bookings
-- "Cancelled" for canceled/refunded bookings
+### SupportUserDetail.tsx Changes
 
-### User Profile Navigation
-1. Support user opens `/booking/:id`
-2. Sees the Host and/or Driver section
-3. Each section shows the user info with a clickable indicator
-4. Clicking opens `/support-user/:userId`
-5. The SupportUserDetail page shows:
-   - Full user profile (name, email, phone, verification status)
-   - Their bookings as a driver
-   - Their registered vehicles
-   - Their listed spots as a host
+**Line 244** (User not found state):
+```typescript
+<Button className="mt-4" onClick={() => {
+  if (window.history.length > 1) {
+    navigate(-1);
+  } else {
+    navigate('/support-reservations');
+  }
+}}>
+```
 
-This provides support staff with a complete view of any user's activity on the platform from any booking they investigate.
+**Line 257** (Header back button):
+```typescript
+<Button variant="ghost" size="icon" onClick={() => {
+  if (window.history.length > 1) {
+    navigate(-1);
+  } else {
+    navigate('/support-reservations');
+  }
+}}>
+```
+
+### BookingDetail.tsx Changes
+
+**Interface update** (around line 54-69):
+Add `host_profile` to the `spots` interface to hold the host's profile information.
+
+**Query update** (line 188):
+Add the host profile join via `host_profile:profiles!spots_host_id_fkey(...)`.
+
+**UI update** (lines 972-1030):
+Replace the existing single card with conditional rendering:
+- If `isSupport`: Show two cards (Driver + Host) with clickable navigation
+- Otherwise: Show the existing single card based on `isHost` flag
+
+---
+
+## Expected Behavior After Fix
+
+### Back Button
+- Clicking back on `/support-user/:id` navigates to the previous page
+- If no history exists, falls back to `/support-reservations`
+
+### Booking Details for Support
+- Support users see TWO cards:
+  1. **Driver** - The person who booked the spot (with their name, avatar)
+  2. **Host** - The spot owner (with their name, avatar)
+- Each card shows a chevron indicator and is clickable
+- Clicking navigates to `/support-user/:userId` for the respective user
+- Labels are accurate: "Driver" for renter, "Host" for spot owner
