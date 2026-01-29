@@ -90,13 +90,13 @@ Deno.Deno.serve(async (req) => {
       throw new Error('Spot is not available for the requested times');
     }
 
-    // Calculate new costs with invisible upcharge + visible service fee + EV charging
+    // Calculate new costs: driver rate equals host rate + visible service fee + EV charging
     const durationMs = newEnd.getTime() - newStart.getTime();
     const newTotalHours = durationMs / (1000 * 60 * 60);
     const hostHourlyRate = booking.spots.hourly_rate;
     const hostEarnings = hostHourlyRate * newTotalHours;
-    const upcharge = Math.max(hostHourlyRate * 0.20, 1.00);
-    const driverHourlyRate = hostHourlyRate + upcharge;
+    // Driver rate equals host rate - no hidden upcharge
+    const driverHourlyRate = hostHourlyRate;
     const driverSubtotal = Math.round(driverHourlyRate * newTotalHours * 100) / 100;
     const newPlatformFee = Math.round(Math.max(hostEarnings * 0.20, 1.00) * 100) / 100;
     

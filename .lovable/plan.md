@@ -195,11 +195,22 @@ hourlyRate: parseFloat(spot.hourly_rate),
 ## Testing Checklist
 
 After implementation, verify:
-- [ ] Explore page shows correct hourly rates from spots table
-- [ ] Spot detail page shows host's actual rate
-- [ ] Booking page calculates correct totals without hidden markup
-- [ ] Guest booking flow charges correct amount
-- [ ] Booking extensions charge correct additional amount
-- [ ] Time modifications calculate correct price differences
-- [ ] Map pins show correct total prices for selected duration
+- [x] Explore page shows correct hourly rates from spots table
+- [x] Spot detail page shows host's actual rate
+- [x] Booking page calculates correct totals without hidden markup
+- [x] Guest booking flow charges correct amount
+- [x] Booking extensions charge correct additional amount
+- [x] Time modifications calculate correct price differences
+- [x] Map pins show correct total prices for selected duration
 - [ ] All emails show correct pricing
+
+## Implementation Status
+
+**COMPLETED** - All hidden upcharge logic has been removed from:
+- `src/lib/pricing.ts` - Core frontend pricing
+- `supabase/functions/_shared/pricing.ts` - Backend shared pricing
+- `supabase/functions/create-booking/index.ts` - New bookings
+- `supabase/functions/extend-booking/index.ts` - Booking extensions
+- `supabase/functions/modify-booking-times/index.ts` - Time modifications
+- `src/pages/Explore.tsx` - Map and search results (removed reverse-engineering logic)
+- `src/pages/SearchResults.tsx` - Search results page

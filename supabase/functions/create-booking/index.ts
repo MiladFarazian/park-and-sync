@@ -178,9 +178,8 @@ serve(async (req) => {
     const hostHourlyRate = parseFloat(spot.hourly_rate);
     const hostEarnings = Math.round(totalHours * hostHourlyRate * 100) / 100; // What host actually earns
     
-    // Invisible upcharge on hourly rate
-    const upcharge = Math.max(hostHourlyRate * 0.20, 1.00);
-    const driverHourlyRate = hostHourlyRate + upcharge;
+    // Driver rate equals host rate - no hidden upcharge
+    const driverHourlyRate = hostHourlyRate;
     const driverSubtotal = Math.round(driverHourlyRate * totalHours * 100) / 100;
     
     // Visible service fee

@@ -165,11 +165,11 @@ serve(async (req) => {
       throw new Error('This spot is not available during the requested extension time.');
     }
 
-    // Calculate extension cost with invisible upcharge + visible service fee + EV charging
+    // Calculate extension cost: driver rate equals host rate + visible service fee + EV charging
     const hostHourlyRate = booking.spots.hourly_rate;
     const hostEarnings = hostHourlyRate * extensionHours;
-    const upcharge = Math.max(hostHourlyRate * 0.20, 1.00);
-    const driverHourlyRate = hostHourlyRate + upcharge;
+    // Driver rate equals host rate - no hidden upcharge
+    const driverHourlyRate = hostHourlyRate;
     const driverSubtotal = Math.round(driverHourlyRate * extensionHours * 100) / 100;
     const serviceFee = Math.round(Math.max(hostEarnings * 0.20, 1.00) * 100) / 100;
     

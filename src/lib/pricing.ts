@@ -16,8 +16,8 @@
  * - Platform revenue: $4 (28.6% of driver total)
  */
 export function calculateDriverPrice(hostHourlyRate: number): number {
-  const upcharge = Math.max(hostHourlyRate * 0.20, 1.00);
-  return Math.round((hostHourlyRate + upcharge) * 100) / 100;
+  // Driver rate equals host rate - no hidden upcharge
+  return Math.round(hostHourlyRate * 100) / 100;
 }
 
 /**
