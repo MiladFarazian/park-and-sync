@@ -1,265 +1,153 @@
 
-# Detailed Preview for Manage Availability
 
-## Overview
+# Multi-Space Listings: Terminology & Availability Display Fix
 
-The current preview section on `/manage-availability` shows a summary like "24/7 availability" or "3 days with custom hours". The user wants a more detailed preview that:
+## Problem Summary
 
-1. Lists specific day names and time ranges
-2. Shows small, narrow cards for each spot being updated
+The user wants to ensure:
+1. **Terminology consistency**: "Spot" = listing, "Space" = individual parking space within a listing
+2. **Quantity is editable**: When listing/editing, hosts should be able to set/change the number of spaces
+3. **Dynamic availability display**: Show "X of Y spaces available" in Explore when some spaces are booked
 
----
+## Current State Analysis
 
-## Current vs Proposed Preview
+### What's Already Working
+- **Quantity is editable** in both ListSpot.tsx and EditSpot.tsx - the field exists and saves correctly
+- **Search returns availability**: `search-spots-lite` calculates and returns `available_quantity` dynamically
+- **DesktopSpotList** already shows "X of Y available" badge for multi-space listings
 
-### Date Override Tab - Current
-```text
-+----------------------------------------------+
-| Changes Preview                              |
-|                                              |
-| [Current: Available all day] → [New: Blocked]|
-|                                              |
-| 3 spots × 2 dates will be updated            |
-| Dates: Jan 29, Jan 30                        |
-+----------------------------------------------+
-```
+### Issues Found
 
-### Date Override Tab - Proposed
-```text
-+----------------------------------------------+
-| Changes Preview                              |
-|                                              |
-| [Current: Available all day] → [New: Blocked]|
-|                                              |
-| Applies to:                                  |
-| +--------+ +--------+ +--------+             |
-| |Venice  | |Santa   | |Downtown|             |
-| |Beach   | |Monica  | |Garage  |             |
-| +--------+ +--------+ +--------+             |
-|                                              |
-| Dates: Wed Jan 29, Thu Jan 30                |
-+----------------------------------------------+
-```
-
-### Recurring Tab - Current
-```text
-+----------------------------------------------+
-| Preview                                      |
-|                                              |
-| 2 spots will have their recurring schedule   |
-| replaced with:                               |
-|                                              |
-| [3 days with custom hours]                   |
-+----------------------------------------------+
-```
-
-### Recurring Tab - Proposed
-```text
-+----------------------------------------------+
-| Preview                                      |
-|                                              |
-| New Schedule:                                |
-| • Mon:  9:00 AM - 5:00 PM                    |
-| • Tue:  9:00 AM - 5:00 PM                    |
-| • Wed:  9:00 AM - 12:00 PM, 2:00 PM - 6:00 PM|
-| • Thu:  Closed                               |
-| • Fri:  9:00 AM - 5:00 PM                    |
-| • Sat:  10:00 AM - 4:00 PM                   |
-| • Sun:  Closed                               |
-|                                              |
-| Applies to:                                  |
-| +--------+ +--------+                        |
-| |Venice  | |Downtown|                        |
-| |Beach   | |Garage  |                        |
-| +--------+ +--------+                        |
-+----------------------------------------------+
-```
+| Location | Current Text | Issue |
+|----------|-------------|-------|
+| ListSpot.tsx | "spots" | Should say "spaces" |
+| EditSpot.tsx | "spots" | Should say "spaces" |
+| SpotDetail.tsx | "X spots available" (static) | Should show "X of Y spaces available" (dynamic) |
+| DesktopSpotList.tsx | "X of Y available" | Should say "X of Y spaces available" |
+| Dashboard.tsx | "X spots" | Should say "X spaces" |
 
 ---
 
-## Technical Implementation
+## Implementation Plan
 
-### File to Modify
-`src/pages/ManageAvailability.tsx`
+### 1. Update ListSpot.tsx Terminology
 
-### 1. Create Helper Function for Detailed Day/Time Breakdown
+**File**: `src/pages/ListSpot.tsx`
 
-Add a new function that converts `recurringRules` into a detailed per-day breakdown:
+Change the quantity field labels from "spots" to "spaces":
+
+```
+Current:
+- "How many identical parking spots?"
+- "All spots share the same price..."
+- "X spots will share one listing"
+- "spots" (suffix after input)
+
+New:
+- "How many identical parking spaces?"
+- "All spaces share the same listing, price, schedule, and rules"
+- "This listing will have X spaces"
+- "spaces" (suffix after input)
+```
+
+### 2. Update EditSpot.tsx Terminology
+
+**File**: `src/pages/EditSpot.tsx`
+
+Same changes as ListSpot:
+- "Number of Identical Spaces" (was "Spots")
+- "All spaces share the same listing..." (was "spots")
+- "X spaces share one listing" (was "spots")
+
+### 3. Update SpotDetail.tsx to Show Dynamic Availability
+
+**File**: `src/pages/SpotDetail.tsx`
+
+Currently shows static total quantity. Need to:
+1. Fetch `available_quantity` for the spot dynamically based on search time range
+2. Display "X of Y spaces available" instead of "X spots available"
+
+This requires calling a function to get the current available quantity. The database has a function `get_spot_available_quantity` that can be used.
 
 ```typescript
-const getDetailedRecurringPreview = (): { day: string; times: string }[] => {
-  const DAYS_FULL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const result: { day: string; times: string }[] = [];
-  
-  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-    const dayRules = recurringRules.filter(r => r.day_of_week === dayIndex);
-    
-    if (dayRules.length === 0) {
-      result.push({ day: DAYS_FULL[dayIndex], times: 'Closed' });
-    } else {
-      // Check for 24h
-      const totalMinutes = dayRules.reduce((sum, r) => {
-        const [sh, sm] = r.start_time.split(':').map(Number);
-        const [eh, em] = r.end_time.split(':').map(Number);
-        return sum + ((eh * 60 + em) - (sh * 60 + sm));
-      }, 0);
-      
-      if (totalMinutes >= 24 * 60 - 30) {
-        result.push({ day: DAYS_FULL[dayIndex], times: '24 hours' });
-      } else {
-        // Format each time range
-        const ranges = dayRules.map(r => {
-          return `${formatTime12h(r.start_time)} - ${formatTime12h(r.end_time)}`;
-        });
-        result.push({ day: DAYS_FULL[dayIndex], times: ranges.join(', ') });
-      }
-    }
+// Add state for available quantity
+const [availableQuantity, setAvailableQuantity] = useState<number | null>(null);
+
+// Fetch available quantity when spot loads or time changes
+useEffect(() => {
+  if (spot?.quantity > 1 && startTime && endTime) {
+    supabase.rpc('get_spot_available_quantity', {
+      p_spot_id: spot.id,
+      p_start_at: startTime.toISOString(),
+      p_end_at: endTime.toISOString(),
+      p_exclude_user_id: user?.id || null
+    }).then(({ data }) => {
+      setAvailableQuantity(data ?? spot.quantity);
+    });
   }
-  
-  return result;
-};
-```
+}, [spot?.id, startTime, endTime, user?.id]);
 
-### 2. Add Time Formatting Helper
+// In render - change from:
+{spot.quantity > 1 && (
+  <Badge>{spot.quantity} spots available</Badge>
+)}
 
-```typescript
-const formatTime12h = (time: string): string => {
-  const [hours, minutes] = time.split(':').map(Number);
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  const hour12 = hours % 12 || 12;
-  if (minutes === 0) return `${hour12} ${ampm}`;
-  return `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
-};
-```
-
-### 3. Update Recurring Tab Preview Section (lines ~1401-1425)
-
-Replace the simple preview with detailed day breakdown and spot cards:
-
-```tsx
-{recurringSelectedSpots.length > 0 && (
-  <section>
-    <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-      <RefreshCw className="h-5 w-5" />
-      Preview
-    </h2>
-    
-    <Card className="p-4 border-primary/30 bg-primary/5">
-      <div className="space-y-4">
-        {/* Day/Time Breakdown */}
-        <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase mb-2">
-            New Schedule
-          </p>
-          {recurringRules.length === 0 ? (
-            <p className="text-sm text-amber-600 flex items-center gap-1">
-              <AlertCircle className="h-3 w-3" />
-              Schedule will be cleared (no hours)
-            </p>
-          ) : (
-            <div className="space-y-1">
-              {getDetailedRecurringPreview().map(({ day, times }) => (
-                <div key={day} className="flex text-sm">
-                  <span className="w-10 font-medium text-muted-foreground">{day}:</span>
-                  <span className={cn(
-                    times === 'Closed' && 'text-muted-foreground italic'
-                  )}>
-                    {times}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        
-        {/* Spot Cards */}
-        <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase mb-2">
-            Applies to
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {recurringSelectedSpots.map(spotId => {
-              const spot = spots.find(s => s.id === spotId);
-              if (!spot) return null;
-              return (
-                <div
-                  key={spotId}
-                  className="bg-background border rounded px-2 py-1 text-xs font-medium truncate max-w-[120px]"
-                  title={spot.title}
-                >
-                  {spot.title}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </Card>
-  </section>
+// To:
+{spot.quantity > 1 && (
+  <Badge>
+    {availableQuantity ?? spot.quantity} of {spot.quantity} spaces available
+  </Badge>
 )}
 ```
 
-### 4. Update Date Override Tab Preview Section (lines ~1160-1224)
+### 4. Update DesktopSpotList.tsx Badge Text
 
-Add spot cards below the current before/after comparison:
+**File**: `src/components/explore/DesktopSpotList.tsx`
 
-```tsx
-{/* Affected spots/dates summary */}
-<div className="mt-3 pt-3 border-t space-y-3">
-  {/* Dates List */}
-  <div>
-    <p className="text-xs font-medium text-muted-foreground uppercase mb-1.5">
-      Dates
-    </p>
-    <p className="text-sm">
-      {selectedDates.length <= 5 
-        ? selectedDates.map(d => format(d, 'EEE MMM d')).join(', ')
-        : `${selectedDates.length} dates selected`
-      }
-    </p>
-  </div>
-  
-  {/* Spot Cards */}
-  <div>
-    <p className="text-xs font-medium text-muted-foreground uppercase mb-1.5">
-      Applies to
-    </p>
-    <div className="flex flex-wrap gap-1.5">
-      {selectedSpots.map(spotId => {
-        const spot = spots.find(s => s.id === spotId);
-        if (!spot) return null;
-        return (
-          <div
-            key={spotId}
-            className="bg-background border rounded px-2 py-1 text-xs font-medium truncate max-w-[120px]"
-            title={spot.title}
-          >
-            {spot.title}
-          </div>
-        );
-      })}
-    </div>
-  </div>
-</div>
+Add "spaces" to the badge:
+
+```typescript
+// From:
+{spot.availableQuantity ?? spot.quantity} of {spot.quantity} available
+
+// To:
+{spot.availableQuantity ?? spot.quantity} of {spot.quantity} spaces
+```
+
+### 5. Update Dashboard.tsx Badge Text
+
+**File**: `src/pages/Dashboard.tsx`
+
+```typescript
+// From:
+{listing.quantity} spots
+
+// To:
+{listing.quantity} spaces
 ```
 
 ---
 
 ## Summary of Changes
 
-| Location | Change |
-|----------|--------|
-| New helper function | `getDetailedRecurringPreview()` - returns per-day time breakdown |
-| New helper function | `formatTime12h()` - formats "HH:MM" to "12:00 PM" style |
-| Recurring tab preview (lines ~1401-1425) | Replace simple summary with day-by-day breakdown + spot cards |
-| Date override tab preview (lines ~1210-1220) | Add spot cards below dates summary |
+| File | Change |
+|------|--------|
+| `src/pages/ListSpot.tsx` | Update terminology: "spots" → "spaces" |
+| `src/pages/EditSpot.tsx` | Update terminology: "spots" → "spaces" |
+| `src/pages/SpotDetail.tsx` | Add dynamic available quantity calculation, update badge to "X of Y spaces available" |
+| `src/components/explore/DesktopSpotList.tsx` | Add "spaces" to availability badge |
+| `src/pages/Dashboard.tsx` | Update badge: "spots" → "spaces" |
 
 ---
 
-## Design Notes
+## Technical Note: Quantity Already Works
 
-- **Spot cards**: Small, narrow (height ~24px), with truncated text and max-width of 120px
-- **Day breakdown**: Compact list with abbreviated day names (Mon, Tue, etc.)
-- **Closed days**: Shown in italic muted text
-- **Time format**: 12-hour format without leading zeros (9 AM, 12 PM, etc.)
-- **Multiple ranges**: Shown comma-separated on same line (e.g., "9 AM - 12 PM, 2 PM - 6 PM")
+The quantity field is **already functional** in both ListSpot and EditSpot:
+- ListSpot.tsx line 97: `const [quantity, setQuantity] = useState<number>(1);`
+- ListSpot.tsx line 495: `quantity: quantity,` (saved to database)
+- EditSpot.tsx line 240: `const [quantity, setQuantity] = useState<number>(1);`
+- EditSpot.tsx line 355: `setQuantity(spotData.quantity || 1);` (loaded from database)
+- EditSpot.tsx line 703: `quantity: quantity,` (saved on update)
+
+The issue may have been that the user didn't scroll down to see the quantity field, or the category wasn't selected (the field only appears after selecting a spot type).
+
