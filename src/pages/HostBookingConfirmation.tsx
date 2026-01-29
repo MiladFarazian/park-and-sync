@@ -419,7 +419,7 @@ const HostBookingConfirmation = () => {
                 <span className="font-medium">${booking.subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Platform Fee (15%)</span>
+                <span className="text-muted-foreground">Platform Fee</span>
                 <span className="font-medium text-destructive">-${booking.platform_fee.toFixed(2)}</span>
               </div>
               <Separator />
