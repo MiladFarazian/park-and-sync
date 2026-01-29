@@ -249,32 +249,33 @@ serve(async (req) => {
           log.warn('Failed to send push notification to host', { error: (pushError as Error).message });
         }
 
-        // Send email notification to host
-        if (hostProfile?.email) {
-          try {
-            await fetch(`${supabaseUrl}/functions/v1/send-booking-confirmation`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${serviceRoleKey}`,
-              },
-              body: JSON.stringify({
-                to: hostProfile.email,
-                type: 'host_request',
-                hostName: hostProfile.first_name || 'Host',
-                driverName: metadata.guest_full_name,
-                spotTitle: spot.title,
-                spotAddress: spot.address,
-                startAt: metadata.start_at,
-                endAt: metadata.end_at,
-                totalAmount: parseFloat(metadata.total_amount),
-                bookingId,
-              }),
-            });
-            log.debug('Email notification sent to host');
-          } catch (emailError) {
-            log.warn('Failed to send email notification to host', { error: (emailError as Error).message });
-          }
+        // Send email notifications to both guest and host for request
+        try {
+          await fetch(`${supabaseUrl}/functions/v1/send-guest-booking-confirmation`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${serviceRoleKey}`,
+            },
+            body: JSON.stringify({
+              type: 'request',  // Indicates this is a pending request
+              guestEmail: metadata.guest_email || null,
+              guestPhone: metadata.guest_phone || null,
+              guestName: metadata.guest_full_name,
+              hostName: hostProfile?.first_name || 'Host',
+              hostEmail: hostProfile?.email,
+              spotTitle: spot?.title || 'Parking Spot',
+              spotAddress: spot?.address || '',
+              startAt: metadata.start_at,
+              endAt: metadata.end_at,
+              totalAmount: parseFloat(metadata.total_amount),
+              bookingId,
+              guestAccessToken: metadata.guest_access_token,
+            }),
+          });
+          log.debug('Request notification emails sent to guest and host');
+        } catch (emailError) {
+          log.warn('Failed to send request notification emails', { error: (emailError as Error).message });
         }
       }
     } else if (initialStatus === 'active') {
