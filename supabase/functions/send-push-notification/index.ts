@@ -13,9 +13,25 @@ async function generateVapidAuthHeader(
   publicKey: string,
   privateKey: string
 ): Promise<{ authorization: string; cryptoKey: string }> {
-  const vapidKeys = {
-    publicKey: base64UrlToUint8Array(publicKey),
-    privateKey: base64UrlToUint8Array(privateKey),
+  // Decode the keys from base64url
+  const publicKeyBytes = base64UrlToUint8Array(publicKey);
+  const privateKeyBytes = base64UrlToUint8Array(privateKey);
+
+  // The public key is in uncompressed format: 0x04 + x (32 bytes) + y (32 bytes)
+  // Extract x and y coordinates (skip the 0x04 prefix byte)
+  const x = publicKeyBytes.slice(1, 33);
+  const y = publicKeyBytes.slice(33, 65);
+
+  // The private key is the raw 32-byte 'd' value
+  const d = privateKeyBytes;
+
+  // Construct JWK for the private key
+  const jwk: JsonWebKey = {
+    kty: 'EC',
+    crv: 'P-256',
+    x: base64UrlEncode(x),
+    y: base64UrlEncode(y),
+    d: base64UrlEncode(d),
   };
 
   // Create JWT header and payload
@@ -30,10 +46,10 @@ async function generateVapidAuthHeader(
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const unsignedToken = `${encodedHeader}.${encodedPayload}`;
 
-  // Import private key for signing
+  // Import private key for signing using JWK format
   const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    vapidKeys.privateKey,
+    'jwk',
+    jwk,
     { name: 'ECDSA', namedCurve: 'P-256' },
     false,
     ['sign']
@@ -131,7 +147,8 @@ async function sendPushNotification(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Push failed for ${subscription.endpoint}: ${response.status} - ${errorText}`);
+      console.error(`[send-push-notification] Push failed for endpoint: ${response.status} - ${errorText}`);
+      console.error(`[send-push-notification] Endpoint was: ${subscription.endpoint.substring(0, 80)}...`);
       
       // If subscription is no longer valid, we should mark it for deletion
       if (response.status === 404 || response.status === 410) {
@@ -141,7 +158,7 @@ async function sendPushNotification(
       return false;
     }
 
-    console.log(`Push sent successfully to ${subscription.endpoint}`);
+    console.log(`[send-push-notification] Push sent successfully to: ${subscription.endpoint.substring(0, 80)}...`);
     return true;
   } catch (error) {
     console.error('Error sending push notification:', error);
@@ -183,7 +200,9 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Sending push notification to ${targetUserIds.length} users: "${title}"`);
+    console.log(`[send-push-notification] Sending to ${targetUserIds.length} users: "${title}"`);
+    console.log(`[send-push-notification] Target user IDs:`, targetUserIds);
+    console.log(`[send-push-notification] Payload:`, { title, body, tag, url, type });
 
     // Fetch all push subscriptions for the target users
     const { data: subscriptions, error: fetchError } = await supabaseClient
@@ -197,14 +216,14 @@ serve(async (req) => {
     }
 
     if (!subscriptions || subscriptions.length === 0) {
-      console.log('No push subscriptions found for users');
+      console.log(`[send-push-notification] No push subscriptions found for users: ${targetUserIds.join(', ')}`);
       return new Response(
-        JSON.stringify({ success: true, sent: 0, message: 'No subscriptions found' }),
+        JSON.stringify({ success: true, sent: 0, message: 'No subscriptions found', userIds: targetUserIds }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 
-    console.log(`Found ${subscriptions.length} subscriptions`);
+    console.log(`[send-push-notification] Found ${subscriptions.length} subscriptions for users:`, subscriptions.map(s => ({ user_id: s.user_id, endpoint: s.endpoint.substring(0, 50) + '...' })));
 
     const payload = { title, body, tag, url, requireInteraction, type, bookingId };
     let successCount = 0;

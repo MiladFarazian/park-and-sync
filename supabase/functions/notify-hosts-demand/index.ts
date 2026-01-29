@@ -239,9 +239,12 @@ serve(async (req) => {
             type: 'demand_availability',
           }),
         }
-      ).then(res => {
+      ).then(async res => {
+        const responseBody = await res.json().catch(() => ({}));
         if (!res.ok) {
-          console.error(`[notify-hosts-demand] Failed to send notification to host ${hostId}`);
+          console.error(`[notify-hosts-demand] Failed to send notification to host ${hostId}: ${res.status}`, responseBody);
+        } else {
+          console.log(`[notify-hosts-demand] Notification sent to host ${hostId}:`, responseBody);
         }
         return res;
       }).catch(err => {

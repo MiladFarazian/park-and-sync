@@ -783,6 +783,16 @@ const Explore = () => {
 
     const effectiveStartTime = timeOverride?.start ?? startTime;
     const effectiveEndTime = timeOverride?.end ?? endTime;
+
+    // Guard: If URL has time params but we don't have effective times, skip this fetch
+    // This prevents race conditions where stale closures call without times
+    // Use window.location.search to get current URL state (not stale closure)
+    const currentUrlParams = new URLSearchParams(window.location.search);
+    const urlHasTimeParams = currentUrlParams.get('start') || currentUrlParams.get('end');
+    if (urlHasTimeParams && !effectiveStartTime && !effectiveEndTime && !timeOverride) {
+      console.log('[Explore] Skipping fetch - URL has time params but no effective times (stale closure)');
+      return;
+    }
     const timeKey = getTimeBucketKey(effectiveStartTime, effectiveEndTime);
 
     // Skip cache when EV filter is applied to get accurate fallback notification
@@ -814,11 +824,15 @@ const Explore = () => {
 
       // Use search-spots-lite for fast map pin loading
       // Pass time range to filter out already-booked spots
-      console.log('[Explore] Calling search-spots-lite with times:', {
+      console.log('[Explore] Calling search-spots-lite:', {
+        requestId,
         startTime: effectiveStartTime?.toISOString() || null,
         endTime: effectiveEndTime?.toISOString() || null,
         stateStartTime: startTime?.toISOString() || null,
         stateEndTime: endTime?.toISOString() || null,
+        isInitialLoad,
+        hasTimeOverride: !!timeOverride,
+        initialLoadComplete: initialLoadCompleteRef.current,
       });
       const { data, error } = await supabase.functions.invoke('search-spots-lite', {
         body: {
@@ -853,8 +867,7 @@ const Explore = () => {
 
       // Debug logging for availability filtering investigation
       if (data._debug) {
-        console.log('[Explore] search-spots-lite debug:', data._debug);
-        console.log('[Explore] API returned', spots.length, 'spots, updating map...');
+        console.log('[Explore] search-spots-lite response:', { requestId, latestRequestId: latestRequestIdRef.current, spotCount: spots.length, debug: data._debug });
       }
 
       // If API returns 0 spots and we had spots before, clear them immediately
