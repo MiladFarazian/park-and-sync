@@ -312,7 +312,50 @@ const ManageAvailability = () => {
     }
   };
 
-  // Get preview of new schedule from grid rules
+  // Format time to 12h format (e.g., "9:00" -> "9 AM", "14:30" -> "2:30 PM")
+  const formatTime12h = (time: string): string => {
+    const [hours, minutes] = time.split(':').map(Number);
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const hour12 = hours % 12 || 12;
+    if (minutes === 0) return `${hour12} ${ampm}`;
+    return `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+  };
+
+  // Get detailed recurring preview with day-by-day breakdown
+  const getDetailedRecurringPreview = (): { day: string; times: string }[] => {
+    const DAYS_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const result: { day: string; times: string }[] = [];
+    
+    for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+      const dayRules = recurringRules.filter(r => r.day_of_week === dayIndex);
+      
+      if (dayRules.length === 0) {
+        result.push({ day: DAYS_ABBR[dayIndex], times: 'Closed' });
+      } else {
+        // Check for 24h (total minutes >= 23.5 hours)
+        const totalMinutes = dayRules.reduce((sum, r) => {
+          const [sh, sm] = r.start_time.split(':').map(Number);
+          const [eh, em] = r.end_time.split(':').map(Number);
+          return sum + ((eh * 60 + em) - (sh * 60 + sm));
+        }, 0);
+        
+        if (totalMinutes >= 24 * 60 - 30) {
+          result.push({ day: DAYS_ABBR[dayIndex], times: '24 hours' });
+        } else {
+          // Format each time range
+          const sortedRules = [...dayRules].sort((a, b) => a.start_time.localeCompare(b.start_time));
+          const ranges = sortedRules.map(r => 
+            `${formatTime12h(r.start_time)} - ${formatTime12h(r.end_time)}`
+          );
+          result.push({ day: DAYS_ABBR[dayIndex], times: ranges.join(', ') });
+        }
+      }
+    }
+    
+    return result;
+  };
+
+  // Get preview of new schedule from grid rules (simple version)
   const getRecurringPreview = (): string => {
     if (recurringRules.length === 0) return 'Clear schedule (no hours selected)';
     
@@ -1208,15 +1251,41 @@ const ManageAvailability = () => {
                 </div>
                 
                 {/* Affected dates/spots summary */}
-                <div className="mt-3 pt-3 border-t text-xs text-muted-foreground">
-                  <p>
-                    <strong>{selectedSpots.length}</strong> spot{selectedSpots.length !== 1 ? 's' : ''} × <strong>{selectedDates.length}</strong> date{selectedDates.length !== 1 ? 's' : ''} will be updated
-                  </p>
-                  {selectedDates.length > 1 && selectedDates.length <= 5 && (
-                    <p className="mt-1">
-                      Dates: {selectedDates.map(d => format(d, 'MMM d')).join(', ')}
+                <div className="mt-3 pt-3 border-t space-y-3">
+                  {/* Dates List */}
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground uppercase mb-1.5">
+                      Dates
                     </p>
-                  )}
+                    <p className="text-sm">
+                      {selectedDates.length <= 5 
+                        ? selectedDates.map(d => format(d, 'EEE MMM d')).join(', ')
+                        : `${selectedDates.length} dates selected`
+                      }
+                    </p>
+                  </div>
+                  
+                  {/* Spot Cards */}
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground uppercase mb-1.5">
+                      Applies to
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedSpots.map(spotId => {
+                        const spot = spots.find(s => s.id === spotId);
+                        if (!spot) return null;
+                        return (
+                          <div
+                            key={spotId}
+                            className="bg-background border rounded px-2 py-1 text-xs font-medium truncate max-w-[120px]"
+                            title={spot.title}
+                          >
+                            {spot.title}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </Card>
             </section>
@@ -1407,19 +1476,54 @@ const ManageAvailability = () => {
                 </h2>
                 
                 <Card className="p-4 border-primary/30 bg-primary/5">
-                <div className="space-y-2">
-                    <p className="text-sm">
-                      <strong>{recurringSelectedSpots.length}</strong> spot{recurringSelectedSpots.length !== 1 ? 's' : ''} will have their recurring schedule replaced with:
-                    </p>
-                    <div className="text-sm font-medium bg-primary/10 p-2 rounded border border-primary/30">
-                      {getRecurringPreview()}
-                    </div>
-                    {recurringRules.length === 0 && (
-                      <p className="text-xs text-amber-600 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        This will clear existing recurring schedules
+                  <div className="space-y-4">
+                    {/* Day/Time Breakdown */}
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground uppercase mb-2">
+                        New Schedule
                       </p>
-                    )}
+                      {recurringRules.length === 0 ? (
+                        <p className="text-sm text-amber-600 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          Schedule will be cleared (no hours)
+                        </p>
+                      ) : (
+                        <div className="space-y-1">
+                          {getDetailedRecurringPreview().map(({ day, times }) => (
+                            <div key={day} className="flex text-sm">
+                              <span className="w-10 font-medium text-muted-foreground">{day}:</span>
+                              <span className={cn(
+                                times === 'Closed' && 'text-muted-foreground italic'
+                              )}>
+                                {times}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Spot Cards */}
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground uppercase mb-2">
+                        Applies to
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {recurringSelectedSpots.map(spotId => {
+                          const spot = spots.find(s => s.id === spotId);
+                          if (!spot) return null;
+                          return (
+                            <div
+                              key={spotId}
+                              className="bg-background border rounded px-2 py-1 text-xs font-medium truncate max-w-[120px]"
+                              title={spot.title}
+                            >
+                              {spot.title}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </Card>
               </section>
