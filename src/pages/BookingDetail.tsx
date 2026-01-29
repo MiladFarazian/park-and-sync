@@ -66,6 +66,13 @@ interface BookingDetails {
       is_primary: boolean | null;
       sort_order: number | null;
     }>;
+    host_profile: {
+      first_name: string;
+      last_name: string;
+      avatar_url: string | null;
+      privacy_show_profile_photo?: boolean | null;
+      privacy_show_full_name?: boolean | null;
+    } | null;
   };
   profiles: {
     first_name: string;
@@ -185,7 +192,7 @@ const BookingDetailContent = () => {
           guest_car_model,
           guest_license_plate,
           guest_email,
-          spots!inner(id, title, address, host_id, description, access_notes, has_ev_charging, ev_charging_instructions, instant_book, spot_photos(url, is_primary, sort_order)),
+          spots!inner(id, title, address, host_id, description, access_notes, has_ev_charging, ev_charging_instructions, instant_book, spot_photos(url, is_primary, sort_order), host_profile:profiles!spots_host_id_fkey(first_name, last_name, avatar_url, privacy_show_profile_photo, privacy_show_full_name)),
           profiles!bookings_renter_id_fkey(first_name, last_name, avatar_url, privacy_show_profile_photo, privacy_show_full_name)
         `)
         .eq('id', bookingId)
@@ -969,51 +976,123 @@ const BookingDetailContent = () => {
           )}
         </Card>
 
-        {/* Host/Driver Info - Show different content based on viewer role */}
-        <Card className="p-4 space-y-4">
-          <h3 className="font-semibold">
-            {isHost ? (booking.is_guest ? 'Guest' : 'Driver') : 'Host'}
-          </h3>
-          <div 
-            className={`flex items-center gap-3 ${isSupport ? 'cursor-pointer hover:bg-muted/50 -m-2 p-2 rounded-lg transition-colors' : ''}`}
-            onClick={isSupport ? () => {
-              // Support users can click to view user profile
-              const targetUserId = isHost ? booking.renter_id : booking.spots.host_id;
-              navigate(`/support-user/${targetUserId}`);
-            } : undefined}
-          >
-            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              {isHost && booking.is_guest ? (
-                <span className="text-lg font-semibold text-primary">
-                  {(booking.guest_full_name || 'G').charAt(0)}
-                </span>
-              ) : booking.profiles?.avatar_url ? (
-                <img src={booking.profiles.avatar_url} alt={isHost ? 'Driver' : 'Host'} className="h-12 w-12 rounded-full object-cover" />
-              ) : (
-                <span className="text-lg font-semibold text-primary">
-                  {formatDisplayName(booking.profiles, isHost ? 'Driver' : 'Host').charAt(0)}
-                </span>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              {isHost && booking.is_guest ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium">{booking.guest_full_name || 'Guest'}</p>
-                    <Badge variant="outline" className="text-xs">Guest</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">Guest booking</p>
-                </>
-              ) : (
-                <>
-                  <p className="font-medium">{formatDisplayName(booking.profiles, isHost ? 'Driver' : 'Host')}</p>
-                  <p className="text-sm text-muted-foreground">{isHost ? 'Driver' : 'Spot Host'}</p>
-                </>
-              )}
-            </div>
-            {isSupport ? (
-              <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
-            ) : (
+        {/* Host/Driver Info - Support sees BOTH, others see counterpart */}
+        {isSupport ? (
+          <>
+            {/* Driver Card */}
+            <Card className="p-4 space-y-4">
+              <h3 className="font-semibold">{booking.is_guest ? 'Guest' : 'Driver'}</h3>
+              <div 
+                className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 -m-2 p-2 rounded-lg transition-colors"
+                onClick={() => navigate(`/support-user/${booking.renter_id}`)}
+              >
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  {booking.is_guest ? (
+                    <span className="text-lg font-semibold text-primary">
+                      {(booking.guest_full_name || 'G').charAt(0)}
+                    </span>
+                  ) : booking.profiles?.avatar_url ? (
+                    <img src={booking.profiles.avatar_url} alt="Driver" className="h-12 w-12 rounded-full object-cover" />
+                  ) : (
+                    <span className="text-lg font-semibold text-primary">
+                      {formatDisplayName(booking.profiles, 'Driver').charAt(0)}
+                    </span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  {booking.is_guest ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{booking.guest_full_name || 'Guest'}</p>
+                        <Badge variant="outline" className="text-xs">Guest</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Guest booking</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-medium">{formatDisplayName(booking.profiles, 'Driver')}</p>
+                      <p className="text-sm text-muted-foreground">Driver</p>
+                    </>
+                  )}
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+              </div>
+            </Card>
+
+            {/* Host Card */}
+            <Card className="p-4 space-y-4">
+              <h3 className="font-semibold">Host</h3>
+              <div 
+                className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 -m-2 p-2 rounded-lg transition-colors"
+                onClick={() => navigate(`/support-user/${booking.spots.host_id}`)}
+              >
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  {booking.spots.host_profile?.avatar_url ? (
+                    <img src={booking.spots.host_profile.avatar_url} alt="Host" className="h-12 w-12 rounded-full object-cover" />
+                  ) : (
+                    <span className="text-lg font-semibold text-primary">
+                      {formatDisplayName(booking.spots.host_profile, 'Host').charAt(0)}
+                    </span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium">{formatDisplayName(booking.spots.host_profile, 'Host')}</p>
+                  <p className="text-sm text-muted-foreground">Spot Host</p>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+              </div>
+            </Card>
+          </>
+        ) : (
+          <Card className="p-4 space-y-4">
+            <h3 className="font-semibold">
+              {isHost ? (booking.is_guest ? 'Guest' : 'Driver') : 'Host'}
+            </h3>
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                {isHost && booking.is_guest ? (
+                  <span className="text-lg font-semibold text-primary">
+                    {(booking.guest_full_name || 'G').charAt(0)}
+                  </span>
+                ) : isHost ? (
+                  booking.profiles?.avatar_url ? (
+                    <img src={booking.profiles.avatar_url} alt="Driver" className="h-12 w-12 rounded-full object-cover" />
+                  ) : (
+                    <span className="text-lg font-semibold text-primary">
+                      {formatDisplayName(booking.profiles, 'Driver').charAt(0)}
+                    </span>
+                  )
+                ) : (
+                  booking.spots.host_profile?.avatar_url ? (
+                    <img src={booking.spots.host_profile.avatar_url} alt="Host" className="h-12 w-12 rounded-full object-cover" />
+                  ) : (
+                    <span className="text-lg font-semibold text-primary">
+                      {formatDisplayName(booking.spots.host_profile, 'Host').charAt(0)}
+                    </span>
+                  )
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                {isHost && booking.is_guest ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{booking.guest_full_name || 'Guest'}</p>
+                      <Badge variant="outline" className="text-xs">Guest</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Guest booking</p>
+                  </>
+                ) : isHost ? (
+                  <>
+                    <p className="font-medium">{formatDisplayName(booking.profiles, 'Driver')}</p>
+                    <p className="text-sm text-muted-foreground">Driver</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium">{formatDisplayName(booking.spots.host_profile, 'Host')}</p>
+                    <p className="text-sm text-muted-foreground">Spot Host</p>
+                  </>
+                )}
+              </div>
               <Button variant="outline" size="sm" onClick={(e) => {
                 e.stopPropagation();
                 if (isHost && booking.is_guest) {
@@ -1025,9 +1104,9 @@ const BookingDetailContent = () => {
                 <MessageCircle className="h-4 w-4 mr-1" />
                 Message
               </Button>
-            )}
-          </div>
-        </Card>
+            </div>
+          </Card>
+        )}
 
         {/* Overstay Status (Host Only) */}
         {isHost && isOverstayed && (
