@@ -254,7 +254,7 @@ const Dashboard = () => {
               variant="outline" 
               size="sm" 
               className="flex-1"
-              onClick={() => navigate(`/edit-availability/${listing.id}`)}
+              onClick={() => navigate(`/manage-availability?tab=recurring&spotId=${listing.id}`)}
             >
               <Clock className="h-4 w-4 mr-1.5" />
               Schedule
