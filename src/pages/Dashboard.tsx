@@ -122,9 +122,9 @@ const Dashboard = () => {
       const { data: allBookings } = spotIds.length > 0
         ? await supabase
             .from('bookings')
-            .select('id, spot_id, host_earnings, hourly_rate, start_at, end_at, status')
+            .select('id, spot_id, host_earnings, hourly_rate, start_at, end_at, status, extension_charges')
             .in('spot_id', spotIds)
-            .eq('status', 'completed')
+            .in('status', ['completed', 'active', 'paid'])
         : { data: [] };
 
       // Group bookings by spot_id for efficient lookup
