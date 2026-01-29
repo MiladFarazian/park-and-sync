@@ -990,6 +990,8 @@ const Explore = () => {
           evChargerType: spot.ev_charger_type,
           hasEvCharging: spot.has_ev_charging,
           totalPrice, // Total booking cost for map pin display
+          quantity: spot.quantity || 1,
+          availableQuantity: spot.available_quantity ?? spot.quantity ?? 1,
         };
       }) || [];
 

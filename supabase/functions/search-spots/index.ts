@@ -228,6 +228,7 @@ serve(async (req) => {
         longitude,
         hourly_rate,
         daily_rate,
+        quantity,
         has_ev_charging,
         ev_charger_type,
         ev_charging_premium_per_hour,

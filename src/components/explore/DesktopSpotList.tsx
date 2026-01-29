@@ -48,6 +48,8 @@ interface Spot {
   sizeConstraints?: string[];
   userBooking?: UserBooking | null;
   instantBook?: boolean;
+  quantity?: number;
+  availableQuantity?: number;
 }
 
 export interface SpotFilters {
@@ -611,6 +613,12 @@ const DesktopSpotList = ({
                           {spot.userBooking && (
                             <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
                               Your Booking
+                            </Badge>
+                          )}
+                          {/* Show available quantity for multi-spot listings */}
+                          {(spot.quantity ?? 1) > 1 && (
+                            <Badge variant="outline" className="text-xs">
+                              {spot.availableQuantity ?? spot.quantity} of {spot.quantity} available
                             </Badge>
                           )}
                           {isNearest && !spot.userBooking && (

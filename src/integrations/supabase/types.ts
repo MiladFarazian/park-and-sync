@@ -882,6 +882,7 @@ export type Database = {
           latitude: number
           location: unknown
           longitude: number
+          quantity: number
           size_constraints: Database["public"]["Enums"]["vehicle_size"][] | null
           status: Database["public"]["Enums"]["spot_status"] | null
           title: string
@@ -910,6 +911,7 @@ export type Database = {
           latitude: number
           location: unknown
           longitude: number
+          quantity?: number
           size_constraints?:
             | Database["public"]["Enums"]["vehicle_size"][]
             | null
@@ -940,6 +942,7 @@ export type Database = {
           latitude?: number
           location?: unknown
           longitude?: number
+          quantity?: number
           size_constraints?:
             | Database["public"]["Enums"]["vehicle_size"][]
             | null
@@ -1228,29 +1231,53 @@ export type Database = {
       }
       cleanup_expired_holds: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: number }
-      create_booking_atomic: {
-        Args: {
-          p_end_at: string
-          p_ev_charging_fee: number
-          p_host_earnings: number
-          p_hourly_rate: number
-          p_idempotency_key: string
-          p_platform_fee: number
-          p_spot_id: string
-          p_start_at: string
-          p_subtotal: number
-          p_total_amount: number
-          p_total_hours: number
-          p_user_id: string
-          p_vehicle_id: string
-          p_will_use_ev_charging: boolean
-        }
-        Returns: {
-          booking_id: string
-          error_message: string
-          success: boolean
-        }[]
-      }
+      create_booking_atomic:
+        | {
+            Args: {
+              p_end_at: string
+              p_ev_charging_fee: number
+              p_host_earnings: number
+              p_hourly_rate: number
+              p_idempotency_key: string
+              p_platform_fee: number
+              p_spot_id: string
+              p_start_at: string
+              p_subtotal: number
+              p_total_amount: number
+              p_total_hours: number
+              p_user_id: string
+              p_vehicle_id: string
+              p_will_use_ev_charging: boolean
+            }
+            Returns: {
+              booking_id: string
+              error_message: string
+              success: boolean
+            }[]
+          }
+        | {
+            Args: {
+              p_end_at: string
+              p_ev_charging_fee: number
+              p_host_earnings: number
+              p_hourly_rate: number
+              p_idempotency_key: string
+              p_platform_fee: number
+              p_spot_id: string
+              p_start_at: string
+              p_subtotal: number
+              p_total_amount: number
+              p_total_hours: number
+              p_user_id: string
+              p_vehicle_id: string
+              p_will_use_ev_charging: boolean
+            }
+            Returns: {
+              booking_id: string
+              error_message: string
+              success: boolean
+            }[]
+          }
       create_booking_hold: {
         Args: {
           p_end_at: string
@@ -1456,6 +1483,34 @@ export type Database = {
         }[]
       }
       get_public_booking_count: { Args: never; Returns: number }
+      get_spot_available_quantity: {
+        Args: {
+          p_end_at: string
+          p_exclude_booking_id?: string
+          p_exclude_user_id?: string
+          p_spot_id: string
+          p_start_at: string
+        }
+        Returns: number
+      }
+      get_spot_booking_count: {
+        Args: {
+          p_end_at: string
+          p_exclude_booking_id?: string
+          p_spot_id: string
+          p_start_at: string
+        }
+        Returns: number
+      }
+      get_spot_hold_count: {
+        Args: {
+          p_end_at: string
+          p_exclude_user_id?: string
+          p_spot_id: string
+          p_start_at: string
+        }
+        Returns: number
+      }
       gettransactionid: { Args: never; Returns: unknown }
       has_role: {
         Args: {

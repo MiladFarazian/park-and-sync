@@ -94,6 +94,7 @@ const ListSpot = () => {
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availabilityRules, setAvailabilityRules] = useState<any[]>([]);
+  const [quantity, setQuantity] = useState<number>(1);
   
   // EV Charging state
   const [evChargingInstructions, setEvChargingInstructions] = useState('');
@@ -491,6 +492,7 @@ const ListSpot = () => {
           ev_charging_instructions: hasEvCharging ? evChargingInstructions : null,
           ev_charging_premium_per_hour: hasEvCharging ? parseFloat(evChargingPremium) || 0 : 0,
           ev_charger_type: hasEvCharging ? evChargerType : null,
+          quantity: quantity,
         })
         .select()
         .single();
@@ -816,6 +818,35 @@ const ListSpot = () => {
                     </select>
                     {errors.category && (
                       <p className="text-sm text-destructive mt-1">{errors.category.message}</p>
+                    )}
+                    
+                    {/* Quantity field - shown prominently for commercial categories */}
+                    {formData.category && (
+                      <div className="mt-4 p-4 bg-muted/50 rounded-lg border">
+                        <Label htmlFor="quantity" className="text-base font-medium">
+                          How many identical parking spots?
+                        </Label>
+                        <p className="text-sm text-muted-foreground mt-1 mb-3">
+                          All spots share the same price, schedule, and rules
+                        </p>
+                        <div className="flex items-center gap-3">
+                          <Input
+                            id="quantity"
+                            type="number"
+                            min="1"
+                            max="1000"
+                            value={quantity}
+                            onChange={(e) => setQuantity(Math.max(1, Math.min(1000, parseInt(e.target.value) || 1)))}
+                            className="w-28"
+                          />
+                          <span className="text-sm text-muted-foreground">spots</span>
+                        </div>
+                        {quantity > 1 && (
+                          <p className="text-sm text-primary mt-2">
+                            ✓ {quantity} spots will share one listing
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
 
