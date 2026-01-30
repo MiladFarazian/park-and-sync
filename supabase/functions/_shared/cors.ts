@@ -21,6 +21,9 @@ const getAllowedOrigins = (): string[] => {
     "http://localhost:8080",
     "http://localhost:5173",
     "http://localhost:3000",
+    // Capacitor iOS/Android native app origins
+    "capacitor://localhost",
+    "ionic://localhost",
   ];
 };
 
@@ -37,18 +40,28 @@ export function getCorsHeaders(request: Request): Record<string, string> {
   const isLovablePreviewOrigin = (o: string) =>
     o.endsWith(".lovable.app") || o.endsWith(".lovableproject.com");
 
+  // Check if this is a Capacitor native app origin
+  const isCapacitorOrigin = (o: string) =>
+    o === "capacitor://localhost" || o === "ionic://localhost";
+
   // If origin is provided and allowed, echo it back; otherwise default to first allowed origin
-  const allowedOrigin =
-    origin && (allowedOrigins.includes(origin) || isLovablePreviewOrigin(origin))
-      ? origin
-      : allowedOrigins[0];
+  // For null origins (like from native apps without origin header), use wildcard to allow the request
+  let allowedOrigin: string;
+  if (!origin) {
+    // No origin header - likely from a native app; use wildcard
+    allowedOrigin = "*";
+  } else if (allowedOrigins.includes(origin) || isLovablePreviewOrigin(origin) || isCapacitorOrigin(origin)) {
+    allowedOrigin = origin;
+  } else {
+    allowedOrigin = allowedOrigins[0];
+  }
 
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
     "Access-Control-Allow-Headers":
       "authorization, x-client-info, apikey, content-type, x-requested-with",
-    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Allow-Credentials": allowedOrigin !== "*" ? "true" : "false",
     "Access-Control-Max-Age": "86400", // 24 hours
   };
 }
