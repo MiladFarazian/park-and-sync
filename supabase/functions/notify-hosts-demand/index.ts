@@ -4,18 +4,65 @@ import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 
 /**
  * Internal Edge Function: notify-hosts-demand
- * 
+ *
  * Called by search-spots-lite when a driver search returns zero results
- * within 0.5 miles. Sends push notifications to eligible hosts within 0.75 miles.
- * 
+ * within 0.5 miles. Sends push notifications AND SMS to eligible hosts within 0.75 miles.
+ *
  * Eligibility criteria:
  * 1. Has active spot within 0.75 miles (1207 meters)
- * 2. Has NOT explicitly marked spot unavailable for today
- * 3. Has NOT already updated availability for today
- * 4. Has NOT already received this notification today
+ * 2. Has NOT explicitly marked spot UNAVAILABLE for today (calendar_override with is_available=false)
+ *
+ * Note: Hosts CAN receive multiple notifications throughout the day from different driver searches.
+ * Notifications are only suppressed if the host explicitly marks their spot as unavailable.
  */
 
 const HOST_NOTIFICATION_RADIUS_METERS = 1207; // 0.75 miles
+
+// SMS notification via Twilio
+async function sendSmsNotification(
+  toPhoneNumber: string,
+  message: string
+): Promise<boolean> {
+  const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+  const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+  const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
+
+  if (!twilioAccountSid || !twilioAuthToken || !twilioPhoneNumber) {
+    console.log('[notify-hosts-demand] Twilio credentials not configured, skipping SMS');
+    return false;
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Basic ' + btoa(`${twilioAccountSid}:${twilioAuthToken}`),
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          To: toPhoneNumber,
+          From: twilioPhoneNumber,
+          Body: message,
+        }),
+      }
+    );
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log(`[notify-hosts-demand] SMS sent successfully to ${toPhoneNumber}, SID: ${result.sid}`);
+      return true;
+    } else {
+      const error = await response.text();
+      console.error(`[notify-hosts-demand] SMS failed to ${toPhoneNumber}: ${response.status}`, error);
+      return false;
+    }
+  } catch (err) {
+    console.error(`[notify-hosts-demand] SMS error to ${toPhoneNumber}:`, err);
+    return false;
+  }
+}
 
 interface NotifyRequest {
   latitude: number;
@@ -118,51 +165,29 @@ serve(async (req) => {
     const hostIds = [...new Set(spotsWithinRadius.map(s => s.host_id))];
     console.log(`[notify-hosts-demand] Unique host IDs:`, hostIds);
 
-    // Step 2: Get calendar overrides for today to check who already updated
+    // Step 2: Get calendar overrides for today - ONLY check for spots explicitly marked UNAVAILABLE
+    // Hosts can receive multiple notifications unless they explicitly mark their spot as unavailable
     const { data: todayOverrides } = await supabase
       .from('calendar_overrides')
       .select('spot_id, is_available')
       .in('spot_id', spotIds)
-      .eq('override_date', pacificDate);
+      .eq('override_date', pacificDate)
+      .eq('is_available', false); // Only get unavailable overrides
 
-    // Build sets for exclusion
-    const spotsWithOverrides = new Set((todayOverrides || []).map(o => o.spot_id));
-    const spotsMarkedUnavailable = new Set(
-      (todayOverrides || [])
-        .filter(o => !o.is_available)
-        .map(o => o.spot_id)
-    );
+    // Build set of spots that are explicitly marked unavailable
+    const spotsMarkedUnavailable = new Set((todayOverrides || []).map(o => o.spot_id));
 
-    console.log(`[notify-hosts-demand] Spots with overrides today: ${spotsWithOverrides.size}`);
-    console.log(`[notify-hosts-demand] Spots marked unavailable: ${spotsMarkedUnavailable.size}`);
+    console.log(`[notify-hosts-demand] Spots explicitly marked unavailable today: ${spotsMarkedUnavailable.size}`);
 
-    // Step 3: Check which hosts already received notification today
-    const { data: alreadyNotified } = await supabase
-      .from('demand_notifications_sent')
-      .select('host_id')
-      .in('host_id', hostIds)
-      .eq('notification_date', pacificDate);
-
-    const alreadyNotifiedHostIds = new Set((alreadyNotified || []).map(n => n.host_id));
-    console.log(`[notify-hosts-demand] Hosts already notified today: ${alreadyNotifiedHostIds.size}`);
-
-    // Step 4: Determine eligible hosts
-    // A host is eligible if they have at least one spot that:
-    // - Has NOT been marked unavailable for today
-    // - Has NOT had any availability update today (no calendar_override exists)
-    // AND the host has NOT already received a notification today
+    // Step 3: Determine eligible hosts
+    // A host is eligible if they have at least one spot that has NOT been explicitly marked unavailable for today
+    // Hosts CAN receive multiple notifications - no suppression based on previous notifications
     const eligibleHostSpots: { hostId: string; spotId: string; spotTitle: string; spotLat: number; spotLng: number }[] = [];
 
     for (const spot of spotsWithinRadius) {
-      // Skip if host already notified
-      if (alreadyNotifiedHostIds.has(spot.host_id)) {
-        console.log(`[notify-hosts-demand] Skipping spot ${spot.id} (${spot.title}): host already notified today`);
-        continue;
-      }
-
-      // Skip if spot has any override for today (means they already updated)
-      if (spotsWithOverrides.has(spot.id)) {
-        console.log(`[notify-hosts-demand] Skipping spot ${spot.id} (${spot.title}): already has calendar override for today`);
+      // Only skip if spot is explicitly marked unavailable
+      if (spotsMarkedUnavailable.has(spot.id)) {
+        console.log(`[notify-hosts-demand] Skipping spot ${spot.id} (${spot.title}): explicitly marked unavailable for today`);
         continue;
       }
 
@@ -192,10 +217,10 @@ serve(async (req) => {
     console.log(`[notify-hosts-demand] Eligible hosts to notify: ${eligibleHosts.size}`);
 
     if (eligibleHosts.size === 0) {
-      return new Response(JSON.stringify({ 
-        success: true, 
+      return new Response(JSON.stringify({
+        success: true,
         hosts_notified: 0,
-        reason: 'No eligible hosts (all already notified or updated availability)'
+        reason: 'No eligible hosts (all spots marked unavailable for today)'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -210,9 +235,29 @@ serve(async (req) => {
       hostSpotIds.get(item.hostId)!.push(item.spotId);
     }
 
-    // Step 6: Send notifications and record in suppression table
+    // Step 5.5: Fetch host profiles to get phone numbers for SMS
+    const eligibleHostIds = Array.from(eligibleHosts.keys());
+    const { data: hostProfiles } = await supabase
+      .from('profiles')
+      .select('user_id, phone, phone_verified, first_name')
+      .in('user_id', eligibleHostIds);
+
+    const hostProfileMap = new Map<string, { phone: string | null; phone_verified: boolean; first_name: string | null }>();
+    for (const profile of hostProfiles || []) {
+      hostProfileMap.set(profile.user_id, {
+        phone: profile.phone,
+        phone_verified: profile.phone_verified || false,
+        first_name: profile.first_name,
+      });
+    }
+
+    console.log(`[notify-hosts-demand] Fetched ${hostProfileMap.size} host profiles`);
+
+    // Step 6: Send notifications (push + SMS) and record in suppression table
     const notificationPromises: Promise<any>[] = [];
     const hostIdsToRecord: string[] = [];
+    let smsSentCount = 0;
+    let pushSentCount = 0;
 
     for (const [hostId, spotInfo] of eligibleHosts) {
       hostIdsToRecord.push(hostId);
@@ -220,9 +265,13 @@ serve(async (req) => {
       // Build deep-link URL with spot IDs for direct navigation
       const spotIdsForHost = hostSpotIds.get(hostId) || [spotInfo.spotId];
       const deepLinkUrl = `/manage-availability?date=${pacificDate}&spots=${spotIdsForHost.join(',')}`;
+      const fullDeepLinkUrl = `https://useparkzy.com${deepLinkUrl}`;
+
+      // Get host profile for SMS
+      const hostProfile = hostProfileMap.get(hostId);
 
       // Send push notification via send-push-notification edge function
-      const notificationPromise = fetch(
+      const pushPromise = fetch(
         `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-push-notification`,
         {
           method: 'POST',
@@ -242,16 +291,35 @@ serve(async (req) => {
       ).then(async res => {
         const responseBody = await res.json().catch(() => ({}));
         if (!res.ok) {
-          console.error(`[notify-hosts-demand] Failed to send notification to host ${hostId}: ${res.status}`, responseBody);
+          console.error(`[notify-hosts-demand] Failed to send push to host ${hostId}: ${res.status}`, responseBody);
         } else {
-          console.log(`[notify-hosts-demand] Notification sent to host ${hostId}:`, responseBody);
+          console.log(`[notify-hosts-demand] Push sent to host ${hostId}:`, responseBody);
+          pushSentCount++;
         }
         return res;
       }).catch(err => {
-        console.error(`[notify-hosts-demand] Error sending notification to host ${hostId}:`, err);
+        console.error(`[notify-hosts-demand] Error sending push to host ${hostId}:`, err);
       });
 
-      notificationPromises.push(notificationPromise);
+      notificationPromises.push(pushPromise);
+
+      // Send SMS if host has a verified phone number
+      if (hostProfile?.phone && hostProfile.phone_verified) {
+        const firstName = hostProfile.first_name || 'Host';
+        const smsMessage = `Hi ${firstName}! Drivers are searching for parking near your spot on Parkzy. Update your availability to earn today: ${fullDeepLinkUrl}`;
+
+        const smsPromise = sendSmsNotification(hostProfile.phone, smsMessage)
+          .then(success => {
+            if (success) {
+              smsSentCount++;
+              console.log(`[notify-hosts-demand] SMS sent to host ${hostId}`);
+            }
+          });
+
+        notificationPromises.push(smsPromise);
+      } else {
+        console.log(`[notify-hosts-demand] Skipping SMS for host ${hostId}: no verified phone (phone=${hostProfile?.phone}, verified=${hostProfile?.phone_verified})`);
+      }
     }
 
     // Record in suppression table (batch insert)
@@ -277,19 +345,23 @@ serve(async (req) => {
     // Wait for all notifications to complete
     await Promise.allSettled(notificationPromises);
 
-    console.log(`[notify-hosts-demand] Successfully notified ${eligibleHosts.size} hosts`);
+    console.log(`[notify-hosts-demand] Successfully notified ${eligibleHosts.size} hosts (${pushSentCount} push, ${smsSentCount} SMS)`);
 
     return new Response(JSON.stringify({
       success: true,
       hosts_notified: eligibleHosts.size,
+      push_sent: pushSentCount,
+      sms_sent: smsSentCount,
       _debug: {
         search_location: { latitude, longitude },
         pacific_date: pacificDate,
         spots_within_radius: spotsWithinRadius.length,
-        spots_with_overrides_today: spotsWithOverrides.size,
-        hosts_already_notified_today: alreadyNotifiedHostIds.size,
+        spots_marked_unavailable_today: spotsMarkedUnavailable.size,
         eligible_host_spots: eligibleHostSpots.map(s => ({ spotId: s.spotId, hostId: s.hostId, title: s.spotTitle })),
         host_ids_notified: hostIdsToRecord,
+        hosts_with_verified_phone: Array.from(hostProfileMap.entries())
+          .filter(([_, p]) => p.phone && p.phone_verified)
+          .map(([id]) => id),
       },
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -589,47 +589,47 @@ serve(async (req) => {
     // Check if we should trigger demand notifications to hosts
     // Conditions: zero spots found within 0.5 miles of search center
     let demandNotificationSent = false;
+    let hostsNotifiedCount = 0;
     const spotsWithinHalfMile = transformedSpots.filter(s => s.distance <= HALF_MILE_METERS);
     if (spotsWithinHalfMile.length === 0) {
-      console.log(`[search-spots-lite] Zero spots within 0.5mi - triggering host demand notifications`);
-      
-      // Fire-and-forget: notify hosts in the background
-      // Use EdgeRuntime.waitUntil if available, otherwise just fire async
-      const notifyHosts = async () => {
-        try {
-          const response = await fetch(
-            `${Deno.env.get('SUPABASE_URL')}/functions/v1/notify-hosts-demand`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-                'X-Internal-Secret': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-              },
-              body: JSON.stringify({
-                latitude,
-                longitude,
-                start_time,
-                end_time,
-              }),
-            }
-          );
-          const result = await response.json();
-          console.log(`[search-spots-lite] Demand notification result:`, result);
-        } catch (err) {
-          console.error(`[search-spots-lite] Failed to send demand notifications:`, err);
-        }
-      };
+      console.log(`[search-spots-lite] Zero spots within 0.5mi - checking for eligible hosts to notify`);
 
-      // Use EdgeRuntime.waitUntil for background processing
-      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
-        EdgeRuntime.waitUntil(notifyHosts());
-      } else {
-        // Fallback: fire async without waiting
-        notifyHosts();
+      // Wait for the notify-hosts-demand response to determine if there are actually hosts to notify
+      // Only show the banner to drivers if hosts were actually notified
+      try {
+        const response = await fetch(
+          `${Deno.env.get('SUPABASE_URL')}/functions/v1/notify-hosts-demand`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              'X-Internal-Secret': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+            },
+            body: JSON.stringify({
+              latitude,
+              longitude,
+              start_time,
+              end_time,
+            }),
+          }
+        );
+        const result = await response.json();
+        console.log(`[search-spots-lite] Demand notification result:`, result);
+
+        // Only set demandNotificationSent to true if hosts were actually notified
+        hostsNotifiedCount = result.hosts_notified || 0;
+        if (hostsNotifiedCount > 0) {
+          demandNotificationSent = true;
+          console.log(`[search-spots-lite] ${hostsNotifiedCount} hosts notified - showing banner to driver`);
+        } else {
+          console.log(`[search-spots-lite] No eligible hosts to notify - not showing banner`);
+        }
+      } catch (err) {
+        console.error(`[search-spots-lite] Failed to send demand notifications:`, err);
+        // On error, don't show the banner since we don't know if hosts were notified
+        demandNotificationSent = false;
       }
-      
-      demandNotificationSent = true;
     }
 
     // Debug info for troubleshooting availability filtering
