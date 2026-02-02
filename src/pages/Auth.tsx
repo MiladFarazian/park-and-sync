@@ -136,10 +136,18 @@ const Auth = () => {
     if (user) {
       log.debug('OAuth callback detected', { provider: oauthProvider, userId: user.id });
 
-      // Refresh profile to get latest data
-      refreshProfile().then(() => {
+      // Fetch profile directly to get latest data (don't rely on state)
+      const checkProfileAndNavigate = async () => {
+        const { data: freshProfile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name, email')
+          .eq('user_id', user.id)
+          .single();
+
+        log.debug('Fresh profile data:', freshProfile);
+
         // Check if profile is complete
-        if (!isProfileComplete(profile)) {
+        if (!isProfileComplete(freshProfile)) {
           log.debug('Profile incomplete after OAuth sign in, showing complete profile step');
           setAuthStep('complete-profile');
           setVerifiedPhone(''); // OAuth users don't have a verified phone
@@ -147,9 +155,11 @@ const Auth = () => {
           log.debug('Profile complete, navigating to', returnTo);
           navigate(returnTo, { replace: true });
         }
-      });
+      };
+
+      checkProfileAndNavigate();
     }
-  }, [oauthProvider, user, profile, authLoading, refreshProfile, navigate, returnTo]);
+  }, [oauthProvider, user, authLoading, navigate, returnTo]);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhoneNumber(e.target.value);
