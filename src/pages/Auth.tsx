@@ -186,8 +186,11 @@ const Auth = () => {
           setAuthStep('complete-profile');
           setVerifiedPhone('');
         } else {
-          log.debug('Profile complete, navigating to', returnTo);
-          navigate(returnTo, { replace: true });
+          log.debug('Profile complete, redirecting to', returnTo);
+          // Use window.location for OAuth callbacks to ensure clean navigation
+          // React Router navigate() can be unreliable after OAuth due to state sync issues
+          window.location.href = returnTo;
+          return; // Prevent further execution
         }
 
         // Unsubscribe after handling
@@ -242,8 +245,9 @@ const Auth = () => {
           setAuthStep('complete-profile');
           setVerifiedPhone(''); // OAuth users don't have a verified phone
         } else {
-          log.debug('Profile complete, navigating to', returnTo);
-          navigate(returnTo, { replace: true });
+          log.debug('Profile complete, redirecting to', returnTo);
+          // Use window.location for OAuth callbacks to ensure clean navigation
+          window.location.href = returnTo;
         }
       };
 
@@ -253,7 +257,7 @@ const Auth = () => {
       // hasn't fired yet. The direct listener above should catch it.
       log.debug('OAuth callback: auth loaded but no user, waiting for auth state change');
     }
-  }, [oauthProvider, user, authLoading, navigate, returnTo, oauthProcessed]);
+  }, [oauthProvider, user, authLoading, returnTo, oauthProcessed]);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhoneNumber(e.target.value);
