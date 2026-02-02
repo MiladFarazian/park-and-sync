@@ -12,18 +12,35 @@ import { logger } from '@/lib/logger';
 const log = logger.scope('CompleteProfileStep');
 
 interface CompleteProfileStepProps {
-  phone: string;
+  phone?: string;
   onComplete: () => void;
 }
 
-const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComplete }) => {
-  const { user, refreshProfile } = useAuth();
+const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone = '', onComplete }) => {
+  const { user, refreshProfile, profile } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: ''
-  });
+
+  // Pre-fill from OAuth data or existing profile
+  const getInitialFormData = () => {
+    // Try to get name from user metadata (OAuth providers like Apple/Google)
+    const firstName = user?.user_metadata?.first_name ||
+                     user?.user_metadata?.given_name ||
+                     user?.user_metadata?.name?.split(' ')[0] ||
+                     profile?.first_name || '';
+    const lastName = user?.user_metadata?.last_name ||
+                    user?.user_metadata?.family_name ||
+                    (user?.user_metadata?.name?.split(' ').slice(1).join(' ')) ||
+                    profile?.last_name || '';
+    const fullName = firstName && lastName ? `${firstName} ${lastName}` : firstName || '';
+
+    // Get email from user or profile
+    const email = user?.email || profile?.email || '';
+
+    return { fullName, email };
+  };
+
+  const [formData, setFormData] = useState(getInitialFormData);
   const [errors, setErrors] = useState<{ fullName?: string; email?: string }>({});
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
   const [emailIsValid, setEmailIsValid] = useState(false);
@@ -161,17 +178,24 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone, onComp
       const { firstName, lastName } = parseFullName(formData.fullName);
       
       // Update profile with upsert
+      // Only set phone_verified if a phone was provided (phone OTP flow)
+      const profileUpdate: Record<string, any> = {
+        user_id: user.id,
+        email: formData.email,
+        first_name: firstName,
+        last_name: lastName,
+        updated_at: new Date().toISOString()
+      };
+
+      // Only include phone fields if phone was provided
+      if (phone) {
+        profileUpdate.phone = phone;
+        profileUpdate.phone_verified = true;
+      }
+
       const { error: profileError } = await supabase
         .from('profiles')
-        .upsert({
-          user_id: user.id,
-          phone: phone || null,
-          email: formData.email,
-          first_name: firstName,
-          last_name: lastName,
-          phone_verified: true,
-          updated_at: new Date().toISOString()
-        }, {
+        .upsert(profileUpdate, {
           onConflict: 'user_id'
         });
 

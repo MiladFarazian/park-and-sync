@@ -11,6 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { logos } from '@/assets';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Capacitor } from '@capacitor/core';
+import { SignInWithApple, SignInWithAppleOptions, SignInWithAppleResponse } from '@capacitor-community/apple-sign-in';
 import {
   Dialog,
   DialogContent,
@@ -66,7 +68,7 @@ const isValidPhoneNumber = (phone: string): boolean => {
 const Auth = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { signIn, signUp, resendVerificationEmail } = useAuth();
+  const { signIn, signUp, resendVerificationEmail, user, profile, loading: authLoading, refreshProfile } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [authMethod, setAuthMethod] = useState<AuthMethod>('phone');
@@ -124,6 +126,30 @@ const Auth = () => {
       }));
     }
   }, [isGuestConversion, prefillEmail, prefillFirstName, prefillLastName]);
+
+  // Handle OAuth callback (e.g., from Apple Sign In on web)
+  const oauthProvider = searchParams.get('oauth');
+  useEffect(() => {
+    if (!oauthProvider || authLoading) return;
+
+    // User returned from OAuth - check if they're logged in
+    if (user) {
+      log.debug('OAuth callback detected', { provider: oauthProvider, userId: user.id });
+
+      // Refresh profile to get latest data
+      refreshProfile().then(() => {
+        // Check if profile is complete
+        if (!isProfileComplete(profile)) {
+          log.debug('Profile incomplete after OAuth sign in, showing complete profile step');
+          setAuthStep('complete-profile');
+          setVerifiedPhone(''); // OAuth users don't have a verified phone
+        } else {
+          log.debug('Profile complete, navigating to', returnTo);
+          navigate(returnTo, { replace: true });
+        }
+      });
+    }
+  }, [oauthProvider, user, profile, authLoading, refreshProfile, navigate, returnTo]);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhoneNumber(e.target.value);
@@ -263,20 +289,111 @@ const Auth = () => {
 
   const handleAppleSignIn = async () => {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'apple',
-      options: {
-        redirectTo: `${window.location.origin}/`
+
+    try {
+      // Use native Sign in with Apple on iOS
+      if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
+        const options: SignInWithAppleOptions = {
+          clientId: 'com.miladfarazian.parkzy.auth',
+          redirectURI: 'https://mqbupmusmciijsjmzbcu.supabase.co/auth/v1/callback',
+          scopes: 'email name',
+          state: crypto.randomUUID(),
+          nonce: crypto.randomUUID(),
+        };
+
+        const result: SignInWithAppleResponse = await SignInWithApple.authorize(options);
+
+        if (result.response && result.response.identityToken) {
+          // Sign in to Supabase with the Apple identity token
+          const { data, error } = await supabase.auth.signInWithIdToken({
+            provider: 'apple',
+            token: result.response.identityToken,
+            nonce: options.nonce,
+          });
+
+          if (error) {
+            log.error('Supabase Apple sign in error:', error);
+            toast({
+              title: "Sign In Failed",
+              description: error.message,
+              variant: "destructive"
+            });
+          } else if (data.user) {
+            log.debug('Apple sign in successful:', data.user.id);
+
+            // Apple only provides name on first sign-in - save it if available
+            const appleFirstName = result.response.givenName;
+            const appleLastName = result.response.familyName;
+
+            // Check if profile is complete
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('first_name, last_name, email, phone, phone_verified')
+              .eq('user_id', data.user.id)
+              .single();
+
+            // If Apple provided a name and profile doesn't have one, update it
+            if ((appleFirstName || appleLastName) && profileData && !profileData.first_name && !profileData.last_name) {
+              await supabase
+                .from('profiles')
+                .update({
+                  first_name: appleFirstName || null,
+                  last_name: appleLastName || null,
+                })
+                .eq('user_id', data.user.id);
+            }
+
+            // Check if profile needs completion
+            const profileForCheck = profileData ? {
+              ...profileData,
+              user_id: data.user.id,
+              first_name: profileData.first_name || appleFirstName,
+              last_name: profileData.last_name || appleLastName,
+            } as any : null;
+
+            if (!isProfileComplete(profileForCheck)) {
+              log.debug('Profile incomplete after Apple sign in, showing complete profile step');
+              setAuthStep('complete-profile');
+            } else {
+              navigate(returnTo);
+            }
+          }
+        } else {
+          toast({
+            title: "Sign In Failed",
+            description: "Could not get identity token from Apple",
+            variant: "destructive"
+          });
+        }
+      } else {
+        // Use OAuth flow for web - redirect back to auth page to handle profile completion
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'apple',
+          options: {
+            redirectTo: `${window.location.origin}/auth?oauth=apple`
+          }
+        });
+
+        if (error) {
+          toast({
+            title: "Error",
+            description: error.message,
+            variant: "destructive"
+          });
+        }
       }
-    });
-    
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
-      });
+    } catch (error: any) {
+      log.error('Apple sign in error:', error);
+      // User cancelled or other error
+      if (error.message !== 'The user canceled the authorization attempt.') {
+        toast({
+          title: "Sign In Failed",
+          description: error.message || "An error occurred during sign in",
+          variant: "destructive"
+        });
+      }
     }
+
     setLoading(false);
   };
 
