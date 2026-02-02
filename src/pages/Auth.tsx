@@ -270,8 +270,10 @@ const Auth = () => {
     try {
       // Use native Sign in with Apple on iOS
       if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
+        // For native iOS, use the app's bundle ID as clientId
+        // This must match what's configured in Supabase Apple provider
         const options: SignInWithAppleOptions = {
-          clientId: 'com.miladfarazian.parkzy.auth',
+          clientId: 'com.useparkzy.parkzy', // iOS app bundle ID
           redirectURI: 'https://mqbupmusmciijsjmzbcu.supabase.co/auth/v1/callback',
           scopes: 'email name',
           state: crypto.randomUUID(),
@@ -595,11 +597,14 @@ const Auth = () => {
 
       {/* Right Panel - Auth Form */}
       <div className="w-full lg:w-1/2 flex flex-col min-h-screen bg-background overflow-y-auto">
-        {/* Mobile Header */}
-        <div className="flex items-center justify-between p-4 lg:p-8 flex-shrink-0">
-          <Button 
-            variant="ghost" 
-            size="icon" 
+        {/* Mobile Header - with safe area padding for iOS notch */}
+        <div
+          className="flex items-center justify-between p-4 lg:p-8 flex-shrink-0"
+          style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 1rem))' }}
+        >
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => navigate('/')}
             className="text-foreground hover:bg-muted"
           >
