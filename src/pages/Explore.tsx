@@ -760,8 +760,8 @@ const Explore = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(onSuccess, onError, {
         enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 20000,
+        maximumAge: 30000, // Allow 30s cached location for faster response
+        timeout: 15000,    // Reduced timeout
       });
     }
   };

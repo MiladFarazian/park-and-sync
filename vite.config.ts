@@ -16,10 +16,16 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
+    // Disable source maps in production for better performance
+    sourcemap: mode === 'development',
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
       },
     },
+  },
+  // Remove console logs in production
+  esbuild: {
+    drop: mode === 'production' ? ['console', 'debugger'] : [],
   },
 }));
