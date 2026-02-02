@@ -129,12 +129,102 @@ const Auth = () => {
 
   // Handle OAuth callback (e.g., from Apple Sign In on web)
   const oauthProvider = searchParams.get('oauth');
+  const [oauthProcessed, setOauthProcessed] = useState(false);
+
+  // Direct auth state listener for OAuth callbacks
+  // This catches the SIGNED_IN event directly rather than relying on AuthContext state propagation
   useEffect(() => {
-    if (!oauthProvider || authLoading) return;
+    if (!oauthProvider || oauthProcessed) return;
+
+    log.debug('Setting up OAuth auth state listener', { oauthProvider });
+
+    // First, check if there are tokens in the URL hash that need to be processed
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    const refreshToken = hashParams.get('refresh_token');
+
+    if (accessToken && refreshToken) {
+      log.debug('OAuth tokens found in URL hash, setting session directly');
+      supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      }).then(({ data, error }) => {
+        if (error) {
+          log.error('Failed to set session from OAuth tokens', { error: error.message });
+          toast({
+            title: 'Sign In Failed',
+            description: error.message,
+            variant: 'destructive'
+          });
+        } else {
+          log.debug('Session set from OAuth tokens successfully');
+          // Clean up URL hash
+          window.history.replaceState({}, '', window.location.pathname + window.location.search);
+        }
+      });
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      log.debug('OAuth auth state change', { event, hasSession: !!session, userId: session?.user?.id?.substring(0, 8) });
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        log.debug('OAuth SIGNED_IN event received!', { userId: session.user.id });
+        setOauthProcessed(true);
+
+        // Fetch profile directly
+        const { data: freshProfile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name, email')
+          .eq('user_id', session.user.id)
+          .single();
+
+        log.debug('Fresh profile data from auth listener:', freshProfile);
+
+        // Check if profile is complete
+        if (!isProfileComplete(freshProfile)) {
+          log.debug('Profile incomplete, showing complete profile step');
+          setAuthStep('complete-profile');
+          setVerifiedPhone('');
+        } else {
+          log.debug('Profile complete, navigating to', returnTo);
+          navigate(returnTo, { replace: true });
+        }
+
+        // Unsubscribe after handling
+        subscription.unsubscribe();
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [oauthProvider, oauthProcessed, navigate, returnTo, toast]);
+
+  // Fallback: Also check AuthContext user state for OAuth callbacks
+  useEffect(() => {
+    // Not an OAuth callback
+    if (!oauthProvider) return;
+
+    // Already processed this callback
+    if (oauthProcessed) return;
+
+    log.debug('OAuth callback effect running', {
+      oauthProvider,
+      authLoading,
+      hasUser: !!user,
+      userId: user?.id?.substring(0, 8)
+    });
+
+    // Wait for auth to finish loading
+    if (authLoading) {
+      log.debug('OAuth callback: still loading auth...');
+      return;
+    }
 
     // User returned from OAuth - check if they're logged in
     if (user) {
-      log.debug('OAuth callback detected', { provider: oauthProvider, userId: user.id });
+      log.debug('OAuth callback: user found via AuthContext!', { provider: oauthProvider, userId: user.id });
+      setOauthProcessed(true);
 
       // Fetch profile directly to get latest data (don't rely on state)
       const checkProfileAndNavigate = async () => {
@@ -158,8 +248,12 @@ const Auth = () => {
       };
 
       checkProfileAndNavigate();
+    } else {
+      // Auth finished loading but no user yet - this might happen if onAuthStateChange
+      // hasn't fired yet. The direct listener above should catch it.
+      log.debug('OAuth callback: auth loaded but no user, waiting for auth state change');
     }
-  }, [oauthProvider, user, authLoading, navigate, returnTo]);
+  }, [oauthProvider, user, authLoading, navigate, returnTo, oauthProcessed]);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhoneNumber(e.target.value);
