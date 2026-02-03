@@ -42,5 +42,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Parkzy needs your location to find parking spots near you and show your position on the map.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Parkzy needs your location to find parking spots near you and show your position on the map.</string>
 </dict>
 </plist>

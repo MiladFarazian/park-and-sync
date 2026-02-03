@@ -35,6 +35,15 @@ const log = logger.scope('Auth');
 
 const REMEMBER_ME_KEY = 'parkzy_remember_me';
 
+// SHA256 hash function for Apple Sign In nonce
+// Apple expects the nonce to be hashed, but Supabase needs the raw nonce
+async function sha256(message: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 type AuthMethod = 'phone' | 'email';
 type AuthStep = 'auth' | 'complete-profile';
 
@@ -270,6 +279,11 @@ const Auth = () => {
     try {
       // Use native Sign in with Apple on iOS
       if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
+        // Generate a raw nonce and hash it for Apple
+        // Apple expects SHA256-hashed nonce, Supabase expects raw nonce
+        const rawNonce = crypto.randomUUID();
+        const hashedNonce = await sha256(rawNonce);
+
         // For native iOS, use the app's bundle ID as clientId
         // This must match what's configured in Supabase Apple provider
         const options: SignInWithAppleOptions = {
@@ -277,17 +291,18 @@ const Auth = () => {
           redirectURI: 'https://mqbupmusmciijsjmzbcu.supabase.co/auth/v1/callback',
           scopes: 'email name',
           state: crypto.randomUUID(),
-          nonce: crypto.randomUUID(),
+          nonce: hashedNonce, // Send hashed nonce to Apple
         };
 
         const result: SignInWithAppleResponse = await SignInWithApple.authorize(options);
 
         if (result.response && result.response.identityToken) {
           // Sign in to Supabase with the Apple identity token
+          // Supabase needs the RAW (unhashed) nonce to verify
           const { data, error } = await supabase.auth.signInWithIdToken({
             provider: 'apple',
             token: result.response.identityToken,
-            nonce: options.nonce,
+            nonce: rawNonce, // Send raw nonce to Supabase
           });
 
           if (error) {
@@ -599,8 +614,8 @@ const Auth = () => {
       <div className="w-full lg:w-1/2 flex flex-col min-h-screen bg-background overflow-y-auto">
         {/* Mobile Header - with safe area padding for iOS notch */}
         <div
-          className="flex items-center justify-between p-4 lg:p-8 flex-shrink-0"
-          style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 1rem))' }}
+          className="flex items-center justify-between px-4 lg:px-8 flex-shrink-0"
+          style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))', paddingBottom: '1rem' }}
         >
           <Button
             variant="ghost"

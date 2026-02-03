@@ -1,61 +1,34 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Skeleton } from '@/components/ui/skeleton';
 
 interface OptimizedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   src: string;
   alt: string;
-  /** Show skeleton while loading (default: true) */
-  showSkeleton?: boolean;
-  /** Use blur-up effect (default: true) */
-  blurOnLoad?: boolean;
-  /** Aspect ratio for skeleton placeholder */
-  aspectRatio?: 'square' | 'video' | 'wide' | 'portrait' | number;
-  /** Container className */
-  containerClassName?: string;
-  /** Priority loading - skip lazy loading for above-fold images */
-  priority?: boolean;
-  /** Fallback image on error */
-  fallbackSrc?: string;
+  className?: string;
+  placeholderClassName?: string;
 }
 
-const aspectRatioClasses = {
-  square: 'aspect-square',
-  video: 'aspect-video',
-  wide: 'aspect-[21/9]',
-  portrait: 'aspect-[3/4]',
-};
-
 /**
- * OptimizedImage - A performant image component with:
- * - Native lazy loading
- * - Skeleton placeholder while loading
- * - Smooth fade-in transition
- * - Error fallback
- * - Intersection Observer for deferred loading
+ * Optimized image component with:
+ * - Lazy loading (only loads when in viewport)
+ * - Fade-in animation when loaded
+ * - Blur placeholder
+ * - Error handling with fallback
  */
 export const OptimizedImage: React.FC<OptimizedImageProps> = ({
   src,
   alt,
-  showSkeleton = true,
-  blurOnLoad = true,
-  aspectRatio,
-  containerClassName,
   className,
-  priority = false,
-  fallbackSrc,
-  style,
+  placeholderClassName,
   ...props
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isInView, setIsInView] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const [isInView, setIsInView] = useState(priority);
-  const imgRef = useRef<HTMLImageElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLDivElement>(null);
 
-  // Use Intersection Observer for lazy loading
   useEffect(() => {
-    if (priority || isInView) return;
+    if (!imgRef.current) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -65,78 +38,47 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
         }
       },
       {
-        rootMargin: '200px', // Start loading 200px before entering viewport
-        threshold: 0,
+        rootMargin: '200px', // Start loading 200px before viewport
+        threshold: 0.01,
       }
     );
 
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
-
+    observer.observe(imgRef.current);
     return () => observer.disconnect();
-  }, [priority, isInView]);
-
-  // Reset states when src changes
-  useEffect(() => {
-    setIsLoaded(false);
-    setHasError(false);
-  }, [src]);
-
-  const handleLoad = () => {
-    setIsLoaded(true);
-    setHasError(false);
-  };
-
-  const handleError = () => {
-    setHasError(true);
-    if (fallbackSrc && imgRef.current) {
-      imgRef.current.src = fallbackSrc;
-    }
-  };
-
-  const aspectClass = aspectRatio
-    ? typeof aspectRatio === 'string'
-      ? aspectRatioClasses[aspectRatio]
-      : undefined
-    : undefined;
-
-  const aspectStyle =
-    typeof aspectRatio === 'number'
-      ? { aspectRatio: String(aspectRatio) }
-      : undefined;
-
-  const imageSrc = hasError && fallbackSrc ? fallbackSrc : src;
+  }, []);
 
   return (
-    <div
-      ref={containerRef}
-      className={cn('relative overflow-hidden', aspectClass, containerClassName)}
-      style={{ ...aspectStyle, ...style }}
-    >
+    <div className={cn('relative overflow-hidden', className)} ref={imgRef}>
       {/* Skeleton placeholder */}
-      {showSkeleton && !isLoaded && !hasError && (
-        <Skeleton className="absolute inset-0 w-full h-full" />
-      )}
+      <div
+        className={cn(
+          'absolute inset-0 bg-muted animate-pulse transition-opacity duration-300',
+          placeholderClassName,
+          isLoaded ? 'opacity-0' : 'opacity-100'
+        )}
+      />
 
-      {/* Actual image - only render when in view */}
-      {isInView && (
+      {/* Only load image when in viewport */}
+      {isInView && !hasError && (
         <img
-          ref={imgRef}
-          src={imageSrc}
+          src={src}
           alt={alt}
-          loading={priority ? 'eager' : 'lazy'}
-          decoding="async"
-          onLoad={handleLoad}
-          onError={handleError}
           className={cn(
             'w-full h-full object-cover transition-opacity duration-300',
-            blurOnLoad && !isLoaded && 'opacity-0',
-            blurOnLoad && isLoaded && 'opacity-100',
-            className
+            isLoaded ? 'opacity-100' : 'opacity-0'
           )}
+          onLoad={() => setIsLoaded(true)}
+          onError={() => setHasError(true)}
+          loading="lazy"
+          decoding="async"
           {...props}
         />
+      )}
+
+      {hasError && (
+        <div className="absolute inset-0 bg-muted flex items-center justify-center">
+          <span className="text-muted-foreground text-xs">No image</span>
+        </div>
       )}
     </div>
   );

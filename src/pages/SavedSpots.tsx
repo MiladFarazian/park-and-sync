@@ -11,6 +11,7 @@ import { ArrowLeft, Heart, MapPin, Star, Zap, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DEFAULT_MAP_CENTER } from '@/lib/constants';
 import { logger } from '@/lib/logger';
+import { getCurrentPosition } from '@/lib/geolocation';
 
 const log = logger.scope('SavedSpots');
 
@@ -100,24 +101,17 @@ export default function SavedSpots() {
     await toggleFavorite(spotId);
   };
 
-  const handleExploreSpots = () => {
+  const handleExploreSpots = async () => {
     const now = new Date();
     const twoHoursLater = addHours(now, 2);
     const startParam = now.toISOString();
     const endParam = twoHoursLater.toISOString();
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          navigate(`/explore?lat=${latitude}&lng=${longitude}&start=${startParam}&end=${endParam}`);
-        },
-        () => {
-          navigate(`/explore?lat=${DEFAULT_MAP_CENTER.lat}&lng=${DEFAULT_MAP_CENTER.lng}&start=${startParam}&end=${endParam}`);
-        },
-        { timeout: 5000, enableHighAccuracy: false }
-      );
-    } else {
+    try {
+      const position = await getCurrentPosition({ timeout: 5000, enableHighAccuracy: false });
+      const { latitude, longitude } = position.coords;
+      navigate(`/explore?lat=${latitude}&lng=${longitude}&start=${startParam}&end=${endParam}`);
+    } catch {
       navigate(`/explore?lat=${DEFAULT_MAP_CENTER.lat}&lng=${DEFAULT_MAP_CENTER.lng}&start=${startParam}&end=${endParam}`);
     }
   };

@@ -5,6 +5,7 @@ import { Search, X, Navigation, MapPin, Loader2, Clock, Star } from 'lucide-reac
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { logger } from '@/lib/logger';
+import { getCurrentPosition, GeolocationError } from '@/lib/geolocation';
 
 const log = logger.scope('LocationSearchInput');
 
@@ -473,17 +474,15 @@ const LocationSearchInput = ({
               } catch (e) {
                 // Ignore parse errors
               }
-            } else if (navigator.geolocation) {
-              // Try to get current location for region detection
-              navigator.geolocation.getCurrentPosition(
-                (position) => {
+            } else {
+              // Try to get current location for region detection using native plugin
+              getCurrentPosition({ enableHighAccuracy: false, maximumAge: 300000, timeout: 5000 })
+                .then((position) => {
                   detectUserRegion(position.coords.latitude, position.coords.longitude, data.token);
-                },
-                () => {
+                })
+                .catch(() => {
                   // Use default region if geolocation fails
-                },
-                { enableHighAccuracy: false, maximumAge: 300000, timeout: 5000 }
-              );
+                });
             }
           }
         }
@@ -611,27 +610,22 @@ const LocationSearchInput = ({
     await removeFavorite(name);
   };
 
-  const handleUseCurrentLocation = () => {
-    if (!navigator.geolocation || !mapboxToken) return;
+  const handleUseCurrentLocation = async () => {
+    if (!mapboxToken) return;
 
     setIsDetectingLocation(true);
     setShowDropdown(false);
 
-    const logGeoError = (label: string, error: GeolocationPositionError) => {
+    const logGeoError = (label: string, error: GeolocationError) => {
       log.debug(label, { code: error.code, message: error.message });
     };
 
-    const onSuccess = async (position: GeolocationPosition) => {
-      const coords = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-      };
-
+    const processLocation = async (lat: number, lng: number) => {
+      const coords = { lat, lng };
       try {
-        const response = await fetch(
+        await fetch(
           `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${mapboxToken}&types=address,neighborhood,place`
         );
-        const data = await response.json();
         localStorage.setItem('parkzy:lastLocation', JSON.stringify({ ...coords, ts: Date.now() }));
         onSelectLocation({ ...coords, name: 'Current Location' });
       } catch (error) {
@@ -643,34 +637,36 @@ const LocationSearchInput = ({
       }
     };
 
-    const onError = (error: GeolocationPositionError) => {
-      logGeoError('LocationSearchInput current location failed', error);
+    try {
+      // Use native geolocation - much faster on iOS
+      const position = await getCurrentPosition({
+        enableHighAccuracy: true,
+        maximumAge: 30000, // Allow 30s cached location for faster response
+        timeout: 10000,    // Native is faster
+      });
+      await processLocation(position.coords.latitude, position.coords.longitude);
+    } catch (error) {
+      const geoError = error as GeolocationError;
+      logGeoError('LocationSearchInput current location failed', geoError);
 
       // If GPS times out/unavailable, retry once without high accuracy
-      if (error.code === 2 || error.code === 3) {
-        navigator.geolocation.getCurrentPosition(
-          onSuccess,
-          (error2) => {
-            logGeoError('LocationSearchInput current location fallback failed', error2);
-            setIsDetectingLocation(false);
-          },
-          {
+      if (geoError.code === 2 || geoError.code === 3) {
+        try {
+          const fallbackPosition = await getCurrentPosition({
             enableHighAccuracy: false,
             maximumAge: 60000,
             timeout: 15000,
-          }
-        );
+          });
+          await processLocation(fallbackPosition.coords.latitude, fallbackPosition.coords.longitude);
+        } catch (fallbackError) {
+          logGeoError('LocationSearchInput current location fallback failed', fallbackError as GeolocationError);
+          setIsDetectingLocation(false);
+        }
         return;
       }
 
       setIsDetectingLocation(false);
-    };
-
-    navigator.geolocation.getCurrentPosition(onSuccess, onError, {
-      enableHighAccuracy: true,
-      maximumAge: 30000, // Allow 30s cached location for faster response
-      timeout: 15000,    // Reduced timeout
-    });
+    }
   };
 
   const handleClear = () => {

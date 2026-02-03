@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { evChargerTypes, getChargerDisplayName } from '@/lib/evChargerTypes';
 import { logger } from '@/lib/logger';
 import { calculateBookingTotal } from '@/lib/pricing';
+import { getCurrentPosition, watchPosition as geoWatchPosition, GeolocationError, isPermissionDenied } from '@/lib/geolocation';
 
 // Scoped logger for Explore page
 const log = logger.scope('Explore');
@@ -487,11 +488,11 @@ const Explore = () => {
           fetchNearbySpots(desired, EXPANDED_RADIUS_METERS, true, { start: start ? startDate : null, end: end ? endDate : null });
         }
       }
-    } else if (query?.toLowerCase().includes('current location') && navigator.geolocation) {
-      // No lat/lng but query is "Current Location" - get GPS coordinates
+    } else if (query?.toLowerCase().includes('current location')) {
+      // No lat/lng but query is "Current Location" - get GPS coordinates using native plugin
       setSearchQuery('Current Location');
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
+      getCurrentPosition({ enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 })
+        .then((position) => {
           const desired = {
             lat: position.coords.latitude,
             lng: position.coords.longitude
@@ -499,23 +500,21 @@ const Explore = () => {
           setSearchLocation(desired);
           setCurrentLocation(desired);
           fetchNearbySpots(desired, EXPANDED_RADIUS_METERS, true, { start: start ? startDate : null, end: end ? endDate : null });
-          
+
           // Update URL with actual coordinates
           const newParams = new URLSearchParams(searchParams);
           newParams.set('lat', desired.lat.toString());
           newParams.set('lng', desired.lng.toString());
           navigate(`/explore?${newParams.toString()}`, { replace: true });
-        },
-        (error) => {
+        })
+        .catch((error: GeolocationError) => {
           log.warn('GPS failed on Explore page, using default location', { code: error.code });
           // Fallback to default LA location
           const defaultLocation = { lat: 34.0224, lng: -118.2851 };
           setSearchLocation(defaultLocation);
           setSearchQuery('University Park, Los Angeles');
           fetchNearbySpots(defaultLocation, EXPANDED_RADIUS_METERS, true, { start: start ? startDate : null, end: end ? endDate : null });
-        },
-        { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
-      );
+        });
     } else {
       // No URL lat/lng: show empty state, user needs to search
       setSpotsLoading(false);
@@ -531,11 +530,9 @@ const Explore = () => {
   }, [startTime, endTime]);
 
   // Continuously watch and update the user's physical location (blue dot marker)
+  // Uses native Capacitor Geolocation on iOS for faster, more reliable updates
   useEffect(() => {
-    if (!navigator.geolocation) return;
-    
-    // Use high accuracy for precise GPS location
-    const watchId = navigator.geolocation.watchPosition(
+    const cleanup = geoWatchPosition(
       (position) => {
         setCurrentLocation({
           lat: position.coords.latitude,
@@ -553,7 +550,7 @@ const Explore = () => {
     );
 
     // Cleanup: stop watching when component unmounts
-    return () => navigator.geolocation.clearWatch(watchId);
+    return cleanup;
   }, []);
   const fetchMapboxToken = async () => {
     try {
@@ -696,7 +693,7 @@ const Explore = () => {
     // Hide "Search Here" button when navigating to current location
     setShowSearchHereButton(false);
     setPendingMapCenter(null);
-    
+
     // If we already have a cached current location, use it immediately
     if (currentLocation) {
       setSearchLocation(currentLocation);
@@ -711,11 +708,16 @@ const Explore = () => {
       return;
     }
 
-    const logGeoError = (label: string, error: GeolocationPositionError) => {
-      log.warn(label, { code: error.code, message: error.message });
-    };
+    setIsLoadingLocation(true);
 
-    const onSuccess = async (position: GeolocationPosition) => {
+    try {
+      // Use native geolocation - much faster on iOS
+      const position = await getCurrentPosition({
+        enableHighAccuracy: true,
+        maximumAge: 30000, // Allow 30s cached location for faster response
+        timeout: 10000,    // Native is faster, so shorter timeout
+      });
+
       const deviceLoc = {
         lat: position.coords.latitude,
         lng: position.coords.longitude,
@@ -730,39 +732,40 @@ const Explore = () => {
       }
 
       fetchNearbySpots(deviceLoc, EXPANDED_RADIUS_METERS, true, { start: startTime, end: endTime });
-      setIsLoadingLocation(false);
-    };
-
-    const onError = (error: GeolocationPositionError) => {
-      logGeoError('Explore current location failed', error);
+    } catch (error) {
+      const geoError = error as GeolocationError;
+      log.warn('Explore current location failed', { code: geoError.code, message: geoError.message });
 
       // If GPS times out/unavailable, retry once without high accuracy
-      if (error.code === 2 || error.code === 3) {
-        navigator.geolocation.getCurrentPosition(
-          onSuccess,
-          (error2) => {
-            logGeoError('Explore current location fallback failed', error2);
-            setIsLoadingLocation(false);
-          },
-          {
+      if (geoError.code === 2 || geoError.code === 3) {
+        try {
+          const fallbackPosition = await getCurrentPosition({
             enableHighAccuracy: false,
             maximumAge: 60000,
             timeout: 15000,
+          });
+
+          const deviceLoc = {
+            lat: fallbackPosition.coords.latitude,
+            lng: fallbackPosition.coords.longitude,
+          };
+
+          setCurrentLocation(deviceLoc);
+          setSearchLocation(deviceLoc);
+
+          if (mapboxToken) {
+            const address = await reverseGeocode(deviceLoc.lat, deviceLoc.lng);
+            if (address) setSearchQuery(address);
           }
-        );
-        return;
+
+          fetchNearbySpots(deviceLoc, EXPANDED_RADIUS_METERS, true, { start: startTime, end: endTime });
+        } catch (fallbackError) {
+          const fallbackGeoError = fallbackError as GeolocationError;
+          log.warn('Explore current location fallback failed', { code: fallbackGeoError.code, message: fallbackGeoError.message });
+        }
       }
-
+    } finally {
       setIsLoadingLocation(false);
-    };
-
-    setIsLoadingLocation(true);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(onSuccess, onError, {
-        enableHighAccuracy: true,
-        maximumAge: 30000, // Allow 30s cached location for faster response
-        timeout: 15000,    // Reduced timeout
-      });
     }
   };
   const clearSearch = () => {

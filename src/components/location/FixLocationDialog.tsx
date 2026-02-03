@@ -19,6 +19,7 @@ import {
   XCircle,
   Smartphone,
 } from 'lucide-react';
+import { getCurrentPosition } from '@/lib/geolocation';
 
 interface FixLocationDialogProps {
   open: boolean;
@@ -42,40 +43,33 @@ const FixLocationDialog = ({
     setIsRetrying(true);
     setRetryResult(null);
 
-    if (!navigator.geolocation) {
-      setRetryResult('failed');
-      setIsRetrying(false);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const coords = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        };
-        setRetryResult('success');
-        setIsRetrying(false);
-        localStorage.setItem(
-          'parkzy:lastLocation',
-          JSON.stringify({ ...coords, ts: Date.now() })
-        );
-        setTimeout(() => {
-          onSuccess?.(coords);
-          onOpenChange(false);
-          onRetry();
-        }, 1000);
-      },
-      () => {
-        setRetryResult('failed');
-        setIsRetrying(false);
-      },
-      {
+    try {
+      // Use native geolocation for faster location on iOS
+      const position = await getCurrentPosition({
         enableHighAccuracy: true,
         maximumAge: 0,
-        timeout: 20000,
-      }
-    );
+        timeout: 10000, // Native is faster
+      });
+
+      const coords = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+      };
+      setRetryResult('success');
+      setIsRetrying(false);
+      localStorage.setItem(
+        'parkzy:lastLocation',
+        JSON.stringify({ ...coords, ts: Date.now() })
+      );
+      setTimeout(() => {
+        onSuccess?.(coords);
+        onOpenChange(false);
+        onRetry();
+      }, 1000);
+    } catch {
+      setRetryResult('failed');
+      setIsRetrying(false);
+    }
   };
 
   const getErrorInfo = () => {

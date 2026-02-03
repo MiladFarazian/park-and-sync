@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { logos } from '@/assets';
 import { SUPPORT_USER_ID } from '@/hooks/useSupportRole';
+import { getCurrentPosition } from '@/lib/geolocation';
 
 const Footer = () => {
   const navigate = useNavigate();
@@ -17,27 +18,21 @@ const Footer = () => {
     const startParam = now.toISOString();
     const endParam = twoHoursLater.toISOString();
 
-    if (navigator.geolocation) {
-      setIsGettingLocation(true);
-      try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 60000,
-          });
-        });
-        const { latitude, longitude } = position.coords;
-        navigate(`/explore?lat=${latitude}&lng=${longitude}&q=Current%20Location&start=${encodeURIComponent(startParam)}&end=${encodeURIComponent(endParam)}`);
-      } catch (error) {
-        // Fallback to default LA location
-        navigate(`/explore?lat=34.0224&lng=-118.2851&q=Los%20Angeles%2C%20CA&start=${encodeURIComponent(startParam)}&end=${encodeURIComponent(endParam)}`);
-      } finally {
-        setIsGettingLocation(false);
-      }
-    } else {
-      // Geolocation not supported, use default
+    setIsGettingLocation(true);
+    try {
+      // Use native geolocation for faster location on iOS
+      const position = await getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      });
+      const { latitude, longitude } = position.coords;
+      navigate(`/explore?lat=${latitude}&lng=${longitude}&q=Current%20Location&start=${encodeURIComponent(startParam)}&end=${encodeURIComponent(endParam)}`);
+    } catch {
+      // Fallback to default LA location
       navigate(`/explore?lat=34.0224&lng=-118.2851&q=Los%20Angeles%2C%20CA&start=${encodeURIComponent(startParam)}&end=${encodeURIComponent(endParam)}`);
+    } finally {
+      setIsGettingLocation(false);
     }
   };
   return (

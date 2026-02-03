@@ -67,7 +67,22 @@ import { initSentry } from "./lib/sentry";
 // Initialize Sentry for error tracking
 initSentry();
 
-const queryClient = new QueryClient();
+// Optimized QueryClient for better performance
+// - staleTime: Data is "fresh" for 30s, won't refetch during navigation
+// - gcTime: Keep unused data in cache for 10 minutes
+// - refetchOnWindowFocus: Only refetch stale data when user returns to app
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30 * 1000, // 30 seconds - data stays fresh, no refetch on navigate
+      gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache for quick return visits
+      refetchOnWindowFocus: 'always', // Refresh when app comes to foreground
+      refetchOnReconnect: true,
+      retry: 2, // Retry failed requests twice
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    },
+  },
+});
 
 const App = () => {
   // Lock orientation to portrait on mobile devices

@@ -22,6 +22,7 @@ import FixLocationDialog from '@/components/location/FixLocationDialog';
 import EmailVerificationBanner from '@/components/auth/EmailVerificationBanner';
 import { evChargerTypes } from '@/lib/evChargerTypes';
 import { logger } from '@/lib/logger';
+import { getCurrentPosition, GeolocationError, isPermissionDenied } from '@/lib/geolocation';
 
 const Home = () => {
   const isMobile = useIsMobile();
@@ -117,12 +118,7 @@ const Home = () => {
       applyLocation({ lat: cached.lat, lng: cached.lng });
     }
 
-    if (!navigator.geolocation) {
-      if (!cached) useDefaultLocation();
-      return;
-    }
-
-    const logGeoError = (label: string, error: GeolocationPositionError) => {
+    const logGeoError = (label: string, error: GeolocationError) => {
       logger.debug(label, { code: error.code, message: error.message });
     };
 
@@ -130,34 +126,40 @@ const Home = () => {
       localStorage.setItem('parkzy:lastLocation', JSON.stringify({ ...loc, ts: Date.now() }));
     };
 
-    const onSuccess = (position: GeolocationPosition) => {
-      const loc = { lat: position.coords.latitude, lng: position.coords.longitude };
-      applyLocation(loc);
-      save(loc);
-    };
-
-    // 1) Fast, low-power attempt (often cached) so we don't block UX
-    navigator.geolocation.getCurrentPosition(
-      onSuccess,
-      (error) => {
-        logGeoError('Location quick attempt failed', error);
-      },
-      {
-        enableHighAccuracy: false,
-        maximumAge: 5 * 60 * 1000,
-        timeout: 4000,
+    // Use native geolocation for faster location on iOS
+    // Try fast cached location first, then accurate GPS
+    const getLocation = async () => {
+      try {
+        // 1) Fast attempt - allow cached location for immediate response
+        const quickPosition = await getCurrentPosition({
+          enableHighAccuracy: false,
+          maximumAge: 5 * 60 * 1000,
+          timeout: 4000,
+        });
+        const loc = { lat: quickPosition.coords.latitude, lng: quickPosition.coords.longitude };
+        applyLocation(loc);
+        save(loc);
+      } catch (quickError) {
+        logGeoError('Location quick attempt failed', quickError as GeolocationError);
       }
-    );
 
-    // 2) Then try for a real GPS fix (this is the accurate one)
-    navigator.geolocation.getCurrentPosition(
-      onSuccess,
-      (error) => {
+      try {
+        // 2) Accurate GPS fix (native is much faster than web API)
+        const gpsPosition = await getCurrentPosition({
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 10000, // Native is faster, shorter timeout
+        });
+        const loc = { lat: gpsPosition.coords.latitude, lng: gpsPosition.coords.longitude };
+        applyLocation(loc);
+        save(loc);
+      } catch (gpsError) {
+        const error = gpsError as GeolocationError;
         logGeoError('Location GPS attempt failed', error);
         setLocationErrorCode(error.code);
 
         // 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT
-        if (error.code === 1) {
+        if (isPermissionDenied(error)) {
           if (cached) {
             toast('Location permission denied — using last known location', {
               action: {
@@ -189,32 +191,31 @@ const Home = () => {
         }
 
         // Last resort: try one more time without GPS but longer timeout
-        navigator.geolocation.getCurrentPosition(
-          onSuccess,
-          (error2) => {
-            logGeoError('Location fallback attempt failed', error2);
-            setLocationErrorCode(error2.code);
-            toast.error('Could not access your location — showing default area', {
-              action: {
-                label: 'Fix',
-                onClick: () => setShowFixLocationDialog(true),
-              },
-            });
-            useDefaultLocation();
-          },
-          {
+        try {
+          const fallbackPosition = await getCurrentPosition({
             enableHighAccuracy: false,
             maximumAge: 60000,
             timeout: 15000,
-          }
-        );
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 20000,
+          });
+          const loc = { lat: fallbackPosition.coords.latitude, lng: fallbackPosition.coords.longitude };
+          applyLocation(loc);
+          save(loc);
+        } catch (fallbackError) {
+          const error2 = fallbackError as GeolocationError;
+          logGeoError('Location fallback attempt failed', error2);
+          setLocationErrorCode(error2.code);
+          toast.error('Could not access your location — showing default area', {
+            action: {
+              label: 'Fix',
+              onClick: () => setShowFixLocationDialog(true),
+            },
+          });
+          useDefaultLocation();
+        }
       }
-    );
+    };
+
+    getLocation();
   }, [mode]);
 
   useEffect(() => {

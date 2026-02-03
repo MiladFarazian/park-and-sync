@@ -19,6 +19,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameM
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { getBookingStatus, getBookingStatusColorWithOverstay, getBookingStatusLabelWithOverstay } from '@/lib/bookingStatus';
 import { logger } from '@/lib/logger';
+import { getCurrentPosition } from '@/lib/geolocation';
 
 const log = logger.scope('Activity');
 
@@ -893,21 +894,15 @@ const Activity = () => {
                     <p className="text-sm text-muted-foreground mb-4">
                       {mode === 'host' ? 'Reservations for your spots will appear here' : 'Start exploring parking spots near you'}
                     </p>
-                    {mode === 'driver' && <Button onClick={() => {
+                    {mode === 'driver' && <Button onClick={async () => {
                   const now = new Date();
                   const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-                  
-                  if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                      (position) => {
-                        navigate(`/explore?lat=${position.coords.latitude}&lng=${position.coords.longitude}&start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
-                      },
-                      (error) => {
-                        log.error('Location error:', error);
-                        navigate(`/explore?start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
-                      }
-                    );
-                  } else {
+
+                  try {
+                    const position = await getCurrentPosition({ timeout: 5000, enableHighAccuracy: false });
+                    navigate(`/explore?lat=${position.coords.latitude}&lng=${position.coords.longitude}&start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
+                  } catch (error) {
+                    log.error('Location error:', error);
                     navigate(`/explore?start=${now.toISOString()}&end=${twoHoursLater.toISOString()}`);
                   }
                 }}>
