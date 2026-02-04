@@ -206,9 +206,12 @@ export const ExtendParkingDialog = ({
   };
 
   const getExtensionCost = (hrs: number) => {
-    if (!booking) return 0;
-    // Simple proportional pricing: hourly_rate * hours
-    return Math.round((booking.hourly_rate || 5) * hrs * 100) / 100;
+    if (!booking) return { subtotal: 0, serviceFee: 0, total: 0 };
+    const hourlyRate = booking.hourly_rate || 5;
+    const subtotal = Math.round(hourlyRate * hrs * 100) / 100;
+    const serviceFee = Math.round(subtotal * 0.10 * 100) / 100; // 10% service fee
+    const total = Math.round((subtotal + serviceFee) * 100) / 100;
+    return { subtotal, serviceFee, total };
   };
 
   const getNewEndTime = (hrs: number) => {
@@ -218,16 +221,18 @@ export const ExtendParkingDialog = ({
   };
 
   const calculateCustomExtensionCost = () => {
-    if (!booking) return { hours: 0, cost: 0 };
+    if (!booking) return { hours: 0, subtotal: 0, serviceFee: 0, total: 0 };
     const selectedDate = getSelectedDate();
     const extensionMinutes = differenceInMinutes(selectedDate, bookingEndTime);
     const hrs = extensionMinutes / 60;
     
-    if (hrs <= 0) return { hours: 0, cost: 0 };
+    if (hrs <= 0) return { hours: 0, subtotal: 0, serviceFee: 0, total: 0 };
     
-    // Simple proportional pricing: hourly_rate * hours
-    const cost = Math.round((booking.hourly_rate || 5) * hrs * 100) / 100;
-    return { hours: hrs, cost };
+    const hourlyRate = booking.hourly_rate || 5;
+    const subtotal = Math.round(hourlyRate * hrs * 100) / 100;
+    const serviceFee = Math.round(subtotal * 0.10 * 100) / 100; // 10% service fee
+    const total = Math.round((subtotal + serviceFee) * 100) / 100;
+    return { hours: hrs, subtotal, serviceFee, total };
   };
 
   const validateCustomTime = () => {
@@ -505,7 +510,7 @@ export const ExtendParkingDialog = ({
                   </div>
                   <span className="flex items-center gap-2">
                     <span className={selectedExtendHours === option.hours ? 'text-primary font-semibold' : 'text-primary font-semibold'}>
-                      +${getExtensionCost(option.hours).toFixed(2)}
+                      +${getExtensionCost(option.hours).total.toFixed(2)}
                     </span>
                     {selectedExtendHours === option.hours && (
                       <Check className="h-4 w-4 text-primary" />
@@ -528,7 +533,7 @@ export const ExtendParkingDialog = ({
                   Processing...
                 </>
               ) : selectedExtendHours !== null ? (
-                `Confirm +$${getExtensionCost(selectedExtendHours).toFixed(2)}`
+                `Confirm +$${getExtensionCost(selectedExtendHours).total.toFixed(2)}`
               ) : (
                 'Select a duration'
               )}
@@ -706,7 +711,7 @@ export const ExtendParkingDialog = ({
                   <span className="text-sm font-medium">Extension cost</span>
                 </div>
                 <span className="text-lg font-bold text-primary">
-                  +${customCost.cost.toFixed(2)}
+                  +${customCost.total.toFixed(2)}
                 </span>
               </div>
             )}
@@ -743,7 +748,7 @@ export const ExtendParkingDialog = ({
                   Processing...
                 </>
               ) : (
-                `Extend Parking${customCost.hours > 0 ? ` • $${customCost.cost.toFixed(2)}` : ''}`
+                `Extend Parking${customCost.hours > 0 ? ` • $${customCost.total.toFixed(2)}` : ''}`
               )}
             </Button>
           </div>

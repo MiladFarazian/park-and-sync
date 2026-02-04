@@ -90,15 +90,25 @@ Deno.Deno.serve(async (req) => {
       throw new Error('Spot is not available for the requested times');
     }
 
-    // Calculate new costs: driver rate equals host rate + visible service fee + EV charging
+    // Calculate new costs with 10%/10% model:
+    // - Driver pays: host rate + 10% service fee
+    // - Host receives: host rate - 10% platform fee
+    // - EV charging: 100% to host
     const durationMs = newEnd.getTime() - newStart.getTime();
     const newTotalHours = durationMs / (1000 * 60 * 60);
     const hostHourlyRate = booking.spots.hourly_rate;
-    const hostEarnings = hostHourlyRate * newTotalHours;
-    // Driver rate equals host rate - no hidden upcharge
-    const driverHourlyRate = hostHourlyRate;
-    const driverSubtotal = Math.round(driverHourlyRate * newTotalHours * 100) / 100;
-    const newPlatformFee = Math.round(Math.max(hostEarnings * 0.20, 1.00) * 100) / 100;
+    
+    // Host gross earnings
+    const hostGross = Math.round(hostHourlyRate * newTotalHours * 100) / 100;
+    // Platform fee: 10% of host gross
+    const hostPlatformFee = Math.round(hostGross * 0.10 * 100) / 100;
+    // Host net earnings (before EV)
+    const hostNetEarnings = Math.round((hostGross - hostPlatformFee) * 100) / 100;
+    
+    // Driver subtotal (same as host gross)
+    const driverSubtotal = hostGross;
+    // Service fee: 10% of driver subtotal
+    const newPlatformFee = Math.round(driverSubtotal * 0.10 * 100) / 100;
     
     // Calculate EV charging fee if booking has EV charging enabled
     const newEvChargingFee = booking.will_use_ev_charging && booking.spots.ev_charging_premium_per_hour
@@ -107,17 +117,25 @@ Deno.Deno.serve(async (req) => {
     
     const newSubtotal = driverSubtotal;
     const newTotalAmount = Math.round((driverSubtotal + newPlatformFee + newEvChargingFee) * 100) / 100;
+    // Host earnings includes EV charging (100% to host)
+    const hostEarnings = Math.round((hostNetEarnings + newEvChargingFee) * 100) / 100;
 
     const priceDifference = newTotalAmount - booking.total_amount;
     const absoluteDifference = Math.abs(priceDifference);
 
-    console.log('Pricing calculation:', {
+    console.log('Pricing calculation (10%/10% model):', {
       oldTotalHours: booking.total_hours,
       newTotalHours,
       hostHourlyRate,
+      hostGross,
+      hostPlatformFee,
+      hostNetEarnings,
+      driverSubtotal,
+      serviceFee: newPlatformFee,
       oldTotalAmount: booking.total_amount,
       newTotalAmount,
       newEvChargingFee,
+      hostEarnings,
       willUseEvCharging: booking.will_use_ev_charging,
       priceDifference,
       willCharge: priceDifference > 0,

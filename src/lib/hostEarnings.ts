@@ -1,4 +1,5 @@
 import { differenceInMinutes } from 'date-fns';
+import { calculatePlatformFee } from './pricing';
 
 interface BookingForEarnings {
   host_earnings?: number | null;
@@ -7,23 +8,25 @@ interface BookingForEarnings {
   end_at?: string;
   total_amount?: number;
   extension_charges?: number | null;
+  ev_charging_fee?: number | null;
 }
 
 /**
  * Get the host's net earnings from a booking.
  * 
- * For bookings with extensions, we always recalculate from hourly_rate × hours
+ * Host net earnings = (hourly_rate × hours) × 0.90 + EV charging fee
+ * The 10% platform fee is deducted from the parking portion.
+ * EV charging goes 100% to host.
+ * 
+ * For bookings with extensions, we always recalculate from hourly_rate × hours × 0.90
  * because older bookings may not have had host_earnings updated during extension.
  * 
  * For bookings without extensions:
  * 1. Use host_earnings field (preferred, accurate net amount)
- * 2. Fallback: calculate from hourly_rate × hours
- * 
- * Never returns total_amount as that includes driver upcharge + service fee.
+ * 2. Fallback: calculate from hourly_rate × hours × 0.90
  */
 export function getHostNetEarnings(booking: BookingForEarnings): number {
   // For bookings with extensions, always recalculate to ensure accuracy
-  // This handles legacy data where host_earnings wasn't updated on extension
   const hasExtensions = (booking.extension_charges ?? 0) > 0;
   
   if (hasExtensions && booking.hourly_rate && booking.start_at && booking.end_at) {
@@ -33,7 +36,11 @@ export function getHostNetEarnings(booking: BookingForEarnings): number {
     const hours = totalMinutes / 60;
     
     if (hours > 0) {
-      return Math.round(booking.hourly_rate * hours * 100) / 100;
+      const hostGross = booking.hourly_rate * hours;
+      const platformFee = calculatePlatformFee(hostGross);
+      const netParking = hostGross - platformFee;
+      const evChargingFee = booking.ev_charging_fee ?? 0;
+      return Math.round((netParking + evChargingFee) * 100) / 100;
     }
   }
   
@@ -42,7 +49,7 @@ export function getHostNetEarnings(booking: BookingForEarnings): number {
     return Math.round(booking.host_earnings * 100) / 100;
   }
   
-  // Fallback: calculate from hourly_rate × duration
+  // Fallback: calculate from hourly_rate × duration × 0.90
   if (booking.hourly_rate && booking.start_at && booking.end_at) {
     const startDate = new Date(booking.start_at);
     const endDate = new Date(booking.end_at);
@@ -50,7 +57,11 @@ export function getHostNetEarnings(booking: BookingForEarnings): number {
     const hours = totalMinutes / 60;
     
     if (hours > 0) {
-      return Math.round(booking.hourly_rate * hours * 100) / 100;
+      const hostGross = booking.hourly_rate * hours;
+      const platformFee = calculatePlatformFee(hostGross);
+      const netParking = hostGross - platformFee;
+      const evChargingFee = booking.ev_charging_fee ?? 0;
+      return Math.round((netParking + evChargingFee) * 100) / 100;
     }
   }
   
@@ -59,7 +70,7 @@ export function getHostNetEarnings(booking: BookingForEarnings): number {
 }
 
 /**
- * Calculate what Parkzy took from a booking (for optional host breakdown).
+ * Calculate what Parkzy took from a booking (driver service fee + host platform fee).
  * This is the difference between what the driver paid and what the host earned.
  */
 export function getParkzyFee(booking: BookingForEarnings): number {

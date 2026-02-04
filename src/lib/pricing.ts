@@ -1,36 +1,54 @@
 /**
+ * Platform pricing model:
+ * - Driver pays: host rate + 10% service fee
+ * - Host receives: host rate - 10% platform fee
+ * - Parkzy revenue: 20% total (10% from driver + 10% from host)
+ *
+ * Example: Host lists at $15/hr, 2-hour booking
+ * - Driver subtotal: $15 × 2 = $30
+ * - Service fee (10%): $3
+ * - Driver total: $33
+ * - Host gross: $30
+ * - Platform fee (10%): $3
+ * - Host net: $27
+ * - Parkzy revenue: $6 (18.2% of driver total)
+ */
+
+/**
  * Calculate the driver-facing hourly rate from the host's hourly rate.
- *
- * Platform fee structure:
- * - Base rate: Host's listed rate
- * - Platform markup: 20% or $1 minimum (whichever is higher) built into displayed rate
- * - Service fee: Additional 20% of host earnings (shown as separate line item)
- *
- * Example: Host lists at $5/hr, 2-hour booking
- * - Platform markup: max($5 × 0.20, $1) = $1
- * - Driver sees hourly rate: $5 + $1 = $6/hr
- * - Subtotal: $6 × 2 = $12
- * - Service fee: max($10 × 0.20, $1) = $2
- * - Driver total: $12 + $2 = $14
- * - Host receives: $5 × 2 = $10
- * - Platform revenue: $4 (28.6% of driver total)
+ * Driver sees the host rate directly (no hidden upcharge).
  */
 export function calculateDriverPrice(hostHourlyRate: number): number {
-  // Driver rate equals host rate - no hidden upcharge
   return Math.round(hostHourlyRate * 100) / 100;
 }
 
 /**
- * Calculate service fee from host's earnings.
- * 20% or $1 minimum (whichever is higher).
- * This is a separate visible line item for drivers.
+ * Calculate service fee from driver subtotal.
+ * 10% of driver subtotal (visible to driver).
  */
-export function calculateServiceFee(hostEarnings: number): number {
-  return Math.round(Math.max(hostEarnings * 0.20, 1.00) * 100) / 100;
+export function calculateServiceFee(driverSubtotal: number): number {
+  return Math.round(driverSubtotal * 0.10 * 100) / 100;
+}
+
+/**
+ * Calculate platform fee from host gross earnings.
+ * 10% of host gross (deducted from host earnings).
+ */
+export function calculatePlatformFee(hostGross: number): number {
+  return Math.round(hostGross * 0.10 * 100) / 100;
+}
+
+/**
+ * Calculate host net earnings after platform fee.
+ */
+export function calculateHostNetEarnings(hostGross: number): number {
+  const platformFee = calculatePlatformFee(hostGross);
+  return Math.round((hostGross - platformFee) * 100) / 100;
 }
 
 /**
  * Calculate EV charging fee based on premium per hour and hours.
+ * EV charging goes 100% to host (no platform fee on EV charging).
  */
 export function calculateEvChargingFee(premiumPerHour: number, hours: number): number {
   return Math.round(premiumPerHour * hours * 100) / 100;
@@ -46,12 +64,16 @@ export function calculateCombinedHourlyRate(hostHourlyRate: number, evChargingPr
 }
 
 /**
- * Calculate total booking cost for driver.
- * - driverSubtotal: driver_rate × hours (includes invisible upcharge)
- * - serviceFee: 20% of host earnings or $1 min (visible to driver)
- * - evChargingFee: optional EV charging premium
+ * Calculate total booking cost for both driver and host.
+ * 
+ * Returns:
+ * - hostGross: host rate × hours
+ * - platformFee: 10% of host gross (deducted from host)
+ * - hostNetEarnings: what host actually receives (hostGross - platformFee + evChargingFee)
+ * - driverSubtotal: host rate × hours (same as hostGross)
+ * - serviceFee: 10% of driverSubtotal (added to driver total)
+ * - evChargingFee: optional EV charging premium (100% to host)
  * - driverTotal: driverSubtotal + serviceFee + evChargingFee
- * - hostEarnings: what the host actually earns (their rate × hours)
  */
 export function calculateBookingTotal(
   hostHourlyRate: number, 
@@ -59,22 +81,31 @@ export function calculateBookingTotal(
   evChargingPremiumPerHour: number = 0,
   willUseEvCharging: boolean = false
 ): {
-  hostEarnings: number;
+  hostGross: number;
+  platformFee: number;
+  hostNetEarnings: number;
+  hostEarnings: number; // Alias for hostNetEarnings for backwards compatibility
   driverHourlyRate: number;
   driverSubtotal: number;
   serviceFee: number;
   evChargingFee: number;
   driverTotal: number;
 } {
-  const hostEarnings = hostHourlyRate * hours;
+  const hostGross = Math.round(hostHourlyRate * hours * 100) / 100;
+  const platformFee = calculatePlatformFee(hostGross);
+  const evChargingFee = willUseEvCharging ? calculateEvChargingFee(evChargingPremiumPerHour, hours) : 0;
+  const hostNetEarnings = Math.round((hostGross - platformFee) * 100) / 100;
+  
   const driverHourlyRate = calculateDriverPrice(hostHourlyRate);
   const driverSubtotal = Math.round(driverHourlyRate * hours * 100) / 100;
-  const serviceFee = calculateServiceFee(hostEarnings);
-  const evChargingFee = willUseEvCharging ? calculateEvChargingFee(evChargingPremiumPerHour, hours) : 0;
+  const serviceFee = calculateServiceFee(driverSubtotal);
   const driverTotal = Math.round((driverSubtotal + serviceFee + evChargingFee) * 100) / 100;
   
   return {
-    hostEarnings,
+    hostGross,
+    platformFee,
+    hostNetEarnings,
+    hostEarnings: hostNetEarnings, // Backwards compatibility alias
     driverHourlyRate,
     driverSubtotal,
     serviceFee,
