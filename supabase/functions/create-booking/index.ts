@@ -386,61 +386,109 @@ serve(async (req) => {
           .single();
 
         // Create notifications for host and renter with appropriate routing
-        if (hostProfile && renterProfile) {
-          const hostNotification = {
-            user_id: spot.host_id,
-            type: 'booking_host',
-            title: 'New Booking Received',
-            message: `${renterProfile.first_name || 'A driver'} has booked your spot at ${spot.address}`,
-            related_id: booking.id,
-          };
+        const driverName = renterProfile?.first_name || userData.user.user_metadata?.first_name || 'A driver';
+        const hostName = hostProfile?.first_name || 'Host';
+        
+        const hostNotification = {
+          user_id: spot.host_id,
+          type: 'booking_host',
+          title: 'New Booking Received',
+          message: `${driverName} has booked your spot at ${spot.address}`,
+          related_id: booking.id,
+        };
 
-          const renterNotification = {
-            user_id: userData.user.id,
-            type: 'booking',
-            title: 'Booking Confirmed',
-            message: `Your booking at ${spot.address} has been confirmed`,
-            related_id: booking.id,
-          };
+        const renterNotification = {
+          user_id: userData.user.id,
+          type: 'booking',
+          title: 'Booking Confirmed',
+          message: `Your booking at ${spot.address} has been confirmed`,
+          related_id: booking.id,
+        };
 
-          const { error: notificationError } = await supabaseAdmin
-            .from('notifications')
-            .insert([hostNotification, renterNotification]);
+        const { error: notificationError } = await supabaseAdmin
+          .from('notifications')
+          .insert([hostNotification, renterNotification]);
 
-          if (notificationError) {
-            log.error('Failed to create booking notifications', { error: notificationError.message });
-          }
-
-          // Send confirmation emails
-          try {
-            const hostEmail = hostUser?.email || hostProfile?.email || '';
-            const driverEmail = userData.user.email || renterProfile?.email || '';
-
-            log.debug('Sending confirmation emails');
-
-            await supabase.functions.invoke('send-booking-confirmation', {
-              body: {
-                hostEmail,
-                hostName: hostProfile?.first_name || 'Host',
-                driverEmail,
-                driverName: renterProfile?.first_name || 'Driver',
-                spotTitle: spot.title,
-                spotAddress: spot.address,
-                startAt: start_at,
-                endAt: end_at,
-                totalAmount: totalAmount,
-                bookingId: booking.id,
-                // Access and EV charging instructions for driver email
-                accessNotes: spot.access_notes || '',
-                evChargingInstructions: spot.ev_charging_instructions || '',
-                hasEvCharging: spot.has_ev_charging || false,
-                willUseEvCharging: useEvCharging,
-              },
-            });
-          } catch (emailError) {
-            log.error('Failed to send confirmation emails', { error: emailError instanceof Error ? emailError.message : emailError });
-          }
+        if (notificationError) {
+          log.error('Failed to create booking notifications', { error: notificationError.message });
         }
+
+        // Send push notifications to both host and renter
+        try {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+          const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+          
+          // Push to host
+          await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${serviceRoleKey}`,
+            },
+            body: JSON.stringify({
+              userId: spot.host_id,
+              title: '🚗 New Booking!',
+              body: `${driverName} booked your spot at ${spot.address}`,
+              url: `/booking/${booking.id}`,
+              type: 'booking_host',
+              bookingId: booking.id,
+              requireInteraction: true,
+            }),
+          });
+          
+          // Push to driver
+          await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${serviceRoleKey}`,
+            },
+            body: JSON.stringify({
+              userId: userData.user.id,
+              title: '✅ Booking Confirmed!',
+              body: `Your parking at ${spot.address} is confirmed`,
+              url: `/booking-confirmation/${booking.id}`,
+              type: 'booking',
+              bookingId: booking.id,
+              requireInteraction: true,
+            }),
+          });
+          
+          log.debug('Push notifications sent to host and driver');
+        } catch (pushError) {
+          log.error('Failed to send push notifications', { error: pushError instanceof Error ? pushError.message : pushError });
+        }
+
+        // Send confirmation emails
+        try {
+          const hostEmail = hostUser?.email || hostProfile?.email || '';
+          const driverEmail = userData.user.email || renterProfile?.email || '';
+
+          log.debug('Sending confirmation emails');
+
+          await supabase.functions.invoke('send-booking-confirmation', {
+            body: {
+              hostEmail,
+              hostName,
+              driverEmail,
+              driverName,
+              spotTitle: spot.title,
+              spotAddress: spot.address,
+              startAt: start_at,
+              endAt: end_at,
+              totalAmount: totalAmount,
+              bookingId: booking.id,
+              // Access and EV charging instructions for driver email
+              accessNotes: spot.access_notes || '',
+              evChargingInstructions: spot.ev_charging_instructions || '',
+              hasEvCharging: spot.has_ev_charging || false,
+              willUseEvCharging: useEvCharging,
+            },
+          });
+        } catch (emailError) {
+          log.error('Failed to send confirmation emails', { error: emailError instanceof Error ? emailError.message : emailError });
+        }
+
 
         // Return success
         return new Response(JSON.stringify({
@@ -593,18 +641,35 @@ serve(async (req) => {
           log.error('Failed to create booking notifications', { error: notificationError.message });
         }
 
-        // Send push notification to host
+        // Send push notification to host (high-urgency alert)
         try {
-          await supabaseAdmin.functions.invoke('send-push-notification', {
-            body: {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+          const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+          
+          const pushResponse = await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${serviceRoleKey}`,
+            },
+            body: JSON.stringify({
               userId: spot.host_id,
               title: '🔔 New Booking Request',
               body: `${driverName} wants to book your spot. Respond within 1 hour.`,
               url: `/host-booking-confirmation/${booking.id}`,
               type: 'booking_approval_required',
-            },
+              bookingId: booking.id,
+              requireInteraction: true, // Urgent alert - requires user interaction
+            }),
           });
-          log.debug('Push notification sent to host');
+          
+          if (pushResponse.ok) {
+            const pushResult = await pushResponse.json();
+            log.debug('Push notification sent to host', { sent: pushResult.sent });
+          } else {
+            const errorText = await pushResponse.text();
+            log.warn('Push notification failed', { status: pushResponse.status, error: errorText });
+          }
         } catch (pushError) {
           log.error('Failed to send push notification to host', { error: pushError instanceof Error ? pushError.message : pushError });
         }
