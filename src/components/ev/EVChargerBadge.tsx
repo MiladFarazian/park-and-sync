@@ -1,7 +1,7 @@
 import React from 'react';
 import { getChargerTypeById } from '@/lib/evChargerTypes';
 import { cn } from '@/lib/utils';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { HybridTooltip } from '@/components/ui/hybrid-tooltip';
 import { Badge } from '@/components/ui/badge';
 
 interface EVChargerBadgeProps {
@@ -51,20 +51,17 @@ export const EVChargerBadge: React.FC<EVChargerBadgeProps> = ({
 
   if (showSpeed) {
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            {badge}
-          </TooltipTrigger>
-          <TooltipContent>
-            <div className="text-center">
-              <p className="font-medium">{charger.name}</p>
-              <p className="text-xs text-muted-foreground">{charger.description}</p>
-              <p className="text-xs font-medium mt-1">{charger.chargingSpeed}</p>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <HybridTooltip
+        content={
+          <div className="text-center">
+            <p className="font-medium">{charger.name}</p>
+            <p className="text-xs text-muted-foreground">{charger.description}</p>
+            <p className="text-xs font-medium mt-1">{charger.chargingSpeed}</p>
+          </div>
+        }
+      >
+        {badge}
+      </HybridTooltip>
     );
   }
 
