@@ -291,8 +291,7 @@ const Explore = () => {
             let totalPrice: number | undefined;
             if (bookingHours) {
               const driverSubtotal = driverHourlyRate * bookingHours;
-              const hostEarnings = hostHourlyRate * bookingHours;
-              const serviceFee = Math.max(hostEarnings * 0.20, 1.00);
+              const serviceFee = driverSubtotal * 0.10; // 10% service fee
               const evPremium = matchingSpot.ev_charging_premium_per_hour || 0;
               const evChargingFee = evChargerType && matchingSpot.has_ev_charging ? evPremium * bookingHours : 0;
               totalPrice = Math.round((driverSubtotal + serviceFee + evChargingFee) * 100) / 100;
@@ -958,11 +957,9 @@ const Explore = () => {
         if (bookingHours) {
           const willUseEvCharging = evChargerTypeFilter != null && spot.has_ev_charging;
           
-          // Driver rate equals host rate - no hidden upcharge
-          const hostHourlyRate = driverHourlyRate;
+          // Calculate total price with 10% service fee
           const driverSubtotal = driverHourlyRate * bookingHours;
-          const hostEarnings = hostHourlyRate * bookingHours;
-          const serviceFee = Math.max(hostEarnings * 0.20, 1.00);
+          const serviceFee = driverSubtotal * 0.10; // 10% service fee
           const evChargingFee = willUseEvCharging ? evPremium * bookingHours : 0;
           
           totalPrice = Math.round((driverSubtotal + serviceFee + evChargingFee) * 100) / 100;

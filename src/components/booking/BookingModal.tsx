@@ -82,15 +82,15 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
     }
 
     const subtotal = hours * spot.hourlyRate;
-    const platformFee = subtotal * 0.15; // 15% platform fee
-    const total = subtotal + platformFee;
+    const serviceFee = subtotal * 0.10; // 10% service fee
+    const total = subtotal + serviceFee;
 
-    log.debug('Pricing:', { hours, subtotal, platformFee, total });
+    log.debug('Pricing:', { hours, subtotal, serviceFee, total });
 
     return {
       hours: hours.toString(),
       subtotal: subtotal.toFixed(2),
-      platformFee: platformFee.toFixed(2),
+      serviceFee: serviceFee.toFixed(2),
       total: total.toFixed(2),
     };
   };
@@ -272,8 +272,8 @@ const BookingModal = ({ open, onOpenChange, spot }: BookingModalProps) => {
                     <span className="font-medium">${pricing.subtotal}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Service fee</span>
-                    <span className="font-medium">${pricing.platformFee}</span>
+                    <span className="text-muted-foreground">Service fee (10%)</span>
+                    <span className="font-medium">${pricing.serviceFee}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-lg">
