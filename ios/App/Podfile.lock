@@ -9,6 +9,8 @@ PODS:
     - IONGeolocationLib (= 1.0.1)
   - CapacitorHaptics (7.0.3):
     - Capacitor
+  - CapacitorPushNotifications (7.0.4):
+    - Capacitor
   - CapacitorScreenOrientation (7.0.3):
     - Capacitor
   - IONGeolocationLib (1.0.1)
@@ -19,6 +21,7 @@ DEPENDENCIES:
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorGeolocation (from `../../node_modules/@capacitor/geolocation`)"
   - "CapacitorHaptics (from `../../node_modules/@capacitor/haptics`)"
+  - "CapacitorPushNotifications (from `../../node_modules/@capacitor/push-notifications`)"
   - "CapacitorScreenOrientation (from `../../node_modules/@capacitor/screen-orientation`)"
 
 SPEC REPOS:
@@ -36,6 +39,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/geolocation"
   CapacitorHaptics:
     :path: "../../node_modules/@capacitor/haptics"
+  CapacitorPushNotifications:
+    :path: "../../node_modules/@capacitor/push-notifications"
   CapacitorScreenOrientation:
     :path: "../../node_modules/@capacitor/screen-orientation"
 
@@ -45,9 +50,10 @@ SPEC CHECKSUMS:
   CapacitorCordova: bf648a636f3c153f652d312ae145fb508b6ffced
   CapacitorGeolocation: bb6f441b53393984f1c4e8b7e4a826fe3e133309
   CapacitorHaptics: ce15be8f287fa2c61c7d2d9e958885b90cf0bebc
+  CapacitorPushNotifications: 7604512af53bbfdf1dd8fb2256b9ef1e8a69cdc2
   CapacitorScreenOrientation: dbc5cb20775d43a8184830792808c71116b12d56
   IONGeolocationLib: 20f9d0248a0b5264511fb57a37e25dd2badf797a
 
-PODFILE CHECKSUM: 59190859e890a0a935c5fe475cf09154af1b1367
+PODFILE CHECKSUM: 93becc404b8d606aa13fe6fc1fd9b2d66eebd6aa
 
 COCOAPODS: 1.16.2

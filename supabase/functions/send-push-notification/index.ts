@@ -6,6 +6,144 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// =============================================================================
+// APNs (Apple Push Notification Service) Implementation
+// =============================================================================
+
+/**
+ * Generate JWT for APNs authentication
+ * APNs requires ES256 signed JWT with team_id and key_id
+ */
+async function generateApnsJwt(): Promise<string | null> {
+  const apnsKeyId = Deno.env.get('APNS_KEY_ID');
+  const apnsTeamId = Deno.env.get('APNS_TEAM_ID');
+  const apnsPrivateKey = Deno.env.get('APNS_PRIVATE_KEY');
+
+  if (!apnsKeyId || !apnsTeamId || !apnsPrivateKey) {
+    console.log('[APNs] Missing APNs configuration, skipping native push');
+    return null;
+  }
+
+  try {
+    // Parse the private key (PEM format)
+    const pemContents = apnsPrivateKey
+      .replace('-----BEGIN PRIVATE KEY-----', '')
+      .replace('-----END PRIVATE KEY-----', '')
+      .replace(/\s/g, '');
+
+    const privateKeyBytes = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+
+    // Import the private key for ES256 signing
+    const cryptoKey = await crypto.subtle.importKey(
+      'pkcs8',
+      privateKeyBytes,
+      { name: 'ECDSA', namedCurve: 'P-256' },
+      false,
+      ['sign']
+    );
+
+    // Create JWT header and payload
+    const header = { alg: 'ES256', kid: apnsKeyId };
+    const payload = {
+      iss: apnsTeamId,
+      iat: Math.floor(Date.now() / 1000),
+    };
+
+    const encodedHeader = base64UrlEncode(JSON.stringify(header));
+    const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+    const unsignedToken = `${encodedHeader}.${encodedPayload}`;
+
+    // Sign the token
+    const signature = await crypto.subtle.sign(
+      { name: 'ECDSA', hash: 'SHA-256' },
+      cryptoKey,
+      new TextEncoder().encode(unsignedToken)
+    );
+
+    // Convert signature to base64url (APNs expects raw r||s format)
+    const signatureArray = new Uint8Array(signature);
+    const signatureBase64 = base64UrlEncode(signatureArray);
+
+    return `${unsignedToken}.${signatureBase64}`;
+  } catch (error) {
+    console.error('[APNs] Error generating JWT:', error);
+    return null;
+  }
+}
+
+/**
+ * Send push notification via APNs
+ */
+async function sendApnsNotification(
+  deviceToken: string,
+  payload: { title: string; body: string; type?: string; bookingId?: string; url?: string },
+  isProduction: boolean = true
+): Promise<boolean> {
+  const bundleId = Deno.env.get('APNS_BUNDLE_ID') || 'com.parkzy.app';
+  const jwt = await generateApnsJwt();
+
+  if (!jwt) {
+    return false;
+  }
+
+  try {
+    // Use production or sandbox APNs server
+    const apnsHost = isProduction
+      ? 'https://api.push.apple.com'
+      : 'https://api.sandbox.push.apple.com';
+
+    const apnsPayload = {
+      aps: {
+        alert: {
+          title: payload.title,
+          body: payload.body,
+        },
+        sound: 'default',
+        badge: 1,
+        'mutable-content': 1,
+      },
+      // Custom data for handling notification taps
+      type: payload.type || null,
+      bookingId: payload.bookingId || null,
+      url: payload.url || '/activity',
+    };
+
+    const response = await fetch(`${apnsHost}/3/device/${deviceToken}`, {
+      method: 'POST',
+      headers: {
+        'authorization': `bearer ${jwt}`,
+        'apns-topic': bundleId,
+        'apns-push-type': 'alert',
+        'apns-priority': '10',
+        'apns-expiration': '0',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(apnsPayload),
+    });
+
+    if (response.ok) {
+      console.log(`[APNs] Push sent successfully to: ${deviceToken.substring(0, 20)}...`);
+      return true;
+    } else {
+      const errorBody = await response.text();
+      console.error(`[APNs] Push failed: ${response.status} - ${errorBody}`);
+
+      // If token is invalid, it should be removed
+      if (response.status === 400 || response.status === 410) {
+        console.log(`[APNs] Token ${deviceToken.substring(0, 20)}... is invalid, should be removed`);
+      }
+      return false;
+    }
+  } catch (error) {
+    console.error('[APNs] Error sending notification:', error);
+    return false;
+  }
+}
+
+// =============================================================================
+// Web Push (VAPID) Implementation
+// =============================================================================
+
 // Web Push VAPID signature implementation
 async function generateVapidAuthHeader(
   audience: string,
@@ -204,59 +342,113 @@ serve(async (req) => {
     console.log(`[send-push-notification] Target user IDs:`, targetUserIds);
     console.log(`[send-push-notification] Payload:`, { title, body, tag, url, type });
 
-    // Fetch all push subscriptions for the target users
+    // Track results
+    let webPushSuccess = 0;
+    let webPushTotal = 0;
+    let apnsSuccess = 0;
+    let apnsTotal = 0;
+    const expiredEndpoints: string[] = [];
+    const expiredDeviceTokens: string[] = [];
+
+    // ==========================================================================
+    // 1. Web Push Notifications (VAPID)
+    // ==========================================================================
     const { data: subscriptions, error: fetchError } = await supabaseClient
       .from('push_subscriptions')
       .select('*')
       .in('user_id', targetUserIds);
 
     if (fetchError) {
-      console.error('Error fetching subscriptions:', fetchError);
-      throw fetchError;
+      console.error('Error fetching web push subscriptions:', fetchError);
     }
 
-    if (!subscriptions || subscriptions.length === 0) {
-      console.log(`[send-push-notification] No push subscriptions found for users: ${targetUserIds.join(', ')}`);
-      return new Response(
-        JSON.stringify({ success: true, sent: 0, message: 'No subscriptions found', userIds: targetUserIds }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-      );
-    }
+    if (subscriptions && subscriptions.length > 0) {
+      console.log(`[send-push-notification] Found ${subscriptions.length} web push subscriptions`);
+      webPushTotal = subscriptions.length;
 
-    console.log(`[send-push-notification] Found ${subscriptions.length} subscriptions for users:`, subscriptions.map(s => ({ user_id: s.user_id, endpoint: s.endpoint.substring(0, 50) + '...' })));
+      const payload = { title, body, tag, url, requireInteraction, type, bookingId };
 
-    const payload = { title, body, tag, url, requireInteraction, type, bookingId };
-    let successCount = 0;
-    const expiredEndpoints: string[] = [];
-
-    // Send to all subscriptions
-    for (const sub of subscriptions) {
-      const success = await sendPushNotification(
-        { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
-        payload
-      );
-      if (success) {
-        successCount++;
-      } else {
-        expiredEndpoints.push(sub.endpoint);
+      for (const sub of subscriptions) {
+        const success = await sendPushNotification(
+          { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
+          payload
+        );
+        if (success) {
+          webPushSuccess++;
+        } else {
+          expiredEndpoints.push(sub.endpoint);
+        }
       }
+
+      // Clean up expired web push subscriptions
+      if (expiredEndpoints.length > 0) {
+        console.log(`Removing ${expiredEndpoints.length} expired web push subscriptions`);
+        await supabaseClient
+          .from('push_subscriptions')
+          .delete()
+          .in('endpoint', expiredEndpoints);
+      }
+    } else {
+      console.log(`[send-push-notification] No web push subscriptions found`);
     }
 
-    // Clean up expired subscriptions
-    if (expiredEndpoints.length > 0) {
-      console.log(`Removing ${expiredEndpoints.length} expired subscriptions`);
-      await supabaseClient
-        .from('push_subscriptions')
-        .delete()
-        .in('endpoint', expiredEndpoints);
+    // ==========================================================================
+    // 2. APNs (Apple Push Notifications)
+    // ==========================================================================
+    const { data: deviceTokens, error: deviceTokenError } = await supabaseClient
+      .from('device_tokens')
+      .select('*')
+      .in('user_id', targetUserIds)
+      .eq('platform', 'ios');
+
+    if (deviceTokenError) {
+      console.error('Error fetching device tokens:', deviceTokenError);
     }
+
+    if (deviceTokens && deviceTokens.length > 0) {
+      console.log(`[send-push-notification] Found ${deviceTokens.length} iOS device tokens`);
+      apnsTotal = deviceTokens.length;
+
+      // Determine if we're in production (check for production flag or environment)
+      const isProduction = Deno.env.get('APNS_ENVIRONMENT') !== 'development';
+
+      for (const device of deviceTokens) {
+        const success = await sendApnsNotification(
+          device.token,
+          { title, body, type, bookingId, url },
+          isProduction
+        );
+        if (success) {
+          apnsSuccess++;
+        } else {
+          expiredDeviceTokens.push(device.token);
+        }
+      }
+
+      // Clean up expired device tokens
+      if (expiredDeviceTokens.length > 0) {
+        console.log(`Removing ${expiredDeviceTokens.length} expired device tokens`);
+        await supabaseClient
+          .from('device_tokens')
+          .delete()
+          .in('token', expiredDeviceTokens);
+      }
+    } else {
+      console.log(`[send-push-notification] No iOS device tokens found`);
+    }
+
+    const totalSent = webPushSuccess + apnsSuccess;
+    const totalAttempted = webPushTotal + apnsTotal;
+
+    console.log(`[send-push-notification] Results: web=${webPushSuccess}/${webPushTotal}, apns=${apnsSuccess}/${apnsTotal}`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        sent: successCount, 
-        total: subscriptions.length,
-        expired: expiredEndpoints.length 
+      JSON.stringify({
+        success: true,
+        sent: totalSent,
+        total: totalAttempted,
+        webPush: { sent: webPushSuccess, total: webPushTotal, expired: expiredEndpoints.length },
+        apns: { sent: apnsSuccess, total: apnsTotal, expired: expiredDeviceTokens.length },
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );

@@ -153,6 +153,63 @@ serve(async (req) => {
       throw new Error(`Failed to update booking: ${updateError.message}`);
     }
 
+    // Get driver name for notification
+    const { data: driverProfile } = await supabaseClient
+      .from('profiles')
+      .select('first_name')
+      .eq('user_id', user.id)
+      .single();
+
+    const driverName = driverProfile?.first_name || 'A driver';
+
+    // Get spot address for notification
+    const { data: spot } = await supabaseClient
+      .from('spots')
+      .select('address, title')
+      .eq('id', booking.spot_id)
+      .single();
+
+    const spotAddress = spot?.address || spot?.title || 'your spot';
+
+    // Create notification for host
+    const { error: notifError } = await supabaseClient
+      .from('notifications')
+      .insert({
+        user_id: booking.spots.host_id,
+        type: 'booking_cancelled_by_driver',
+        title: 'Booking Cancelled',
+        message: `${driverName} cancelled their booking at ${spotAddress}.`,
+        related_id: bookingId,
+      });
+
+    if (notifError) {
+      console.error('Failed to create host notification:', notifError);
+    }
+
+    // Send push notification to host
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+      await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          userId: booking.spots.host_id,
+          title: '❌ Booking Cancelled',
+          body: `${driverName} cancelled their booking at ${spotAddress}.`,
+          url: `/booking/${bookingId}`,
+          type: 'booking_cancelled_by_driver',
+          bookingId: bookingId,
+        }),
+      });
+    } catch (pushError) {
+      console.error('Failed to send push notification:', pushError);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

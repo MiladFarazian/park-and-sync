@@ -133,6 +133,32 @@ serve(async (req) => {
       log.debug('Notification sent to renter');
     }
 
+    // Send push notification to driver
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+      await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          userId: booking.renter_id,
+          title: '❌ Booking Cancelled by Host',
+          body: `Your booking at ${booking.spots.address} was cancelled. Full refund of $${refundAmount.toFixed(2)} processed.`,
+          url: `/activity`,
+          type: 'booking_cancelled_by_host',
+          bookingId: bookingId,
+          requireInteraction: true,
+        }),
+      });
+      log.debug('Push notification sent to driver');
+    } catch (pushError) {
+      log.error('Failed to send push notification:', { error: pushError instanceof Error ? pushError.message : pushError });
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

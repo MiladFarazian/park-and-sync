@@ -61,8 +61,16 @@ import { MessagesProvider } from "./contexts/MessagesContext";
 import { SupportRedirect } from "./components/auth/SupportRedirect";
 import RequireHostMode from "./components/auth/RequireHostMode";
 import { useOrientationLock } from "./hooks/useOrientationLock";
+import { useNativePush } from "./hooks/useNativePush";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { initSentry } from "./lib/sentry";
+
+// Component to initialize native push notifications
+// Must be inside AuthProvider and BrowserRouter to access auth context and navigation
+const NativePushInitializer = () => {
+  useNativePush();
+  return null;
+};
 
 // Initialize Sentry for error tracking
 initSentry();
@@ -124,6 +132,7 @@ const App = () => {
             <Toaster />
             <Sonner />
             <BrowserRouter>
+            <NativePushInitializer />
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />

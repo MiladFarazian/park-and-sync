@@ -86,7 +86,7 @@ export function sendMessage({
       if (error) {
         log.error('Error sending message:', error);
         // Mark message as error (keep in UI to allow retry)
-        setMessages(prev => 
+        setMessages(prev =>
           prev.map(m => m.id === tempId ? { ...m, id: `error-${clientId}` } : m)
         );
         onError?.(error);
@@ -101,7 +101,7 @@ export function sendMessage({
         setTimeout(() => {
           try { supabase.removeChannel(notifyChannel); } catch {}
         }, 100);
-        
+
         // Also notify sender's conversation list
         const senderNotifyChannel = supabase.channel(`messages-broadcast-${senderId}`);
         senderNotifyChannel.send({
@@ -112,7 +112,21 @@ export function sendMessage({
         setTimeout(() => {
           try { supabase.removeChannel(senderNotifyChannel); } catch {}
         }, 100);
-        
+
+        // Send push notification to recipient (works when app is in background/closed)
+        // Fire and forget - don't block the UI
+        supabase.functions.invoke('send-push-notification', {
+          body: {
+            userId: recipientId,
+            title: '💬 New Message',
+            body: messageText.length > 100 ? messageText.substring(0, 100) + '...' : messageText,
+            url: `/messages`,
+            type: 'new_message',
+          },
+        }).catch((pushError) => {
+          log.debug('Push notification not sent (expected if not configured):', pushError);
+        });
+
         onSuccess?.();
       }
     });

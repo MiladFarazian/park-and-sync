@@ -13,58 +13,41 @@ interface BookingForEarnings {
 
 /**
  * Get the host's net earnings from a booking.
- * 
+ *
  * Host net earnings = (hourly_rate × hours) × 0.90 + EV charging fee
  * The 10% platform fee is deducted from the parking portion.
  * EV charging goes 100% to host.
- * 
- * For bookings with extensions, we always recalculate from hourly_rate × hours × 0.90
- * because older bookings may not have had host_earnings updated during extension.
- * 
- * For bookings without extensions:
- * 1. Use host_earnings field (preferred, accurate net amount)
- * 2. Fallback: calculate from hourly_rate × hours × 0.90
+ *
+ * ALWAYS calculates from hourly_rate × hours to ensure consistency with
+ * the current 10%/10% pricing model, regardless of what was stored in
+ * the host_earnings field (which may have been calculated with old pricing).
  */
 export function getHostNetEarnings(booking: BookingForEarnings): number {
-  // For bookings with extensions, always recalculate to ensure accuracy
-  const hasExtensions = (booking.extension_charges ?? 0) > 0;
-  
-  if (hasExtensions && booking.hourly_rate && booking.start_at && booking.end_at) {
-    const startDate = new Date(booking.start_at);
-    const endDate = new Date(booking.end_at);
-    const totalMinutes = differenceInMinutes(endDate, startDate);
-    const hours = totalMinutes / 60;
-    
-    if (hours > 0) {
-      const hostGross = booking.hourly_rate * hours;
-      const platformFee = calculatePlatformFee(hostGross);
-      const netParking = hostGross - platformFee;
-      const evChargingFee = booking.ev_charging_fee ?? 0;
-      return Math.round((netParking + evChargingFee) * 100) / 100;
-    }
-  }
-  
-  // For non-extended bookings, prefer the stored host_earnings value
-  if (booking.host_earnings != null && booking.host_earnings > 0) {
-    return Math.round(booking.host_earnings * 100) / 100;
-  }
-  
-  // Fallback: calculate from hourly_rate × duration × 0.90
+  // Always calculate from raw booking data to ensure 10%/10% pricing model
   if (booking.hourly_rate && booking.start_at && booking.end_at) {
     const startDate = new Date(booking.start_at);
     const endDate = new Date(booking.end_at);
     const totalMinutes = differenceInMinutes(endDate, startDate);
     const hours = totalMinutes / 60;
-    
+
     if (hours > 0) {
+      // Host gross = hourly_rate × hours (hourly_rate is the host's rate)
       const hostGross = booking.hourly_rate * hours;
+      // Platform fee = 10% of host gross
       const platformFee = calculatePlatformFee(hostGross);
+      // Net parking = host gross - platform fee
       const netParking = hostGross - platformFee;
+      // EV charging goes 100% to host
       const evChargingFee = booking.ev_charging_fee ?? 0;
       return Math.round((netParking + evChargingFee) * 100) / 100;
     }
   }
-  
+
+  // Fallback: use stored host_earnings if raw data not available
+  if (booking.host_earnings != null && booking.host_earnings > 0) {
+    return Math.round(booking.host_earnings * 100) / 100;
+  }
+
   // Last resort: return 0 (never use total_amount as it's driver-facing)
   return 0;
 }

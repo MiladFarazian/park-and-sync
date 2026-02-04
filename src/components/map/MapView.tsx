@@ -3,7 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Star, MapPin, Navigation, Footprints, Pencil, ChevronLeft, ChevronRight, Zap, Heart } from 'lucide-react';
+import { Star, MapPin, Navigation, Footprints, Pencil, ChevronLeft, ChevronRight, Zap, Heart, Bolt, Clock } from 'lucide-react';
 import { EVChargerBadge } from '@/components/ev/EVChargerBadge';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
@@ -1342,6 +1342,18 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                             {spot.userBooking && (
                               <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-xs px-1.5 py-0">
                                 Your Booking
+                              </Badge>
+                            )}
+                            {/* Instant book indicator */}
+                            {spot.instantBook ? (
+                              <Badge variant="outline" className="text-xs px-1.5 py-0 border-amber-400 text-amber-600 dark:border-amber-500 dark:text-amber-400">
+                                <Bolt className="h-3 w-3 mr-0.5" />
+                                Instant
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs px-1.5 py-0 text-muted-foreground">
+                                <Clock className="h-3 w-3 mr-0.5" />
+                                Request
                               </Badge>
                             )}
                           </div>

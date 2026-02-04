@@ -627,6 +627,18 @@ const DesktopSpotList = ({
                               Nearest
                             </Badge>
                           )}
+                          {/* Instant book indicator */}
+                          {spot.instantBook ? (
+                            <Badge variant="outline" className="text-xs border-amber-400 text-amber-600 dark:border-amber-500 dark:text-amber-400">
+                              <BoltIcon className="h-3 w-3 mr-0.5" />
+                              Instant
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3 mr-0.5" />
+                              Request
+                            </Badge>
+                          )}
                         </div>
                         <div className="text-right flex-shrink-0">
                           {/* Show total price when available (booking duration selected) */}
