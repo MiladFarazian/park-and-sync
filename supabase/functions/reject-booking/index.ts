@@ -134,6 +134,39 @@ serve(async (req) => {
         related_id: booking_id,
       });
 
+    // Send push notification to driver (high-urgency alert)
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+      
+      const pushResponse = await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          userId: booking.renter_id,
+          title: '❌ Booking Declined',
+          body: `Your booking request at ${booking.spots.address} was declined. Your card was not charged.`,
+          url: `/booking-declined/${booking_id}`,
+          type: 'booking_declined',
+          bookingId: booking_id,
+          requireInteraction: true,
+        }),
+      });
+      
+      if (pushResponse.ok) {
+        const pushResult = await pushResponse.json();
+        console.log('Push notification sent to driver', { sent: pushResult.sent });
+      } else {
+        const errorText = await pushResponse.text();
+        console.warn('Push notification failed', { status: pushResponse.status, error: errorText });
+      }
+    } catch (pushError) {
+      console.error('Failed to send push notification to driver', { error: pushError instanceof Error ? pushError.message : pushError });
+    }
+
     // Send rejection email to driver
     const driverEmail = renterUser?.email || booking.profiles?.email || '';
     const driverName = booking.profiles?.first_name || 'Driver';
