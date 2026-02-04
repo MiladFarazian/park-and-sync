@@ -1,83 +1,143 @@
 
-# Update Schedule Button to Navigate to Manage Availability
+# Fix Tooltip Touch Support on Mobile
 
-## Overview
+## Problem
+Radix UI Tooltips are hover-based and don't work on touch devices. When users tap the info icon on the Booking page (e.g., the service fee tooltip), nothing happens because mobile devices don't have hover events.
 
-The "Schedule" button in My Listings (Dashboard) currently navigates to the deprecated `/edit-availability/{spotId}` page. It should instead navigate to `/manage-availability` with the Recurring tab active and the selected spot pre-loaded.
+## Solution
+Create a "HybridTooltip" component that automatically switches between:
+- **Desktop**: Uses standard Tooltip (hover-based)
+- **Mobile**: Uses Popover (tap-based)
 
-## Changes Required
-
-### 1. Update Dashboard.tsx - Schedule Button Navigation
-
-**Current behavior (line 257):**
-```typescript
-onClick={() => navigate(`/edit-availability/${listing.id}`)}
-```
-
-**New behavior:**
-```typescript
-onClick={() => navigate(`/manage-availability?tab=recurring&spotId=${listing.id}`)}
-```
-
-This will:
-- Navigate to the Manage Availability page
-- Set the tab to "recurring" (handled by existing `tabParam` logic)
-- Pass the spot ID for pre-selection
+This is a common pattern for making tooltips accessible on touch devices.
 
 ---
 
-### 2. Update ManageAvailability.tsx - Pre-select Source Spot for Recurring Tab
+## Implementation
 
-Add a `useEffect` to initialize `sourceSpotId` and `recurringSelectedSpots` when:
-- The tab is `recurring`
-- A `spotIdParam` is provided
-- Spots have been loaded
-- Recurring rules have been fetched
+### 1. Create HybridTooltip Component
 
-**New useEffect to add (after spots/rules are loaded):**
-```typescript
-// Pre-select source spot and recurring selected spots when coming from Dashboard
-useEffect(() => {
-  if (
-    activeTab === 'recurring' &&
-    spotIdParam &&
-    spots.length > 0 &&
-    spots.some(s => s.id === spotIdParam) &&
-    Object.keys(spotRecurringRules).length > 0
-  ) {
-    // Set as source spot (loads its schedule into the grid)
-    if (!sourceSpotId) {
-      setSourceSpotId(spotIdParam);
-    }
-    // Pre-select for "Apply to" if not already selected
-    if (!recurringSelectedSpots.includes(spotIdParam)) {
-      setRecurringSelectedSpots(prev => [...prev, spotIdParam]);
-    }
-  }
-}, [activeTab, spotIdParam, spots, spotRecurringRules]);
+**New file**: `src/components/ui/hybrid-tooltip.tsx`
+
+This component will:
+- Detect if the device is mobile using the existing `useIsMobile` hook
+- Render a Tooltip on desktop (hover to show)
+- Render a Popover on mobile (tap to show)
+- Accept the same props as Tooltip for a seamless drop-in replacement
+
+```text
+┌─────────────────────────────────────────┐
+│           HybridTooltip                 │
+├─────────────────────────────────────────┤
+│  if (isMobile)                          │
+│    → Render Popover (tap to toggle)     │
+│  else                                   │
+│    → Render Tooltip (hover to show)     │
+└─────────────────────────────────────────┘
 ```
 
-This ensures:
-1. The spot's schedule is loaded into the WeeklyScheduleGrid (via `sourceSpotId`)
-2. The spot is pre-checked in the "Apply to" section (via `recurringSelectedSpots`)
+**Component API**:
+```tsx
+<HybridTooltip content="Tooltip text here">
+  <span>Trigger element</span>
+</HybridTooltip>
+```
+
+### 2. Update Booking.tsx
+
+Replace the service fee tooltip with HybridTooltip:
+
+**Before**:
+```tsx
+<TooltipProvider>
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <span className="text-muted-foreground flex items-center gap-1 cursor-help">
+        Service fee
+        <Info className="h-3 w-3" />
+      </span>
+    </TooltipTrigger>
+    <TooltipContent>
+      <p className="text-xs max-w-[200px]">This fee helps cover...</p>
+    </TooltipContent>
+  </Tooltip>
+</TooltipProvider>
+```
+
+**After**:
+```tsx
+<HybridTooltip content="This fee helps cover platform costs and ensures secure payments.">
+  <span className="text-muted-foreground flex items-center gap-1 cursor-help">
+    Service fee
+    <Info className="h-3 w-3" />
+  </span>
+</HybridTooltip>
+```
+
+### 3. Update EVChargerBadge.tsx (bonus fix)
+
+Also has tooltips that won't work on mobile. Update to use HybridTooltip for consistency.
 
 ---
 
-## User Flow After Changes
+## Files to Create/Modify
 
-1. Host clicks "Schedule" on a listing in My Listings
-2. Navigates to `/manage-availability?tab=recurring&spotId=xxx`
-3. Recurring tab is active
-4. The dropdown "Load Schedule From" shows the selected spot
-5. The WeeklyScheduleGrid shows that spot's current recurring schedule
-6. The spot is pre-checked in "Apply to Spots" section
-7. Host can modify the schedule and apply to additional spots if desired
-
----
-
-## Files to Modify
-
-| File | Change |
+| File | Action |
 |------|--------|
-| `src/pages/Dashboard.tsx` | Update navigate path from `/edit-availability/{id}` to `/manage-availability?tab=recurring&spotId={id}` |
-| `src/pages/ManageAvailability.tsx` | Add useEffect to pre-select `sourceSpotId` and `recurringSelectedSpots` based on URL params |
+| `src/components/ui/hybrid-tooltip.tsx` | **Create** - New hybrid component |
+| `src/pages/Booking.tsx` | **Modify** - Replace service fee tooltip with HybridTooltip |
+| `src/components/ev/EVChargerBadge.tsx` | **Modify** - Replace tooltip with HybridTooltip |
+
+---
+
+## Technical Details
+
+### HybridTooltip Component Structure
+
+```tsx
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "./popover";
+
+interface HybridTooltipProps {
+  content: React.ReactNode;
+  children: React.ReactNode;
+  side?: "top" | "right" | "bottom" | "left";
+  className?: string;
+}
+
+export function HybridTooltip({ content, children, side = "top", className }: HybridTooltipProps) {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    // On mobile: use Popover (click-based)
+    return (
+      <Popover>
+        <PopoverTrigger asChild>{children}</PopoverTrigger>
+        <PopoverContent side={side} className={...}>
+          {content}
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
+  // On desktop: use Tooltip (hover-based)
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>{children}</TooltipTrigger>
+        <TooltipContent side={side} className={className}>
+          {content}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+```
+
+### Popover Styling for Tooltip-like Appearance
+
+The Popover will be styled to look like a tooltip:
+- Smaller width (`w-auto max-w-[220px]` instead of `w-72`)
+- Smaller padding (`p-2` instead of `p-4`)
+- Smaller text (`text-xs`)
