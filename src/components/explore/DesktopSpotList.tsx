@@ -632,7 +632,7 @@ const DesktopSpotList = ({
                           {/* Show total price when available (booking duration selected) */}
                           {spot.totalPrice ? (
                             <>
-                              <p className="font-bold text-lg">${Math.round(spot.totalPrice)}</p>
+                              <p className="font-bold text-lg">${spot.totalPrice.toFixed(2)}</p>
                               <p className="text-xs text-muted-foreground">total</p>
                             </>
                           ) : filters.evCharging && spot.hasEvCharging && (spot.evChargingPremium ?? 0) > 0 ? (

@@ -948,8 +948,9 @@ const Explore = () => {
         : null;
 
       const transformedSpots = spots.map((spot: any) => {
-        // spot.hourly_rate from lite endpoint is ALREADY the driver rate (host rate + markup)
-        const driverHourlyRate = spot.hourly_rate;
+        // spot.hourly_rate from lite endpoint is the raw host rate
+        // Frontend adds 10% service fee for total price display
+        const hostHourlyRate = spot.hourly_rate;
         const evPremium = spot.ev_charging_premium_per_hour || 0;
         
         // Calculate total price for map pins (includes EV charging if EV filter is active)
@@ -958,7 +959,7 @@ const Explore = () => {
           const willUseEvCharging = evChargerTypeFilter != null && spot.has_ev_charging;
           
           // Calculate total price with 10% service fee
-          const driverSubtotal = driverHourlyRate * bookingHours;
+          const driverSubtotal = hostHourlyRate * bookingHours;
           const serviceFee = driverSubtotal * 0.10; // 10% service fee
           const evChargingFee = willUseEvCharging ? evPremium * bookingHours : 0;
           
@@ -970,7 +971,7 @@ const Explore = () => {
           title: spot.title,
           category: spot.category,
           address: spot.address,
-          hourlyRate: driverHourlyRate, // Already includes platform fee from lite endpoint
+          hourlyRate: hostHourlyRate, // Raw host rate - service fee added in totalPrice calculation
           evChargingPremium: evPremium,
           rating: spot.spot_rating || 0,
           reviews: spot.spot_review_count || 0,

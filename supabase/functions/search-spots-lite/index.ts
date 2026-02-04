@@ -547,11 +547,10 @@ serve(async (req) => {
     // Transform response with minimal data for map pins
     const transformedSpots = spotsWithDistance.map(spot => {
       const stats = reviewStats.get(spot.id) || { avgRating: 0, count: 0 };
-      
-      // Calculate driver price (base rate + 20% platform fee or $1 min)
-      const baseRate = parseFloat(spot.hourly_rate);
-      const platformFee = Math.max(baseRate * 0.20, 1.00);
-      const driverPrice = Math.round((baseRate + platformFee) * 100) / 100;
+
+      // Return raw host hourly rate - frontend calculates service fee (10%) for display
+      // Pricing model: driver pays host_rate + 10% service fee, host receives host_rate - 10% platform fee
+      const hostHourlyRate = parseFloat(spot.hourly_rate);
 
       // Get primary photo
       const primaryPhoto = spot.spot_photos?.find((p: any) => p.is_primary)?.url 
@@ -565,7 +564,7 @@ serve(async (req) => {
         address: spot.address,
         latitude: spot.latitude,
         longitude: spot.longitude,
-        hourly_rate: driverPrice,
+        hourly_rate: hostHourlyRate,
         ev_charging_premium_per_hour: spot.ev_charging_premium_per_hour || 0,
         spot_rating: Number(stats.avgRating.toFixed(2)),
         spot_review_count: stats.count,

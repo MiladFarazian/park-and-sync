@@ -1346,7 +1346,13 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                             )}
                           </div>
                           <div className="text-right flex-shrink-0">
-                            {spot.hasEvCharging && (spot.evChargingPremium ?? 0) > 0 ? (
+                            {/* Show total price when available (booking duration selected) */}
+                            {spot.totalPrice ? (
+                              <>
+                                <p className="font-bold text-primary text-lg">${spot.totalPrice.toFixed(2)}</p>
+                                <p className="text-xs text-muted-foreground">total</p>
+                              </>
+                            ) : spot.hasEvCharging && (spot.evChargingPremium ?? 0) > 0 ? (
                               // Spot has EV charging: show base rate + charging add-on option
                               <>
                                 <p className="font-bold text-primary text-lg">${spot.hourlyRate.toFixed(2)}/hr</p>
