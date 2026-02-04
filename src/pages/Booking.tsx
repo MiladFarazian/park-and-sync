@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { HybridTooltip } from '@/components/ui/hybrid-tooltip';
 import { Calendar } from '@/components/ui/calendar';
 import { TimePicker } from '@/components/ui/time-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -1152,19 +1152,12 @@ const BookingContent = () => {
                 <span className="font-medium">${pricing.subtotal}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="text-muted-foreground flex items-center gap-1 cursor-help">
-                        Service fee
-                        <Info className="h-3 w-3" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="text-xs max-w-[200px]">This fee helps cover platform costs and ensures secure payments.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <HybridTooltip content="This fee helps cover platform costs and ensures secure payments.">
+                  <span className="text-muted-foreground flex items-center gap-1 cursor-help">
+                    Service fee
+                    <Info className="h-3 w-3" />
+                  </span>
+                </HybridTooltip>
                 <span className="font-medium">${pricing.serviceFee}</span>
               </div>
               {useEvCharging && parseFloat(pricing.evChargingFee) > 0 && (
