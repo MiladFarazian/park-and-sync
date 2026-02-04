@@ -179,23 +179,19 @@ const CompleteProfileStep: React.FC<CompleteProfileStepProps> = ({ phone = '', o
       
       // Update profile with upsert
       // Only set phone_verified if a phone was provided (phone OTP flow)
-      const profileUpdate: Record<string, any> = {
+      const profileUpdate = {
         user_id: user.id,
         email: formData.email,
         first_name: firstName,
         last_name: lastName,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        ...(phone ? { phone, phone_verified: true } : {})
       };
 
-      // Only include phone fields if phone was provided
-      if (phone) {
-        profileUpdate.phone = phone;
-        profileUpdate.phone_verified = true;
-      }
 
       const { error: profileError } = await supabase
         .from('profiles')
-        .upsert(profileUpdate, {
+        .upsert([profileUpdate], {
           onConflict: 'user_id'
         });
 

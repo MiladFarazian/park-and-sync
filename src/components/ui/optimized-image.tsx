@@ -6,6 +6,8 @@ interface OptimizedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> 
   alt: string;
   className?: string;
   placeholderClassName?: string;
+  containerClassName?: string;
+  priority?: boolean;
 }
 
 /**
@@ -20,15 +22,17 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
   alt,
   className,
   placeholderClassName,
+  containerClassName,
+  priority = false,
   ...props
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
-  const [isInView, setIsInView] = useState(false);
+  const [isInView, setIsInView] = useState(priority); // If priority, load immediately
   const [hasError, setHasError] = useState(false);
   const imgRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!imgRef.current) return;
+    if (priority || !imgRef.current) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -45,7 +49,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
 
     observer.observe(imgRef.current);
     return () => observer.disconnect();
-  }, []);
+  }, [priority]);
 
   return (
     <div className={cn('relative overflow-hidden', className)} ref={imgRef}>
