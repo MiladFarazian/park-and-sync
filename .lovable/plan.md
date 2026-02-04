@@ -1,266 +1,210 @@
 
-
-# Refine Platform Pricing: 10% Driver Service Fee + 10% Host Platform Fee
+# Align Pricing Across Platform: 10% Service Fee + Total Price on Map/Cards
 
 ## Overview
 
-This change updates the pricing model across the entire Parkzy platform to:
-
-**For Drivers:**
-- Pay the host's listed rate PLUS a 10% service fee
-- Example: Host lists at $15/hr → Driver pays $15 + $1.50 = **$16.50**
-
-**For Hosts:**
-- Receive their listed rate MINUS a 10% platform fee
-- Example: Host lists at $15/hr → Host receives $15 - $1.50 = **$13.50**
-
-This means Parkzy takes 20% total ($3.00 in the example above): 10% from the driver-facing service fee + 10% from the host's earnings.
+This change ensures the new 10%/10% pricing model (10% driver service fee, 10% host platform fee) is consistently applied everywhere, and updates map pins + spot cards to show the **total booking price** (including service fee) instead of just the hourly rate.
 
 ---
 
-## Current State (What Needs to Change)
+## Current Issues
 
-| Component | Current Logic |
-|-----------|---------------|
-| `calculateDriverPrice()` | Returns host rate unchanged (no upcharge) |
-| `calculateServiceFee()` | max(20% of host earnings, $1.00) |
-| Host earnings | `host_rate × hours` (no deduction) |
-| Host UI | Shows "To Parkzy" as the service fee, but that's driver-paid |
-
-**Current flow (example: $15/hr, 2 hours):**
-- Driver subtotal: $15 × 2 = $30
-- Service fee: max($30 × 0.20, $1) = $6
-- Driver total: $36
-- Host earnings: $30 (no platform fee deducted)
+| Location | Current Behavior | Issue |
+|----------|------------------|-------|
+| **Explore.tsx** (map pins) | Uses old formula: `Math.max(hostEarnings * 0.20, 1.00)` | Wrong fee calculation |
+| **search-spots/index.ts** | Uses old formula: `Math.max(effectiveHostRate * 0.20, 1.00)` | Wrong fee calculation |
+| **BookingModal.tsx** | Uses 15% platform fee | Wrong fee percentage |
+| **DesktopSpotList.tsx** | Shows hourly rate only (`$X.XX/hr`) | Should show total booking price |
+| **MapView.tsx** | Shows total if available, else hourly rate | Correct logic but relies on Explore.tsx calculation |
 
 ---
 
-## New Pricing Logic
+## Changes Required
 
-### Core Formula
+### 1. Frontend: Explore.tsx (Price Calculation for Map Pins)
 
-```text
-Given: host_rate, hours
+**File:** `src/pages/Explore.tsx`
+**Lines:** ~290-298 and ~960-968
 
-DRIVER SIDE:
-  driverSubtotal = host_rate × hours
-  serviceFee = driverSubtotal × 0.10  (10% of subtotal)
-  driverTotal = driverSubtotal + serviceFee + evChargingFee (if any)
+Update the total price calculation to use the new 10% service fee formula:
 
-HOST SIDE:
-  hostGross = host_rate × hours
-  platformFee = hostGross × 0.10  (10% of host gross)
-  hostNetEarnings = hostGross - platformFee
-
-EV CHARGING (if applicable):
-  evChargingFee = ev_premium × hours
-  (No platform fee on EV charging - goes 100% to host)
-```
-
-### Example Calculation
-
-| Item | Value |
-|------|-------|
-| Host Rate | $15/hr |
-| Duration | 2 hours |
-| Driver Subtotal | $15 × 2 = $30.00 |
-| Service Fee (10%) | $3.00 |
-| **Driver Total** | **$33.00** |
-| Host Gross | $15 × 2 = $30.00 |
-| Platform Fee (10%) | $3.00 |
-| **Host Net** | **$27.00** |
-| **Parkzy Revenue** | **$6.00** (18.2% of driver total) |
-
----
-
-## Files to Modify
-
-### 1. Frontend Pricing Library
-
-**File:** `src/lib/pricing.ts`
-
-Update all functions:
-
+**Current (around line 294 and 964):**
 ```typescript
-// Service fee: 10% of driver subtotal
-export function calculateServiceFee(driverSubtotal: number): number {
-  return Math.round(driverSubtotal * 0.10 * 100) / 100;
-}
-
-// Platform fee: 10% of host gross (for host-side display)
-export function calculatePlatformFee(hostGross: number): number {
-  return Math.round(hostGross * 0.10 * 100) / 100;
-}
-
-// Host net earnings after platform fee
-export function calculateHostNetEarnings(hostGross: number): number {
-  const platformFee = calculatePlatformFee(hostGross);
-  return Math.round((hostGross - platformFee) * 100) / 100;
-}
-
-// calculateBookingTotal - return all values for both driver and host
-export function calculateBookingTotal(...) {
-  const hostGross = hostHourlyRate * hours;
-  const platformFee = calculatePlatformFee(hostGross);
-  const hostNetEarnings = hostGross - platformFee;
-  
-  const driverSubtotal = hostHourlyRate * hours; // Same as host gross
-  const serviceFee = calculateServiceFee(driverSubtotal);
-  const evChargingFee = willUseEvCharging ? evPremium * hours : 0;
-  const driverTotal = driverSubtotal + serviceFee + evChargingFee;
-  
-  return {
-    hostGross,
-    platformFee,
-    hostNetEarnings,
-    driverSubtotal,
-    serviceFee,
-    evChargingFee,
-    driverTotal,
-  };
-}
-```
-
----
-
-### 2. Backend Pricing Library (Edge Functions)
-
-**File:** `supabase/functions/_shared/pricing.ts`
-
-Mirror the frontend changes exactly to ensure consistency.
-
----
-
-### 3. Edge Functions (Backend)
-
-Update pricing calculations in these functions:
-
-| Function | Changes |
-|----------|---------|
-| `create-booking/index.ts` | Update service fee (10% of subtotal), store `host_earnings` as net (after 10% deduction) |
-| `create-guest-booking/index.ts` | Same pricing updates |
-| `extend-booking/index.ts` | Apply 10%/10% to extension hours |
-| `modify-booking-times/index.ts` | Apply new fee structure to time modifications |
-| `verify-guest-payment/index.ts` | Already reads from metadata, no formula change needed |
-| `stripe-webhooks/index.ts` | Already reads stored values, no formula change needed |
-
-**Key change in edge functions:**
-
-```typescript
-// OLD
 const serviceFee = Math.max(hostEarnings * 0.20, 1.00);
-const hostEarningsStored = hostHourlyRate * hours;
+```
 
-// NEW
-const driverSubtotal = hostHourlyRate * hours;
+**New:**
+```typescript
 const serviceFee = driverSubtotal * 0.10;  // 10% service fee
-const hostGross = hostHourlyRate * hours;
-const platformFee = hostGross * 0.10;  // 10% platform fee
-const hostNetEarnings = hostGross - platformFee;  // This is what gets stored
+```
+
+This appears in two places:
+1. Real-time subscription handler (~line 294)
+2. `fetchNearbySpots` callback (~line 964)
+
+---
+
+### 2. Backend: search-spots/index.ts (Full Search Endpoint)
+
+**File:** `supabase/functions/search-spots/index.ts`
+**Lines:** 382-384
+
+Update the driver price calculation:
+
+**Current:**
+```typescript
+const platformFee = Math.max(effectiveHostRate * 0.20, 1.00);
+const driverPrice = Math.round((effectiveHostRate + platformFee) * 100) / 100;
+```
+
+**New:**
+```typescript
+// Driver sees host rate; service fee (10%) added at checkout
+// For display purposes, we still return the effective host rate
+// The frontend calculates total price including service fee
+```
+
+Actually, looking at this more carefully, `search-spots` returns a `driver_hourly_rate` which was the upcharged rate. With the new transparent model, drivers see the host rate directly. The total price calculation should happen in the frontend.
+
+**Change to:**
+```typescript
+// No upcharge on hourly rate - driver sees host rate directly
+// Service fee (10%) is added at checkout
+const driverPrice = Math.round(effectiveHostRate * 100) / 100;
 ```
 
 ---
 
-### 4. Host Earnings Utility
+### 3. Frontend: DesktopSpotList.tsx (Spot Cards)
 
-**File:** `src/lib/hostEarnings.ts`
+**File:** `src/components/explore/DesktopSpotList.tsx`
+**Lines:** 630-655
 
-Update `getHostNetEarnings()` to:
-1. Prefer the stored `host_earnings` value (which will now be net after platform fee)
-2. Fallback: calculate `hourly_rate × hours × 0.90` (net after 10% fee)
+Update spot cards to show **total booking price** when time range is selected, similar to map pins.
 
-Update `getParkzyFee()` to reflect the new structure.
+**Current behavior:** Shows `$X.XX per hour`
+
+**New behavior:** 
+- When booking duration is known: Show `$XX total` (like map pins)
+- When no duration: Show `$X.XX/hr` as fallback
+
+Add a `totalPrice` display like the map pins already do. The `Spot` interface already has `totalPrice?: number` so we just need to use it.
+
+**Update lines 630-655:**
+```tsx
+<div className="text-right flex-shrink-0">
+  {/* Show total price if available, otherwise hourly rate */}
+  {spot.totalPrice ? (
+    <>
+      <p className="font-bold text-lg">${Math.round(spot.totalPrice)}</p>
+      <p className="text-xs text-muted-foreground">total</p>
+    </>
+  ) : filters.evCharging && spot.hasEvCharging && (spot.evChargingPremium ?? 0) > 0 ? (
+    // EV charging - show combined hourly
+    <>
+      <p className="font-bold text-lg">${(spot.hourlyRate + (spot.evChargingPremium ?? 0)).toFixed(2)}</p>
+      <p className="text-xs text-muted-foreground flex items-center justify-end gap-0.5">
+        <Zap className="h-3 w-3 text-green-600" />
+        /hr incl. charging
+      </p>
+    </>
+  ) : (
+    // Default hourly rate
+    <>
+      <p className="font-bold text-lg">${spot.hourlyRate.toFixed(2)}</p>
+      <p className="text-xs text-muted-foreground">per hour</p>
+    </>
+  )}
+</div>
+```
 
 ---
 
-### 5. UI Components (Driver Side)
+### 4. Frontend: BookingModal.tsx (Legacy Modal)
 
-**File:** `src/pages/Booking.tsx`
+**File:** `src/components/booking/BookingModal.tsx`
+**Lines:** 84-85
 
-Update the "Price Breakdown" card:
-- Line 1: `$X/hr × Y hours` → subtotal
-- Line 2: "Service fee (10%)" → service fee
-- Line 3: "EV charging" (if applicable)
-- Total
+Update to use 10% service fee instead of 15%:
 
-The tooltip text should be updated:
-> "This fee helps cover platform costs and ensures secure payments."
+**Current:**
+```typescript
+const platformFee = subtotal * 0.15; // 15% platform fee
+```
 
----
+**New:**
+```typescript
+const serviceFee = subtotal * 0.10; // 10% service fee
+```
 
-### 6. UI Components (Host Side)
-
-**File:** `src/pages/HostBookingConfirmation.tsx`
-
-Update the "Payout Breakdown" card:
-- Line 1: "Gross earnings (X hrs × $Y)" → host gross
-- Line 2: "Platform fee (10%)" → platform fee (shown as deduction)
-- Line 3: "EV Charging (to Host)" (if applicable, no fee)
-- Separator
-- "Host Payout" → net earnings
-
-Current lines 421-458 need to be updated to show:
-- Host gross instead of just "To Host"
-- Platform fee as a visible deduction
-- Correct net payout calculation
+Also update variable naming and UI labels for consistency.
 
 ---
 
-### 7. Other Affected Files
+### 5. Frontend: MapView.tsx (Already Correct)
+
+**File:** `src/components/map/MapView.tsx`
+**Lines:** 718-721
+
+The map pins already show total price when available:
+```typescript
+const priceDisplay = spot.totalPrice 
+  ? `$${Math.round(spot.totalPrice)}`
+  : `$${spot.hourlyRate}/hr`;
+```
+
+No changes needed here - it relies on `totalPrice` calculated in Explore.tsx.
+
+---
+
+## Summary of Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/pages/SpotDetail.tsx` | `calculateDriverPrice()` still returns host rate (no change needed) |
-| `src/pages/Explore.tsx` | Uses `calculateBookingTotal()` for map pins - will auto-update |
-| `src/components/booking/BookingModal.tsx` | Legacy modal - update fee calculation |
-| `src/components/booking/ExtendParkingDialog.tsx` | Update extension fee display |
-| `src/pages/BookingDetail.tsx` | May need updates for showing price breakdown |
+| `src/pages/Explore.tsx` | Update service fee: `0.20` → `0.10` (2 places) |
+| `supabase/functions/search-spots/index.ts` | Remove upcharge from driver_hourly_rate |
+| `src/components/explore/DesktopSpotList.tsx` | Show total price on cards when available |
+| `src/components/booking/BookingModal.tsx` | Update fee: `0.15` → `0.10` |
 
 ---
 
-## Database Considerations
+## Technical Details
 
-The `bookings` table stores:
-- `subtotal`: Driver subtotal (unchanged - still `rate × hours`)
-- `platform_fee`: Currently stored as service fee; will now store service fee (driver side)
-- `host_earnings`: Will now store NET earnings (after 10% platform fee deduction)
-- `total_amount`: Driver total (subtotal + service fee + EV)
+### New Price Display Logic
 
-**No schema changes needed** - just different values being stored.
+**Map Pins & Spot Cards (when duration is selected):**
+```typescript
+const bookingHours = (endTime - startTime) / (1000 * 60 * 60);
+const driverSubtotal = hostHourlyRate * bookingHours;
+const serviceFee = driverSubtotal * 0.10;  // 10% service fee
+const evChargingFee = hasEvCharging ? evPremium * bookingHours : 0;
+const totalPrice = driverSubtotal + serviceFee + evChargingFee;
+```
 
----
+**Map Pin Display:**
+- With duration: `$45` (total)
+- Without duration: `$15/hr`
 
-## Summary of Changes
+**Spot Card Display:**
+- With duration: `$45 total`
+- Without duration: `$15.00 per hour`
 
-| Area | Files |
-|------|-------|
-| Frontend pricing library | `src/lib/pricing.ts` |
-| Backend pricing library | `supabase/functions/_shared/pricing.ts` |
-| Booking creation | `supabase/functions/create-booking/index.ts` |
-| Guest booking | `supabase/functions/create-guest-booking/index.ts` |
-| Booking extension | `supabase/functions/extend-booking/index.ts` |
-| Time modification | `supabase/functions/modify-booking-times/index.ts` |
-| Host earnings utility | `src/lib/hostEarnings.ts` |
-| Driver booking UI | `src/pages/Booking.tsx` |
-| Host confirmation UI | `src/pages/HostBookingConfirmation.tsx` |
-| Legacy booking modal | `src/components/booking/BookingModal.tsx` |
+### Consistency Check
+
+After these changes:
+- **Booking.tsx**: Shows breakdown (subtotal + 10% service fee + EV = total) ✓
+- **BookingDetail.tsx**: Shows breakdown for drivers ✓
+- **Explore map pins**: Shows total price with 10% fee ✓
+- **Explore spot cards**: Shows total price with 10% fee ✓
+- **search-spots endpoint**: Returns host rate (no upcharge) ✓
+- **create-booking endpoint**: Already uses 10%/10% model ✓
 
 ---
 
 ## Testing Recommendations
 
 After implementation:
-
-1. **Create a new booking** and verify:
-   - Driver sees correct 10% service fee
-   - Host confirmation shows correct 10% platform fee deduction
-   - Database stores correct `host_earnings` (net)
-
-2. **Test booking extension** and verify:
-   - Extension fees follow 10%/10% model
-   - Host earnings increment correctly
-
-3. **Test EV charging booking** and verify:
-   - EV premium goes 100% to host (no platform fee on EV)
-   - Service fee is only on parking subtotal
-
+1. Search for spots on Explore page → verify map pins show correct total
+2. Verify spot cards show same total as map pins
+3. Click through to Book → verify price breakdown matches
+4. Complete a booking → verify final charge matches displayed price
