@@ -379,9 +379,8 @@ serve(async (req) => {
             }
           }
 
-          // Calculate driver-facing price (effective host rate + 20% or $1 min)
-          const platformFee = Math.max(effectiveHostRate * 0.20, 1.00);
-          const driverPrice = Math.round((effectiveHostRate + platformFee) * 100) / 100;
+          // Driver sees host rate directly - service fee (10%) is added at checkout
+          const driverPrice = Math.round(effectiveHostRate * 100) / 100;
 
           availableSpots.push({ 
             ...spot, 

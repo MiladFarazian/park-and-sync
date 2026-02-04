@@ -50,6 +50,7 @@ interface Spot {
   instantBook?: boolean;
   quantity?: number;
   availableQuantity?: number;
+  totalPrice?: number;
 }
 
 export interface SpotFilters {
@@ -628,13 +629,19 @@ const DesktopSpotList = ({
                           )}
                         </div>
                         <div className="text-right flex-shrink-0">
-                          {filters.evCharging && spot.hasEvCharging && (spot.evChargingPremium ?? 0) > 0 ? (
-                            // EV charging search: show combined price
+                          {/* Show total price when available (booking duration selected) */}
+                          {spot.totalPrice ? (
+                            <>
+                              <p className="font-bold text-lg">${Math.round(spot.totalPrice)}</p>
+                              <p className="text-xs text-muted-foreground">total</p>
+                            </>
+                          ) : filters.evCharging && spot.hasEvCharging && (spot.evChargingPremium ?? 0) > 0 ? (
+                            // EV charging search: show combined price per hour
                             <>
                               <p className="font-bold text-lg">${(spot.hourlyRate + (spot.evChargingPremium ?? 0)).toFixed(2)}</p>
                               <p className="text-xs text-muted-foreground flex items-center justify-end gap-0.5">
                                 <Zap className="h-3 w-3 text-green-600" />
-                                incl. charging
+                                /hr incl. charging
                               </p>
                             </>
                           ) : spot.hasEvCharging && (spot.evChargingPremium ?? 0) > 0 ? (
