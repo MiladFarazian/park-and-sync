@@ -1152,9 +1152,9 @@ const BookingContent = () => {
                 <span className="font-medium">${pricing.subtotal}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <HybridTooltip content="This fee helps cover platform costs and ensures secure payments.">
+                <HybridTooltip content="This 10% service fee helps cover platform costs and ensures secure payments.">
                   <span className="text-muted-foreground flex items-center gap-1 cursor-help">
-                    Service fee
+                    Service fee (10%)
                     <Info className="h-3 w-3" />
                   </span>
                 </HybridTooltip>

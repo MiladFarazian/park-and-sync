@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { getHostNetEarnings } from '@/lib/hostEarnings';
-import { calculateServiceFee } from '@/lib/pricing';
+import { calculatePlatformFee } from '@/lib/pricing';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -248,10 +248,13 @@ const HostBookingConfirmation = () => {
     : (driver ? `${driver.first_name || ''} ${driver.last_name || ''}`.trim() : 'Driver');
   const driverInitial = driverName.charAt(0).toUpperCase();
   const bookingNumber = `#PK-${new Date(booking.created_at).getFullYear()}-${booking.id.slice(0, 3).toUpperCase()}`;
-  const hostEarnings = getHostNetEarnings(booking);
-  const parkzyFee = calculateServiceFee(hostEarnings);
+  
+  // Calculate host payout with 10% platform fee
+  const hostGross = Math.round(duration * booking.hourly_rate * 100) / 100;
+  const platformFee = calculatePlatformFee(hostGross);
+  const hostNetParking = Math.round((hostGross - platformFee) * 100) / 100;
   const evChargingFee = booking.ev_charging_fee || 0;
-  const hostPayout = hostEarnings + evChargingFee;
+  const hostPayout = Math.round((hostNetParking + evChargingFee) * 100) / 100;
   const timeUntilExpiry = isPendingApproval && !hasExpired ? formatDistanceToNow(expiryAt, { addSuffix: true }) : null;
 
   return (
@@ -338,7 +341,7 @@ const HostBookingConfirmation = () => {
                   <div>
                     <h3 className="font-semibold text-amber-700 dark:text-amber-400">Action Required</h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Approve to earn <span className="font-semibold">${hostEarnings.toFixed(2)}</span> from this booking. 
+                    Approve to earn <span className="font-semibold">${hostPayout.toFixed(2)}</span> from this booking. 
                       If declined, the driver will be notified and <span className="font-medium text-green-600 dark:text-green-400">no charge will be made</span>.
                     </p>
                   </div>
@@ -405,7 +408,7 @@ const HostBookingConfirmation = () => {
                 Booking Confirmed! 🎉
               </h2>
               <p className="text-muted-foreground">
-                You've earned <span className="font-bold text-foreground">${hostEarnings.toFixed(2)}</span> from this booking
+                You've earned <span className="font-bold text-foreground">${hostPayout.toFixed(2)}</span> from this booking
               </p>
             </div>
           </>
@@ -420,29 +423,31 @@ const HostBookingConfirmation = () => {
                 <h3 className="font-semibold">Payout Breakdown</h3>
               </div>
               
-              {/* To Host line */}
+              {/* Gross Earnings line */}
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground">
-                  To Host ({duration} hr{duration !== 1 ? 's' : ''} × ${booking.hourly_rate.toFixed(2)})
+                  Gross earnings ({duration} hr{duration !== 1 ? 's' : ''} × ${booking.hourly_rate.toFixed(2)})
                 </span>
-                <span className="font-medium">${hostEarnings.toFixed(2)}</span>
+                <span className="font-medium">${hostGross.toFixed(2)}</span>
+              </div>
+              
+              {/* Platform Fee line */}
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">
+                  Platform fee (10%)
+                </span>
+                <span className="font-medium text-destructive">-${platformFee.toFixed(2)}</span>
               </div>
               
               {/* EV Charging line - only if applicable */}
               {evChargingFee > 0 && (
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-muted-foreground">
-                    EV Charging (to Host)
+                    EV Charging (100% to you)
                   </span>
-                  <span className="font-medium">${evChargingFee.toFixed(2)}</span>
+                  <span className="font-medium text-green-600">+${evChargingFee.toFixed(2)}</span>
                 </div>
               )}
-              
-              {/* To Parkzy line */}
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">To Parkzy</span>
-                <span className="font-medium text-muted-foreground">${parkzyFee.toFixed(2)}</span>
-              </div>
               
               <Separator />
               
@@ -468,22 +473,22 @@ const HostBookingConfirmation = () => {
                 <span className="font-medium">Potential Payout</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span>To Host</span>
-                <span>${hostEarnings.toFixed(2)}</span>
+                <span>Gross earnings</span>
+                <span>${hostGross.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Platform fee (10%)</span>
+                <span className="text-destructive">-${platformFee.toFixed(2)}</span>
               </div>
               {evChargingFee > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span>EV Charging (to Host)</span>
-                  <span>${evChargingFee.toFixed(2)}</span>
+                  <span>EV Charging (100% to you)</span>
+                  <span className="text-green-600">+${evChargingFee.toFixed(2)}</span>
                 </div>
               )}
-              <div className="flex justify-between text-sm">
-                <span>To Parkzy</span>
-                <span className="text-muted-foreground">${parkzyFee.toFixed(2)}</span>
-              </div>
               <Separator className="my-2" />
               <div className="flex justify-between">
-                <span className="font-medium">Host Payout</span>
+                <span className="font-medium">Your Payout</span>
                 <span className="font-bold text-lg">${hostPayout.toFixed(2)}</span>
               </div>
             </div>

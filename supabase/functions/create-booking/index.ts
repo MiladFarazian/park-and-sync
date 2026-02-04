@@ -167,33 +167,49 @@ serve(async (req) => {
       throw new Error('You cannot book your own parking spot');
     }
 
-    // Calculate pricing
-    // - Driver sees upcharged rate (host rate + 20% or $1 min) as "Host Rate"
-    // - Service fee is separate and visible (20% of host earnings or $1 min)
-    // - EV charging fee is optional
+    // Calculate pricing with 10%/10% model:
+    // - Driver pays: host rate + 10% service fee
+    // - Host receives: host rate - 10% platform fee
+    // - EV charging: 100% to host (no platform fee)
     const startDate = new Date(start_at);
     const endDate = new Date(end_at);
     // Calculate actual hours as decimal (e.g., 0.5 for 30 minutes)
     const totalHours = Math.round(((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)) * 100) / 100;
     const hostHourlyRate = parseFloat(spot.hourly_rate);
-    const hostEarnings = Math.round(totalHours * hostHourlyRate * 100) / 100; // What host actually earns
     
-    // Driver rate equals host rate - no hidden upcharge
-    const driverHourlyRate = hostHourlyRate;
-    const driverSubtotal = Math.round(driverHourlyRate * totalHours * 100) / 100;
+    // Host gross earnings (before platform fee)
+    const hostGross = Math.round(totalHours * hostHourlyRate * 100) / 100;
+    // Platform fee: 10% of host gross
+    const hostPlatformFee = Math.round(hostGross * 0.10 * 100) / 100;
+    // Host net earnings (after platform fee deduction)
+    const hostNetEarnings = Math.round((hostGross - hostPlatformFee) * 100) / 100;
     
-    // Visible service fee
-    const serviceFee = Math.round(Math.max(hostEarnings * 0.20, 1.00) * 100) / 100;
+    // Driver subtotal (same as host gross)
+    const driverSubtotal = hostGross;
+    // Service fee: 10% of driver subtotal
+    const serviceFee = Math.round(driverSubtotal * 0.10 * 100) / 100;
     
-    // EV charging fee
+    // EV charging fee (100% to host, no platform fee)
     const evChargingPremium = spot.ev_charging_premium_per_hour || 0;
     const evChargingFee = useEvCharging ? Math.round(evChargingPremium * totalHours * 100) / 100 : 0;
     
     const subtotal = driverSubtotal; // What driver sees as rate × hours
-    const platformFee = serviceFee; // Visible service fee
+    const platformFee = serviceFee; // This is the driver-facing service fee stored in DB
     const totalAmount = Math.round((driverSubtotal + serviceFee + evChargingFee) * 100) / 100;
+    // Host earnings includes EV charging (100% to host)
+    const hostEarnings = Math.round((hostNetEarnings + evChargingFee) * 100) / 100;
     
-    log.debug('Pricing calculated', { totalHours, totalAmount });
+    log.debug('Pricing calculated (10%/10% model)', { 
+      totalHours, 
+      hostGross,
+      hostPlatformFee,
+      hostNetEarnings,
+      driverSubtotal,
+      serviceFee,
+      evChargingFee,
+      totalAmount,
+      hostEarnings
+    });
 
     // Initialize Stripe
     const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');

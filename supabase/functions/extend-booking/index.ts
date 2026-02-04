@@ -165,13 +165,23 @@ serve(async (req) => {
       throw new Error('This spot is not available during the requested extension time.');
     }
 
-    // Calculate extension cost: driver rate equals host rate + visible service fee + EV charging
+    // Calculate extension cost with 10%/10% model:
+    // - Driver pays: host rate + 10% service fee
+    // - Host receives: host rate - 10% platform fee
+    // - EV charging: 100% to host
     const hostHourlyRate = booking.spots.hourly_rate;
-    const hostEarnings = hostHourlyRate * extensionHours;
-    // Driver rate equals host rate - no hidden upcharge
-    const driverHourlyRate = hostHourlyRate;
-    const driverSubtotal = Math.round(driverHourlyRate * extensionHours * 100) / 100;
-    const serviceFee = Math.round(Math.max(hostEarnings * 0.20, 1.00) * 100) / 100;
+    
+    // Host gross for extension
+    const hostGross = Math.round(hostHourlyRate * extensionHours * 100) / 100;
+    // Platform fee: 10% of host gross
+    const hostPlatformFee = Math.round(hostGross * 0.10 * 100) / 100;
+    // Host net earnings for extension (before EV)
+    const hostNetEarnings = Math.round((hostGross - hostPlatformFee) * 100) / 100;
+    
+    // Driver subtotal (same as host gross)
+    const driverSubtotal = hostGross;
+    // Service fee: 10% of driver subtotal
+    const serviceFee = Math.round(driverSubtotal * 0.10 * 100) / 100;
     
     // Calculate EV charging fee for extension if booking has EV charging enabled
     const evChargingFeeExtension = booking.will_use_ev_charging && booking.spots.ev_charging_premium_per_hour
@@ -179,14 +189,20 @@ serve(async (req) => {
       : 0;
     
     const extensionCost = Math.round((driverSubtotal + serviceFee + evChargingFeeExtension) * 100) / 100;
+    // Host earnings for extension includes EV charging (100% to host)
+    const hostEarnings = Math.round((hostNetEarnings + evChargingFeeExtension) * 100) / 100;
     
-    console.log('Extension pricing:', { 
+    console.log('Extension pricing (10%/10% model):', { 
       hostHourlyRate, 
-      extensionHours, 
+      extensionHours,
+      hostGross,
+      hostPlatformFee,
+      hostNetEarnings,
       driverSubtotal, 
       serviceFee, 
       evChargingFeeExtension,
       extensionCost,
+      hostEarnings,
       willUseEvCharging: booking.will_use_ev_charging
     });
 
