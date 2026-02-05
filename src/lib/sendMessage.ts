@@ -118,9 +118,9 @@ export function sendMessage({
         supabase.functions.invoke('send-push-notification', {
           body: {
             userId: recipientId,
-            title: '💬 New Message',
+            senderId: senderId,
             body: messageText.length > 100 ? messageText.substring(0, 100) + '...' : messageText,
-            url: `/messages`,
+            url: `/messages?userId=${senderId}`,
             type: 'new_message',
           },
         }).catch((pushError) => {

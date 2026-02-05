@@ -349,7 +349,7 @@ serve(async (req) => {
       console.log('[send-push-notification] Service role call');
     }
 
-    const { userId, userIds, title, body, tag, url, requireInteraction, type, bookingId } = await req.json();
+    const { userId, userIds, title, body, tag, url, requireInteraction, type, bookingId, senderId } = await req.json();
 
     const targetUserIds = userIds || (userId ? [userId] : []);
 
@@ -360,9 +360,28 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[send-push-notification] Sending to ${targetUserIds.length} users: "${title}"`);
+    // For new_message type, look up sender's name for personalized notification
+    let notificationTitle = title;
+    if (type === 'new_message' && senderId) {
+      const { data: senderProfile } = await supabaseClient
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('user_id', senderId)
+        .single();
+
+      if (senderProfile) {
+        const senderName = senderProfile.last_name
+          ? `${senderProfile.first_name} ${senderProfile.last_name.charAt(0)}.`
+          : senderProfile.first_name;
+        notificationTitle = `New Message from ${senderName}`;
+      } else {
+        notificationTitle = 'New Message';
+      }
+    }
+
+    console.log(`[send-push-notification] Sending to ${targetUserIds.length} users: "${notificationTitle}"`);
     console.log(`[send-push-notification] Target user IDs:`, targetUserIds);
-    console.log(`[send-push-notification] Payload:`, { title, body, tag, url, type });
+    console.log(`[send-push-notification] Payload:`, { title: notificationTitle, body, tag, url, type });
 
     // Track results
     let webPushSuccess = 0;
@@ -388,7 +407,7 @@ serve(async (req) => {
       console.log(`[send-push-notification] Found ${subscriptions.length} web push subscriptions`);
       webPushTotal = subscriptions.length;
 
-      const payload = { title, body, tag, url, requireInteraction, type, bookingId };
+      const payload = { title: notificationTitle, body, tag, url, requireInteraction, type, bookingId };
 
       for (const sub of subscriptions) {
         const success = await sendPushNotification(
@@ -437,7 +456,7 @@ serve(async (req) => {
       for (const device of deviceTokens) {
         const success = await sendApnsNotification(
           device.token,
-          { title, body, type, bookingId, url },
+          { title: notificationTitle, body, type, bookingId, url },
           isProduction
         );
         if (success) {
