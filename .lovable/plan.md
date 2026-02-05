@@ -1,55 +1,104 @@
 
-# Fix Flashing in OptimizedImage Component
 
-## Problem
+# Allow Free Cancellation for Unapproved Booking Requests
 
-The `OptimizedImage` component has a skeleton placeholder with `animate-pulse` that creates a flashing effect during image loading. This pulsing animation continuously alternates the opacity of the placeholder, causing visual distraction.
+## Overview
 
-**Root cause:** Line 59 in `src/components/ui/optimized-image.tsx`:
-```tsx
-'absolute inset-0 bg-muted animate-pulse transition-opacity duration-300'
-```
+Drivers should be able to cancel a booking request that the host hasn't approved yet **at any time** without being charged. Currently, the cancellation policy applies time-based rules regardless of approval status.
 
-The `animate-pulse` Tailwind class applies a keyframe animation that oscillates opacity between 1 and 0.5 repeatedly, creating the "flash" effect.
+## Current Behavior
 
----
+The `cancel-booking` edge function applies these rules uniformly:
+- Within 10-minute grace period → full refund
+- More than 1 hour before start → full refund  
+- Less than 1 hour before start → no refund
+
+This means if a driver submits a booking request on a non-instant-book spot and the host doesn't respond for 45 minutes, then the driver wants to cancel, the system would charge them if the booking start time is within an hour.
 
 ## Solution
 
-Remove the `animate-pulse` animation and use a static skeleton placeholder instead. This provides a cleaner loading state without the distracting flash.
+### 1. Edge Function Update (`supabase/functions/cancel-booking/index.ts`)
 
----
+Add a check at the top of the refund logic to handle `held` status bookings specially:
 
-## Change Required
+```text
+Current flow:
+1. Check grace period
+2. Check time until start
+3. Determine refund
 
-**File:** `src/components/ui/optimized-image.tsx`
-**Line:** 59
-
-**Current:**
-```tsx
-'absolute inset-0 bg-muted animate-pulse transition-opacity duration-300',
+New flow:
+1. Check if booking status is 'held' (pending approval)
+   → If yes: Always cancel the Stripe authorization, no charge
+2. Check grace period
+3. Check time until start
+4. Determine refund
 ```
 
-**New:**
-```tsx
-'absolute inset-0 bg-muted transition-opacity duration-300',
+**Changes:**
+- After line 53 (after checking if already cancelled), add logic to detect `held` status
+- If `status === 'held'`, set `refundAmount = 0` and `refundReason = 'Booking request cancelled before host approval - no charge'`
+- The existing Stripe logic already handles canceling uncaptured PaymentIntents correctly (lines 107-119)
+
+### 2. Frontend Update (`src/pages/BookingConfirmation.tsx`)
+
+Update the `getCancellationPolicy()` function to recognize held bookings:
+
+```text
+Current:
+- Returns message based on grace period and time before start
+
+New:
+- First check if booking.status === 'held'
+  → Return: "No charge - host hasn't accepted yet"
+- Then apply existing time-based rules
+```
+
+**Changes to `getCancellationPolicy()` (around line 188):**
+```typescript
+const getCancellationPolicy = () => {
+  if (!booking) return { refundable: false, message: '' };
+  
+  // Special case: Booking request pending host approval
+  if (booking.status === 'held') {
+    return {
+      refundable: true,
+      message: 'No charge - booking request not yet approved'
+    };
+  }
+  
+  // Existing time-based logic...
+  const now = new Date();
+  // ...rest of function
+};
 ```
 
 ---
 
-## Result
+## Technical Details
 
-- The placeholder will remain a static muted background color
-- Once the image loads, it will smoothly fade in (opacity transition still works)
-- No more visual flashing/pulsing during load
-- Maintains the lazy loading and fade-in animation benefits
+### Why This Works
 
----
+For `held` bookings, Stripe PaymentIntent is in `requires_capture` status (authorized but not captured). The current edge function code at lines 107-119 already handles this:
 
-## Technical Notes
+```typescript
+if (pi.status !== 'canceled') {
+  await stripe.paymentIntents.cancel(pi.id);
+}
+refundReason = `Payment not captured (status=${pi.status}); canceled intent; no refund needed`;
+refundAmount = 0;
+```
 
-The component will still:
-- Lazy load images when they enter the viewport
-- Show a clean static placeholder while loading
-- Fade in smoothly when the image is ready
-- Handle errors with a fallback "No image" state
+The fix ensures we hit this path by setting `refundAmount = 0` for held bookings, and the existing Stripe logic will cancel the authorization hold.
+
+### Files to Modify
+
+| File | Change |
+|------|--------|
+| `supabase/functions/cancel-booking/index.ts` | Add held status check before refund calculation |
+| `src/pages/BookingConfirmation.tsx` | Update `getCancellationPolicy()` to show correct message for held bookings |
+
+### Notification Updates
+
+The existing notification logic will work correctly. The host notification message will say the driver cancelled their booking request, which is appropriate.
+
