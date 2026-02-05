@@ -634,7 +634,10 @@ const ListSpot = () => {
       }
       // If EV charging is selected, require charger type and premium
       if (selectedAmenities.includes('ev')) {
-        return evChargerType && evChargingPremium && parseFloat(evChargingPremium) > 0;
+        return evChargerType && 
+               evChargingPremium && 
+               parseFloat(evChargingPremium) > 0 &&
+               evChargingInstructions.trim().length >= 20;
       }
       return true;
     }
@@ -1187,6 +1190,10 @@ const ListSpot = () => {
                       if (selectedVehicleSizes.length === 0) {
                         setVehicleSizeError('Please select at least one vehicle size');
                         toast.error('Please select at least one vehicle size that can fit in your spot');
+                        return;
+                      }
+                      if (selectedAmenities.includes('ev') && evChargingInstructions.trim().length < 20) {
+                        toast.error('Please provide at least 20 characters of EV charging instructions');
                         return;
                       }
                       setCurrentStep(4);
