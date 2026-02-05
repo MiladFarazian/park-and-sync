@@ -56,7 +56,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
       {/* Skeleton placeholder */}
       <div
         className={cn(
-          'absolute inset-0 bg-muted animate-pulse transition-opacity duration-300',
+          'absolute inset-0 bg-muted transition-opacity duration-300',
           placeholderClassName,
           isLoaded ? 'opacity-0' : 'opacity-100'
         )}
