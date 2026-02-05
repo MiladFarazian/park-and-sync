@@ -48,6 +48,12 @@ const sendWelcomeEmail = async (userId: string, email: string, firstName?: strin
 
 type VerificationStage = 'checking' | 'ready' | 'verifying' | 'success' | 'error' | 'resend';
 
+// Detect if user is on iOS (for showing "Open in App" button)
+const isIOSDevice = () => {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+};
+
 const EmailConfirmation = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -58,23 +64,34 @@ const EmailConfirmation = () => {
   const [sending, setSending] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const hasChecked = useRef(false);
-  
+
   // Store token params for manual verification
   const [tokenParams, setTokenParams] = useState<{ tokenHash: string; otpType: EmailOtpType } | null>(null);
-  
+
+  // Store session tokens for opening the app
+  const [sessionTokens, setSessionTokens] = useState<{ accessToken: string; refreshToken: string } | null>(null);
+
   const isResendMode = searchParams.get('resend') === 'true';
   const prefillEmail = searchParams.get('email') || '';
 
   const handleVerificationSuccess = useCallback(async (session: any) => {
     if (stage === 'success') return;
-    
+
     setStage('success');
-    
+
+    // Store session tokens for opening the app (on iOS devices)
+    if (session.access_token && session.refresh_token) {
+      setSessionTokens({
+        accessToken: session.access_token,
+        refreshToken: session.refresh_token,
+      });
+    }
+
     // Extract names from user metadata (support both naming conventions)
     const meta = session.user.user_metadata || {};
     const firstName = meta.first_name || meta.firstName || null;
     const lastName = meta.last_name || meta.lastName || null;
-    
+
     try {
       // Upsert profile to ensure it exists and has correct data
       await supabase
@@ -93,9 +110,9 @@ const EmailConfirmation = () => {
     } catch (error) {
       log.error('Failed to upsert profile:', error);
     }
-    
+
     sendWelcomeEmail(session.user.id, session.user.email || '', firstName);
-    
+
     // Clean up URL
     if (
       window.location.hash ||
@@ -104,8 +121,11 @@ const EmailConfirmation = () => {
     ) {
       window.history.replaceState({}, '', window.location.pathname);
     }
-    
-    setTimeout(() => navigate('/'), 2500);
+
+    // Only auto-redirect if NOT on iOS (iOS users need to tap "Open in App")
+    if (!isIOSDevice()) {
+      setTimeout(() => navigate('/'), 2500);
+    }
   }, [navigate, stage]);
 
   // Handle the "Confirm Email" button click
@@ -295,11 +315,17 @@ const EmailConfirmation = () => {
     setSending(true);
     
     try {
+      // Always use the production web URL for email redirects
+      // This ensures the link works regardless of where this page is accessed from
+      const redirectUrl = isIOSDevice()
+        ? 'https://useparkzy.com/email-confirmation'
+        : `${window.location.origin}/email-confirmation`;
+
       const { error } = await supabase.auth.resend({
         type: 'signup',
         email: resendEmail,
         options: {
-          emailRedirectTo: `${window.location.origin}/email-confirmation`
+          emailRedirectTo: redirectUrl
         }
       });
 
@@ -419,10 +445,31 @@ const EmailConfirmation = () => {
               <p className="mt-2 text-center text-muted-foreground">
                 Welcome to Parkzy! You're all set.
               </p>
-              <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Redirecting you to the app...</span>
-              </div>
+
+              {/* iOS: Show "Open in App" button */}
+              {isIOSDevice() && sessionTokens ? (
+                <div className="mt-6 w-full space-y-3">
+                  <a
+                    href={`parkzy://email-confirmation#access_token=${sessionTokens.accessToken}&refresh_token=${sessionTokens.refreshToken}`}
+                    className="flex items-center justify-center w-full h-12 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors"
+                  >
+                    <ArrowRight className="h-5 w-5 mr-2" />
+                    Open in Parkzy App
+                  </a>
+                  <Button
+                    variant="ghost"
+                    onClick={() => navigate('/')}
+                    className="w-full h-10 text-muted-foreground"
+                  >
+                    Continue in browser
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Redirecting you to the app...</span>
+                </div>
+              )}
             </CardContent>
           )}
           

@@ -62,6 +62,7 @@ import { SupportRedirect } from "./components/auth/SupportRedirect";
 import RequireHostMode from "./components/auth/RequireHostMode";
 import { useOrientationLock } from "./hooks/useOrientationLock";
 import { useNativePush } from "./hooks/useNativePush";
+import { useDeepLinks } from "./hooks/useDeepLinks";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { initSentry } from "./lib/sentry";
 
@@ -69,6 +70,13 @@ import { initSentry } from "./lib/sentry";
 // Must be inside AuthProvider and BrowserRouter to access auth context and navigation
 const NativePushInitializer = () => {
   useNativePush();
+  return null;
+};
+
+// Component to handle deep links (email verification, password reset, etc.)
+// Must be inside BrowserRouter to access navigation
+const DeepLinkHandler = () => {
+  useDeepLinks();
   return null;
 };
 
@@ -133,6 +141,7 @@ const App = () => {
             <Sonner />
             <BrowserRouter>
             <NativePushInitializer />
+            <DeepLinkHandler />
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
+import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { authLogger as log } from '@/lib/logger';
@@ -195,8 +196,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signUp = async (email: string, password: string, firstName?: string, lastName?: string, phone?: string) => {
-    const redirectUrl = `${window.location.origin}/email-confirmation`;
-    
+    // Always use web URL for email redirects - Safari blocks HTTPS→custom scheme redirects
+    // The web EmailConfirmation page will offer a button to open the iOS app
+    const redirectUrl = Capacitor.isNativePlatform()
+      ? 'https://useparkzy.com/email-confirmation'
+      : `${window.location.origin}/email-confirmation`;
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -370,11 +375,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const email = user?.email || profile?.email;
     if (!email) return { error: new Error('No email address found') };
 
+    // Always use web URL - Safari blocks HTTPS→custom scheme redirects
+    const redirectUrl = Capacitor.isNativePlatform()
+      ? 'https://useparkzy.com/email-confirmation'
+      : `${window.location.origin}/email-confirmation`;
+
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/email-confirmation`
+        emailRedirectTo: redirectUrl
       }
     });
 

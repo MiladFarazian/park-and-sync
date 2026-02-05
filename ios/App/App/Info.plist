@@ -46,5 +46,16 @@
 	<string>Parkzy needs your location to find parking spots near you and show your position on the map.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Parkzy needs your location to find parking spots near you and show your position on the map.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.useparkzy.parkzy</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>parkzy</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
