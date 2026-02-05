@@ -1125,10 +1125,13 @@ const ListSpot = () => {
                               e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
                             }, 250);
                           }}
-                          className="mt-1.5 resize-none scroll-mb-40"
+                          className={`mt-1.5 resize-none scroll-mb-40 ${evChargingInstructions.trim().length < 20 ? 'border-destructive' : ''}`}
                         />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          These instructions will be shown to drivers who opt-in to EV charging (minimum 20 characters: {evChargingInstructions.trim().length}/20)
+                        <p className={`text-xs mt-1 ${evChargingInstructions.trim().length < 20 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                          {evChargingInstructions.trim().length < 20 
+                            ? `⚠ ${20 - evChargingInstructions.trim().length} more characters needed (${evChargingInstructions.trim().length}/20 minimum)`
+                            : `✓ Instructions complete (${evChargingInstructions.trim().length}/20 minimum)`
+                          }
                         </p>
                       </div>
                     </div>
