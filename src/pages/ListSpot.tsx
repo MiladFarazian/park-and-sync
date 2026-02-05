@@ -434,6 +434,12 @@ const ListSpot = () => {
       return;
     }
     
+    // Validate EV charging instructions minimum length
+    if (hasEvCharging && evChargingInstructions.trim().length < 20) {
+      toast.error('Please provide at least 20 characters of EV charging instructions');
+      return;
+    }
+    
     try {
       setIsSubmitting(true);
       const { data: { user } } = await supabase.auth.getUser();
@@ -1119,7 +1125,7 @@ const ListSpot = () => {
                           className="mt-1.5 resize-none scroll-mb-40"
                         />
                         <p className="text-xs text-muted-foreground mt-1">
-                          These instructions will be shown to drivers who opt-in to EV charging
+                          These instructions will be shown to drivers who opt-in to EV charging (minimum 20 characters: {evChargingInstructions.trim().length}/20)
                         </p>
                       </div>
                     </div>
