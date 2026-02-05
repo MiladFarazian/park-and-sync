@@ -1177,6 +1177,9 @@ const ManageAvailability = () => {
                           className="pl-7 h-9 text-sm"
                         />
                       </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        10% service fee applies
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -1213,7 +1216,7 @@ const ManageAvailability = () => {
                   <span className="text-sm text-muted-foreground">/hr</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Leave blank to use each spot's default hourly rate
+                  Leave blank to use each spot's default hourly rate. Parkzy takes 10% of your earnings as a service fee.
                 </p>
               </div>
             )}

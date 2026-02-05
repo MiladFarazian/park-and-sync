@@ -817,6 +817,9 @@ const EditSpot = () => {
                     <Input id="hourlyRate" type="number" step="0.01" placeholder="0.00" {...register('hourlyRate')} className="pl-10" />
                   </div>
                   {errors.hourlyRate && <p className="text-sm text-destructive mt-1">{String(errors.hourlyRate.message)}</p>}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Parkzy takes 10% of your earnings as a service fee
+                  </p>
                 </div>
 
                 {/* Quantity field */}
