@@ -1,63 +1,63 @@
 
 
-## Add 20-Character Minimum for EV Charging Instructions
+## Fix: EV Charging Instructions Validation on Step Navigation
 
-### Goal
-Require hosts to provide at least 20 characters for EV charging instructions when enabling EV charging on their spot. This ensures drivers receive meaningful information about how to use the charging equipment.
+### Problem Identified
+The 20-character minimum validation for EV charging instructions only runs on **final form submission** (`onSubmit`). In the multi-step wizard, users can click "Next" on Step 3 and proceed to Step 4 without meeting the minimum character requirement because:
+
+1. **`isStepValid()` for Step 3** (lines 630-639) checks vehicle size, charger type, and premium amount, but **not** the instructions length
+2. **The "Next" button click handler** (lines 1186-1193) only validates vehicle size, then proceeds to Step 4
 
 ---
 
-### Changes Required
+### Solution
+Add the 20-character minimum check in **two places** in ListSpot.tsx:
 
-#### 1. ListSpot.tsx
+#### 1. Update `isStepValid()` function (around line 636-638)
+Add the instructions length check when EV charging is enabled:
 
-**A) Add validation on submit** (around line 435, after the premium validation)
 ```typescript
-if (hasEvCharging && evChargingInstructions.trim().length < 20) {
-  toast.error('Please provide at least 20 characters of EV charging instructions');
-  return;
+if (selectedAmenities.includes('ev')) {
+  return evChargerType && 
+         evChargingPremium && 
+         parseFloat(evChargingPremium) > 0 &&
+         evChargingInstructions.trim().length >= 20;
 }
 ```
 
-**B) Add character count helper text** (around line 1121-1123, replace existing helper text)
-```tsx
-<p className="text-xs text-muted-foreground mt-1">
-  These instructions will be shown to drivers who opt-in to EV charging (minimum 20 characters: {evChargingInstructions.trim().length}/20)
-</p>
-```
+This will disable the "Next" button until the user enters at least 20 characters.
 
----
+#### 2. Update the "Next" button click handler (around line 1186-1193)
+Add a validation check with a toast message before proceeding:
 
-#### 2. EditSpot.tsx
-
-**A) Add validation on submit** (around line 563, after the premium validation)
 ```typescript
-if (hasEvCharging && evChargingInstructions.trim().length < 20) {
-  toast.error('Please provide at least 20 characters of EV charging instructions');
-  return;
-}
+onClick={() => {
+  if (selectedVehicleSizes.length === 0) {
+    setVehicleSizeError('Please select at least one vehicle size');
+    toast.error('Please select at least one vehicle size that can fit in your spot');
+    return;
+  }
+  if (selectedAmenities.includes('ev') && evChargingInstructions.trim().length < 20) {
+    toast.error('Please provide at least 20 characters of EV charging instructions');
+    return;
+  }
+  setCurrentStep(4);
+}}
 ```
 
-**B) Add character count helper text** (around line 942-944, replace existing helper text)
-```tsx
-<p className="text-xs text-muted-foreground mt-1">
-  These instructions will be shown to drivers who opt-in to EV charging (minimum 20 characters: {evChargingInstructions.trim().length}/20)
-</p>
-```
-
----
-
-### User Experience
-- Host sees a live character count (e.g., "5/20") as they type
-- Count updates in real-time showing progress toward the 20-character minimum
-- If they try to submit with fewer than 20 characters, they see a clear toast error
-- The `.trim()` ensures whitespace-only inputs don't count toward the minimum
+This provides explicit feedback if they somehow bypass the disabled state.
 
 ---
 
 ### Files to Modify
-| File | Changes |
-|------|---------|
-| `src/pages/ListSpot.tsx` | Add validation check + update helper text with character count |
-| `src/pages/EditSpot.tsx` | Add validation check + update helper text with character count |
+| File | Location | Change |
+|------|----------|--------|
+| `src/pages/ListSpot.tsx` | ~line 637 | Add `evChargingInstructions.trim().length >= 20` to `isStepValid()` |
+| `src/pages/ListSpot.tsx` | ~line 1186-1193 | Add EV instructions validation in Next button click handler |
 
+---
+
+### User Experience After Fix
+- "Next" button on Step 3 will be **disabled** until EV charging instructions reach 20 characters (live character count already shows progress)
+- If they click "Next" with insufficient characters, they see a toast error explaining the requirement
+- The validation is consistent with the final submission validation
