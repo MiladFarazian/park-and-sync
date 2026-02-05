@@ -1,104 +1,102 @@
 
 
-# Allow Free Cancellation for Unapproved Booking Requests
+# Add "Clear Schedule" Button to Weekly Schedule Grid
 
 ## Overview
 
-Drivers should be able to cancel a booking request that the host hasn't approved yet **at any time** without being charged. Currently, the cancellation policy applies time-based rules regardless of approval status.
+Add a "Clear" button to the `WeeklyScheduleGrid` component's quick actions, allowing hosts to quickly clear all selected hours from their recurring schedule. This is a common action that should be easily accessible alongside the existing "24/7", "M-F 9-5", and "Undo" buttons.
 
-## Current Behavior
-
-The `cancel-booking` edge function applies these rules uniformly:
-- Within 10-minute grace period → full refund
-- More than 1 hour before start → full refund  
-- Less than 1 hour before start → no refund
-
-This means if a driver submits a booking request on a non-instant-book spot and the host doesn't respond for 45 minutes, then the driver wants to cancel, the system would charge them if the booking start time is within an hour.
+---
 
 ## Solution
 
-### 1. Edge Function Update (`supabase/functions/cancel-booking/index.ts`)
-
-Add a check at the top of the refund logic to handle `held` status bookings specially:
-
-```text
-Current flow:
-1. Check grace period
-2. Check time until start
-3. Determine refund
-
-New flow:
-1. Check if booking status is 'held' (pending approval)
-   → If yes: Always cancel the Stripe authorization, no charge
-2. Check grace period
-3. Check time until start
-4. Determine refund
-```
+### File: `src/components/availability/WeeklyScheduleGrid.tsx`
 
 **Changes:**
-- After line 53 (after checking if already cancelled), add logic to detect `held` status
-- If `status === 'held'`, set `refundAmount = 0` and `refundReason = 'Booking request cancelled before host approval - no charge'`
-- The existing Stripe logic already handles canceling uncaptured PaymentIntents correctly (lines 107-119)
 
-### 2. Frontend Update (`src/pages/BookingConfirmation.tsx`)
+1. **Add import for `Trash2` icon** (line 4)
+   - Add `Trash2` to the existing lucide-react import
 
-Update the `getCancellationPolicy()` function to recognize held bookings:
+2. **Create `clearAll` function** (after the `set24_7` function, around line 141)
+   ```typescript
+   const clearAll = () => {
+     saveToHistory();
+     setGrid(Array.from({ length: 7 }, () => Array(TOTAL_SLOTS).fill(false)));
+     toast.success('Cleared all hours');
+   };
+   ```
 
-```text
-Current:
-- Returns message based on grace period and time before start
+3. **Add "Clear" button to quick actions** (line 361-393)
+   - Add a new button between "M-F 9-5" and "Undo" (or at the end)
+   - Use the `Trash2` icon for visual consistency
+   - Style: `variant="outline"` with a subtle destructive hint
 
-New:
-- First check if booking.status === 'held'
-  → Return: "No charge - host hasn't accepted yet"
-- Then apply existing time-based rules
-```
-
-**Changes to `getCancellationPolicy()` (around line 188):**
-```typescript
-const getCancellationPolicy = () => {
-  if (!booking) return { refundable: false, message: '' };
-  
-  // Special case: Booking request pending host approval
-  if (booking.status === 'held') {
-    return {
-      refundable: true,
-      message: 'No charge - booking request not yet approved'
-    };
-  }
-  
-  // Existing time-based logic...
-  const now = new Date();
-  // ...rest of function
-};
+**Updated Quick Actions section:**
+```tsx
+<div className="flex gap-2 shrink-0 pt-2">
+  <Button
+    type="button"
+    variant="outline"
+    size="sm"
+    className="flex-1 h-8 text-xs"
+    onClick={set24_7}
+  >
+    <CalendarClock className="h-3.5 w-3.5 mr-1" />
+    24/7
+  </Button>
+  <Button
+    type="button"
+    variant="outline"
+    size="sm"
+    className="flex-1 h-8 text-xs"
+    onClick={set9to5MF}
+  >
+    <Briefcase className="h-3.5 w-3.5 mr-1" />
+    M-F 9-5
+  </Button>
+  <Button
+    type="button"
+    variant="outline"
+    size="sm"
+    className="flex-1 h-8 text-xs"
+    onClick={clearAll}
+  >
+    <Trash2 className="h-3.5 w-3.5 mr-1" />
+    Clear
+  </Button>
+  <Button
+    type="button"
+    variant="outline"
+    size="sm"
+    className="flex-1 h-8 text-xs"
+    onClick={undo}
+    disabled={history.length === 0}
+  >
+    <Undo2 className="h-3.5 w-3.5 mr-1" />
+    Undo
+  </Button>
+</div>
 ```
 
 ---
 
-## Technical Details
+## Behavior
 
-### Why This Works
+| Action | Result |
+|--------|--------|
+| Click "Clear" | All hours are deselected (grid becomes empty) |
+| Toast | "Cleared all hours" success message |
+| Undo | Previous state is saved to history, so "Undo" works |
+| Parent callback | `onChange` fires with empty rules array `[]` |
 
-For `held` bookings, Stripe PaymentIntent is in `requires_capture` status (authorized but not captured). The current edge function code at lines 107-119 already handles this:
+---
 
-```typescript
-if (pi.status !== 'canceled') {
-  await stripe.paymentIntents.cancel(pi.id);
-}
-refundReason = `Payment not captured (status=${pi.status}); canceled intent; no refund needed`;
-refundAmount = 0;
+## Visual Layout
+
+The quick actions row will now have 4 buttons:
+```text
+[ 24/7 ] [ M-F 9-5 ] [ Clear ] [ Undo ]
 ```
 
-The fix ensures we hit this path by setting `refundAmount = 0` for held bookings, and the existing Stripe logic will cancel the authorization hold.
-
-### Files to Modify
-
-| File | Change |
-|------|--------|
-| `supabase/functions/cancel-booking/index.ts` | Add held status check before refund calculation |
-| `src/pages/BookingConfirmation.tsx` | Update `getCancellationPolicy()` to show correct message for held bookings |
-
-### Notification Updates
-
-The existing notification logic will work correctly. The host notification message will say the driver cancelled their booking request, which is appropriate.
+Each button uses `flex-1` so they distribute evenly across the available width.
 
