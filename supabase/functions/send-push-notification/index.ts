@@ -79,7 +79,7 @@ async function sendApnsNotification(
   payload: { title: string; body: string; type?: string; bookingId?: string; url?: string },
   isProduction: boolean = true
 ): Promise<boolean> {
-  const bundleId = Deno.env.get('APNS_BUNDLE_ID') || 'com.parkzy.app';
+  const bundleId = Deno.env.get('APNS_BUNDLE_ID') || 'com.useparkzy.parkzy';
   const jwt = await generateApnsJwt();
 
   if (!jwt) {
@@ -310,12 +310,12 @@ serve(async (req) => {
   }
 
   try {
-    // Validate internal secret - this function should only be called by other edge functions
+    // Validate authorization - accept either service role key or valid user JWT
     const authHeader = req.headers.get('Authorization');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    if (!authHeader || !authHeader.includes(serviceRoleKey || '')) {
-      console.warn('[send-push-notification] Unauthorized access attempt');
+
+    if (!authHeader) {
+      console.warn('[send-push-notification] No authorization header');
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
@@ -326,6 +326,28 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+
+    // Check if it's a service role call (from other edge functions) or user JWT (from client)
+    const isServiceRoleCall = authHeader.includes(serviceRoleKey || '');
+    let authenticatedUserId: string | null = null;
+
+    if (!isServiceRoleCall) {
+      // Verify user JWT token
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+
+      if (userError || !user) {
+        console.warn('[send-push-notification] Invalid user token');
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+        );
+      }
+      authenticatedUserId = user.id;
+      console.log(`[send-push-notification] Client call from user: ${authenticatedUserId}`);
+    } else {
+      console.log('[send-push-notification] Service role call');
+    }
 
     const { userId, userIds, title, body, tag, url, requireInteraction, type, bookingId } = await req.json();
 

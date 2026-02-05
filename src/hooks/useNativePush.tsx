@@ -89,17 +89,33 @@ export const useNativePush = () => {
     };
   }, [isNative, user, navigate]);
 
-  // When user logs in, save existing token or register
+  // When user logs in, request permission and register
   useEffect(() => {
     if (!isNative || !user) return;
 
-    if (deviceToken) {
-      // If we already have a token, just save it for the new user
-      saveDeviceToken(deviceToken);
-    } else if (permission === 'granted' && !isRegistered) {
-      // If permission was previously granted but not registered, try to register
-      registerForPushNotifications();
-    }
+    const initializePush = async () => {
+      if (deviceToken) {
+        // If we already have a token, just save it for the new user
+        saveDeviceToken(deviceToken);
+      } else if (permission === 'granted' && !isRegistered) {
+        // If permission was previously granted but not registered, try to register
+        registerForPushNotifications();
+      } else if (permission === 'prompt') {
+        // Auto-request permission when user is logged in and we haven't asked yet
+        log.info('Auto-requesting push notification permission for logged-in user');
+        const result = await PushNotifications.requestPermissions();
+        log.debug('Permission request result:', result.receive);
+
+        if (result.receive === 'granted') {
+          setPermission('granted');
+          await registerForPushNotifications();
+        } else if (result.receive === 'denied') {
+          setPermission('denied');
+        }
+      }
+    };
+
+    initializePush();
   }, [user, isNative, deviceToken, permission, isRegistered]);
 
   const checkPermissions = async () => {
