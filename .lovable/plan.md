@@ -1,74 +1,63 @@
 
 
-## Add Platform Fee Disclosure to Pricing Inputs
+## Add 20-Character Minimum for EV Charging Instructions
 
 ### Goal
-Display a brief statement near all pricing-related inputs informing hosts that Parkzy takes a 10% platform fee from their earnings.
+Require hosts to provide at least 20 characters for EV charging instructions when enabling EV charging on their spot. This ensures drivers receive meaningful information about how to use the charging equipment.
 
 ---
 
 ### Changes Required
 
-#### 1. ListSpot.tsx (Step 1: Basic Information - Hourly Rate field)
-**Location:** After the hourly rate input (around line 943)
+#### 1. ListSpot.tsx
 
-Add helper text below the input field:
+**A) Add validation on submit** (around line 435, after the premium validation)
+```typescript
+if (hasEvCharging && evChargingInstructions.trim().length < 20) {
+  toast.error('Please provide at least 20 characters of EV charging instructions');
+  return;
+}
+```
+
+**B) Add character count helper text** (around line 1121-1123, replace existing helper text)
 ```tsx
 <p className="text-xs text-muted-foreground mt-1">
-  Parkzy takes 10% of your earnings as a service fee
+  These instructions will be shown to drivers who opt-in to EV charging (minimum 20 characters: {evChargingInstructions.trim().length}/20)
 </p>
 ```
 
-This appears right after the validation error message (if any), providing context as hosts set their rate.
-
 ---
 
-#### 2. EditSpot.tsx (Hourly Rate field)
-**Location:** After the hourly rate input (around line 819)
+#### 2. EditSpot.tsx
 
-Add the same helper text:
+**A) Add validation on submit** (around line 563, after the premium validation)
+```typescript
+if (hasEvCharging && evChargingInstructions.trim().length < 20) {
+  toast.error('Please provide at least 20 characters of EV charging instructions');
+  return;
+}
+```
+
+**B) Add character count helper text** (around line 942-944, replace existing helper text)
 ```tsx
 <p className="text-xs text-muted-foreground mt-1">
-  Parkzy takes 10% of your earnings as a service fee
+  These instructions will be shown to drivers who opt-in to EV charging (minimum 20 characters: {evChargingInstructions.trim().length}/20)
 </p>
 ```
 
 ---
 
-#### 3. ManageAvailability.tsx (Price Override sections)
-Two locations need this disclosure:
-
-**A) Default Custom Rate section (around line 1215-1217)**
-Update the existing helper text to include the fee disclosure:
-```tsx
-<p className="text-xs text-muted-foreground">
-  Leave blank to use each spot's default hourly rate. Parkzy takes 10% of your earnings as a service fee.
-</p>
-```
-
-**B) Per-block custom rate input (around line 1176)**
-Add helper text below the input:
-```tsx
-<p className="text-xs text-muted-foreground mt-0.5">
-  10% service fee applies
-</p>
-```
-This is a shorter version since space is limited in the time block cards.
-
----
-
-### Visual Consistency
-- All disclosures use `text-xs text-muted-foreground` for subtle but readable styling
-- Messaging is consistent: "Parkzy takes 10% of your earnings as a service fee"
-- Shorter variant used where space is constrained
+### User Experience
+- Host sees a live character count (e.g., "5/20") as they type
+- Count updates in real-time showing progress toward the 20-character minimum
+- If they try to submit with fewer than 20 characters, they see a clear toast error
+- The `.trim()` ensures whitespace-only inputs don't count toward the minimum
 
 ---
 
 ### Files to Modify
-| File | Location | Change |
-|------|----------|--------|
-| `src/pages/ListSpot.tsx` | ~line 943 | Add fee disclosure after hourly rate input |
-| `src/pages/EditSpot.tsx` | ~line 819 | Add fee disclosure after hourly rate input |
-| `src/pages/ManageAvailability.tsx` | ~line 1176 | Add short fee note to per-block rate |
-| `src/pages/ManageAvailability.tsx` | ~line 1215-1217 | Append fee disclosure to existing helper text |
+| File | Changes |
+|------|---------|
+| `src/pages/ListSpot.tsx` | Add validation check + update helper text with character count |
+| `src/pages/EditSpot.tsx` | Add validation check + update helper text with character count |
 
