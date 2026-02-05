@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Undo2, Briefcase, CalendarClock } from 'lucide-react';
+import { Undo2, Briefcase, CalendarClock, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -138,6 +138,12 @@ export const WeeklyScheduleGrid = ({
     saveToHistory();
     setGrid(Array.from({ length: 7 }, () => Array(TOTAL_SLOTS).fill(true)));
     toast.success('Set available 24/7');
+  };
+
+  const clearAll = () => {
+    saveToHistory();
+    setGrid(Array.from({ length: 7 }, () => Array(TOTAL_SLOTS).fill(false)));
+    toast.success('Cleared all hours');
   };
 
   const undo = () => {
@@ -378,6 +384,16 @@ export const WeeklyScheduleGrid = ({
         >
           <Briefcase className="h-3.5 w-3.5 mr-1" />
           M-F 9-5
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="flex-1 h-8 text-xs"
+          onClick={clearAll}
+        >
+          <Trash2 className="h-3.5 w-3.5 mr-1" />
+          Clear
         </Button>
         <Button
           type="button"
