@@ -53,6 +53,10 @@ serve(async (req) => {
     }
 
     const now = new Date();
+    
+    // Special case: Booking request pending host approval (held status)
+    // Drivers can cancel at any time without charge - just release the authorization
+    let isHeldBooking = booking.status === 'held';
     const bookingStart = new Date(booking.start_at);
     const bookingCreated = new Date(booking.created_at);
     const gracePeriodEnd = new Date(bookingCreated.getTime() + 10 * 60 * 1000); // 10 minutes after booking
@@ -62,7 +66,12 @@ serve(async (req) => {
     let refundReason = '';
 
     // Determine refund amount based on cancellation policy
-    if (now <= gracePeriodEnd) {
+    if (isHeldBooking) {
+      // Held bookings (pending host approval) can always be cancelled without charge
+      // The payment is only authorized, not captured, so we just need to cancel the intent
+      refundAmount = 0;
+      refundReason = 'Booking request cancelled before host approval - no charge';
+    } else if (now <= gracePeriodEnd) {
       // Within 10-minute grace period - full refund
       refundAmount = booking.total_amount;
       refundReason = 'Within 10-minute grace period';
