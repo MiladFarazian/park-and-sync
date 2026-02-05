@@ -275,9 +275,21 @@ export const WeeklyScheduleGrid = ({
     <div className="flex flex-col flex-shrink-0">
       {/* Instructions & Legend - Compact */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-1">
-        <p className="text-[10px] sm:text-xs text-muted-foreground">
-          Click and drag to select hours
-        </p>
+        <div className="flex items-center justify-between sm:justify-start gap-2">
+          <p className="text-[10px] sm:text-xs text-muted-foreground">
+            Click and drag to select hours
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-[10px] sm:text-xs text-muted-foreground hover:text-destructive"
+            onClick={clearAll}
+          >
+            <Trash2 className="h-3 w-3 mr-1" />
+            Clear
+          </Button>
+        </div>
         <div className="flex items-center gap-2 text-[10px] sm:text-xs">
           <div className="flex items-center gap-1">
             <div className="w-2.5 h-2.5 rounded-sm bg-primary" />
@@ -384,16 +396,6 @@ export const WeeklyScheduleGrid = ({
         >
           <Briefcase className="h-3.5 w-3.5 mr-1" />
           M-F 9-5
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="flex-1 h-8 text-xs"
-          onClick={clearAll}
-        >
-          <Trash2 className="h-3.5 w-3.5 mr-1" />
-          Clear
         </Button>
         <Button
           type="button"
