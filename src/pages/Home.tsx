@@ -461,8 +461,10 @@ const Home = () => {
           navigate('/auth', { state: { from: '/list-spot', intendedMode: 'host' } });
           return;
         }
-        setMode('host', false); // Instant switch, no overlay
-        navigate('/list-spot');
+        // Navigate first to unmount Home.tsx before mode change triggers redirect
+        navigate('/list-spot', { replace: true });
+        // Then set mode - ListSpot's RequireHostMode will see 'host' mode
+        setMode('host', false);
       },
     },
     {
