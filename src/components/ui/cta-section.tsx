@@ -2,9 +2,11 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Car, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useMode } from '@/contexts/ModeContext';
 
 const CTASection = () => {
   const navigate = useNavigate();
+  const { setMode } = useMode();
   
   return (
     <section className="py-20 lg:py-28">
@@ -53,7 +55,10 @@ const CTASection = () => {
                 variant="secondary" 
                 size="lg" 
                 className="font-semibold"
-                onClick={() => navigate('/list-spot')}
+                onClick={() => {
+                  navigate('/list-spot', { replace: true });
+                  setMode('host', false);
+                }}
               >
                 List Your Spot
                 <ArrowRight className="ml-2 h-5 w-5" />

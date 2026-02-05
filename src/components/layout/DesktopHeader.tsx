@@ -224,7 +224,10 @@ const DesktopHeader = () => {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     {mode === 'driver' ? (
-                      <DropdownMenuItem onClick={() => navigate('/list-spot')}>
+                      <DropdownMenuItem onClick={() => {
+                        navigate('/list-spot', { replace: true });
+                        setMode('host', false);
+                      }}>
                         List Your Spot
                       </DropdownMenuItem>
                     ) : (
@@ -247,7 +250,10 @@ const DesktopHeader = () => {
                     Sign Up
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/list-spot')}>
+                  <DropdownMenuItem onClick={() => {
+                    navigate('/list-spot', { replace: true });
+                    setMode('host', false);
+                  }}>
                     List Your Spot
                   </DropdownMenuItem>
                 </>

@@ -607,8 +607,10 @@ const Profile = () => {
     label: 'List Your Spot',
     subtitle: 'Earn money by hosting',
     onClick: () => {
-      setMode('host');
-      navigate('/list-spot');
+      // Navigate first to prevent race condition with mode-watching useEffects
+      navigate('/list-spot', { replace: true });
+      // Then set mode - ListSpot's RequireHostMode will see 'host' mode
+      setMode('host', false);
     }
   }, {
     icon: Car,

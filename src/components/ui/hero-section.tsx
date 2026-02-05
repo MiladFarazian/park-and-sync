@@ -9,6 +9,7 @@ import LocationSearchInput from '@/components/ui/location-search-input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
+import { useMode } from '@/contexts/ModeContext';
 import { evChargerTypes } from '@/lib/evChargerTypes';
 import { OptimizedImage } from '@/components/ui/optimized-image';
 import {
@@ -21,6 +22,7 @@ import {
 
 const HeroSection = () => {
   const navigate = useNavigate();
+  const { setMode } = useMode();
   const [searchLocation, setSearchLocation] = useState('');
   const [searchCoords, setSearchCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false);
@@ -216,7 +218,10 @@ const HeroSection = () => {
 
             {/* List Your Spot CTA */}
             <button
-              onClick={() => navigate('/list-spot')}
+              onClick={() => {
+                navigate('/list-spot', { replace: true });
+                setMode('host', false);
+              }}
               className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors font-medium"
             >
               <span>Earn money by listing your parking spot</span>
