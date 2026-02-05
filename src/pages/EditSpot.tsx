@@ -238,6 +238,7 @@ const EditSpot = () => {
   
   // Quantity state
   const [quantity, setQuantity] = useState<number>(1);
+  const [quantityDisplay, setQuantityDisplay] = useState<string>('1');
   
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
@@ -351,8 +352,9 @@ const EditSpot = () => {
         setEvChargingPremium(spotData.ev_charging_premium_per_hour?.toString() || '0');
         setEvChargerType(spotData.ev_charger_type || null);
         
-        // Load quantity
-        setQuantity(spotData.quantity || 1);
+                // Load quantity
+                setQuantity(spotData.quantity || 1);
+                setQuantityDisplay(String(spotData.quantity || 1));
         const {
           data: photosData,
           error: photosError
@@ -831,8 +833,21 @@ const EditSpot = () => {
                       type="number"
                       min="1"
                       max="1000"
-                      value={quantity}
-                      onChange={(e) => setQuantity(Math.max(1, Math.min(1000, parseInt(e.target.value) || 1)))}
+                      value={quantityDisplay}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setQuantityDisplay(val);
+                        const parsed = parseInt(val);
+                        if (!isNaN(parsed)) {
+                          setQuantity(Math.max(1, Math.min(1000, parsed)));
+                        }
+                      }}
+                      onBlur={() => {
+                        const parsed = parseInt(quantityDisplay);
+                        const validValue = isNaN(parsed) ? 1 : Math.max(1, Math.min(1000, parsed));
+                        setQuantity(validValue);
+                        setQuantityDisplay(String(validValue));
+                      }}
                       className="w-28"
                     />
                     <span className="text-sm text-muted-foreground">spaces</span>
