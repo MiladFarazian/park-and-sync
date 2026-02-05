@@ -95,6 +95,7 @@ const ListSpot = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availabilityRules, setAvailabilityRules] = useState<any[]>([]);
   const [quantity, setQuantity] = useState<number>(1);
+  const [quantityDisplay, setQuantityDisplay] = useState<string>('1');
   
   // EV Charging state
   const [evChargingInstructions, setEvChargingInstructions] = useState('');
@@ -835,8 +836,21 @@ const ListSpot = () => {
                             type="number"
                             min="1"
                             max="1000"
-                            value={quantity}
-                            onChange={(e) => setQuantity(Math.max(1, Math.min(1000, parseInt(e.target.value) || 1)))}
+                            value={quantityDisplay}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setQuantityDisplay(val);
+                              const parsed = parseInt(val);
+                              if (!isNaN(parsed)) {
+                                setQuantity(Math.max(1, Math.min(1000, parsed)));
+                              }
+                            }}
+                            onBlur={() => {
+                              const parsed = parseInt(quantityDisplay);
+                              const validValue = isNaN(parsed) ? 1 : Math.max(1, Math.min(1000, parsed));
+                              setQuantity(validValue);
+                              setQuantityDisplay(String(validValue));
+                            }}
                             className="w-28"
                           />
                           <span className="text-sm text-muted-foreground">spaces</span>
