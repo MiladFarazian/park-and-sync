@@ -1,133 +1,74 @@
 
-# Fix Quantity Input to Allow Clearing Before Typing New Value
 
-## Problem
+## Add Platform Fee Disclosure to Pricing Inputs
 
-When listing multiple identical parking spaces, the host cannot delete the "1" from the quantity input field to type a new number. The current code immediately resets the value to `1` when the input is cleared, making editing frustrating.
-
-**Root cause:** Both `ListSpot.tsx` and `EditSpot.tsx` have:
-```typescript
-onChange={(e) => setQuantity(Math.max(1, Math.min(1000, parseInt(e.target.value) || 1)))}
-```
-
-When the user clears the input:
-1. `e.target.value` becomes `""`
-2. `parseInt("")` returns `NaN`
-3. `NaN || 1` evaluates to `1`
-4. Input immediately snaps back to `1`
+### Goal
+Display a brief statement near all pricing-related inputs informing hosts that Parkzy takes a 10% platform fee from their earnings.
 
 ---
 
-## Solution
+### Changes Required
 
-Use a **local string state** for the input value, allowing the field to be empty while typing. Only enforce the minimum value of `1` when the input loses focus (on blur) or during form validation.
+#### 1. ListSpot.tsx (Step 1: Basic Information - Hourly Rate field)
+**Location:** After the hourly rate input (around line 943)
 
-### Approach: Temporary String Display Value
-
-1. Track a `quantityDisplay` string state alongside the numeric `quantity`
-2. Allow the input to be empty or contain any typed value
-3. On blur, validate and snap to valid range (1-1000)
-4. On submit, ensure minimum of 1
-
----
-
-## Files to Change
-
-### 1. `src/pages/ListSpot.tsx`
-
-**Add state** (around line 97):
-```typescript
-const [quantity, setQuantity] = useState<number>(1);
-const [quantityDisplay, setQuantityDisplay] = useState<string>('1');
-```
-
-**Update the Input component** (around line 833-841):
+Add helper text below the input field:
 ```tsx
-<Input
-  id="quantity"
-  type="number"
-  min="1"
-  max="1000"
-  value={quantityDisplay}
-  onChange={(e) => {
-    const val = e.target.value;
-    setQuantityDisplay(val);
-    const parsed = parseInt(val);
-    if (!isNaN(parsed)) {
-      setQuantity(Math.max(1, Math.min(1000, parsed)));
-    }
-  }}
-  onBlur={() => {
-    // Snap to valid value on blur
-    const parsed = parseInt(quantityDisplay);
-    const validValue = isNaN(parsed) ? 1 : Math.max(1, Math.min(1000, parsed));
-    setQuantity(validValue);
-    setQuantityDisplay(String(validValue));
-  }}
-  className="w-28"
-/>
+<p className="text-xs text-muted-foreground mt-1">
+  Parkzy takes 10% of your earnings as a service fee
+</p>
 ```
 
-**Update draft restoration** (around line 196-200) to also set `quantityDisplay` if quantity is included in the draft.
+This appears right after the validation error message (if any), providing context as hosts set their rate.
 
 ---
 
-### 2. `src/pages/EditSpot.tsx`
+#### 2. EditSpot.tsx (Hourly Rate field)
+**Location:** After the hourly rate input (around line 819)
 
-**Add state** (around line 240):
-```typescript
-const [quantity, setQuantity] = useState<number>(1);
-const [quantityDisplay, setQuantityDisplay] = useState<string>('1');
-```
-
-**Update data loading** (around line 355):
-```typescript
-setQuantity(spotData.quantity || 1);
-setQuantityDisplay(String(spotData.quantity || 1));
-```
-
-**Update the Input component** (around line 829-837):
+Add the same helper text:
 ```tsx
-<Input
-  id="quantity"
-  type="number"
-  min="1"
-  max="1000"
-  value={quantityDisplay}
-  onChange={(e) => {
-    const val = e.target.value;
-    setQuantityDisplay(val);
-    const parsed = parseInt(val);
-    if (!isNaN(parsed)) {
-      setQuantity(Math.max(1, Math.min(1000, parsed)));
-    }
-  }}
-  onBlur={() => {
-    const parsed = parseInt(quantityDisplay);
-    const validValue = isNaN(parsed) ? 1 : Math.max(1, Math.min(1000, parsed));
-    setQuantity(validValue);
-    setQuantityDisplay(String(validValue));
-  }}
-  className="w-28"
-/>
+<p className="text-xs text-muted-foreground mt-1">
+  Parkzy takes 10% of your earnings as a service fee
+</p>
 ```
 
 ---
 
-## User Experience
+#### 3. ManageAvailability.tsx (Price Override sections)
+Two locations need this disclosure:
 
-| Action | Before | After |
-|--------|--------|-------|
-| Select all + delete "1" | Snaps back to 1 | Field becomes empty |
-| Type "25" after clearing | Impossible | Works: field shows "25" |
-| Leave field empty + blur | N/A | Resets to "1" |
-| Type "9999" + blur | Shows 9999 | Corrects to "1000" |
-| Type "0" + blur | Shows 0 | Corrects to "1" |
+**A) Default Custom Rate section (around line 1215-1217)**
+Update the existing helper text to include the fee disclosure:
+```tsx
+<p className="text-xs text-muted-foreground">
+  Leave blank to use each spot's default hourly rate. Parkzy takes 10% of your earnings as a service fee.
+</p>
+```
+
+**B) Per-block custom rate input (around line 1176)**
+Add helper text below the input:
+```tsx
+<p className="text-xs text-muted-foreground mt-0.5">
+  10% service fee applies
+</p>
+```
+This is a shorter version since space is limited in the time block cards.
 
 ---
 
-## Validation Behavior
+### Visual Consistency
+- All disclosures use `text-xs text-muted-foreground` for subtle but readable styling
+- Messaging is consistent: "Parkzy takes 10% of your earnings as a service fee"
+- Shorter variant used where space is constrained
 
-- **While typing:** No restrictions (allows empty/out-of-range temporarily)
-- **On blur:** Snaps to valid range [1, 1000]
-- **On submit:** Uses the numeric `quantity` state which is always valid
+---
+
+### Files to Modify
+| File | Location | Change |
+|------|----------|--------|
+| `src/pages/ListSpot.tsx` | ~line 943 | Add fee disclosure after hourly rate input |
+| `src/pages/EditSpot.tsx` | ~line 819 | Add fee disclosure after hourly rate input |
+| `src/pages/ManageAvailability.tsx` | ~line 1176 | Add short fee note to per-block rate |
+| `src/pages/ManageAvailability.tsx` | ~line 1215-1217 | Append fee disclosure to existing helper text |
+
