@@ -1,102 +1,47 @@
 
+## Goal
+In **Manage Availability**, show **today’s date** with an **orange outline** (accent ring) instead of an **orange filled background**, to avoid confusion with selected/blocked/available states.
 
-# Add "Clear Schedule" Button to Weekly Schedule Grid
+## What’s happening now (root cause)
+Even though `src/components/ui/calendar.tsx` was updated, **ManageAvailability overrides the calendar styles locally** and still sets:
+- `day_today: "bg-accent text-accent-foreground"`
 
-## Overview
+So the “today” cell stays orange-filled on `/manage-availability` regardless of the shared Calendar component styling.
 
-Add a "Clear" button to the `WeeklyScheduleGrid` component's quick actions, allowing hosts to quickly clear all selected hours from their recurring schedule. This is a common action that should be easily accessible alongside the existing "24/7", "M-F 9-5", and "Undo" buttons.
+## Implementation approach
+### 1) Update ManageAvailability’s inline DayPicker `classNames`
+**File:** `src/pages/ManageAvailability.tsx` (around the calendar block near the “Select Dates” section)
 
----
+Change:
+- `day_today: "bg-accent text-accent-foreground"`
+to an outline-based style, for example:
+- `day_today: "ring-2 ring-accent ring-inset text-foreground aria-selected:ring-0"`
 
-## Solution
+Notes:
+- `ring-accent` = orange outline.
+- `aria-selected:ring-0` prevents an orange ring around a selected-today date (so selected stays clearly “selected” in purple).
+- This keeps “today” visually distinct without implying selection.
 
-### File: `src/components/availability/WeeklyScheduleGrid.tsx`
+### 2) Make the shared Calendar component consistent (recommended)
+**File:** `src/components/ui/calendar.tsx`
 
-**Changes:**
+Update `day_today` to match the new behavior app-wide:
+- From: `ring-2 ring-primary ring-inset text-foreground`
+- To: `ring-2 ring-accent ring-inset text-foreground aria-selected:ring-0`
 
-1. **Add import for `Trash2` icon** (line 4)
-   - Add `Trash2` to the existing lucide-react import
+This ensures any other places that use the shared `<Calendar />` (without local overrides) also follow the “orange outline for today” rule.
 
-2. **Create `clearAll` function** (after the `set24_7` function, around line 141)
-   ```typescript
-   const clearAll = () => {
-     saveToHistory();
-     setGrid(Array.from({ length: 7 }, () => Array(TOTAL_SLOTS).fill(false)));
-     toast.success('Cleared all hours');
-   };
-   ```
+## Validation checklist (what to test)
+1. Go to: `/manage-availability?...`
+2. Confirm **today** shows as an **orange outline** only (no orange fill).
+3. Confirm **selected dates** still show as **purple filled**.
+4. Confirm tapping dates still works and the UI doesn’t accidentally apply orange fill to “today” unless the user is actively hovering (desktop) or selecting.
+5. Test on mobile width to ensure the ring is visible and doesn’t look like selection.
 
-3. **Add "Clear" button to quick actions** (line 361-393)
-   - Add a new button between "M-F 9-5" and "Undo" (or at the end)
-   - Use the `Trash2` icon for visual consistency
-   - Style: `variant="outline"` with a subtle destructive hint
+## Edge cases considered
+- **Today is selected:** should appear selected (purple) and not double-emphasized by the orange ring (handled via `aria-selected:ring-0`).
+- **Disabled/past days:** should remain muted; the today ring should only apply when DayPicker marks the day as today (and in ManageAvailability, past dates are disabled anyway).
 
-**Updated Quick Actions section:**
-```tsx
-<div className="flex gap-2 shrink-0 pt-2">
-  <Button
-    type="button"
-    variant="outline"
-    size="sm"
-    className="flex-1 h-8 text-xs"
-    onClick={set24_7}
-  >
-    <CalendarClock className="h-3.5 w-3.5 mr-1" />
-    24/7
-  </Button>
-  <Button
-    type="button"
-    variant="outline"
-    size="sm"
-    className="flex-1 h-8 text-xs"
-    onClick={set9to5MF}
-  >
-    <Briefcase className="h-3.5 w-3.5 mr-1" />
-    M-F 9-5
-  </Button>
-  <Button
-    type="button"
-    variant="outline"
-    size="sm"
-    className="flex-1 h-8 text-xs"
-    onClick={clearAll}
-  >
-    <Trash2 className="h-3.5 w-3.5 mr-1" />
-    Clear
-  </Button>
-  <Button
-    type="button"
-    variant="outline"
-    size="sm"
-    className="flex-1 h-8 text-xs"
-    onClick={undo}
-    disabled={history.length === 0}
-  >
-    <Undo2 className="h-3.5 w-3.5 mr-1" />
-    Undo
-  </Button>
-</div>
-```
-
----
-
-## Behavior
-
-| Action | Result |
-|--------|--------|
-| Click "Clear" | All hours are deselected (grid becomes empty) |
-| Toast | "Cleared all hours" success message |
-| Undo | Previous state is saved to history, so "Undo" works |
-| Parent callback | `onChange` fires with empty rules array `[]` |
-
----
-
-## Visual Layout
-
-The quick actions row will now have 4 buttons:
-```text
-[ 24/7 ] [ M-F 9-5 ] [ Clear ] [ Undo ]
-```
-
-Each button uses `flex-1` so they distribute evenly across the available width.
-
+## Files to change
+- `src/pages/ManageAvailability.tsx` (fix the local override that’s causing the orange fill)
+- `src/components/ui/calendar.tsx` (optional but recommended for consistency across the app)
