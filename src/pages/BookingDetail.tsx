@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { calculateBookingTotal, calculateDriverPrice } from '@/lib/pricing';
+import { calculateBookingTotal, calculateDriverPrice, calculatePlatformFee } from '@/lib/pricing';
 import { getHostNetEarnings, getParkzyFee } from '@/lib/hostEarnings';
 import RequireAuth from '@/components/auth/RequireAuth';
 import { getBookingStatus, getBookingStatusColor, getBookingStatusLabelWithOverstay } from '@/lib/bookingStatus';
@@ -906,18 +906,41 @@ const BookingDetailContent = () => {
                 <span>${getHostNetEarnings(booking).toFixed(2)}</span>
               </div>
               
-              {/* Optional earnings breakdown for transparency */}
+              {/* Transparent earnings breakdown showing host gross and 10% platform fee */}
               <Separator />
-              <div className="text-xs text-muted-foreground space-y-1">
-                <div className="flex justify-between">
-                  <span>Driver paid</span>
-                  <span>${(booking.total_amount + booking.overstay_charge_amount).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Parkzy fee</span>
-                  <span>-${getParkzyFee(booking).toFixed(2)}</span>
-                </div>
-              </div>
+              {(() => {
+                const durationMs = new Date(booking.end_at).getTime() - new Date(booking.start_at).getTime();
+                const totalMinutes = Math.round(durationMs / (1000 * 60));
+                const hours = totalMinutes / 60;
+                const hostGross = Math.round(booking.hourly_rate * hours * 100) / 100;
+                const platformFee = calculatePlatformFee(hostGross);
+                const evChargingFee = booking.ev_charging_fee ?? 0;
+                
+                const hoursInt = Math.floor(totalMinutes / 60);
+                const minutes = totalMinutes % 60;
+                const durationLabel = hoursInt === 0 ? `${minutes}min` : 
+                                      minutes === 0 ? `${hoursInt}h` : 
+                                      `${hoursInt}h ${minutes}min`;
+                
+                return (
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <div className="flex justify-between">
+                      <span>Gross earnings ({durationLabel} × ${booking.hourly_rate.toFixed(2)})</span>
+                      <span>${hostGross.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Platform fee (10%)</span>
+                      <span className="text-destructive">-${platformFee.toFixed(2)}</span>
+                    </div>
+                    {evChargingFee > 0 && (
+                      <div className="flex justify-between">
+                        <span>EV Charging (100% to you)</span>
+                        <span>${evChargingFee.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             // DRIVER VIEW: Show full payment breakdown
