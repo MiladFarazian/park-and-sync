@@ -1,137 +1,126 @@
 
-
-## Fix "List Your Spot" Being Redirected to Host Home
+## Fix "List Your Spot" Quick Actions Across the App
 
 ### Problem
-When clicking "List Your Spot", the navigation flow is:
-1. `setMode('host', false)` changes mode to 'host'
-2. `navigate('/list-spot')` is called
-3. **But** `Home.tsx` has a `useEffect` (lines 62-69) that watches for mode changes
-4. When mode becomes 'host', it redirects to `/host-home` before the `/list-spot` navigation completes
-
-### Root Cause
-The `useEffect` in Home.tsx that redirects to `/host-home` when mode is 'host' is interfering with direct navigation to host routes:
-
-```tsx
-useEffect(() => {
-  const fromLogoClick = (location.state as { fromLogoClick?: boolean })?.fromLogoClick;
-  if (mode === 'host' && !fromLogoClick) {
-    navigate('/host-home', { replace: true });
-  }
-}, [mode, navigate, location.state]);
-```
+Multiple "List Your Spot" buttons across the app have inconsistent navigation behavior:
+1. **Profile.tsx** (lines 609-612): Same race condition as Home.tsx - calls `setMode` before `navigate`, causing redirect to `/host-home`
+2. **DesktopHeader.tsx**, **hero-section.tsx**, **cta-section.tsx**: Navigate directly to `/list-spot` without setting host mode, which may fail with `RequireHostMode` wrapper
 
 ### Solution
-Update the click handler to navigate **before** switching mode. Since `/list-spot` is wrapped in `RequireHostMode`, we need a different approach:
-
-**Use `replace: true` navigation** which happens synchronously and takes priority over the useEffect redirect. Navigate with `replace: true` to immediately take the user to `/list-spot` before the mode-watching effect can fire.
-
-Actually, the cleaner fix is to **reorder the operations** and use `setTimeout` to ensure navigation happens after the current render cycle but before the useEffect in Home.tsx can redirect:
-
-```typescript
-onClick: () => {
-  if (!user) {
-    navigate('/auth', { state: { from: '/list-spot', intendedMode: 'host' } });
-    return;
-  }
-  // Navigate first with replace to prevent back-button issues
-  navigate('/list-spot', { replace: true });
-  // Then switch mode - ListSpot's RequireHostMode will see the new mode
-  setMode('host', false);
-}
-```
-
-Wait - this won't work because `RequireHostMode` checks mode synchronously.
-
-**Better solution**: Add a state flag similar to `fromLogoClick` to indicate we're intentionally going to a host route:
-
-```typescript
-onClick: () => {
-  if (!user) {
-    navigate('/auth', { state: { from: '/list-spot', intendedMode: 'host' } });
-    return;
-  }
-  setMode('host', false);
-  navigate('/list-spot', { state: { directHostNavigation: true } });
-}
-```
-
-Then update the useEffect to check for this flag... but wait, this useEffect is in Home.tsx and we're navigating away from Home.tsx, so actually the issue is different.
-
-Let me reconsider: The user is ON `/` (Home), clicks the button which:
-1. Sets mode to 'host'
-2. Navigates to `/list-spot`
-
-But the navigation triggers a re-render of Home.tsx with mode='host', and the useEffect fires before navigation completes, redirecting to `/host-home`.
-
-**The actual fix**: Use `replace: true` in the navigate call AND navigate before setting mode, then set mode in the next tick:
-
-```typescript
-onClick: () => {
-  if (!user) {
-    navigate('/auth', { state: { from: '/list-spot', intendedMode: 'host' } });
-    return;
-  }
-  // Navigate immediately - this unmounts Home.tsx
-  navigate('/list-spot', { replace: true });
-  // Set mode after navigation starts (for RequireHostMode on ListSpot)
-  setMode('host', false);
-}
-```
-
-This should work because:
-1. `navigate()` starts the route transition immediately
-2. `setMode()` updates context
-3. By the time ListSpot mounts, mode is 'host'
-4. Home.tsx is being unmounted, so its useEffect won't redirect
+Apply the same fix pattern from Home.tsx to all "List Your Spot" navigation handlers:
+1. Navigate first with `replace: true` to start route transition
+2. Then set mode to 'host' so `RequireHostMode` sees correct mode when ListSpot mounts
 
 ---
 
 ### Technical Changes
 
-#### File: `src/pages/Home.tsx`
+#### File 1: `src/pages/Profile.tsx`
 
-**Location**: Lines 459-466
+**Location**: Lines 609-612
 
 **Current code**:
 ```typescript
 onClick: () => {
-  if (!user) {
-    navigate('/auth', { state: { from: '/list-spot', intendedMode: 'host' } });
-    return;
-  }
-  setMode('host', false); // Instant switch, no overlay
+  setMode('host');
   navigate('/list-spot');
-},
+}
 ```
 
 **New code**:
 ```typescript
 onClick: () => {
-  if (!user) {
-    navigate('/auth', { state: { from: '/list-spot', intendedMode: 'host' } });
-    return;
-  }
-  // Navigate first to unmount Home.tsx before mode change triggers redirect
+  // Navigate first to prevent race condition with mode-watching useEffects
   navigate('/list-spot', { replace: true });
   // Then set mode - ListSpot's RequireHostMode will see 'host' mode
   setMode('host', false);
-},
+}
 ```
+
+#### File 2: `src/components/layout/DesktopHeader.tsx`
+
+**Location**: Line 227
+
+**Current code**:
+```typescript
+<DropdownMenuItem onClick={() => navigate('/list-spot')}>
+```
+
+**New code**:
+```typescript
+<DropdownMenuItem onClick={() => {
+  navigate('/list-spot', { replace: true });
+  setMode('host', false);
+}}>
+```
+
+**Location**: Line 250
+
+**Current code**:
+```typescript
+<DropdownMenuItem onClick={() => navigate('/list-spot')}>
+```
+
+**New code**:
+```typescript
+<DropdownMenuItem onClick={() => {
+  navigate('/list-spot', { replace: true });
+  setMode('host', false);
+}}>
+```
+
+#### File 3: `src/components/ui/hero-section.tsx`
+
+**Location**: Line 219
+
+**Current code**:
+```typescript
+onClick={() => navigate('/list-spot')}
+```
+
+**New code**:
+```typescript
+onClick={() => {
+  navigate('/list-spot', { replace: true });
+  setMode('host', false);
+}}
+```
+
+*Note: Will need to import `useMode` from `@/contexts/ModeContext`*
+
+#### File 4: `src/components/ui/cta-section.tsx`
+
+**Location**: Line 56
+
+**Current code**:
+```typescript
+onClick={() => navigate('/list-spot')}
+```
+
+**New code**:
+```typescript
+onClick={() => {
+  navigate('/list-spot', { replace: true });
+  setMode('host', false);
+}}
+```
+
+*Note: Will need to import `useMode` from `@/contexts/ModeContext`*
 
 ---
 
 ### Files to Modify
 | File | Lines | Change |
 |------|-------|--------|
-| `src/pages/Home.tsx` | 459-466 | Reorder to navigate first, then set mode; add `replace: true` |
+| `src/pages/Profile.tsx` | 609-612 | Reorder navigate/setMode, add `replace: true` |
+| `src/components/layout/DesktopHeader.tsx` | 227, 250 | Add mode switch after navigation |
+| `src/components/ui/hero-section.tsx` | 219 | Add mode switch after navigation, add useMode import |
+| `src/components/ui/cta-section.tsx` | 56 | Add mode switch after navigation, add useMode import |
 
 ---
 
-### Why This Works
-1. **`navigate()` with `replace: true`** immediately starts the route transition and begins unmounting Home.tsx
-2. **`setMode('host', false)`** updates context state synchronously after navigation starts
-3. By the time React processes the next render cycle, Home.tsx is unmounted so its useEffect doesn't fire
-4. ListSpot mounts and `RequireHostMode` sees `mode === 'host'` ✓
-5. User lands on `/list-spot` as expected
-
+### Why This Pattern Works
+1. `navigate('/list-spot', { replace: true })` starts the route transition immediately
+2. `setMode('host', false)` updates context synchronously after navigation starts
+3. By the time ListSpot mounts, `RequireHostMode` sees `mode === 'host'` ✓
+4. No race conditions with mode-watching useEffects on the source page
