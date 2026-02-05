@@ -457,8 +457,12 @@ const Home = () => {
       icon: Plus,
       label: 'List Your Spot',
       onClick: () => {
-        setMode('host');
-        navigate('/dashboard');
+        if (!user) {
+          navigate('/auth', { state: { from: '/list-spot', intendedMode: 'host' } });
+          return;
+        }
+        setMode('host', false); // Instant switch, no overlay
+        navigate('/list-spot');
       },
     },
     {
