@@ -941,6 +941,9 @@ const ListSpot = () => {
                     {errors.hourlyRate && (
                       <p className="text-sm text-destructive mt-1">{errors.hourlyRate.message}</p>
                     )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Parkzy takes 10% of your earnings as a service fee
+                    </p>
                   </div>
                 </div>
 
