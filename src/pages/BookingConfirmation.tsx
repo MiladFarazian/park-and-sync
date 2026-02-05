@@ -190,6 +190,16 @@ const BookingConfirmationContent = () => {
       refundable: false,
       message: ''
     };
+    
+    // Special case: Booking request pending host approval
+    // Driver can cancel at any time without being charged
+    if (booking.status === 'held') {
+      return {
+        refundable: true,
+        message: 'No charge - booking request not yet approved'
+      };
+    }
+    
     const now = new Date();
     const bookingStart = new Date(booking.start_at);
     const bookingCreated = new Date(booking.created_at);
