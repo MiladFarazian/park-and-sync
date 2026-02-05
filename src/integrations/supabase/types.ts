@@ -337,6 +337,7 @@ export type Database = {
         Row: {
           created_at: string
           device_id: string | null
+          environment: string
           id: string
           platform: string
           token: string
@@ -346,6 +347,7 @@ export type Database = {
         Insert: {
           created_at?: string
           device_id?: string | null
+          environment?: string
           id?: string
           platform: string
           token: string
@@ -355,6 +357,7 @@ export type Database = {
         Update: {
           created_at?: string
           device_id?: string | null
+          environment?: string
           id?: string
           platform?: string
           token?: string

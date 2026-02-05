@@ -187,7 +187,12 @@ export const useNativePush = () => {
     try {
       const platform = Capacitor.getPlatform(); // 'ios' or 'android'
 
-      log.debug('Saving device token for platform:', platform);
+      // Detect APNs environment based on build type
+      // - Development: Xcode builds running via dev server (import.meta.env.DEV)
+      // - Production: TestFlight/App Store builds (production bundle)
+      const environment = import.meta.env.DEV ? 'development' : 'production';
+
+      log.debug('Saving device token for platform:', platform, 'environment:', environment);
 
       const { error } = await supabase
         .from('device_tokens')
@@ -195,6 +200,7 @@ export const useNativePush = () => {
           user_id: user.id,
           token: token,
           platform: platform,
+          environment: environment,
           updated_at: new Date().toISOString(),
         }, {
           onConflict: 'user_id,token',
@@ -205,7 +211,7 @@ export const useNativePush = () => {
         return false;
       }
 
-      log.info('Device token saved successfully');
+      log.info('Device token saved successfully with environment:', environment);
       return true;
     } catch (error) {
       log.error('Error saving device token:', error);

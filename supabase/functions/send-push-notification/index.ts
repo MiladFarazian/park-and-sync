@@ -450,10 +450,16 @@ serve(async (req) => {
       console.log(`[send-push-notification] Found ${deviceTokens.length} iOS device tokens`);
       apnsTotal = deviceTokens.length;
 
-      // Determine if we're in production (check for production flag or environment)
-      const isProduction = Deno.env.get('APNS_ENVIRONMENT') !== 'development';
+      // Group tokens by environment for logging
+      const devTokens = deviceTokens.filter(d => d.environment === 'development');
+      const prodTokens = deviceTokens.filter(d => d.environment !== 'development');
+      console.log(`[send-push-notification] Token breakdown: ${devTokens.length} development, ${prodTokens.length} production`);
 
       for (const device of deviceTokens) {
+        // Route each token to its appropriate APNs server based on stored environment
+        // Development tokens (from Xcode) go to sandbox, production tokens (TestFlight/App Store) go to production
+        const isProduction = device.environment !== 'development';
+
         const success = await sendApnsNotification(
           device.token,
           { title: notificationTitle, body, type, bookingId, url },
