@@ -19,6 +19,7 @@ interface BookingConfirmationRequest {
   startAt: string;
   endAt: string;
   totalAmount: number;
+  hostEarnings?: number;
   bookingId: string;
   accessNotes?: string;
   evChargingInstructions?: string;
@@ -83,6 +84,7 @@ const handler = async (req: Request): Promise<Response> => {
       startAt,
       endAt,
       totalAmount,
+      hostEarnings,
       bookingId,
       accessNotes,
       evChargingInstructions,
@@ -205,7 +207,7 @@ const handler = async (req: Request): Promise<Response> => {
                       <td class="header-cell" style="background: linear-gradient(135deg, #6B4EFF 0%, #5B3EEF 100%); padding: 40px 24px; text-align: center;">
                         <img src="https://mqbupmusmciijsjmzbcu.supabase.co/storage/v1/object/public/assets/parkzy-logo-white.png" alt="Parkzy" style="height: 36px; width: auto; margin-bottom: 16px;" />
                         <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700;">🎉 New Booking!</h1>
-                        <p style="margin: 10px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 15px;">You've earned $${totalAmount.toFixed(2)}</p>
+                        <p style="margin: 10px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 15px;">You've earned $${(hostEarnings ?? totalAmount).toFixed(2)}</p>
                       </td>
                     </tr>
                     
@@ -251,7 +253,7 @@ const handler = async (req: Request): Promise<Response> => {
                                     <table width="100%">
                                       <tr>
                                         <td style="color: #1f2937; font-size: 15px; font-weight: 700;">💰 Total Earnings</td>
-                                        <td style="color: #6B4EFF; font-size: 18px; font-weight: 700; text-align: right;">$${totalAmount.toFixed(2)}</td>
+                                        <td style="color: #6B4EFF; font-size: 18px; font-weight: 700; text-align: right;">$${(hostEarnings ?? totalAmount).toFixed(2)}</td>
                                       </tr>
                                     </table>
                                   </td>

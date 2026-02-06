@@ -20,6 +20,7 @@ interface GuestBookingConfirmationRequest {
   startAt: string;
   endAt: string;
   totalAmount: number;
+  hostEarnings?: number;
   bookingId: string;
   guestAccessToken: string;
   accessNotes?: string;
@@ -115,6 +116,7 @@ const handler = async (req: Request): Promise<Response> => {
       evChargingInstructions,
       hasEvCharging,
       willUseEvCharging,
+      hostEarnings,
     }: GuestBookingConfirmationRequest = await req.json();
 
     const isRequest = type === 'request';
@@ -412,7 +414,7 @@ Get directions: ${directionsUrl}`;
       
       const hostHeaderSubtitle = isRequest
         ? "Action required within 1 hour"
-        : `You've earned $${totalAmount.toFixed(2)}`;
+        : `You've earned $${(hostEarnings ?? totalAmount).toFixed(2)}`;
       
       const hostIntroText = isRequest
         ? `<strong>${guestName}</strong> (a guest user) wants to book your parking spot. Please approve or decline within <strong>1 hour</strong> or the request will expire automatically.`
@@ -500,7 +502,7 @@ Get directions: ${directionsUrl}`;
                                       <table width="100%">
                                         <tr>
                                           <td style="color: #1f2937; font-size: 16px; font-weight: 700;">💰 ${isRequest ? 'Potential' : 'Your'} Earnings</td>
-                                          <td style="color: ${isRequest ? '#f59e0b' : '#6B4EFF'}; font-size: 20px; font-weight: 700; text-align: right;">$${totalAmount.toFixed(2)}</td>
+                                          <td style="color: ${isRequest ? '#f59e0b' : '#6B4EFF'}; font-size: 20px; font-weight: 700; text-align: right;">$${(hostEarnings ?? totalAmount).toFixed(2)}</td>
                                         </tr>
                                         ${hostPaymentNote}
                                       </table>

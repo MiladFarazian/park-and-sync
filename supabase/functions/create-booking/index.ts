@@ -477,6 +477,7 @@ serve(async (req) => {
               startAt: start_at,
               endAt: end_at,
               totalAmount: totalAmount,
+              hostEarnings: hostEarnings,
               bookingId: booking.id,
               // Access and EV charging instructions for driver email
               accessNotes: spot.access_notes || '',
