@@ -1,71 +1,95 @@
 
 
-## Fix Instant Book Filter and Display Inconsistency
+## Fix Incorrect Pricing in Host and Driver Confirmation Emails
 
-### Problem
-There's a naming inconsistency between components causing two issues:
-1. **Display Bug**: All spots in the MapView carousel show "Request" badge instead of correctly showing "Instant" for instant-book spots
-2. **Root Cause**: Property naming mismatch between `instantBook` (camelCase) and `instant_book` (snake_case)
+### Problem Found
 
-### How the Bug Manifests
-- `Explore.tsx` transforms spots with property `instantBook` (camelCase)
-- `MapView.tsx` interface defines `instant_book` (snake_case)  
-- MapView checks `spot.instant_book` which is `undefined` for all spots
-- Since `undefined` is falsy, all spots show the "Request" badge regardless of their actual booking type
+The host confirmation emails incorrectly show the **driver's total** (including the driver's 10% service fee) as the host's "earnings." This overstates what the host actually receives.
 
-### Verification
-I tested in the browser and confirmed:
-- A spot at "844 W 32nd St" has `instant_book: true` in the database
-- But the carousel card displays "Request" badge instead of "Instant"
-- The filter count updates correctly (showing fewer spots when filter is applied)
-- But because the display is wrong, it appears as if the filter isn't working
+### Specific Issues
+
+**1. send-booking-confirmation (registered user bookings)**
+
+| Location | Current (Wrong) | Should Be |
+|----------|-----------------|-----------|
+| Host header (line 208) | "You've earned $[totalAmount]" | "You've earned $[hostEarnings]" |
+| Host "Total Earnings" row (line 254) | Shows `totalAmount` (driver total) | Should show `hostEarnings` (host net) |
+
+The `create-booking` function passes `totalAmount` (driver total = rate + 10% service fee + EV) but the host email uses it as "earnings." For example, a $30 booking at $15/hr for 2 hours: driver pays $33, but host earns $27. The email currently says the host earned $33.
+
+The email template does not receive `hostEarnings` at all -- it needs to be added to the interface and passed through.
+
+**2. send-guest-booking-confirmation (guest bookings)**
+
+| Location | Current (Wrong) | Should Be |
+|----------|-----------------|-----------|
+| Host header subtitle (line 415) | "You've earned $[totalAmount]" | "You've earned $[hostEarnings]" |
+| Host "Your Earnings" row (line 503) | Shows `totalAmount` | Should show host net earnings |
+
+Same issue -- `totalAmount` is the driver-facing total, not what the host receives.
+
+**3. Driver emails -- OK**
+Driver emails correctly show `totalAmount` as "Total Paid" -- this is correct since `totalAmount` IS what the driver pays.
+
+**4. Extension emails -- OK**
+`send-extension-confirmation` already receives a separate `hostEarnings` field and uses it correctly for the host email. The driver email uses `extensionCost` (driver total for extension) correctly.
 
 ### Solution
-Update `MapView.tsx` to use the correct camelCase property name `instantBook` that matches how spots are transformed in `Explore.tsx`.
+
+#### Step 1: Update `send-booking-confirmation` edge function
+- Add `hostEarnings` to the `BookingConfirmationRequest` interface
+- Replace `totalAmount` with `hostEarnings` in the host email header and earnings row
+- Keep `totalAmount` in the driver email (it's correct there)
+
+#### Step 2: Update `create-booking` to pass `hostEarnings`
+- Add `hostEarnings` to the email payload sent to `send-booking-confirmation` (line 469-487)
+- The `hostEarnings` value is already calculated at line 200
+
+#### Step 3: Update `send-guest-booking-confirmation` edge function
+- Add `hostEarnings` to the `GuestBookingConfirmationRequest` interface
+- Replace `totalAmount` with `hostEarnings` in the host email header and earnings row
+- Keep `totalAmount` in the guest email (correct for driver/guest)
+
+#### Step 4: Update callers of `send-guest-booking-confirmation`
+- The `verify-guest-payment` and `approve-booking` functions that call this need to pass `hostEarnings`
 
 ---
 
-### Technical Changes
+### Technical Details
 
-**File: `src/components/map/MapView.tsx`**
+**File: `supabase/functions/send-booking-confirmation/index.ts`**
 
-**Change 1: Update the Spot interface (line 43)**
+- Add `hostEarnings?: number` to `BookingConfirmationRequest` interface (around line 12)
+- Line 208: Change `$${totalAmount.toFixed(2)}` to `$${(hostEarnings ?? totalAmount).toFixed(2)}`
+- Line 254: Change `$${totalAmount.toFixed(2)}` to `$${(hostEarnings ?? totalAmount).toFixed(2)}`
 
-Current:
-```typescript
-instant_book?: boolean; // Whether the spot supports instant booking
-```
+**File: `supabase/functions/create-booking/index.ts`**
 
-New:
-```typescript
-instantBook?: boolean; // Whether the spot supports instant booking
-```
+- Line ~479: Add `hostEarnings: hostEarnings` to the email payload object
 
-**Change 2: Update the badge conditional (line 1349)**
+**File: `supabase/functions/send-guest-booking-confirmation/index.ts`**
 
-Current:
-```typescript
-{spot.instant_book ? (
-```
+- Add `hostEarnings?: number` to `GuestBookingConfirmationRequest` interface
+- Line 415: Change `$${totalAmount.toFixed(2)}` to `$${(hostEarnings ?? totalAmount).toFixed(2)}`
+- Line 503: Change `$${totalAmount.toFixed(2)}` to `$${(hostEarnings ?? totalAmount).toFixed(2)}`
 
-New:
-```typescript
-{spot.instantBook ? (
-```
+**File: `supabase/functions/verify-guest-payment/index.ts`** and **`supabase/functions/approve-booking/index.ts`**
+
+- Add `hostEarnings` to the payload when invoking `send-guest-booking-confirmation`
 
 ---
 
 ### Files to Modify
 
-| File | Lines | Change |
-|------|-------|--------|
-| `src/components/map/MapView.tsx` | 43 | Rename `instant_book` to `instantBook` in Spot interface |
-| `src/components/map/MapView.tsx` | 1349 | Change `spot.instant_book` to `spot.instantBook` in conditional |
+| File | Change |
+|------|--------|
+| `supabase/functions/send-booking-confirmation/index.ts` | Add `hostEarnings` field, use it in host email |
+| `supabase/functions/create-booking/index.ts` | Pass `hostEarnings` in email payload |
+| `supabase/functions/send-guest-booking-confirmation/index.ts` | Add `hostEarnings` field, use it in host email |
+| `supabase/functions/verify-guest-payment/index.ts` | Pass `hostEarnings` in guest confirmation payload |
+| `supabase/functions/approve-booking/index.ts` | Pass `hostEarnings` in guest confirmation payload |
 
----
-
-### Result
-- Spots with Instant Book enabled will correctly show the "Instant" badge (yellow with lightning bolt)
-- Spots requiring host confirmation will correctly show the "Request" badge
-- The Instant Book filter will appear to work correctly because the visual display will now match the actual filter behavior
-
+### Impact
+- Host emails will show accurate net earnings (after 10% platform fee)
+- Driver/guest emails remain unchanged (correctly show total paid)
+- Backwards compatible: uses `hostEarnings ?? totalAmount` fallback
