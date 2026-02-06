@@ -1,126 +1,90 @@
 
-## Fix "List Your Spot" Quick Actions Across the App
+Goal: Ensure the “List Your Spot” quick action on `/` reliably lands on `/list-spot` (not `/host-home`).
 
-### Problem
-Multiple "List Your Spot" buttons across the app have inconsistent navigation behavior:
-1. **Profile.tsx** (lines 609-612): Same race condition as Home.tsx - calls `setMode` before `navigate`, causing redirect to `/host-home`
-2. **DesktopHeader.tsx**, **hero-section.tsx**, **cta-section.tsx**: Navigate directly to `/list-spot` without setting host mode, which may fail with `RequireHostMode` wrapper
+What’s happening (based on code inspection)
+- `src/pages/Home.tsx` has two separate “host-mode safety” redirects that are currently fighting the quick action:
+  1) A `useEffect` that redirects to `/host-home` whenever `mode === 'host'` (lines 62–69).
+  2) A render-time guard that returns `null` (blank) whenever `mode === 'host'` on `/` (lines 477–482).
+- Your quick action currently does:
+  - `navigate('/list-spot', { replace: true })`
+  - then `setMode('host', false)`
+- In React 18, updates are batched. A common failure mode is:
+  - the app briefly renders `/list-spot` while `mode` is still `driver`
+  - `RequireHostMode` redirects back to `/`
+  - then `mode` becomes `host`, and Home’s “host-mode safety” logic sends you to `/host-home`
+- Net result: you end up at `/host-home` even though you intended `/list-spot`.
 
-### Solution
-Apply the same fix pattern from Home.tsx to all "List Your Spot" navigation handlers:
-1. Navigate first with `replace: true` to start route transition
-2. Then set mode to 'host' so `RequireHostMode` sees correct mode when ListSpot mounts
+Proposed fix (robust against batching/race conditions)
+We’ll make the Home page’s host-redirect logic “opt-out” for this one, intentional transition, and we’ll force the mode update to be applied before the route guard evaluates.
 
----
+Implementation details
 
-### Technical Changes
+1) Add a “suppress host redirect temporarily” ref in `src/pages/Home.tsx`
+- Add a ref near the other refs:
+  - `const suppressHostRedirectRef = useRef(false);`
 
-#### File 1: `src/pages/Profile.tsx`
-
-**Location**: Lines 609-612
-
-**Current code**:
-```typescript
-onClick: () => {
-  setMode('host');
-  navigate('/list-spot');
+2) Update Home’s host redirect `useEffect` to respect the suppression flag
+Current:
+```ts
+if (mode === 'host' && !fromLogoClick) {
+  navigate('/host-home', { replace: true });
 }
 ```
+Change to:
+- If `suppressHostRedirectRef.current` is true, do nothing.
+- This prevents Home from sending us to `/host-home` while we are intentionally switching to host just to reach `/list-spot`.
 
-**New code**:
-```typescript
-onClick: () => {
-  // Navigate first to prevent race condition with mode-watching useEffects
-  navigate('/list-spot', { replace: true });
-  // Then set mode - ListSpot's RequireHostMode will see 'host' mode
-  setMode('host', false);
+3) Update the render-time guard in Home to respect the suppression flag
+Current:
+```ts
+if (mode === 'host' && !fromLogoClick) {
+  return null;
 }
 ```
+Change to:
+- Only return null when `mode === 'host' && !fromLogoClick && !suppressHostRedirectRef.current`
+- This avoids a blank “flash”/stall during the intentional quick-action transition.
 
-#### File 2: `src/components/layout/DesktopHeader.tsx`
+4) Update ONLY the Home quick action “List Your Spot” handler to:
+- Set suppression flag ON
+- Force host mode to apply synchronously
+- Navigate to `/list-spot`
+- Clear suppression flag shortly after
 
-**Location**: Line 227
+Concretely:
+- Import `flushSync` from `react-dom` at the top of `Home.tsx`
+- Update the onClick to:
+  - If not logged in: keep current `/auth` redirect behavior
+  - Else:
+    - `suppressHostRedirectRef.current = true`
+    - `flushSync(() => setMode('host', false))`
+    - `navigate('/list-spot', { replace: true })`
+    - Clear suppression in a `setTimeout(() => { suppressHostRedirectRef.current = false; }, 0)` (or `requestAnimationFrame`) so it only applies for the transition
 
-**Current code**:
-```typescript
-<DropdownMenuItem onClick={() => navigate('/list-spot')}>
-```
+Why this works
+- `flushSync` ensures `mode` becomes `'host'` before React Router’s `RequireHostMode` decides whether it should redirect away.
+- The suppression ref prevents Home’s own “host mode => /host-home” logic from hijacking this specific intentional flow.
+- This makes the quick action deterministic: `/` → `/list-spot` every time (when logged in), instead of occasionally bouncing `/` → `/host-home`.
 
-**New code**:
-```typescript
-<DropdownMenuItem onClick={() => {
-  navigate('/list-spot', { replace: true });
-  setMode('host', false);
-}}>
-```
+Files to change
+- `src/pages/Home.tsx`
+  - Add `suppressHostRedirectRef`
+  - Gate the host redirect `useEffect`
+  - Gate the “return null” host guard
+  - Update the quick action handler to use `flushSync` + suppression
 
-**Location**: Line 250
+Manual test checklist (important)
+1) On mobile, logged in, from `/` tap quick action “List Your Spot”:
+   - Expected: lands on `/list-spot` (no detour to `/host-home`)
+2) Hard refresh while last saved mode is host, open `/`:
+   - Expected: still redirects you to `/host-home` (the original safety behavior should remain)
+3) Logged out, from `/` tap “List Your Spot”:
+   - Expected: goes to `/auth` with intended destination preserved
 
-**Current code**:
-```typescript
-<DropdownMenuItem onClick={() => navigate('/list-spot')}>
-```
+Optional follow-up hardening (if you want)
+- Add a small debug log (DEV-only) in the Home quick action and in `RequireHostMode` to confirm the exact redirect path during testing.
+- Consider later centralizing “go to list spot” behavior into one helper/hook to avoid future drift between buttons/links.
 
-**New code**:
-```typescript
-<DropdownMenuItem onClick={() => {
-  navigate('/list-spot', { replace: true });
-  setMode('host', false);
-}}>
-```
-
-#### File 3: `src/components/ui/hero-section.tsx`
-
-**Location**: Line 219
-
-**Current code**:
-```typescript
-onClick={() => navigate('/list-spot')}
-```
-
-**New code**:
-```typescript
-onClick={() => {
-  navigate('/list-spot', { replace: true });
-  setMode('host', false);
-}}
-```
-
-*Note: Will need to import `useMode` from `@/contexts/ModeContext`*
-
-#### File 4: `src/components/ui/cta-section.tsx`
-
-**Location**: Line 56
-
-**Current code**:
-```typescript
-onClick={() => navigate('/list-spot')}
-```
-
-**New code**:
-```typescript
-onClick={() => {
-  navigate('/list-spot', { replace: true });
-  setMode('host', false);
-}}
-```
-
-*Note: Will need to import `useMode` from `@/contexts/ModeContext`*
-
----
-
-### Files to Modify
-| File | Lines | Change |
-|------|-------|--------|
-| `src/pages/Profile.tsx` | 609-612 | Reorder navigate/setMode, add `replace: true` |
-| `src/components/layout/DesktopHeader.tsx` | 227, 250 | Add mode switch after navigation |
-| `src/components/ui/hero-section.tsx` | 219 | Add mode switch after navigation, add useMode import |
-| `src/components/ui/cta-section.tsx` | 56 | Add mode switch after navigation, add useMode import |
-
----
-
-### Why This Pattern Works
-1. `navigate('/list-spot', { replace: true })` starts the route transition immediately
-2. `setMode('host', false)` updates context synchronously after navigation starts
-3. By the time ListSpot mounts, `RequireHostMode` sees `mode === 'host'` ✓
-4. No race conditions with mode-watching useEffects on the source page
+Risks / trade-offs
+- `flushSync` should be used sparingly, but this is a user-interaction-driven navigation edge case and is an appropriate place for it.
+- The suppression ref is localized to Home and only affects this transition, keeping the rest of the app’s host-mode redirect behavior intact.
