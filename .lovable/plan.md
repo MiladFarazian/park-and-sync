@@ -1,54 +1,48 @@
 
-## Disable Swipe-Back Navigation on Weekly Schedule Page (Step 4)
+
+## Show Address Instead of Spot Title in "Load Schedule From" Dropdown
 
 ### Problem
-The "List Your Spot" flow uses horizontal swipe gestures to navigate between steps (swipe right = go back). However, on **Step 4 (Weekly Schedule)**, the `WeeklyScheduleGrid` component requires horizontal touch interactions for selecting time slots. The swipe-back gesture is likely interfering with this interaction or causing accidental navigation.
+In the Manage Availability page's Recurring Schedule tab, the "Load Schedule From" dropdown currently displays spots by their title (spot type like "Driveway", "Garage", etc.) instead of by address. This makes it difficult to identify which spot is which when you have multiple spots of the same type.
+
+**Current display**: `Driveway — 24/7` or `Garage — Mon-Fri 9-5`
+
+**Desired display**: `123 Main St — 24/7` or `456 Oak Ave — Mon-Fri 9-5`
 
 ### Solution
-Conditionally disable swipe-back navigation when the user is on step 4 (the Weekly Schedule page). We'll modify the `useSwipeNavigation` hook's `onSwipeRight` callback to do nothing when `currentStep === 4`.
+Update the dropdown to show the street address (using the existing `getStreetAddress` utility) instead of the spot title.
 
 ---
 
 ### Technical Changes
 
-#### File: `src/pages/ListSpot.tsx`
+#### File: `src/pages/ManageAvailability.tsx`
 
-**Location**: Lines 759-770
+**Change 1: Add import for address utility**
+
+**Location**: Near the top imports (around line 22)
+
+Add:
+```typescript
+import { getStreetAddress } from '@/lib/addressUtils';
+```
+
+**Change 2: Update dropdown display**
+
+**Location**: Lines 1362-1364
 
 **Current code**:
 ```typescript
-// Swipe navigation for multi-step form
-const swipeHandlers = useSwipeNavigation({
-  onSwipeLeft: () => {}, // No action on swipe left
-  onSwipeRight: () => {
-    if (currentStep === 1) {
-      navigate('/dashboard');
-    } else {
-      setCurrentStep(currentStep - 1);
-    }
-  },
-  threshold: 50,
-});
+<SelectItem key={spot.id} value={spot.id}>
+  {spot.title} — {getRecurringScheduleSummary(spot.id)}
+</SelectItem>
 ```
 
 **New code**:
 ```typescript
-// Swipe navigation for multi-step form
-// Disabled on step 4 (Weekly Schedule) to prevent interference with grid interactions
-const swipeHandlers = useSwipeNavigation({
-  onSwipeLeft: () => {}, // No action on swipe left
-  onSwipeRight: () => {
-    // Skip swipe-back on step 4 (Weekly Schedule) - grid uses horizontal touch gestures
-    if (currentStep === 4) return;
-    
-    if (currentStep === 1) {
-      navigate('/dashboard');
-    } else {
-      setCurrentStep(currentStep - 1);
-    }
-  },
-  threshold: 50,
-});
+<SelectItem key={spot.id} value={spot.id}>
+  {getStreetAddress(spot.address)} — {getRecurringScheduleSummary(spot.id)}
+</SelectItem>
 ```
 
 ---
@@ -56,13 +50,14 @@ const swipeHandlers = useSwipeNavigation({
 ### Files to Modify
 | File | Lines | Change |
 |------|-------|--------|
-| `src/pages/ListSpot.tsx` | 759-770 | Add early return when `currentStep === 4` in `onSwipeRight` handler |
+| `src/pages/ManageAvailability.tsx` | ~22 | Add `getStreetAddress` import |
+| `src/pages/ManageAvailability.tsx` | 1363 | Replace `spot.title` with `getStreetAddress(spot.address)` |
 
 ---
 
-### Why This Works
-1. The `onSwipeRight` callback now checks if the user is on step 4
-2. If on step 4, the swipe gesture is ignored (does nothing)
-3. The back button on step 4 still works normally (lines 1220-1226)
-4. All other steps retain their swipe-back functionality
-5. The `WeeklyScheduleGrid` can now handle horizontal touch interactions without interference
+### Result
+- **Before**: `Driveway — 24/7`
+- **After**: `123 Main St — 24/7`
+
+The `getStreetAddress` utility extracts just the street portion from a full address (removing city, state, ZIP), keeping the dropdown items concise while being more identifiable.
+
