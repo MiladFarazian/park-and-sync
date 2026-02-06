@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import { WeeklyScheduleGrid, AvailabilityRule as GridAvailabilityRule } from '@/components/availability/WeeklyScheduleGrid';
 import { logger } from '@/lib/logger';
+import { getStreetAddress } from '@/lib/addressUtils';
 
 const log = logger.scope('ManageAvailability');
 
@@ -1360,7 +1361,7 @@ const ManageAvailability = () => {
                 <SelectContent className="bg-background">
                   {spots.map(spot => (
                     <SelectItem key={spot.id} value={spot.id}>
-                      {spot.title} — {getRecurringScheduleSummary(spot.id)}
+                      {getStreetAddress(spot.address)} — {getRecurringScheduleSummary(spot.id)}
                     </SelectItem>
                   ))}
                 </SelectContent>
