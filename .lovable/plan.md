@@ -1,63 +1,71 @@
 
 
-## Show Address Instead of Spot Title in "Load Schedule From" Dropdown
+## Fix Instant Book Filter and Display Inconsistency
 
 ### Problem
-In the Manage Availability page's Recurring Schedule tab, the "Load Schedule From" dropdown currently displays spots by their title (spot type like "Driveway", "Garage", etc.) instead of by address. This makes it difficult to identify which spot is which when you have multiple spots of the same type.
+There's a naming inconsistency between components causing two issues:
+1. **Display Bug**: All spots in the MapView carousel show "Request" badge instead of correctly showing "Instant" for instant-book spots
+2. **Root Cause**: Property naming mismatch between `instantBook` (camelCase) and `instant_book` (snake_case)
 
-**Current display**: `Driveway — 24/7` or `Garage — Mon-Fri 9-5`
+### How the Bug Manifests
+- `Explore.tsx` transforms spots with property `instantBook` (camelCase)
+- `MapView.tsx` interface defines `instant_book` (snake_case)  
+- MapView checks `spot.instant_book` which is `undefined` for all spots
+- Since `undefined` is falsy, all spots show the "Request" badge regardless of their actual booking type
 
-**Desired display**: `123 Main St — 24/7` or `456 Oak Ave — Mon-Fri 9-5`
+### Verification
+I tested in the browser and confirmed:
+- A spot at "844 W 32nd St" has `instant_book: true` in the database
+- But the carousel card displays "Request" badge instead of "Instant"
+- The filter count updates correctly (showing fewer spots when filter is applied)
+- But because the display is wrong, it appears as if the filter isn't working
 
 ### Solution
-Update the dropdown to show the street address (using the existing `getStreetAddress` utility) instead of the spot title.
+Update `MapView.tsx` to use the correct camelCase property name `instantBook` that matches how spots are transformed in `Explore.tsx`.
 
 ---
 
 ### Technical Changes
 
-#### File: `src/pages/ManageAvailability.tsx`
+**File: `src/components/map/MapView.tsx`**
 
-**Change 1: Add import for address utility**
+**Change 1: Update the Spot interface (line 43)**
 
-**Location**: Near the top imports (around line 22)
-
-Add:
+Current:
 ```typescript
-import { getStreetAddress } from '@/lib/addressUtils';
+instant_book?: boolean; // Whether the spot supports instant booking
 ```
 
-**Change 2: Update dropdown display**
-
-**Location**: Lines 1362-1364
-
-**Current code**:
+New:
 ```typescript
-<SelectItem key={spot.id} value={spot.id}>
-  {spot.title} — {getRecurringScheduleSummary(spot.id)}
-</SelectItem>
+instantBook?: boolean; // Whether the spot supports instant booking
 ```
 
-**New code**:
+**Change 2: Update the badge conditional (line 1349)**
+
+Current:
 ```typescript
-<SelectItem key={spot.id} value={spot.id}>
-  {getStreetAddress(spot.address)} — {getRecurringScheduleSummary(spot.id)}
-</SelectItem>
+{spot.instant_book ? (
+```
+
+New:
+```typescript
+{spot.instantBook ? (
 ```
 
 ---
 
 ### Files to Modify
+
 | File | Lines | Change |
 |------|-------|--------|
-| `src/pages/ManageAvailability.tsx` | ~22 | Add `getStreetAddress` import |
-| `src/pages/ManageAvailability.tsx` | 1363 | Replace `spot.title` with `getStreetAddress(spot.address)` |
+| `src/components/map/MapView.tsx` | 43 | Rename `instant_book` to `instantBook` in Spot interface |
+| `src/components/map/MapView.tsx` | 1349 | Change `spot.instant_book` to `spot.instantBook` in conditional |
 
 ---
 
 ### Result
-- **Before**: `Driveway — 24/7`
-- **After**: `123 Main St — 24/7`
-
-The `getStreetAddress` utility extracts just the street portion from a full address (removing city, state, ZIP), keeping the dropdown items concise while being more identifiable.
+- Spots with Instant Book enabled will correctly show the "Instant" badge (yellow with lightning bolt)
+- Spots requiring host confirmation will correctly show the "Request" badge
+- The Instant Book filter will appear to work correctly because the visual display will now match the actual filter behavior
 
