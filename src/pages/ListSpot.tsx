@@ -757,9 +757,13 @@ const ListSpot = () => {
   const showStripeSetup = currentStep === 6 && !stripeConnected && !isCheckingStripe;
 
   // Swipe navigation for multi-step form
+  // Disabled on step 4 (Weekly Schedule) to prevent interference with grid interactions
   const swipeHandlers = useSwipeNavigation({
     onSwipeLeft: () => {}, // No action on swipe left
     onSwipeRight: () => {
+      // Skip swipe-back on step 4 (Weekly Schedule) - grid uses horizontal touch gestures
+      if (currentStep === 4) return;
+      
       if (currentStep === 1) {
         navigate('/dashboard');
       } else {
