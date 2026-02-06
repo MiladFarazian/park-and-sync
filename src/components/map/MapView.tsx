@@ -40,7 +40,7 @@ interface Spot {
   hostId?: string;
   userBooking?: UserBooking | null;
   totalPrice?: number; // Total booking cost for selected duration
-  instant_book?: boolean; // Whether the spot supports instant booking
+  instantBook?: boolean; // Whether the spot supports instant booking
 }
 
 interface MapViewProps {
@@ -1346,7 +1346,7 @@ const MapView = ({ spots, searchCenter, currentLocation, onVisibleSpotsChange, o
                               </Badge>
                             )}
                             {/* Instant book indicator */}
-                            {spot.instant_book ? (
+                            {spot.instantBook ? (
                               <Badge variant="outline" className="text-xs px-1.5 py-0 border-amber-400 text-amber-600 dark:border-amber-500 dark:text-amber-400">
                                 <Bolt className="h-3 w-3 mr-0.5" />
                                 Instant
