@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -58,12 +59,16 @@ const Home = () => {
   const lastNearbySearchAtRef = useRef<number>(0);
   const isFetchingNearbyRef = useRef(false);
   const lastRateLimitToastAtRef = useRef<number>(0);
+  
+  // Suppression flag for intentional "List Your Spot" navigation to /list-spot
+  const suppressHostRedirectRef = useRef(false);
 
   // Redirect to host-home if mode is host (prevents mode/content mismatch on app launch)
   // Skip redirect if coming from logo click (mode was just switched to driver)
   useEffect(() => {
     const fromLogoClick = (location.state as { fromLogoClick?: boolean })?.fromLogoClick;
-    if (mode === 'host' && !fromLogoClick) {
+    // Skip redirect if suppression flag is set (intentional navigation to /list-spot)
+    if (mode === 'host' && !fromLogoClick && !suppressHostRedirectRef.current) {
       navigate('/host-home', { replace: true });
     }
   }, [mode, navigate, location.state]);
@@ -461,10 +466,14 @@ const Home = () => {
           navigate('/auth', { state: { from: '/list-spot', intendedMode: 'host' } });
           return;
         }
-        // Navigate first to unmount Home.tsx before mode change triggers redirect
+        // Suppress Home's host-mode redirect during this intentional transition
+        suppressHostRedirectRef.current = true;
+        // Force mode update synchronously so RequireHostMode sees 'host' immediately
+        flushSync(() => setMode('host', false));
+        // Navigate to list-spot
         navigate('/list-spot', { replace: true });
-        // Then set mode - ListSpot's RequireHostMode will see 'host' mode
-        setMode('host', false);
+        // Clear suppression flag after navigation completes
+        setTimeout(() => { suppressHostRedirectRef.current = false; }, 0);
       },
     },
     {
@@ -476,8 +485,9 @@ const Home = () => {
 
   // Redirect to host-home if in host mode - return null to prevent flash
   // But allow rendering if we came from logo click (mode was just switched)
+  // Also allow rendering during suppressed intentional navigation to /list-spot
   const fromLogoClick = (location.state as { fromLogoClick?: boolean })?.fromLogoClick;
-  if (mode === 'host' && !fromLogoClick) {
+  if (mode === 'host' && !fromLogoClick && !suppressHostRedirectRef.current) {
     return null;
   }
 
