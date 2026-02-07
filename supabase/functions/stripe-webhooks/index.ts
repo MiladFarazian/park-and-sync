@@ -117,6 +117,13 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     return;
   }
 
+  // Don't override 'held' status - these bookings are awaiting host approval
+  // The approve-booking function will handle the transition to 'active'
+  if (booking.status === 'held') {
+    console.log('Booking is held (awaiting host approval), skipping automatic activation:', booking.id);
+    return;
+  }
+
   // Update booking status to active and store PaymentIntent + charge IDs
   const { error: updateError } = await supabase
     .from('bookings')
