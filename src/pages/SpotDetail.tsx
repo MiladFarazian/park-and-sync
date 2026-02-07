@@ -1185,6 +1185,12 @@ const SpotDetail = () => {
                 {reviews.length > 0 ? `${getAverageRating()} (${reviews.length})` : 'New'}
               </span>
             </div>
+            {spot.instant_book === false && (
+              <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                <Shield className="h-3 w-3" />
+                Requires host confirmation
+              </p>
+            )}
           </div>
           {isOwnSpot ? (
             <Button size="lg" variant="outline" disabled>
@@ -1198,8 +1204,14 @@ const SpotDetail = () => {
             <Button size="lg" variant="outline" onClick={handleBookNow}>
               Switch to Driver Mode
             </Button>
+          ) : spot.instant_book === false ? (
+            <Button size="lg" onClick={handleBookNow} className="gap-2">
+              <Shield className="h-4 w-4" />
+              Request to Book
+            </Button>
           ) : (
-            <Button size="lg" onClick={handleBookNow}>
+            <Button size="lg" onClick={handleBookNow} className="gap-2">
+              <BoltIcon className="h-4 w-4" />
               Book Now
             </Button>
           )}
