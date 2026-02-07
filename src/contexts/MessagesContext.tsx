@@ -183,6 +183,18 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       }
 
+      // Also include any user who has an existing message thread with the current user
+      // This ensures pre-booking conversations are visible regardless of booking status
+      const { data: directMessages } = await supabase
+        .from('messages')
+        .select('sender_id, recipient_id')
+        .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`);
+
+      directMessages?.forEach(msg => {
+        const partnerId = msg.sender_id === user.id ? msg.recipient_id : msg.sender_id;
+        relevantIds.add(partnerId);
+      });
+
       // Always include support user
       relevantIds.add('00000000-0000-0000-0000-000000000001');
 
