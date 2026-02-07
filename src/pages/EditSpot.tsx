@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Shield, Camera, MapPin, DollarSign, Trash2, Upload, Star, CheckCircle2, ChevronLeft, ChevronRight, Save, Zap, GripVertical, Clock, Car, Lightbulb, CalendarDays, BoltIcon, Accessibility } from 'lucide-react';
+import { ArrowLeft, Shield, Camera, MapPin, DollarSign, Trash2, Upload, Star, CheckCircle2, ChevronLeft, ChevronRight, Save, Zap, GripVertical, Clock, Car, Lightbulb, CalendarDays, BoltIcon, Accessibility, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { compressImage } from '@/lib/compressImage';
@@ -957,15 +957,21 @@ const EditSpot = () => {
                 <div className="p-4 rounded-lg border bg-muted/30">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900">
-                        <BoltIcon className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                      <div className={`p-2 rounded-lg ${instantBook ? 'bg-amber-100 dark:bg-amber-900' : 'bg-blue-100 dark:bg-blue-900'}`}>
+                        {instantBook 
+                          ? <BoltIcon className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                          : <ShieldCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        }
                       </div>
                       <div>
                         <Label htmlFor="instant-book" className="text-base font-medium cursor-pointer">
-                          Instant Book
+                          {instantBook ? 'Instant Book' : 'Requires Confirmation'}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          Allow drivers to book without your approval
+                          {instantBook 
+                            ? 'Allow drivers to book without your approval'
+                            : "You'll need to approve each booking request"
+                          }
                         </p>
                       </div>
                     </div>
