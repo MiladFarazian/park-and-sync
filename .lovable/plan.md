@@ -1,54 +1,49 @@
 
 
-## Fix: Host Not Receiving Notification When Driver Cancels Booking
+## Fix: Pre-Booking Messages Not Showing in Messages Tab
 
-### Root Cause Found
-The `cancel-booking` edge function tries to insert a notification with `type: 'booking_cancelled_by_driver'`, but this type is **not allowed** by the database `notifications_type_check` constraint. The insert silently fails (the error is caught and logged, but the function continues), so no notification is ever created for the host.
+### Problem
+When a driver sends a message to a host before booking their spot (using the "Message" button on the spot detail page), neither the driver nor the host can see that message in their Messages tab.
 
-The same issue affects `host-cancel-booking`, which uses `type: 'booking_cancelled_by_host'` -- also not in the constraint.
+### Root Cause
+The Messages tab filters conversations based on **booking relationships only**. It builds a list of "relevant user IDs" by looking at bookings -- in driver mode, it finds hosts of spots you've booked; in host mode, it finds renters who've booked your spots. Any message thread with a user who isn't in that booking-based list gets silently hidden.
 
-### Current Allowed Types (from latest migration)
-```
-booking, booking_pending, booking_host, booking_approval_required,
-booking_declined, booking_rejected, booking_extended, extension_confirmed,
-booking_ending_soon, message, overstay_warning, overstay_detected,
-overstay_action_needed, overstay_grace_ended, overstay_charge_applied,
-overstay_charge_finalized, overstay_charge_update, overstay_charging,
-overstay_towing, overstay_booking_completed, departure_confirmed
-```
+So when a driver messages a host before making a booking, the message is saved to the database, but both users' conversation lists skip it because there's no booking linking them.
 
-Missing: `booking_cancelled_by_driver`, `booking_cancelled_by_host`
+### Solution
+Expand the "relevant user IDs" logic to also include users who have an existing message thread with the current user, regardless of whether a booking exists.
 
-### Fix
+### Technical Details
 
-**Database migration** -- Add the two missing notification types to the constraint:
+**File: `src/contexts/MessagesContext.tsx`**
 
+Update the `fetchRelevantUserIds` function to also query the `messages` table for any existing conversation partners. This ensures that any thread with at least one message always appears, while still maintaining mode-based filtering for booking context display.
+
+The change will:
+
+1. In the `fetchRelevantUserIds` function, after fetching booking-based IDs, also query the `messages` table for distinct conversation partners
+2. Merge those partner IDs into the `relevantIds` set
+3. This way, pre-booking conversations show up alongside booking-related ones
+
+The query will be something like:
 ```sql
-ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
-ALTER TABLE notifications ADD CONSTRAINT notifications_type_check
-CHECK (type = ANY (ARRAY[
-  'booking', 'booking_pending', 'booking_host',
-  'booking_approval_required', 'booking_declined', 'booking_rejected',
-  'booking_extended', 'extension_confirmed', 'booking_ending_soon',
-  'booking_cancelled_by_driver', 'booking_cancelled_by_host',
-  'message',
-  'overstay_warning', 'overstay_detected', 'overstay_action_needed',
-  'overstay_grace_ended', 'overstay_charge_applied',
-  'overstay_charge_finalized', 'overstay_charge_update',
-  'overstay_charging', 'overstay_towing',
-  'overstay_booking_completed', 'departure_confirmed'
-]));
+-- Get all users who have exchanged messages with current user
+SELECT DISTINCT sender_id, recipient_id 
+FROM messages 
+WHERE sender_id = current_user OR recipient_id = current_user
 ```
 
-That single migration is the only change needed. The edge function code already correctly builds the notification with the right user ID, message, and related booking ID -- it just fails at insert time due to the constraint.
+Then extract the partner IDs and add them to the relevant set.
+
+### Impact
+- Pre-booking messages will now appear in both the driver's and host's Messages tabs
+- Booking-related context headers will still only show for conversations that have associated bookings
+- No changes needed to message sending, which already works correctly
+- Minimal performance impact since this is a single additional query during conversation loading
 
 ### Files to Modify
 
-| Resource | Change |
-|----------|--------|
-| New SQL migration | Add `booking_cancelled_by_driver` and `booking_cancelled_by_host` to the `notifications_type_check` constraint |
-
-### Risk Assessment
-- **Very low risk**: Only adds two new allowed values to an existing constraint; no existing data or logic is affected.
-- **Immediate impact**: Both `cancel-booking` and `host-cancel-booking` notification inserts will start succeeding immediately after migration runs.
+| File | Change |
+|------|--------|
+| `src/contexts/MessagesContext.tsx` | Update `fetchRelevantUserIds` to include message-thread partners alongside booking-based partners |
 
