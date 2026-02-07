@@ -1,33 +1,51 @@
 
 
-## Redirect "Edit Availability" to the New Manage Availability Page
+## Make Instant Book Toggle More Obvious
 
-### Problem
-The "Edit Availability" button on the Edit Spot page (`/edit-spot/:spotId`) navigates to the old `/edit-availability/:spotId` page (the standalone `EditSpotAvailability` component). It should instead navigate to the new `/manage-availability` page with the spot pre-loaded, matching the behavior of the "Schedule" button on the Dashboard.
+### What Changes
+When the toggle is ON, it shows "Instant Book" with a bolt icon (current behavior). When toggled OFF, the label dynamically changes to "Requires Confirmation" with a shield/check icon, making the current state immediately clear.
 
-### Solution
-Update the `onClick` handler in `src/pages/EditSpot.tsx` (line 1136) to navigate to the new manage availability page with the spot ID as a URL parameter.
+### Visual Design
 
----
+**Toggle ON (Instant Book)**
+- Icon: Bolt (amber background) -- unchanged
+- Label: "Instant Book"
+- Description: "Allow drivers to book without your approval"
 
-### Technical Details
-
-**File: `src/pages/EditSpot.tsx`**
-
-Change line 1136 from:
-```typescript
-onClick={() => navigate(`/edit-availability/${spotId}`)}
-```
-To:
-```typescript
-onClick={() => navigate(`/manage-availability?tab=recurring&spotId=${spotId}`)}
-```
-
-This matches the existing pattern used by the Dashboard's "Schedule" button, which deep-links to the manage availability page with the spot pre-loaded and pre-selected.
+**Toggle OFF (Requires Confirmation)**
+- Icon: ShieldCheck (blue background)
+- Label: "Requires Confirmation"
+- Description: "You'll need to approve each booking request"
 
 ### Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/pages/EditSpot.tsx` | Update navigation target from old route to new manage availability page |
+| `src/pages/ListSpot.tsx` (lines 1145-1167) | Make icon, label, and description dynamic based on `instantBook` state |
+| `src/pages/EditSpot.tsx` (lines 956-978) | Same dynamic toggle treatment |
 
+### Technical Details
+
+Both files have identical toggle blocks. Each will be updated to conditionally render:
+
+```tsx
+<div className={`p-2 rounded-lg ${instantBook ? 'bg-amber-100 dark:bg-amber-900' : 'bg-blue-100 dark:bg-blue-900'}`}>
+  {instantBook 
+    ? <BoltIcon className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+    : <ShieldCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+  }
+</div>
+<div>
+  <Label htmlFor="instant-book" className="text-base font-medium cursor-pointer">
+    {instantBook ? 'Instant Book' : 'Requires Confirmation'}
+  </Label>
+  <p className="text-sm text-muted-foreground">
+    {instantBook 
+      ? 'Allow drivers to book without your approval'
+      : "You'll need to approve each booking request"
+    }
+  </p>
+</div>
+```
+
+The `ShieldCheck` icon import will be added to both files from `lucide-react`.
