@@ -1,58 +1,54 @@
 
-## Fix: Stripe Webhook Bypassing Host Confirmation
 
-### Problem Confirmed
-The UI tester's concern is **valid**. When a host sets their spot to "Requires Confirmation" (`instant_book = false`), bookings can still end up as `active` without host approval.
+## Fix: Host Not Receiving Notification When Driver Cancels Booking
 
-**Root cause**: The `stripe-webhooks` edge function's `handlePaymentSucceeded` handler unconditionally sets any booking to `active` when Stripe fires a `payment_intent.succeeded` event. For non-instant-book spots, the `create-booking` and `verify-guest-payment` functions correctly set the booking to `held` status (awaiting host approval), but the webhook fires shortly after and overrides it to `active`, bypassing the approval flow entirely.
+### Root Cause Found
+The `cancel-booking` edge function tries to insert a notification with `type: 'booking_cancelled_by_driver'`, but this type is **not allowed** by the database `notifications_type_check` constraint. The insert silently fails (the error is caught and logged, but the function continues), so no notification is ever created for the host.
 
-### Evidence
-Database query confirmed that booking `2b71b6dc` (a guest booking on a non-instant-book spot) is `active` with no approval notifications -- meaning it was never approved by the host.
+The same issue affects `host-cancel-booking`, which uses `type: 'booking_cancelled_by_host'` -- also not in the constraint.
 
-### Solution
-Update `handlePaymentSucceeded` in `supabase/functions/stripe-webhooks/index.ts` to skip bookings that are in `held` status, since those are intentionally awaiting host approval.
-
-### Technical Details
-
-**File: `supabase/functions/stripe-webhooks/index.ts`**
-
-In the `handlePaymentSucceeded` function, change the early-return check (line 115) from:
-
-```typescript
-if (booking.status === 'active' || booking.status === 'completed') {
-  console.log('Booking already active/completed, skipping...');
-  return;
-}
+### Current Allowed Types (from latest migration)
+```
+booking, booking_pending, booking_host, booking_approval_required,
+booking_declined, booking_rejected, booking_extended, extension_confirmed,
+booking_ending_soon, message, overstay_warning, overstay_detected,
+overstay_action_needed, overstay_grace_ended, overstay_charge_applied,
+overstay_charge_finalized, overstay_charge_update, overstay_charging,
+overstay_towing, overstay_booking_completed, departure_confirmed
 ```
 
-To:
+Missing: `booking_cancelled_by_driver`, `booking_cancelled_by_host`
 
-```typescript
-if (booking.status === 'active' || booking.status === 'completed') {
-  console.log('Booking already active/completed, skipping...');
-  return;
-}
+### Fix
 
-// Don't override 'held' status - these bookings are awaiting host approval
-// The approve-booking function will handle the transition to 'active'
-if (booking.status === 'held') {
-  console.log('Booking is held (awaiting host approval), skipping automatic activation:', booking.id);
-  return;
-}
+**Database migration** -- Add the two missing notification types to the constraint:
+
+```sql
+ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
+ALTER TABLE notifications ADD CONSTRAINT notifications_type_check
+CHECK (type = ANY (ARRAY[
+  'booking', 'booking_pending', 'booking_host',
+  'booking_approval_required', 'booking_declined', 'booking_rejected',
+  'booking_extended', 'extension_confirmed', 'booking_ending_soon',
+  'booking_cancelled_by_driver', 'booking_cancelled_by_host',
+  'message',
+  'overstay_warning', 'overstay_detected', 'overstay_action_needed',
+  'overstay_grace_ended', 'overstay_charge_applied',
+  'overstay_charge_finalized', 'overstay_charge_update',
+  'overstay_charging', 'overstay_towing',
+  'overstay_booking_completed', 'departure_confirmed'
+]));
 ```
 
-This ensures that:
-- `pending` bookings still get activated by the webhook (normal instant-book flow fallback)
-- `held` bookings are left alone for the host to approve/reject
-- `active`/`completed` bookings are still skipped (existing idempotency)
+That single migration is the only change needed. The edge function code already correctly builds the notification with the right user ID, message, and related booking ID -- it just fails at insert time due to the constraint.
 
 ### Files to Modify
 
-| File | Change |
-|------|--------|
-| `supabase/functions/stripe-webhooks/index.ts` | Add `held` status check in `handlePaymentSucceeded` to prevent overriding host confirmation flow |
+| Resource | Change |
+|----------|--------|
+| New SQL migration | Add `booking_cancelled_by_driver` and `booking_cancelled_by_host` to the `notifications_type_check` constraint |
 
 ### Risk Assessment
-- **Low risk**: This is a targeted, additive change (adding one more early-return condition)
-- **No side effects**: The `approve-booking` function already handles the `held` to `active` transition with payment capture
-- **Backwards compatible**: Existing instant-book bookings are unaffected since they never enter `held` status
+- **Very low risk**: Only adds two new allowed values to an existing constraint; no existing data or logic is affected.
+- **Immediate impact**: Both `cancel-booking` and `host-cancel-booking` notification inserts will start succeeding immediately after migration runs.
+
