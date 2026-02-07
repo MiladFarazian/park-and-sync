@@ -2,7 +2,7 @@ import { MobileTimePicker } from '@/components/booking/MobileTimePicker';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { bookingLogger as log } from '@/lib/logger';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle, Loader2, Info, Zap } from 'lucide-react';
+import { ArrowLeft, CalendarIcon, Clock, MapPin, Star, Edit2, CreditCard, Car, Plus, Check, AlertCircle, Loader2, Info, Zap, Shield } from 'lucide-react';
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -1178,6 +1178,23 @@ const BookingContent = () => {
           </Card>
         )}
 
+        {/* Booking Type Notice */}
+        {spot && spot.instant_book === false && (
+          <Card className="p-4 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="font-medium text-blue-900 dark:text-blue-100">Host confirmation required</p>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mt-0.5">
+                  Your card will be authorized but not charged until the host approves your request (within 1 hour).
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Book Now Button */}
         <div className="space-y-2 pb-6">
           {!serverAvailable.ok && startDateTime && endDateTime && (
@@ -1197,12 +1214,17 @@ const BookingContent = () => {
             {bookingLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing payment...
+                {spot?.instant_book === false ? 'Submitting request...' : 'Processing payment...'}
               </>
             ) : checkingAvailability ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Checking availability...
+              </>
+            ) : spot?.instant_book === false ? (
+              <>
+                <Shield className="mr-2 h-4 w-4" />
+                {`Request to Book • $${pricing?.total || '0.00'}`}
               </>
             ) : (
               `Book Now • $${pricing?.total || '0.00'}`
@@ -1231,7 +1253,9 @@ const BookingContent = () => {
           )}
           {!(!isTimeValid && startDateTime && endDateTime && availabilityRules.length > 0) && (!selectedVehicle || !selectedPaymentMethod) === false && (
             <p className="text-center text-xs text-muted-foreground">
-              Your card will be charged immediately upon booking
+              {spot?.instant_book === false
+                ? 'Your card will only be charged if the host approves'
+                : 'Your card will be charged immediately upon booking'}
             </p>
           )}
         </div>
